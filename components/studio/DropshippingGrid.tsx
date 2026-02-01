@@ -477,6 +477,176 @@ function DeepFaceTool({ onBack }: { onBack: () => void }) {
 }
 
 // ============================================
+// CLONAR VIRAL COMPONENT
+// ============================================
+function ClonarViralTool({ onBack }: { onBack: () => void }) {
+  const [viralUrl, setViralUrl] = useState('')
+  const [productImages, setProductImages] = useState<File[]>([])
+  const [productDescription, setProductDescription] = useState('')
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [resultVideoUrl, setResultVideoUrl] = useState<string | null>(null)
+
+  const tool = DROPSHIPPING_TOOLS.find(t => t.id === 'clonar-viral')!
+
+  const handleImagesUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length > 0) {
+      setProductImages(prev => [...prev, ...files].slice(0, 5))
+      setResultVideoUrl(null)
+    }
+  }
+
+  const removeImage = (index: number) => {
+    setProductImages(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const handleProcess = async () => {
+    if (!viralUrl.trim() || productImages.length === 0) return
+    setIsProcessing(true)
+    // TODO: Implement API call
+    setTimeout(() => {
+      setIsProcessing(false)
+    }, 2000)
+  }
+
+  return (
+    <div className="h-[calc(100vh-200px)] min-h-[600px]">
+      <div className="bg-surface rounded-2xl border border-border h-full flex flex-col">
+        {/* Header */}
+        <div className="flex items-center gap-4 px-6 py-4 border-b border-border">
+          <button onClick={onBack} className="p-2 hover:bg-border/50 rounded-lg transition-colors">
+            <ArrowLeft className="w-5 h-5 text-text-secondary" />
+          </button>
+          <div className="flex items-center gap-3">
+            <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center bg-gradient-to-br', tool.color)}>
+              <span className="text-xl">{tool.emoji}</span>
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-text-primary">{tool.name}</h2>
+              <p className="text-sm text-text-secondary">{tool.description}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 p-6 flex gap-6 overflow-hidden">
+          {/* Input Section */}
+          <div className="w-1/2 flex flex-col gap-4">
+            {/* Viral URL */}
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-2">
+                URL del video viral *
+              </label>
+              <input
+                type="url"
+                value={viralUrl}
+                onChange={(e) => setViralUrl(e.target.value)}
+                placeholder="https://tiktok.com/... o https://instagram.com/..."
+                className="w-full px-4 py-3 bg-surface-elevated border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-accent"
+              />
+              <p className="text-xs text-text-secondary mt-1">TikTok, Instagram Reels, YouTube Shorts</p>
+            </div>
+
+            {/* Product Images */}
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-2">
+                Imagenes de tu producto * (max 5)
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {productImages.map((file, index) => (
+                  <div key={index} className="relative aspect-square bg-surface-elevated rounded-lg overflow-hidden">
+                    <img src={URL.createObjectURL(file)} alt="" className="w-full h-full object-cover" />
+                    <button
+                      onClick={() => removeImage(index)}
+                      className="absolute top-1 right-1 w-5 h-5 bg-error/80 hover:bg-error rounded-full flex items-center justify-center"
+                    >
+                      <span className="text-white text-xs">X</span>
+                    </button>
+                  </div>
+                ))}
+                {productImages.length < 5 && (
+                  <label className="aspect-square border-2 border-dashed border-border hover:border-accent/50 rounded-lg cursor-pointer flex items-center justify-center transition-colors">
+                    <input type="file" accept="image/*" multiple className="hidden" onChange={handleImagesUpload} />
+                    <span className="text-2xl text-text-secondary">+</span>
+                  </label>
+                )}
+              </div>
+            </div>
+
+            {/* Product Description */}
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-2">
+                Descripcion del producto (opcional)
+              </label>
+              <textarea
+                value={productDescription}
+                onChange={(e) => setProductDescription(e.target.value)}
+                placeholder="Describe brevemente tu producto y sus beneficios..."
+                rows={3}
+                className="w-full px-4 py-3 bg-surface-elevated border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-accent resize-none"
+              />
+            </div>
+          </div>
+
+          {/* Output Section */}
+          <div className="w-1/2 flex flex-col">
+            <label className="block text-sm font-medium text-text-secondary mb-2">
+              Video clonado
+            </label>
+            <div className="flex-1 bg-surface-elevated rounded-xl overflow-hidden flex items-center justify-center">
+              {resultVideoUrl ? (
+                <video src={resultVideoUrl} controls className="w-full h-full object-contain" autoPlay />
+              ) : (
+                <div className="text-center p-8">
+                  {isProcessing ? (
+                    <>
+                      <Loader2 className="w-12 h-12 text-accent mx-auto mb-3 animate-spin" />
+                      <p className="text-text-primary font-medium">Clonando video viral...</p>
+                      <p className="text-sm text-text-secondary mt-1">Analizando estilo y creando version</p>
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="w-12 h-12 text-text-secondary mx-auto mb-3" />
+                      <p className="text-text-secondary">El video clonado aparecera aqui</p>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="px-6 py-4 border-t border-border flex items-center justify-end">
+          <button
+            onClick={handleProcess}
+            disabled={!viralUrl.trim() || productImages.length === 0 || isProcessing}
+            className={cn(
+              'flex items-center gap-2 px-6 py-2.5 rounded-xl font-semibold transition-all',
+              !viralUrl.trim() || productImages.length === 0 || isProcessing
+                ? 'bg-border text-text-secondary cursor-not-allowed'
+                : 'bg-accent hover:bg-accent-hover text-background'
+            )}
+          >
+            {isProcessing ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Clonando...
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4" />
+                Clonar Video
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ============================================
 // PLACEHOLDER TOOL COMPONENT
 // ============================================
 function PlaceholderTool({ toolId, onBack }: { toolId: string; onBack: () => void }) {
@@ -534,6 +704,10 @@ export function DropshippingGrid() {
 
   if (activeTool === 'deep-face') {
     return <DeepFaceTool onBack={handleBack} />
+  }
+
+  if (activeTool === 'clonar-viral') {
+    return <ClonarViralTool onBack={handleBack} />
   }
 
   if (activeTool) {
