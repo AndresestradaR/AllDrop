@@ -1270,13 +1270,13 @@ export default function ProductResearchPage() {
                                     </div>
                                     <div className="flex justify-between">
                                       <span className="text-text-secondary">Tu costo ({qty}u + flete + CPA):</span>
-                                      <span className="text-text-primary">${costWithCPA.toLocaleString()}</span>
+                                      <span className="text-text-primary">${Math.round(costWithCPA).toLocaleString()}</span>
                                     </div>
                                     <hr className="border-border" />
                                     <div className="flex justify-between">
                                       <span className="text-text-secondary">Margen bruto:</span>
                                       <span className={marginAtAvg >= 0 ? 'text-green-500 font-semibold' : 'text-red-500 font-semibold'}>
-                                        ${marginAtAvg.toLocaleString()} ({marginPercent.toFixed(0)}%)
+                                        ${Math.round(marginAtAvg).toLocaleString()} ({marginPercent.toFixed(0)}%)
                                       </span>
                                     </div>
                                     <div className="flex justify-between">
@@ -1299,9 +1299,9 @@ export default function ProductResearchPage() {
                               <div>
                                 <p className="text-xs text-text-secondary">Margen bruto</p>
                                 <p className={`text-2xl font-bold ${marginCalc.marginAtMinPrice >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                                  ${marginCalc.marginAtMinPrice.toLocaleString()}
+                                  ${Math.round(marginCalc.marginAtMinPrice).toLocaleString()}
                                 </p>
-                                <p className="text-xs text-text-secondary">({marginCalc.marginPercentAtMin.toFixed(1)}%)</p>
+                                <p className="text-xs text-text-secondary">({marginCalc.marginPercentAtMin.toFixed(0)}%)</p>
                               </div>
                               <div className="text-right">
                                 <p className="text-xs text-text-secondary">Lo que realmente queda ({effectiveRate}% efect.)</p>
@@ -1318,9 +1318,9 @@ export default function ProductResearchPage() {
                               <div>
                                 <p className="text-xs text-text-secondary">Margen bruto</p>
                                 <p className={`text-2xl font-bold ${marginCalc.marginAtAvgPrice >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                                  ${marginCalc.marginAtAvgPrice.toLocaleString()}
+                                  ${Math.round(marginCalc.marginAtAvgPrice).toLocaleString()}
                                 </p>
-                                <p className="text-xs text-text-secondary">({marginCalc.marginPercentAtAvg.toFixed(1)}%)</p>
+                                <p className="text-xs text-text-secondary">({marginCalc.marginPercentAtAvg.toFixed(0)}%)</p>
                               </div>
                               <div className="text-right">
                                 <p className="text-xs text-text-secondary">Lo que realmente queda ({effectiveRate}% efect.)</p>
@@ -1404,9 +1404,9 @@ export default function ProductResearchPage() {
                           <div className="text-center px-4 py-2 bg-surface rounded-lg">
                             <p className="text-xs text-text-secondary">Margen bruto</p>
                             <p className={`text-lg font-bold ${simulatedCalc.marginBruto >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                              ${simulatedCalc.marginBruto.toLocaleString()}
+                              ${Math.round(simulatedCalc.marginBruto).toLocaleString()}
                             </p>
-                            <p className="text-xs text-text-secondary">({simulatedCalc.marginPercent.toFixed(1)}%)</p>
+                            <p className="text-xs text-text-secondary">({simulatedCalc.marginPercent.toFixed(0)}%)</p>
                           </div>
 
                           <div className="text-center px-4 py-2 bg-surface rounded-lg">
