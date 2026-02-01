@@ -367,17 +367,6 @@ export default function ProductResearchPage() {
           <span className="text-xs bg-green-500/20 text-green-500 px-1.5 py-0.5 rounded">14k+</span>
         </button>
         <button
-          onClick={() => setActiveTab('search')}
-          className={`px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 ${
-            activeTab === 'search'
-              ? 'bg-accent text-background'
-              : 'text-text-secondary hover:text-text-primary hover:bg-background'
-          }`}
-        >
-          <Search className="w-4 h-4" />
-          Buscar en Vivo
-        </button>
-        <button
           onClick={() => setActiveTab('competitor')}
           className={`px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 ${
             activeTab === 'competitor'
@@ -387,6 +376,17 @@ export default function ProductResearchPage() {
         >
           <Users className="w-4 h-4" />
           Analizar Competencia
+        </button>
+        <button
+          onClick={() => setActiveTab('search')}
+          className={`px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 ${
+            activeTab === 'search'
+              ? 'bg-accent text-background'
+              : 'text-text-secondary hover:text-text-primary hover:bg-background'
+          }`}
+        >
+          <Search className="w-4 h-4" />
+          Buscar en Vivo
         </button>
       </div>
 
