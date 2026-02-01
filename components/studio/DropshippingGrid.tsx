@@ -647,6 +647,233 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
 }
 
 // ============================================
+// VIDEO PRODUCTO COMPONENT
+// ============================================
+function VideoProductoTool({ onBack }: { onBack: () => void }) {
+  const [productImages, setProductImages] = useState<File[]>([])
+  const [productName, setProductName] = useState('')
+  const [productDescription, setProductDescription] = useState('')
+  const [videoStyle, setVideoStyle] = useState<'promocional' | 'unboxing' | 'lifestyle' | 'testimonial'>('promocional')
+  const [duration, setDuration] = useState<'15' | '30' | '60'>('30')
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [resultVideoUrl, setResultVideoUrl] = useState<string | null>(null)
+
+  const tool = DROPSHIPPING_TOOLS.find(t => t.id === 'video-producto')!
+
+  const handleImagesUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length > 0) {
+      setProductImages(prev => [...prev, ...files].slice(0, 6))
+      setResultVideoUrl(null)
+    }
+  }
+
+  const removeImage = (index: number) => {
+    setProductImages(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const handleProcess = async () => {
+    if (productImages.length === 0 || !productName.trim()) return
+    setIsProcessing(true)
+    // TODO: Implement API call
+    setTimeout(() => {
+      setIsProcessing(false)
+    }, 2000)
+  }
+
+  return (
+    <div className="h-[calc(100vh-200px)] min-h-[600px]">
+      <div className="bg-surface rounded-2xl border border-border h-full flex flex-col">
+        {/* Header */}
+        <div className="flex items-center gap-4 px-6 py-4 border-b border-border">
+          <button onClick={onBack} className="p-2 hover:bg-border/50 rounded-lg transition-colors">
+            <ArrowLeft className="w-5 h-5 text-text-secondary" />
+          </button>
+          <div className="flex items-center gap-3">
+            <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center bg-gradient-to-br', tool.color)}>
+              <span className="text-xl">{tool.emoji}</span>
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-text-primary">{tool.name}</h2>
+              <p className="text-sm text-text-secondary">{tool.description}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 p-6 flex gap-6 overflow-hidden">
+          {/* Input Section */}
+          <div className="w-1/2 flex flex-col gap-4 overflow-y-auto">
+            {/* Product Images */}
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-2">
+                Imagenes del producto * (max 6)
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {productImages.map((file, index) => (
+                  <div key={index} className="relative aspect-square bg-surface-elevated rounded-lg overflow-hidden">
+                    <img src={URL.createObjectURL(file)} alt="" className="w-full h-full object-cover" />
+                    <button
+                      onClick={() => removeImage(index)}
+                      className="absolute top-1 right-1 w-5 h-5 bg-error/80 hover:bg-error rounded-full flex items-center justify-center"
+                    >
+                      <span className="text-white text-xs">X</span>
+                    </button>
+                  </div>
+                ))}
+                {productImages.length < 6 && (
+                  <label className="aspect-square border-2 border-dashed border-border hover:border-accent/50 rounded-lg cursor-pointer flex items-center justify-center transition-colors">
+                    <input type="file" accept="image/*" multiple className="hidden" onChange={handleImagesUpload} />
+                    <span className="text-2xl text-text-secondary">+</span>
+                  </label>
+                )}
+              </div>
+            </div>
+
+            {/* Product Name */}
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-2">
+                Nombre del producto *
+              </label>
+              <input
+                type="text"
+                value={productName}
+                onChange={(e) => setProductName(e.target.value)}
+                placeholder="Ej: Serum Vitamina C, Faja Colombiana..."
+                className="w-full px-4 py-3 bg-surface-elevated border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-accent"
+              />
+            </div>
+
+            {/* Product Description */}
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-2">
+                Descripcion y beneficios
+              </label>
+              <textarea
+                value={productDescription}
+                onChange={(e) => setProductDescription(e.target.value)}
+                placeholder="Describe las caracteristicas principales y beneficios..."
+                rows={3}
+                className="w-full px-4 py-3 bg-surface-elevated border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-accent resize-none"
+              />
+            </div>
+
+            {/* Video Style */}
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-2">
+                Estilo del video
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { id: 'promocional', label: 'Promocional', desc: 'Enfoque en beneficios' },
+                  { id: 'unboxing', label: 'Unboxing', desc: 'Abriendo el paquete' },
+                  { id: 'lifestyle', label: 'Lifestyle', desc: 'Uso en la vida real' },
+                  { id: 'testimonial', label: 'Testimonial', desc: 'Estilo resena' },
+                ].map((style) => (
+                  <button
+                    key={style.id}
+                    onClick={() => setVideoStyle(style.id as typeof videoStyle)}
+                    className={cn(
+                      'p-3 rounded-lg text-left transition-colors',
+                      videoStyle === style.id
+                        ? 'bg-accent text-background'
+                        : 'bg-surface-elevated text-text-secondary hover:text-text-primary'
+                    )}
+                  >
+                    <span className="text-sm font-medium block">{style.label}</span>
+                    <span className={cn('text-xs', videoStyle === style.id ? 'text-background/70' : 'text-text-secondary/70')}>{style.desc}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Duration */}
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-2">
+                Duracion
+              </label>
+              <div className="flex gap-2">
+                {[
+                  { id: '15', label: '15 seg' },
+                  { id: '30', label: '30 seg' },
+                  { id: '60', label: '60 seg' },
+                ].map((dur) => (
+                  <button
+                    key={dur.id}
+                    onClick={() => setDuration(dur.id as typeof duration)}
+                    className={cn(
+                      'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+                      duration === dur.id
+                        ? 'bg-accent text-background'
+                        : 'bg-surface-elevated text-text-secondary hover:text-text-primary'
+                    )}
+                  >
+                    {dur.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Output Section */}
+          <div className="w-1/2 flex flex-col">
+            <label className="block text-sm font-medium text-text-secondary mb-2">
+              Video generado
+            </label>
+            <div className="flex-1 bg-surface-elevated rounded-xl overflow-hidden flex items-center justify-center">
+              {resultVideoUrl ? (
+                <video src={resultVideoUrl} controls className="w-full h-full object-contain" autoPlay />
+              ) : (
+                <div className="text-center p-8">
+                  {isProcessing ? (
+                    <>
+                      <Loader2 className="w-12 h-12 text-accent mx-auto mb-3 animate-spin" />
+                      <p className="text-text-primary font-medium">Generando video...</p>
+                      <p className="text-sm text-text-secondary mt-1">Creando escenas y transiciones</p>
+                    </>
+                  ) : (
+                    <>
+                      <Video className="w-12 h-12 text-text-secondary mx-auto mb-3" />
+                      <p className="text-text-secondary">El video generado aparecera aqui</p>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="px-6 py-4 border-t border-border flex items-center justify-end">
+          <button
+            onClick={handleProcess}
+            disabled={productImages.length === 0 || !productName.trim() || isProcessing}
+            className={cn(
+              'flex items-center gap-2 px-6 py-2.5 rounded-xl font-semibold transition-all',
+              productImages.length === 0 || !productName.trim() || isProcessing
+                ? 'bg-border text-text-secondary cursor-not-allowed'
+                : 'bg-accent hover:bg-accent-hover text-background'
+            )}
+          >
+            {isProcessing ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Generando...
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4" />
+                Generar Video
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ============================================
 // PLACEHOLDER TOOL COMPONENT
 // ============================================
 function PlaceholderTool({ toolId, onBack }: { toolId: string; onBack: () => void }) {
@@ -708,6 +935,10 @@ export function DropshippingGrid() {
 
   if (activeTool === 'clonar-viral') {
     return <ClonarViralTool onBack={handleBack} />
+  }
+
+  if (activeTool === 'video-producto') {
+    return <VideoProductoTool onBack={handleBack} />
   }
 
   if (activeTool) {
