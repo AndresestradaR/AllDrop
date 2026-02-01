@@ -106,6 +106,7 @@ export default function ProductResearchPage() {
   const [costCPA, setCostCPA] = useState<number | ''>('')
   const [effectiveRate, setEffectiveRate] = useState<number>(65)
   const [cancellationRate, setCancellationRate] = useState<number>(20)
+  const [simulatedPrice, setSimulatedPrice] = useState<number | ''>('')
 
   const handleSearch = async (filters: Filters) => {
     if (!cookies) {
@@ -437,6 +438,36 @@ export default function ProductResearchPage() {
       verdictTip
     }
   }, [analysisStats, costProduct, costShipping, costCPA, cancellationRate, effectiveRate])
+
+  // Cálculos del simulador de precio
+  const simulatedCalc = useMemo(() => {
+    if (simulatedPrice === '' || costProduct === '' || costShipping === '' || costCPA === '') {
+      return null
+    }
+
+    const price = Number(simulatedPrice)
+    const totalCost = Number(costProduct) + Number(costShipping)
+    const adjustedCPA = Number(costCPA) / (1 - cancellationRate / 100)
+    const totalCostWithCPA = totalCost + adjustedCPA
+
+    const marginBruto = price - totalCostWithCPA
+    const marginPercent = (marginBruto / price) * 100
+    const marginReal = marginBruto * (effectiveRate / 100) - (totalCost * ((100 - effectiveRate) / 100))
+
+    // Comparación con promedio de competencia
+    const avgPrice = pricesByQuantity?.[1]?.avg || analysisStats?.priceAvg || 0
+    const diffVsAvg = avgPrice ? price - avgPrice : 0
+    const diffPercentVsAvg = avgPrice ? ((price - avgPrice) / avgPrice) * 100 : 0
+
+    return {
+      marginBruto,
+      marginPercent,
+      marginReal,
+      avgPrice,
+      diffVsAvg,
+      diffPercentVsAvg
+    }
+  }, [simulatedPrice, costProduct, costShipping, costCPA, cancellationRate, effectiveRate, pricesByQuantity, analysisStats])
 
   // Score badge color
   const getScoreBadge = (score: number) => {
@@ -1346,6 +1377,58 @@ export default function ProductResearchPage() {
                       </div>
                     </div>
                   )}
+
+                  {/* Simulador de precio personalizado */}
+                  <div className="mt-6 p-4 bg-background rounded-lg border border-border">
+                    <h4 className="text-sm font-medium text-text-secondary mb-3 flex items-center gap-2">
+                      <DollarSign className="w-4 h-4" />
+                      Simulador de Precio
+                    </h4>
+                    <div className="flex flex-wrap items-end gap-4">
+                      <div className="flex-1 min-w-[200px]">
+                        <label className="text-xs text-text-secondary mb-1 block">¿A cuánto quieres venderlo?</label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary">$</span>
+                          <input
+                            type="number"
+                            value={simulatedPrice}
+                            onChange={(e) => setSimulatedPrice(e.target.value ? Number(e.target.value) : '')}
+                            placeholder="Ej: 89900"
+                            className="w-full pl-8 pr-4 py-2.5 bg-surface border border-border rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50"
+                          />
+                        </div>
+                      </div>
+
+                      {simulatedCalc && (
+                        <>
+                          <div className="text-center px-4 py-2 bg-surface rounded-lg">
+                            <p className="text-xs text-text-secondary">Margen bruto</p>
+                            <p className={`text-lg font-bold ${simulatedCalc.marginBruto >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                              ${simulatedCalc.marginBruto.toLocaleString()}
+                            </p>
+                            <p className="text-xs text-text-secondary">({simulatedCalc.marginPercent.toFixed(1)}%)</p>
+                          </div>
+
+                          <div className="text-center px-4 py-2 bg-surface rounded-lg">
+                            <p className="text-xs text-text-secondary">Margen real ({effectiveRate}%)</p>
+                            <p className={`text-lg font-bold ${simulatedCalc.marginReal >= 15000 ? 'text-green-500' : simulatedCalc.marginReal >= 0 ? 'text-yellow-500' : 'text-red-500'}`}>
+                              ${Math.round(simulatedCalc.marginReal).toLocaleString()}
+                            </p>
+                          </div>
+
+                          {simulatedCalc.avgPrice > 0 && (
+                            <div className="text-center px-4 py-2 bg-surface rounded-lg">
+                              <p className="text-xs text-text-secondary">vs Promedio competencia</p>
+                              <p className={`text-lg font-bold ${simulatedCalc.diffVsAvg >= 0 ? 'text-orange-500' : 'text-green-500'}`}>
+                                {simulatedCalc.diffVsAvg >= 0 ? '+' : ''}{simulatedCalc.diffPercentVsAvg.toFixed(0)}%
+                              </p>
+                              <p className="text-xs text-text-secondary">(${simulatedCalc.avgPrice.toLocaleString()} prom.)</p>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
 
                   {!marginCalc && (
                     <div className="text-center py-6 text-text-secondary">
