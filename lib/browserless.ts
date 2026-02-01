@@ -19,35 +19,60 @@ export interface ScrapedOffer {
 }
 
 // NUEVA FUNCIÓN: Extraer precios usando Gemini
-async function extractPricesWithLLM(modalText: string, fullText: string): Promise<PriceOffer[]> {
+async function extractPricesWithLLM(modalText: string, priceAreaText: string, fullText: string): Promise<PriceOffer[]> {
   const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY
 
-  if (!apiKey || !modalText) {
-    console.log('[LLM Extract] No API key or no modal text')
+  // Priorizar: modal > priceArea > primeros 1500 chars de fullText
+  let textToAnalyze = ''
+  let source = ''
+
+  if (modalText && modalText.length > 50) {
+    textToAnalyze = modalText
+    source = 'modal'
+  } else if (priceAreaText && priceAreaText.length > 30) {
+    textToAnalyze = priceAreaText
+    source = 'priceArea'
+  } else if (fullText) {
+    // Solo usar una porción limitada del fullText para evitar otros productos
+    textToAnalyze = fullText.substring(0, 1500)
+    source = 'fullText'
+  }
+
+  if (!apiKey || !textToAnalyze) {
+    console.log('[LLM Extract] No API key or no text to analyze')
     return []
   }
 
-  const textToAnalyze = modalText.length > 100 ? modalText : fullText
+  console.log('[LLM Extract] Using source:', source, 'length:', textToAnalyze.length)
 
-  const prompt = `Analiza este texto de una tienda online colombiana y extrae SOLO los precios de venta actuales (NO los precios tachados/anteriores).
+  const prompt = `Eres un experto en extraer precios de tiendas de dropshipping colombianas.
 
-TEXTO:
-${textToAnalyze.substring(0, 3000)}
+CONTEXTO: Esta es una página de UN SOLO PRODUCTO con diferentes opciones de compra (1 unidad, 2 unidades, combo, etc).
 
-REGLAS:
-1. Los precios tachados (antes, era, precio anterior, con línea encima) son precios VIEJOS - ignóralos
-2. Los precios actuales/de venta son los que el cliente paga - extrae SOLO estos
-3. Busca ofertas como "1 frasco $X", "2 frascos $Y", "2x1 $Z", etc.
-4. Los precios colombianos tienen formato $XX.XXX o $XXX.XXX (con punto como separador de miles)
-5. Ignora precios de ahorro/descuento (ej: "Ahorra $50.000")
+TEXTO DEL MODAL/PÁGINA:
+${textToAnalyze.substring(0, 2500)}
 
-Responde SOLO con un JSON array así (sin explicaciones):
+TU TAREA:
+Extrae las OFERTAS/OPCIONES de compra del producto principal. Busca patrones como:
+- "1 Frasco $79.900" / "2 Frascos $109.900" / "3 Frascos $159.600"
+- "1 UNIDAD $49.900" / "2 UNIDADES $99.800"
+- "Lleva 1 $X" / "Lleva 2 $Y" / "Lleva 3 $Z"
+- "2x1 $119.900" / "4x2 $197.600"
+
+REGLAS CRÍTICAS:
+1. SOLO extrae precios de las OFERTAS/OPCIONES del producto principal
+2. IGNORA precios tachados (precio anterior, antes, era, con línea)
+3. IGNORA precios de ahorro/descuento (ej: "Ahorra $50.000")
+4. IGNORA precios de OTROS productos diferentes listados en la página
+5. Los precios colombianos usan punto como separador de miles: $79.900 = 79900
+
+Responde ÚNICAMENTE con un JSON array (sin explicaciones ni texto adicional):
 [
-  {"quantity": 1, "label": "1 unidad", "price": 79900},
-  {"quantity": 2, "label": "2 unidades", "price": 109900}
+  {"quantity": 1, "label": "1 Frasco", "price": 79900},
+  {"quantity": 2, "label": "2 Frascos", "price": 109900}
 ]
 
-Si no encuentras precios válidos, responde: []`
+Si no encuentras ofertas claras del producto principal, responde: []`
 
   try {
     const response = await fetch(
@@ -248,7 +273,8 @@ export default async function({ page }) {
 
     // USAR LLM PARA EXTRAER PRECIOS
     const llmPrices = await extractPricesWithLLM(
-      data.modalText || data.priceAreaText || '',
+      data.modalText || '',
+      data.priceAreaText || '',
       data.fullText || ''
     )
 
