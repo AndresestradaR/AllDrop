@@ -141,26 +141,33 @@ export default async function({ page }) {
   let clickSuccess = false;
 
   await page.goto("${escapedUrl}", { waitUntil: "networkidle2", timeout: 25000 });
-  await new Promise(r => setTimeout(r, 2000));
+  await new Promise(r => setTimeout(r, 3000));
 
-  // PASO 1: Click en botón de EasySell o Releasit (apps de checkout para dropshipping)
-  // Esperar hasta 10 segundos a que Releasit/EasySell cargue el botón dinámicamente
-  const codSelector = '#es-popup-button, [class*="es-popup-button"], [id*="_rsi-buy-now-button"], [class*="_rsi-buy-now-button"]';
+  // PASO 1: Intentar EasySell primero (selector más común)
   try {
-    await page.waitForSelector(codSelector, { timeout: 10000, visible: true });
-  } catch (e) {
-    // Si no aparece después de 10s, continuar con fallbacks
-  }
-
-  try {
-    const codButton = await page.$(codSelector);
-    if (codButton) {
-      await codButton.click();
-      clickedButton = "COD-APP-BUTTON";
+    await page.waitForSelector('#es-popup-button', { timeout: 5000 });
+    const esBtn = await page.$('#es-popup-button');
+    if (esBtn) {
+      await esBtn.click();
+      clickedButton = "EASYSELL-BUTTON";
       clickSuccess = true;
-      await new Promise(r => setTimeout(r, 3000));
+      await new Promise(r => setTimeout(r, 4000));
     }
   } catch (e) {}
+
+  // PASO 2: Intentar Releasit
+  if (!clickSuccess) {
+    try {
+      await page.waitForSelector('[id*="_rsi-buy-now-button"]', { timeout: 5000 });
+      const rsiBtn = await page.$('[id*="_rsi-buy-now-button"]');
+      if (rsiBtn) {
+        await rsiBtn.click();
+        clickedButton = "RSI-BUTTON";
+        clickSuccess = true;
+        await new Promise(r => setTimeout(r, 4000));
+      }
+    } catch (e) {}
+  }
 
   // PASO 2: Fallback - buscar form de Shopify estándar
   if (!clickSuccess) {
