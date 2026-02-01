@@ -143,42 +143,75 @@ export default async function({ page }) {
   await page.goto("${escapedUrl}", { waitUntil: "networkidle2", timeout: 25000 });
   await new Promise(r => setTimeout(r, 2000));
 
-  // PASO 1: Click en botón de compra
-  const buttonKeywords = ["QUIERO", "OFERTA", "COMPRAR", "PEDIR", "AGREGAR", "CONTRA ENTREGA", "CONTRAENTREGA", "ORDENAR", "VER OFERTA", "VER PRECIO"];
-  const buttonSelectors = ["button", "[role='button']", "[class*='btn']", "[class*='cta']", "[class*='buy']", "[class*='comprar']", "[class*='pedir']", "a[class*='btn']"];
-
+  // PASO 1: Click en botón de Releasit (PRIORIDAD MÁXIMA - usado en todas las landings de dropshipping)
   try {
-    for (const selector of buttonSelectors) {
-      if (clickSuccess) break;
-      const elements = await page.$$(selector);
-      for (const el of elements) {
-        try {
-          const text = await el.evaluate(e => (e.innerText || "").toUpperCase().trim());
-          for (const keyword of buttonKeywords) {
-            if (text.includes(keyword) && text.length < 80) {
-              const isVisible = await el.evaluate(e => {
-                const style = window.getComputedStyle(e);
-                const rect = e.getBoundingClientRect();
-                return style.display !== 'none' &&
-                       style.visibility !== 'hidden' &&
-                       style.opacity !== '0' &&
-                       rect.width > 0 &&
-                       rect.height > 0;
-              });
-              if (isVisible) {
-                await el.click();
-                clickedButton = text.substring(0, 50);
-                clickSuccess = true;
-                await new Promise(r => setTimeout(r, 4000));
-                break;
-              }
-            }
-          }
-          if (clickSuccess) break;
-        } catch (e) {}
+    const rsiButton = await page.$('[id*="_rsi-buy-now-button"], [class*="_rsi-buy-now-button"], [id*="rsi-buy-now"], [class*="rsi-buy-now"]');
+    if (rsiButton) {
+      const isVisible = await rsiButton.evaluate(e => {
+        const rect = e.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      });
+      if (isVisible) {
+        await rsiButton.click();
+        clickedButton = "RSI-BUTTON";
+        clickSuccess = true;
+        await new Promise(r => setTimeout(r, 4000));
       }
     }
   } catch (e) {}
+
+  // PASO 2: Fallback - buscar form de Shopify (por si no es Releasit)
+  if (!clickSuccess) {
+    try {
+      const shopifyBtn = await page.$('form[action*="cart"] button[type="submit"], form[action*="cart"] input[type="submit"], [data-add-to-cart], .product-form__submit, .add-to-cart-button');
+      if (shopifyBtn) {
+        const isVisible = await shopifyBtn.evaluate(e => {
+          const rect = e.getBoundingClientRect();
+          return rect.width > 0 && rect.height > 0;
+        });
+        if (isVisible) {
+          await shopifyBtn.click();
+          clickedButton = "SHOPIFY-FORM";
+          clickSuccess = true;
+          await new Promise(r => setTimeout(r, 4000));
+        }
+      }
+    } catch (e) {}
+  }
+
+  // PASO 3: Último fallback - buscar por keywords (solo si todo lo anterior falló)
+  if (!clickSuccess) {
+    const buttonKeywords = ["QUIERO", "OFERTA", "COMPRAR", "PEDIR", "AGREGAR", "CONTRA ENTREGA", "CONTRAENTREGA", "ORDENAR"];
+    const buttonSelectors = ["button", "[role='button']", "[class*='btn']", "[class*='cta']", "a[class*='btn']"];
+
+    try {
+      for (const selector of buttonSelectors) {
+        if (clickSuccess) break;
+        const elements = await page.$$(selector);
+        for (const el of elements) {
+          try {
+            const text = await el.evaluate(e => (e.innerText || "").toUpperCase().trim());
+            for (const keyword of buttonKeywords) {
+              if (text.includes(keyword) && text.length < 80) {
+                const isVisible = await el.evaluate(e => {
+                  const rect = e.getBoundingClientRect();
+                  return rect.width > 0 && rect.height > 0;
+                });
+                if (isVisible) {
+                  await el.click();
+                  clickedButton = text.substring(0, 50);
+                  clickSuccess = true;
+                  await new Promise(r => setTimeout(r, 4000));
+                  break;
+                }
+              }
+            }
+            if (clickSuccess) break;
+          } catch (e) {}
+        }
+      }
+    } catch (e) {}
+  }
 
   // PASO 2: Capturar texto del modal/popup (SIN modificar el DOM)
   const modalText = await page.evaluate(() => {
