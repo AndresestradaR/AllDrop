@@ -71,44 +71,83 @@ const DROPSHIPPING_TOOLS: DropshippingTool[] = [
 type ActiveTool = typeof DROPSHIPPING_TOOLS[number]['id'] | null
 
 // ============================================
-// RESENA UGC COMPONENT
+// RESENA UGC COMPONENT (Video Version)
 // ============================================
 function ResenaUGCTool({ onBack }: { onBack: () => void }) {
+  // Product info
   const [productName, setProductName] = useState('')
   const [productBenefit, setProductBenefit] = useState('')
+
+  // Image/Person
+  const [imageSource, setImageSource] = useState<'upload' | 'generate'>('generate')
+  const [uploadedImage, setUploadedImage] = useState<File | null>(null)
+  const [imageModel, setImageModel] = useState<'nano-banana' | 'gemini' | 'imagen3'>('nano-banana')
   const [persona, setPersona] = useState<'mujer-joven' | 'mujer-adulta' | 'hombre-joven' | 'hombre-adulto'>('mujer-joven')
+
+  // Video
+  const [videoModel, setVideoModel] = useState<'kling' | 'veo' | 'sora'>('kling')
   const [tone, setTone] = useState<'casual' | 'entusiasta' | 'esceptico-convencido'>('casual')
+  const [duration, setDuration] = useState<'15' | '30' | '60'>('30')
+
+  // Script
+  const [useCustomScript, setUseCustomScript] = useState(false)
+  const [customScript, setCustomScript] = useState('')
+
+  // Generation state
   const [isGenerating, setIsGenerating] = useState(false)
-  const [generatedReview, setGeneratedReview] = useState('')
-  const [copied, setCopied] = useState(false)
+  const [generationStep, setGenerationStep] = useState('')
+  const [resultVideoUrl, setResultVideoUrl] = useState<string | null>(null)
+
+  const tool = DROPSHIPPING_TOOLS.find(t => t.id === 'resena-ugc')!
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setUploadedImage(file)
+      setImageSource('upload')
+    }
+  }
 
   const handleGenerate = async () => {
     if (!productName.trim()) return
+    if (imageSource === 'upload' && !uploadedImage) return
+
     setIsGenerating(true)
-    // TODO: Implement API call
-    setTimeout(() => {
-      setGeneratedReview(`Me encanta este ${productName}! Al principio estaba un poco esceptica pero despues de usarlo por una semana, puedo decir que realmente funciona. ${productBenefit ? `Lo mejor es que ${productBenefit.toLowerCase()}.` : ''} Super recomendado para todas las que buscan resultados reales. 10/10 lo volveria a comprar!`)
-      setIsGenerating(false)
-    }, 1500)
+    setResultVideoUrl(null)
+
+    // TODO: Implement full API flow
+    // Step 1: Generate face if needed
+    setGenerationStep('Generando cara...')
+    await new Promise(r => setTimeout(r, 1500))
+
+    // Step 2: Create character profile
+    setGenerationStep('Creando perfil de personaje...')
+    await new Promise(r => setTimeout(r, 1500))
+
+    // Step 3: Generate script if needed
+    if (!useCustomScript) {
+      setGenerationStep('Generando guion...')
+      await new Promise(r => setTimeout(r, 1000))
+    }
+
+    // Step 4: Generate video
+    setGenerationStep('Generando video con dialogo...')
+    await new Promise(r => setTimeout(r, 3000))
+
+    // Step 5: Done (placeholder)
+    setGenerationStep('')
+    setIsGenerating(false)
+    // setResultVideoUrl would be set here with actual URL
   }
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(generatedReview)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
-
-  const tool = DROPSHIPPING_TOOLS.find(t => t.id === 'resena-ugc')!
+  const canGenerate = productName.trim() && (imageSource === 'generate' || uploadedImage)
 
   return (
     <div className="h-[calc(100vh-200px)] min-h-[600px]">
       <div className="bg-surface rounded-2xl border border-border h-full flex flex-col">
         {/* Header */}
         <div className="flex items-center gap-4 px-6 py-4 border-b border-border">
-          <button
-            onClick={onBack}
-            className="p-2 hover:bg-border/50 rounded-lg transition-colors"
-          >
+          <button onClick={onBack} className="p-2 hover:bg-border/50 rounded-lg transition-colors">
             <ArrowLeft className="w-5 h-5 text-text-secondary" />
           </button>
           <div className="flex items-center gap-3">
@@ -117,127 +156,270 @@ function ResenaUGCTool({ onBack }: { onBack: () => void }) {
             </div>
             <div>
               <h2 className="text-lg font-semibold text-text-primary">{tool.name}</h2>
-              <p className="text-sm text-text-secondary">{tool.description}</p>
+              <p className="text-sm text-text-secondary">Genera videos de resenas UGC con IA</p>
             </div>
           </div>
         </div>
 
         {/* Content */}
         <div className="flex-1 p-6 flex gap-6 overflow-hidden">
-          {/* Input Section */}
-          <div className="w-1/2 flex flex-col gap-4">
-            <div>
-              <label className="block text-sm font-medium text-text-secondary mb-2">
-                Nombre del producto *
-              </label>
-              <input
-                type="text"
-                value={productName}
-                onChange={(e) => setProductName(e.target.value)}
-                placeholder="Ej: Serum facial, Faja reductora..."
-                className="w-full px-4 py-3 bg-surface-elevated border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-accent"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-text-secondary mb-2">
-                Beneficio principal (opcional)
-              </label>
-              <input
-                type="text"
-                value={productBenefit}
-                onChange={(e) => setProductBenefit(e.target.value)}
-                placeholder="Ej: Reduce arrugas en 2 semanas..."
-                className="w-full px-4 py-3 bg-surface-elevated border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-accent"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-text-secondary mb-2">
-                Persona del reviewer
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { id: 'mujer-joven', label: 'Mujer joven (18-30)' },
-                  { id: 'mujer-adulta', label: 'Mujer adulta (30-50)' },
-                  { id: 'hombre-joven', label: 'Hombre joven (18-30)' },
-                  { id: 'hombre-adulto', label: 'Hombre adulto (30-50)' },
-                ].map((option) => (
-                  <button
-                    key={option.id}
-                    onClick={() => setPersona(option.id as typeof persona)}
-                    className={cn(
-                      'px-3 py-2 rounded-lg text-sm font-medium transition-colors text-left',
-                      persona === option.id
-                        ? 'bg-accent text-background'
-                        : 'bg-surface-elevated text-text-secondary hover:text-text-primary'
-                    )}
-                  >
-                    {option.label}
-                  </button>
-                ))}
+          {/* Input Section - Scrollable */}
+          <div className="w-1/2 flex flex-col gap-4 overflow-y-auto pr-2">
+            {/* Product Info */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-text-primary uppercase tracking-wide">Producto</h3>
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-1.5">Nombre del producto *</label>
+                <input
+                  type="text"
+                  value={productName}
+                  onChange={(e) => setProductName(e.target.value)}
+                  placeholder="Ej: Serum facial, Faja reductora..."
+                  className="w-full px-4 py-2.5 bg-surface-elevated border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-accent text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-1.5">Beneficio principal</label>
+                <input
+                  type="text"
+                  value={productBenefit}
+                  onChange={(e) => setProductBenefit(e.target.value)}
+                  placeholder="Ej: Reduce arrugas en 2 semanas..."
+                  className="w-full px-4 py-2.5 bg-surface-elevated border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-accent text-sm"
+                />
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-text-secondary mb-2">
-                Tono de la resena
-              </label>
-              <div className="flex gap-2">
-                {[
-                  { id: 'casual', label: 'Casual' },
-                  { id: 'entusiasta', label: 'Entusiasta' },
-                  { id: 'esceptico-convencido', label: 'Esceptico convencido' },
-                ].map((option) => (
-                  <button
-                    key={option.id}
-                    onClick={() => setTone(option.id as typeof tone)}
-                    className={cn(
-                      'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
-                      tone === option.id
-                        ? 'bg-accent text-background'
-                        : 'bg-surface-elevated text-text-secondary hover:text-text-primary'
-                    )}
-                  >
-                    {option.label}
-                  </button>
-                ))}
+            {/* Divider */}
+            <div className="border-t border-border pt-4">
+              <h3 className="text-sm font-semibold text-text-primary uppercase tracking-wide mb-3">Imagen de la Persona</h3>
+
+              {/* Image Source Toggle */}
+              <div className="flex gap-2 mb-3">
+                <button
+                  onClick={() => setImageSource('generate')}
+                  className={cn(
+                    'flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+                    imageSource === 'generate' ? 'bg-accent text-background' : 'bg-surface-elevated text-text-secondary hover:text-text-primary'
+                  )}
+                >
+                  Generar con IA
+                </button>
+                <button
+                  onClick={() => setImageSource('upload')}
+                  className={cn(
+                    'flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+                    imageSource === 'upload' ? 'bg-accent text-background' : 'bg-surface-elevated text-text-secondary hover:text-text-primary'
+                  )}
+                >
+                  Subir imagen
+                </button>
               </div>
+
+              {imageSource === 'upload' ? (
+                <div>
+                  {uploadedImage ? (
+                    <div className="relative h-32 bg-surface-elevated rounded-xl overflow-hidden">
+                      <img src={URL.createObjectURL(uploadedImage)} alt="" className="w-full h-full object-cover" />
+                      <button
+                        onClick={() => setUploadedImage(null)}
+                        className="absolute top-2 right-2 w-6 h-6 bg-error/80 hover:bg-error rounded-full flex items-center justify-center"
+                      >
+                        <span className="text-white text-xs">X</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="flex flex-col items-center justify-center h-32 border-2 border-dashed border-border hover:border-accent/50 rounded-xl cursor-pointer transition-colors">
+                      <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                      <UserCircle className="w-8 h-8 text-text-secondary mb-2" />
+                      <p className="text-sm text-text-secondary">Subir foto de la persona</p>
+                      <p className="text-xs text-text-secondary/70">Cara frontal, buena iluminacion</p>
+                    </label>
+                  )}
+                </div>
+              ) : (
+                <>
+                  {/* Image Model */}
+                  <div className="mb-3">
+                    <label className="block text-sm font-medium text-text-secondary mb-1.5">Modelo de imagen</label>
+                    <div className="space-y-1.5">
+                      {[
+                        { id: 'nano-banana', label: 'Nano Banana Pro', desc: 'Recomendado para caras realistas' },
+                        { id: 'gemini', label: 'Gemini 2.5 Flash Image', desc: 'Buena calidad general' },
+                        { id: 'imagen3', label: 'Imagen 3', desc: 'Alta calidad, mas lento' },
+                      ].map((model) => (
+                        <button
+                          key={model.id}
+                          onClick={() => setImageModel(model.id as typeof imageModel)}
+                          className={cn(
+                            'w-full px-3 py-2 rounded-lg text-left transition-colors flex items-center justify-between',
+                            imageModel === model.id ? 'bg-accent text-background' : 'bg-surface-elevated text-text-secondary hover:text-text-primary'
+                          )}
+                        >
+                          <span className="text-sm font-medium">{model.label}</span>
+                          <span className={cn('text-xs', imageModel === model.id ? 'text-background/70' : 'text-text-secondary/70')}>{model.desc}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Persona */}
+                  <div>
+                    <label className="block text-sm font-medium text-text-secondary mb-1.5">Persona del reviewer</label>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {[
+                        { id: 'mujer-joven', label: 'Mujer joven (18-30)' },
+                        { id: 'mujer-adulta', label: 'Mujer adulta (30-50)' },
+                        { id: 'hombre-joven', label: 'Hombre joven (18-30)' },
+                        { id: 'hombre-adulto', label: 'Hombre adulto (30-50)' },
+                      ].map((option) => (
+                        <button
+                          key={option.id}
+                          onClick={() => setPersona(option.id as typeof persona)}
+                          className={cn(
+                            'px-3 py-2 rounded-lg text-sm font-medium transition-colors text-left',
+                            persona === option.id ? 'bg-accent text-background' : 'bg-surface-elevated text-text-secondary hover:text-text-primary'
+                          )}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Video Section */}
+            <div className="border-t border-border pt-4">
+              <h3 className="text-sm font-semibold text-text-primary uppercase tracking-wide mb-3">Video</h3>
+
+              {/* Video Model */}
+              <div className="mb-3">
+                <label className="block text-sm font-medium text-text-secondary mb-1.5">Modelo de video *</label>
+                <div className="space-y-1.5">
+                  {[
+                    { id: 'kling', label: 'Kling 2.6 Pro', desc: 'Recomendado - mejor para personas hablando' },
+                    { id: 'veo', label: 'Veo 3.1', desc: 'Alta calidad cinematografica' },
+                    { id: 'sora', label: 'Sora 2', desc: 'Bueno para creatividad' },
+                  ].map((model) => (
+                    <button
+                      key={model.id}
+                      onClick={() => setVideoModel(model.id as typeof videoModel)}
+                      className={cn(
+                        'w-full px-3 py-2 rounded-lg text-left transition-colors flex items-center justify-between',
+                        videoModel === model.id ? 'bg-accent text-background' : 'bg-surface-elevated text-text-secondary hover:text-text-primary'
+                      )}
+                    >
+                      <span className="text-sm font-medium">{model.label}</span>
+                      <span className={cn('text-xs', videoModel === model.id ? 'text-background/70' : 'text-text-secondary/70')}>{model.desc}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Tone */}
+              <div className="mb-3">
+                <label className="block text-sm font-medium text-text-secondary mb-1.5">Tono de la resena</label>
+                <div className="flex gap-1.5">
+                  {[
+                    { id: 'casual', label: 'Casual' },
+                    { id: 'entusiasta', label: 'Entusiasta' },
+                    { id: 'esceptico-convencido', label: 'Esceptico convencido' },
+                  ].map((option) => (
+                    <button
+                      key={option.id}
+                      onClick={() => setTone(option.id as typeof tone)}
+                      className={cn(
+                        'flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+                        tone === option.id ? 'bg-accent text-background' : 'bg-surface-elevated text-text-secondary hover:text-text-primary'
+                      )}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Duration */}
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-1.5">Duracion</label>
+                <div className="flex gap-1.5">
+                  {[
+                    { id: '15', label: '15 seg' },
+                    { id: '30', label: '30 seg' },
+                    { id: '60', label: '60 seg' },
+                  ].map((dur) => (
+                    <button
+                      key={dur.id}
+                      onClick={() => setDuration(dur.id as typeof duration)}
+                      className={cn(
+                        'flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+                        duration === dur.id ? 'bg-accent text-background' : 'bg-surface-elevated text-text-secondary hover:text-text-primary'
+                      )}
+                    >
+                      {dur.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Script Section */}
+            <div className="border-t border-border pt-4">
+              <div className="flex items-center gap-2 mb-3">
+                <input
+                  type="checkbox"
+                  id="customScript"
+                  checked={useCustomScript}
+                  onChange={(e) => setUseCustomScript(e.target.checked)}
+                  className="w-4 h-4 rounded border-border text-accent focus:ring-accent"
+                />
+                <label htmlFor="customScript" className="text-sm font-medium text-text-primary cursor-pointer">
+                  Escribir guion personalizado
+                </label>
+              </div>
+
+              {useCustomScript && (
+                <textarea
+                  value={customScript}
+                  onChange={(e) => setCustomScript(e.target.value)}
+                  placeholder={`Ej: "Hola! Les quiero contar mi experiencia con este ${productName || 'producto'}. Al principio no lo creia, pero mis piernas ya no se me duermen en la noche. 100% recomendado."`}
+                  rows={4}
+                  className="w-full px-4 py-3 bg-surface-elevated border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-accent text-sm resize-none"
+                />
+              )}
+
+              {!useCustomScript && (
+                <p className="text-xs text-text-secondary/70">
+                  El guion se generara automaticamente basado en el producto, beneficio, tono y persona seleccionados.
+                </p>
+              )}
             </div>
           </div>
 
           {/* Output Section */}
           <div className="w-1/2 flex flex-col">
-            <label className="block text-sm font-medium text-text-secondary mb-2">
-              Resena generada
-            </label>
-            <div className="flex-1 bg-surface-elevated rounded-xl p-4 overflow-auto">
-              {generatedReview ? (
-                <div className="relative">
-                  <p className="text-text-primary whitespace-pre-wrap">{generatedReview}</p>
-                  <button
-                    onClick={handleCopy}
-                    className="absolute top-0 right-0 p-2 hover:bg-border/50 rounded-lg transition-colors"
-                  >
-                    {copied ? (
-                      <Check className="w-4 h-4 text-green-500" />
-                    ) : (
-                      <Copy className="w-4 h-4 text-text-secondary" />
-                    )}
-                  </button>
-                </div>
+            <label className="block text-sm font-medium text-text-secondary mb-2">Video generado</label>
+            <div className="flex-1 bg-surface-elevated rounded-xl overflow-hidden flex items-center justify-center">
+              {resultVideoUrl ? (
+                <video src={resultVideoUrl} controls className="w-full h-full object-contain" autoPlay />
               ) : (
-                <div className="h-full flex items-center justify-center text-center">
+                <div className="text-center p-8">
                   {isGenerating ? (
-                    <div>
-                      <Loader2 className="w-8 h-8 text-accent mx-auto mb-2 animate-spin" />
-                      <p className="text-text-secondary">Generando resena...</p>
-                    </div>
+                    <>
+                      <Loader2 className="w-12 h-12 text-accent mx-auto mb-3 animate-spin" />
+                      <p className="text-text-primary font-medium">{generationStep}</p>
+                      <p className="text-sm text-text-secondary mt-1">Esto puede tardar varios minutos</p>
+                    </>
                   ) : (
-                    <div>
-                      <Star className="w-8 h-8 text-text-secondary mx-auto mb-2" />
-                      <p className="text-text-secondary">La resena aparecera aqui</p>
-                    </div>
+                    <>
+                      <Video className="w-12 h-12 text-text-secondary mx-auto mb-3" />
+                      <p className="text-text-secondary">El video de la resena aparecera aqui</p>
+                      <p className="text-xs text-text-secondary/70 mt-2">
+                        Persona hablando a camara con tu guion
+                      </p>
+                    </>
                   )}
                 </div>
               )}
@@ -246,13 +428,18 @@ function ResenaUGCTool({ onBack }: { onBack: () => void }) {
         </div>
 
         {/* Actions */}
-        <div className="px-6 py-4 border-t border-border flex items-center justify-end">
+        <div className="px-6 py-4 border-t border-border flex items-center justify-between">
+          <p className="text-xs text-text-secondary">
+            {videoModel === 'kling' && 'Kling 2.6 Pro - Mejor calidad para personas hablando'}
+            {videoModel === 'veo' && 'Veo 3.1 - Cinematografia de alta calidad'}
+            {videoModel === 'sora' && 'Sora 2 - Bueno para estilos creativos'}
+          </p>
           <button
             onClick={handleGenerate}
-            disabled={!productName.trim() || isGenerating}
+            disabled={!canGenerate || isGenerating}
             className={cn(
               'flex items-center gap-2 px-6 py-2.5 rounded-xl font-semibold transition-all',
-              !productName.trim() || isGenerating
+              !canGenerate || isGenerating
                 ? 'bg-border text-text-secondary cursor-not-allowed'
                 : 'bg-accent hover:bg-accent-hover text-background'
             )}
@@ -265,7 +452,7 @@ function ResenaUGCTool({ onBack }: { onBack: () => void }) {
             ) : (
               <>
                 <Sparkles className="w-4 h-4" />
-                Generar Resena
+                Generar Video
               </>
             )}
           </button>
