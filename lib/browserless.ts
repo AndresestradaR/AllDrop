@@ -321,13 +321,20 @@ export default async function({ page }) {
   // Primero intentar capturar modal de Releasit/EasySell específicamente
   if (clickSuccess) {
     const rsiModalSelectors = [
+      // EasySell selectors
+      '.es-popup-content',
+      '[class*="es-popup-content"]',
+      '[class*="es-modal"]',
+      '[class*="easysell"] [class*="modal"]',
+      '[class*="easysell"] [class*="popup"]',
+      'easysell-form [class*="content"]',
+      'easysell-form [class*="popup"]',
+      // Releasit selectors
       '[class*="rsi-modal"]',
       '[class*="rsi-popup"]',
       '[id*="rsi-modal"]',
       '.shopify-block[class*="rsi"]',
-      '[class*="cod-form"]',
-      '[class*="es-popup-content"]',
-      '[class*="es-modal"]'
+      '[class*="cod-form"]'
     ];
 
     for (const selector of rsiModalSelectors) {
