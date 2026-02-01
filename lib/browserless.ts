@@ -141,31 +141,24 @@ export default async function({ page }) {
   let clickSuccess = false;
 
   await page.goto("${escapedUrl}", { waitUntil: "networkidle2", timeout: 25000 });
-
-  // Esperar 4 segundos para que JavaScript cargue los botones de EasySell/Releasit
-  await new Promise(r => setTimeout(r, 4000));
+  await new Promise(r => setTimeout(r, 2000));
 
   // PASO 1: Click en botón de EasySell o Releasit (apps de checkout para dropshipping)
-  // Intentar esperar explícitamente a que aparezca el botón
+  // Esperar hasta 10 segundos a que Releasit/EasySell cargue el botón dinámicamente
+  const codSelector = '#es-popup-button, [class*="es-popup-button"], [id*="_rsi-buy-now-button"], [class*="_rsi-buy-now-button"]';
   try {
-    await page.waitForSelector('#es-popup-button, [id*="_rsi-buy-now-button"]', { timeout: 3000 });
+    await page.waitForSelector(codSelector, { timeout: 10000, visible: true });
   } catch (e) {
-    // Si no aparece después de 3s, continuar con el flujo normal
+    // Si no aparece después de 10s, continuar con fallbacks
   }
 
   try {
-    const codButton = await page.$('#es-popup-button, [class*="es-popup-button"], [id*="_rsi-buy-now-button"], [class*="_rsi-buy-now-button"], [id*="rsi-buy-now"], [class*="rsi-buy-now"]');
+    const codButton = await page.$(codSelector);
     if (codButton) {
-      const isVisible = await codButton.evaluate(e => {
-        const rect = e.getBoundingClientRect();
-        return rect.width > 0 && rect.height > 0;
-      });
-      if (isVisible) {
-        await codButton.click();
-        clickedButton = "COD-APP-BUTTON";
-        clickSuccess = true;
-        await new Promise(r => setTimeout(r, 4000));
-      }
+      await codButton.click();
+      clickedButton = "COD-APP-BUTTON";
+      clickSuccess = true;
+      await new Promise(r => setTimeout(r, 3000));
     }
   } catch (e) {}
 
@@ -222,19 +215,49 @@ export default async function({ page }) {
     } catch (e) {}
   }
 
-  // PASO 4: Capturar texto del modal/popup/drawer (versión simple que funcionaba)
-  const modalText = await page.evaluate(() => {
-    const modalSelectors = [
-      // Generic modal/drawer selectors (funcionaban bien)
-      '[class*="modal"]:not([style*="display: none"])',
-      '[class*="popup"]:not([style*="display: none"])',
-      '[class*="drawer"]:not([style*="display: none"])',
-      '[role="dialog"]',
-      '[class*="cart-drawer"]',
-      '[class*="slideout"]',
-      '[class*="overlay"][class*="active"]',
-      '[class*="lightbox"]'
+  // PASO 4: Capturar texto del modal de Releasit/EasySell (con waitForSelector)
+  let modalText = "";
+
+  // Primero intentar capturar modal de Releasit/EasySell específicamente
+  if (clickSuccess) {
+    const rsiModalSelectors = [
+      '[class*="rsi-modal"]',
+      '[class*="rsi-popup"]',
+      '[id*="rsi-modal"]',
+      '.shopify-block[class*="rsi"]',
+      '[class*="cod-form"]',
+      '[class*="es-popup-content"]',
+      '[class*="es-modal"]'
     ];
+
+    for (const selector of rsiModalSelectors) {
+      try {
+        await page.waitForSelector(selector, { timeout: 2000, visible: true });
+        const modalEl = await page.$(selector);
+        if (modalEl) {
+          const text = await modalEl.evaluate(el => el.innerText);
+          if (text && text.length > 10) {
+            modalText = text;
+            break;
+          }
+        }
+      } catch (e) {}
+    }
+  }
+
+  // Fallback: captura genérica de modal/popup/drawer
+  if (!modalText) {
+    modalText = await page.evaluate(() => {
+      const modalSelectors = [
+        '[class*="modal"]:not([style*="display: none"])',
+        '[class*="popup"]:not([style*="display: none"])',
+        '[class*="drawer"]:not([style*="display: none"])',
+        '[role="dialog"]',
+        '[class*="cart-drawer"]',
+        '[class*="slideout"]',
+        '[class*="overlay"][class*="active"]',
+        '[class*="lightbox"]'
+      ];
 
     for (const sel of modalSelectors) {
       try {
@@ -253,10 +276,11 @@ export default async function({ page }) {
         }
       } catch (e) {}
     }
-    return "";
-  });
+      return "";
+    });
+  }
 
-  // PASO 3: Capturar texto de área de precios (fallback)
+  // PASO 5: Capturar texto de área de precios (fallback)
   const priceAreaText = await page.evaluate(() => {
     const selectors = [
       '[class*="product-form"]',
