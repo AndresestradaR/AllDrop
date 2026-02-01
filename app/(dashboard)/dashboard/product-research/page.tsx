@@ -611,6 +611,7 @@ export default function ProductResearchPage() {
                     <option value="EC">🇪🇨 Ecuador</option>
                     <option value="CL">🇨🇱 Chile</option>
                     <option value="AR">🇦🇷 Argentina</option>
+                    <option value="PA">🇵🇦 Panamá</option>
                     <option value="PY">🇵🇾 Paraguay</option>
                   </select>
                 </div>
