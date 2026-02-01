@@ -1285,6 +1285,10 @@ export default function ProductResearchPage() {
                                         ${Math.round(realMargin).toLocaleString()}
                                       </span>
                                     </div>
+                                    <hr className="border-border" />
+                                    <div className={`text-xs font-medium px-2 py-1 rounded text-center ${realMargin >= 15000 ? 'bg-green-500/10 text-green-500' : realMargin >= 0 ? 'bg-yellow-500/10 text-yellow-500' : 'bg-red-500/10 text-red-500'}`}>
+                                      {realMargin >= 15000 ? '🟢 Rentable' : realMargin >= 0 ? '🟡 Ajustado' : '🔴 No rentable'}
+                                    </div>
                                   </div>
                                 </div>
                               )
@@ -1292,41 +1296,70 @@ export default function ProductResearchPage() {
                           </div>
                         </div>
                       ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className={`p-4 rounded-lg border ${marginCalc.realMarginAtMin >= 15000 ? 'bg-green-500/5 border-green-500/30' : marginCalc.realMarginAtMin >= 0 ? 'bg-yellow-500/5 border-yellow-500/30' : 'bg-red-500/5 border-red-500/30'}`}>
-                            <p className="text-sm text-text-secondary mb-2">Si te toca pelear al precio mínimo (${analysisStats.priceMin?.toLocaleString()})</p>
-                            <div className="flex items-end justify-between">
-                              <div>
-                                <p className="text-xs text-text-secondary">Margen bruto</p>
-                                <p className={`text-2xl font-bold ${marginCalc.marginAtMinPrice >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                                  ${Math.round(marginCalc.marginAtMinPrice).toLocaleString()}
-                                </p>
-                                <p className="text-xs text-text-secondary">({marginCalc.marginPercentAtMin.toFixed(0)}%)</p>
+                        <div className="space-y-4">
+                          <h4 className="text-sm font-medium text-text-secondary">Análisis por escenario de precio</h4>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Card MÍNIMO */}
+                            <div className={`p-4 rounded-lg border ${marginCalc.realMarginAtMin >= 15000 ? 'bg-green-500/5 border-green-500/30' : marginCalc.realMarginAtMin >= 0 ? 'bg-yellow-500/5 border-yellow-500/30' : 'bg-red-500/5 border-red-500/30'}`}>
+                              <div className="flex items-center justify-between mb-3">
+                                <h5 className="font-semibold text-text-primary flex items-center gap-2">
+                                  📉 Si vendes al MÍNIMO
+                                </h5>
+                                <span className="text-lg font-bold text-text-primary">${analysisStats.priceMin?.toLocaleString()}</span>
                               </div>
-                              <div className="text-right">
-                                <p className="text-xs text-text-secondary">Lo que realmente queda ({effectiveRate}% efect.)</p>
-                                <p className={`text-xl font-bold ${marginCalc.realMarginAtMin >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                                  ${Math.round(marginCalc.realMarginAtMin).toLocaleString()}
-                                </p>
+                              <div className="space-y-2 text-sm">
+                                <div className="flex justify-between">
+                                  <span className="text-text-secondary">Tu costo:</span>
+                                  <span className="text-text-primary">${Math.round(marginCalc.totalCostWithCPA).toLocaleString()}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-text-secondary">Margen bruto:</span>
+                                  <span className={marginCalc.marginAtMinPrice >= 0 ? 'text-green-500 font-medium' : 'text-red-500 font-medium'}>
+                                    ${Math.round(marginCalc.marginAtMinPrice).toLocaleString()} ({marginCalc.marginPercentAtMin.toFixed(0)}%)
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-text-secondary">Margen real ({effectiveRate}%):</span>
+                                  <span className={`font-bold ${marginCalc.realMarginAtMin >= 15000 ? 'text-green-500' : marginCalc.realMarginAtMin >= 0 ? 'text-yellow-500' : 'text-red-500'}`}>
+                                    ${Math.round(marginCalc.realMarginAtMin).toLocaleString()}
+                                  </span>
+                                </div>
+                                <hr className="border-border" />
+                                <div className={`text-xs font-medium px-2 py-1 rounded ${marginCalc.realMarginAtMin >= 15000 ? 'bg-green-500/10 text-green-500' : marginCalc.realMarginAtMin >= 0 ? 'bg-yellow-500/10 text-yellow-500' : 'bg-red-500/10 text-red-500'}`}>
+                                  {marginCalc.realMarginAtMin >= 15000 ? '🟢 Rentable' : marginCalc.realMarginAtMin >= 0 ? '🟡 Ajustado, cuidado' : '🔴 No rentable - pierdes plata'}
+                                </div>
                               </div>
                             </div>
-                          </div>
 
-                          <div className={`p-4 rounded-lg border ${marginCalc.realMarginAtAvg >= 15000 ? 'bg-green-500/5 border-green-500/30' : marginCalc.realMarginAtAvg >= 0 ? 'bg-yellow-500/5 border-yellow-500/30' : 'bg-red-500/5 border-red-500/30'}`}>
-                            <p className="text-sm text-text-secondary mb-2">Si vendes al precio promedio (${analysisStats.priceAvg?.toLocaleString()})</p>
-                            <div className="flex items-end justify-between">
-                              <div>
-                                <p className="text-xs text-text-secondary">Margen bruto</p>
-                                <p className={`text-2xl font-bold ${marginCalc.marginAtAvgPrice >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                                  ${Math.round(marginCalc.marginAtAvgPrice).toLocaleString()}
-                                </p>
-                                <p className="text-xs text-text-secondary">({marginCalc.marginPercentAtAvg.toFixed(0)}%)</p>
+                            {/* Card PROMEDIO */}
+                            <div className={`p-4 rounded-lg border ${marginCalc.realMarginAtAvg >= 15000 ? 'bg-green-500/5 border-green-500/30' : marginCalc.realMarginAtAvg >= 0 ? 'bg-yellow-500/5 border-yellow-500/30' : 'bg-red-500/5 border-red-500/30'}`}>
+                              <div className="flex items-center justify-between mb-3">
+                                <h5 className="font-semibold text-text-primary flex items-center gap-2">
+                                  📊 Si vendes al PROMEDIO
+                                </h5>
+                                <span className="text-lg font-bold text-text-primary">${analysisStats.priceAvg?.toLocaleString()}</span>
                               </div>
-                              <div className="text-right">
-                                <p className="text-xs text-text-secondary">Lo que realmente queda ({effectiveRate}% efect.)</p>
-                                <p className={`text-xl font-bold ${marginCalc.realMarginAtAvg >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                                  ${Math.round(marginCalc.realMarginAtAvg).toLocaleString()}
-                                </p>
+                              <div className="space-y-2 text-sm">
+                                <div className="flex justify-between">
+                                  <span className="text-text-secondary">Tu costo:</span>
+                                  <span className="text-text-primary">${Math.round(marginCalc.totalCostWithCPA).toLocaleString()}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-text-secondary">Margen bruto:</span>
+                                  <span className={marginCalc.marginAtAvgPrice >= 0 ? 'text-green-500 font-medium' : 'text-red-500 font-medium'}>
+                                    ${Math.round(marginCalc.marginAtAvgPrice).toLocaleString()} ({marginCalc.marginPercentAtAvg.toFixed(0)}%)
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-text-secondary">Margen real ({effectiveRate}%):</span>
+                                  <span className={`font-bold ${marginCalc.realMarginAtAvg >= 15000 ? 'text-green-500' : marginCalc.realMarginAtAvg >= 0 ? 'text-yellow-500' : 'text-red-500'}`}>
+                                    ${Math.round(marginCalc.realMarginAtAvg).toLocaleString()}
+                                  </span>
+                                </div>
+                                <hr className="border-border" />
+                                <div className={`text-xs font-medium px-2 py-1 rounded ${marginCalc.realMarginAtAvg >= 15000 ? 'bg-green-500/10 text-green-500' : marginCalc.realMarginAtAvg >= 0 ? 'bg-yellow-500/10 text-yellow-500' : 'bg-red-500/10 text-red-500'}`}>
+                                  {marginCalc.realMarginAtAvg >= 15000 ? '🟢 Rentable' : marginCalc.realMarginAtAvg >= 0 ? '🟡 Ajustado, cuidado' : '🔴 No rentable - pierdes plata'}
+                                </div>
                               </div>
                             </div>
                           </div>
