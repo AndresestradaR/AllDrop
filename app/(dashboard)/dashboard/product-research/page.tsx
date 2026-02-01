@@ -89,6 +89,17 @@ export default function ProductResearchPage() {
   const [analysisStats, setAnalysisStats] = useState<AnalysisStats | null>(null)
   const [analysisError, setAnalysisError] = useState<string | null>(null)
 
+  // Competidores manuales
+  const [manualCompetitors, setManualCompetitors] = useState<AnalyzedCompetitor[]>([])
+  const [showAddManualForm, setShowAddManualForm] = useState(false)
+  const [manualForm, setManualForm] = useState({
+    name: '',
+    url: '',
+    price1: '',
+    price2: '',
+    price3: ''
+  })
+
   // State para calculadora de márgenes
   const [costProduct, setCostProduct] = useState<number | ''>('')
   const [costShipping, setCostShipping] = useState<number | ''>('')
@@ -270,13 +281,66 @@ export default function ProductResearchPage() {
     setAnalysisStats(null)
   }
 
+  // Agregar competidor manual
+  const handleAddManualCompetitor = () => {
+    if (!manualForm.name.trim() || !manualForm.price1) {
+      toast.error('Nombre y precio de 1 unidad son requeridos')
+      return
+    }
+
+    const allPrices: PriceOffer[] = []
+    if (manualForm.price1) {
+      allPrices.push({ label: '1 unidad', quantity: 1, price: Number(manualForm.price1) })
+    }
+    if (manualForm.price2) {
+      allPrices.push({ label: '2 unidades', quantity: 2, price: Number(manualForm.price2) })
+    }
+    if (manualForm.price3) {
+      allPrices.push({ label: '3 unidades', quantity: 3, price: Number(manualForm.price3) })
+    }
+
+    const newCompetitor: AnalyzedCompetitor = {
+      id: `manual-${Date.now()}`,
+      advertiserName: manualForm.name.trim(),
+      landingUrl: manualForm.url || '',
+      adLibraryUrl: '',
+      adText: '',
+      ctaText: '',
+      price: Number(manualForm.price1),
+      priceFormatted: `$${Number(manualForm.price1).toLocaleString()}`,
+      allPrices,
+      combo: null,
+      gift: null,
+      angle: null,
+      headline: null,
+      cta: null,
+      source: 'browserless' as const,
+    }
+
+    setManualCompetitors(prev => [...prev, newCompetitor])
+    setManualForm({ name: '', url: '', price1: '', price2: '', price3: '' })
+    setShowAddManualForm(false)
+    toast.success('Competidor agregado')
+  }
+
+  // Eliminar competidor manual
+  const handleRemoveManualCompetitor = (id: string) => {
+    setManualCompetitors(prev => prev.filter(c => c.id !== id))
+  }
+
+  // Combinar resultados con manuales
+  const allCompetitors = useMemo(() => {
+    if (!analysisResults) return manualCompetitors
+    return [...analysisResults, ...manualCompetitors]
+  }, [analysisResults, manualCompetitors])
+
   // Calcular estadísticas por cantidad (1, 2, 3 unidades)
   const pricesByQuantity = useMemo(() => {
-    if (!analysisResults) return null
+    if (!allCompetitors || allCompetitors.length === 0) return null
 
     const grouped: { [qty: number]: number[] } = {}
 
-    analysisResults.forEach(comp => {
+    allCompetitors.forEach(comp => {
       if (comp.allPrices && comp.allPrices.length > 0) {
         comp.allPrices.forEach(offer => {
           const qty = offer.quantity || 1
@@ -307,7 +371,7 @@ export default function ProductResearchPage() {
     })
 
     return result
-  }, [analysisResults])
+  }, [allCompetitors])
 
   // Cálculos de margen
   const marginCalc = useMemo(() => {
@@ -826,9 +890,72 @@ export default function ProductResearchPage() {
 
               {/* Competitors Table */}
               <div className="bg-surface rounded-xl border border-border overflow-hidden">
-                <div className="p-4 border-b border-border">
+                <div className="p-4 border-b border-border flex items-center justify-between">
                   <h3 className="text-lg font-semibold text-text-primary">Detalle de Competidores</h3>
+                  <button
+                    onClick={() => setShowAddManualForm(!showAddManualForm)}
+                    className="px-3 py-1.5 text-sm bg-accent/10 text-accent hover:bg-accent/20 rounded-lg transition-colors flex items-center gap-1"
+                  >
+                    {showAddManualForm ? 'Cancelar' : '+ Agregar Competidor'}
+                  </button>
                 </div>
+
+                {/* Formulario para agregar competidor manual */}
+                {showAddManualForm && (
+                  <div className="p-4 bg-background border-b border-border">
+                    <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+                      <div className="md:col-span-2">
+                        <label className="text-xs text-text-secondary">Nombre tienda *</label>
+                        <input
+                          type="text"
+                          value={manualForm.name}
+                          onChange={(e) => setManualForm(prev => ({ ...prev, name: e.target.value }))}
+                          placeholder="Mi Competidor"
+                          className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-text-primary"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-text-secondary">Precio 1 und *</label>
+                        <input
+                          type="number"
+                          value={manualForm.price1}
+                          onChange={(e) => setManualForm(prev => ({ ...prev, price1: e.target.value }))}
+                          placeholder="79900"
+                          className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-text-primary"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-text-secondary">Precio 2 und</label>
+                        <input
+                          type="number"
+                          value={manualForm.price2}
+                          onChange={(e) => setManualForm(prev => ({ ...prev, price2: e.target.value }))}
+                          placeholder="109900"
+                          className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-text-primary"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-text-secondary">Precio 3 und</label>
+                        <input
+                          type="number"
+                          value={manualForm.price3}
+                          onChange={(e) => setManualForm(prev => ({ ...prev, price3: e.target.value }))}
+                          placeholder="159600"
+                          className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-text-primary"
+                        />
+                      </div>
+                      <div className="flex items-end">
+                        <button
+                          onClick={handleAddManualCompetitor}
+                          className="w-full px-3 py-2 bg-accent text-background text-sm font-medium rounded-lg hover:bg-accent/90"
+                        >
+                          Agregar
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead className="bg-background">
@@ -839,10 +966,11 @@ export default function ProductResearchPage() {
                         <th className="px-4 py-3 text-left text-sm font-medium text-text-secondary">Regalo</th>
                         <th className="px-4 py-3 text-left text-sm font-medium text-text-secondary">Ángulo de Venta</th>
                         <th className="px-4 py-3 text-left text-sm font-medium text-text-secondary">CTA</th>
+                        <th className="px-4 py-3 text-center text-sm font-medium text-text-secondary w-10"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
-                      {analysisResults.map((competitor, index) => (
+                      {allCompetitors.map((competitor, index) => (
                         <tr key={index} className="hover:bg-background/50 transition-colors">
                           <td className="px-4 py-3">
                             <div className="space-y-1">
@@ -924,6 +1052,19 @@ export default function ProductResearchPage() {
                               <span className="text-text-secondary">-</span>
                             )}
                           </td>
+                          <td className="px-4 py-3 text-center">
+                            {competitor.id.startsWith('manual-') ? (
+                              <button
+                                onClick={() => handleRemoveManualCompetitor(competitor.id)}
+                                className="p-1 text-red-500 hover:bg-red-500/10 rounded transition-colors"
+                                title="Eliminar"
+                              >
+                                <XCircle className="w-4 h-4" />
+                              </button>
+                            ) : (
+                              <span className="text-xs text-text-secondary/50">Auto</span>
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -932,7 +1073,7 @@ export default function ProductResearchPage() {
               </div>
 
               {/* Calculadora de Márgenes */}
-              {analysisStats.priceMin && analysisStats.priceAvg && (
+              {(analysisStats.priceMin && analysisStats.priceAvg) || allCompetitors.length > 0 ? (
                 <div className="bg-surface rounded-xl border border-border p-6">
                   <div className="flex items-center gap-2 mb-4">
                     <Calculator className="w-5 h-5 text-accent" />
@@ -1213,7 +1354,7 @@ export default function ProductResearchPage() {
                     </div>
                   )}
                 </div>
-              )}
+              ) : null}
 
               <div className="text-center text-sm text-text-secondary/70 py-4">
                 <p>Datos extraidos automaticamente de las landing pages</p>
