@@ -94,6 +94,7 @@ export default function ProductResearchPage() {
   const [costShipping, setCostShipping] = useState<number | ''>('')
   const [costCPA, setCostCPA] = useState<number | ''>('')
   const [effectiveRate, setEffectiveRate] = useState<number>(65)
+  const [cancellationRate, setCancellationRate] = useState<number>(20)
 
   const handleSearch = async (filters: Filters) => {
     if (!cookies) {
@@ -316,26 +317,28 @@ export default function ProductResearchPage() {
 
     const minCompetitorPrice = analysisStats.priceMin
     const avgCompetitorPrice = analysisStats.priceAvg
-    
+
     const totalCost = Number(costProduct) + Number(costShipping)
-    const totalCostWithCPA = totalCost + Number(costCPA)
-    
+    // CPA ajustado por cancelaciones: CPA_real = CPA / (1 - cancelaciones/100)
+    const adjustedCPA = Number(costCPA) / (1 - cancellationRate / 100)
+    const totalCostWithCPA = totalCost + adjustedCPA
+
     const marginAtMinPrice = minCompetitorPrice - totalCostWithCPA
     const marginPercentAtMin = ((marginAtMinPrice / minCompetitorPrice) * 100)
-    
+
     const marginAtAvgPrice = avgCompetitorPrice - totalCostWithCPA
     const marginPercentAtAvg = ((marginAtAvgPrice / avgCompetitorPrice) * 100)
-    
+
     const realMarginAtMin = marginAtMinPrice * (effectiveRate / 100) - (totalCost * ((100 - effectiveRate) / 100))
     const realMarginAtAvg = marginAtAvgPrice * (effectiveRate / 100) - (totalCost * ((100 - effectiveRate) / 100))
-    
+
     const minViablePrice = Math.ceil((totalCostWithCPA / (1 - 0.20)) / 100) * 100
-    
+
     let verdict: 'go' | 'maybe' | 'nogo' = 'nogo'
     let verdictTitle = ''
     let verdictText = ''
     let verdictTip = ''
-    
+
     if (realMarginAtMin >= 15000) {
       verdict = 'go'
       verdictTitle = '🔥 ¡Está pa\' darle!'
@@ -355,6 +358,7 @@ export default function ProductResearchPage() {
 
     return {
       totalCost,
+      adjustedCPA,
       totalCostWithCPA,
       marginAtMinPrice,
       marginPercentAtMin,
@@ -368,7 +372,7 @@ export default function ProductResearchPage() {
       verdictText,
       verdictTip
     }
-  }, [analysisStats, costProduct, costShipping, costCPA, effectiveRate])
+  }, [analysisStats, costProduct, costShipping, costCPA, cancellationRate, effectiveRate])
 
   // Score badge color
   const getScoreBadge = (score: number) => {
@@ -939,7 +943,7 @@ export default function ProductResearchPage() {
                     Mete tus costos acá y miramos si los números dan o si toca buscar otro producto 👇
                   </p>
 
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
                     <div>
                       <label className="flex items-center gap-2 text-sm font-medium text-text-secondary mb-2">
                         <Package className="w-4 h-4" />
@@ -993,6 +997,25 @@ export default function ProductResearchPage() {
 
                     <div>
                       <label className="flex items-center gap-2 text-sm font-medium text-text-secondary mb-2">
+                        <XCircle className="w-4 h-4" />
+                        % Cancelaciones
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          value={cancellationRate}
+                          onChange={(e) => setCancellationRate(Number(e.target.value) || 20)}
+                          placeholder="20"
+                          min={0}
+                          max={80}
+                          className="w-full pl-4 pr-8 py-2.5 bg-background border border-border rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary">%</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="flex items-center gap-2 text-sm font-medium text-text-secondary mb-2">
                         <PiggyBank className="w-4 h-4" />
                         % Efectividad
                       </label>
@@ -1013,14 +1036,19 @@ export default function ProductResearchPage() {
 
                   {marginCalc && (
                     <div className="space-y-4">
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-4 bg-background rounded-lg">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-background rounded-lg">
                         <div>
                           <p className="text-xs text-text-secondary mb-1">Costo Total (Producto + Flete)</p>
                           <p className="text-lg font-semibold text-text-primary">${marginCalc.totalCost.toLocaleString()}</p>
                         </div>
                         <div>
+                          <p className="text-xs text-text-secondary mb-1">CPA Ajustado ({cancellationRate}% cancel.)</p>
+                          <p className="text-lg font-semibold text-orange-500">${Math.round(marginCalc.adjustedCPA).toLocaleString()}</p>
+                          <p className="text-[10px] text-text-secondary">CPA base: ${Number(costCPA).toLocaleString()}</p>
+                        </div>
+                        <div>
                           <p className="text-xs text-text-secondary mb-1">Costo Total + CPA</p>
-                          <p className="text-lg font-semibold text-text-primary">${marginCalc.totalCostWithCPA.toLocaleString()}</p>
+                          <p className="text-lg font-semibold text-text-primary">${Math.round(marginCalc.totalCostWithCPA).toLocaleString()}</p>
                         </div>
                         <div>
                           <p className="text-xs text-text-secondary mb-1">Precio Mín. pa&apos; que cuadre</p>
@@ -1038,7 +1066,9 @@ export default function ProductResearchPage() {
                               if (!qtyData) return null
 
                               const costForQty = (Number(costProduct) * qty) + Number(costShipping)
-                              const costWithCPA = costForQty + Number(costCPA)
+                              // CPA ajustado por cancelaciones
+                              const adjustedCPAForCalc = Number(costCPA) / (1 - cancellationRate / 100)
+                              const costWithCPA = costForQty + adjustedCPAForCalc
                               const marginAtAvg = qtyData.avg - costWithCPA
                               const marginPercent = (marginAtAvg / qtyData.avg) * 100
                               const realMargin = marginAtAvg * (effectiveRate / 100) - (costForQty * ((100 - effectiveRate) / 100))
