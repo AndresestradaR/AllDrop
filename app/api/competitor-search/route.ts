@@ -134,16 +134,21 @@ export async function POST(request: Request) {
     }
     
     const body = await request.json()
-    const { keyword, country = 'CO' } = body
+    const { keyword, country = 'CO', resultsLimit = 10 } = body
 
     if (!keyword || keyword.trim().length < 2) {
       return NextResponse.json({ error: 'Palabra clave requerida (mínimo 2 caracteres)' }, { status: 400 })
     }
 
+    // Validar límite de resultados (10-50)
+    const limit = Math.min(Math.max(Number(resultsLimit) || 10, 10), 50)
+    // Pedir 3x más para tener suficientes después de filtrar
+    const apifyCount = limit * 3
+
     // Search Meta Ads Library using Apify
     const metaAdsUrl = `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=${country}&q=${encodeURIComponent(keyword)}&search_type=keyword_unordered&media_type=all`
 
-    console.log('Searching Meta Ads Library with Apify:', metaAdsUrl)
+    console.log('Searching Meta Ads Library with Apify:', metaAdsUrl, 'limit:', limit)
 
     const apifyResponse = await fetch(`${APIFY_API_URL}?token=${apifyApiKey}&timeout=90`, {
       method: 'POST',
@@ -152,8 +157,8 @@ export async function POST(request: Request) {
       },
       body: JSON.stringify({
         urls: [{ url: metaAdsUrl, method: 'GET' }],
-        count: 30, // Pedir más para tener suficientes después de filtrar
-        limitPerSource: 30,
+        count: apifyCount,
+        limitPerSource: apifyCount,
         scrapeAdDetails: true,
       }),
     })
@@ -238,7 +243,7 @@ export async function POST(request: Request) {
       if (!ad.domain || seenDomains.has(ad.domain)) return false
       seenDomains.add(ad.domain)
       return true
-    }).slice(0, 15) // Limit to 15 unique competitors for selection
+    }).slice(0, limit) // Limit to user-selected number
 
     return NextResponse.json({
       success: true,

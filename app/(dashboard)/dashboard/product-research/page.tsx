@@ -73,6 +73,7 @@ export default function ProductResearchPage() {
   // State para análisis de competencia - Nuevo flujo 2 fases
   const [competitorKeyword, setCompetitorKeyword] = useState('')
   const [competitorCountry, setCompetitorCountry] = useState('CO')
+  const [resultsLimit, setResultsLimit] = useState(10)
   const [analysisPhase, setAnalysisPhase] = useState<AnalysisPhase>('search')
   const [isSearching, setIsSearching] = useState(false)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
@@ -150,9 +151,10 @@ export default function ProductResearchPage() {
       const response = await fetch('/api/competitor-search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           keyword: competitorKeyword.trim(),
-          country: competitorCountry 
+          country: competitorCountry,
+          resultsLimit: resultsLimit
         }),
       })
 
@@ -436,7 +438,7 @@ export default function ProductResearchPage() {
                 </p>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="md:col-span-2">
                   <label className="flex items-center gap-2 text-sm font-medium text-text-secondary mb-2">
                     <Search className="w-4 h-4" />
@@ -471,6 +473,24 @@ export default function ProductResearchPage() {
                     <option value="CL">🇨🇱 Chile</option>
                     <option value="AR">🇦🇷 Argentina</option>
                     <option value="PY">🇵🇾 Paraguay</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-text-secondary mb-2">
+                    Resultados
+                  </label>
+                  <select
+                    value={resultsLimit}
+                    onChange={(e) => setResultsLimit(Number(e.target.value))}
+                    className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50"
+                    disabled={analysisPhase !== 'search'}
+                  >
+                    <option value={10}>10 resultados</option>
+                    <option value={20}>20 resultados</option>
+                    <option value={30}>30 resultados</option>
+                    <option value={40}>40 resultados</option>
+                    <option value={50}>50 resultados</option>
                   </select>
                 </div>
               </div>
