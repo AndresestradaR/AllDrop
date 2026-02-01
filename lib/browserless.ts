@@ -143,24 +143,25 @@ export default async function({ page }) {
   await page.goto("${escapedUrl}", { waitUntil: "networkidle2", timeout: 25000 });
   await new Promise(r => setTimeout(r, 2000));
 
-  // PASO 1: Click en botón de Releasit (PRIORIDAD MÁXIMA - usado en todas las landings de dropshipping)
+  // PASO 1: Click en botón de Releasit o EasySell (apps de checkout para dropshipping)
   try {
-    const rsiButton = await page.$('[id*="_rsi-buy-now-button"], [class*="_rsi-buy-now-button"], [id*="rsi-buy-now"], [class*="rsi-buy-now"]');
-    if (rsiButton) {
-      const isVisible = await rsiButton.evaluate(e => {
+    // Selectores de Releasit y EasySell - las dos apps más usadas en dropshipping colombiano
+    const codButton = await page.$('#es-popup-button, [class*="es-popup-button"], [id*="_rsi-buy-now-button"], [class*="_rsi-buy-now-button"], [id*="rsi-buy-now"], [class*="rsi-buy-now"], easysell-form button, [class*="easysell"] button');
+    if (codButton) {
+      const isVisible = await codButton.evaluate(e => {
         const rect = e.getBoundingClientRect();
         return rect.width > 0 && rect.height > 0;
       });
       if (isVisible) {
-        await rsiButton.click();
-        clickedButton = "RSI-BUTTON";
+        await codButton.click();
+        clickedButton = "COD-APP-BUTTON";
         clickSuccess = true;
         await new Promise(r => setTimeout(r, 4000));
       }
     }
   } catch (e) {}
 
-  // PASO 2: Fallback - buscar form de Shopify (por si no es Releasit)
+  // PASO 2: Fallback - buscar form de Shopify estándar
   if (!clickSuccess) {
     try {
       const shopifyBtn = await page.$('form[action*="cart"] button[type="submit"], form[action*="cart"] input[type="submit"], [data-add-to-cart], .product-form__submit, .add-to-cart-button');
@@ -213,9 +214,22 @@ export default async function({ page }) {
     } catch (e) {}
   }
 
-  // PASO 2: Capturar texto del modal/popup (SIN modificar el DOM)
+  // PASO 4: Capturar texto del modal/popup de Releasit, EasySell o genérico
   const modalText = await page.evaluate(() => {
     const modalSelectors = [
+      // EasySell selectors
+      '#es-popup-container',
+      '[class*="es-popup"]',
+      '[class*="easysell-popup"]',
+      '[class*="easysell-modal"]',
+      '[class*="easysell-drawer"]',
+      'easysell-form',
+      // Releasit selectors
+      '[class*="rsi-drawer"]',
+      '[class*="rsi-modal"]',
+      '[class*="rsi-popup"]',
+      '[id*="rsi-drawer"]',
+      // Generic modal selectors
       '[class*="modal"]:not([style*="display: none"])',
       '[class*="popup"]:not([style*="display: none"])',
       '[class*="drawer"]:not([style*="display: none"])',
