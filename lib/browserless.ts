@@ -18,6 +18,98 @@ export interface ScrapedOffer {
   clickedButton: string
 }
 
+// NUEVA FUNCIÓN: Extraer precios usando Gemini Vision (para precios en imágenes)
+async function extractPricesWithVision(screenshotBase64: string): Promise<PriceOffer[]> {
+  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY
+
+  if (!apiKey || !screenshotBase64) {
+    console.log('[Vision Extract] No API key or no screenshot')
+    return []
+  }
+
+  console.log('[Vision Extract] Analyzing screenshot with Gemini Vision...')
+
+  const prompt = `Eres un experto en extraer precios de tiendas de dropshipping colombianas.
+
+CONTEXTO: Esta es una captura de pantalla de una página de producto con diferentes opciones de compra.
+
+TU TAREA:
+Extrae las OFERTAS/OPCIONES de compra del producto principal que veas en la imagen. Busca patrones como:
+- "1 Frasco $79.900" / "2 Frascos $109.900" / "3 Frascos $159.600"
+- "1 UNIDAD $49.900" / "2 UNIDADES $99.800"
+- "Lleva 1 $X" / "Lleva 2 $Y" / "Lleva 3 $Z"
+- "2x1 $119.900" / "4x2 $197.600"
+
+REGLAS CRÍTICAS:
+1. SOLO extrae precios de las OFERTAS/OPCIONES del producto principal
+2. IGNORA precios tachados (precio anterior, antes, era, con línea)
+3. IGNORA precios de ahorro/descuento (ej: "Ahorra $50.000")
+4. Los precios colombianos usan punto como separador de miles: $79.900 = 79900
+
+Responde ÚNICAMENTE con un JSON array (sin explicaciones ni texto adicional):
+[
+  {"quantity": 1, "label": "1 Frasco", "price": 79900},
+  {"quantity": 2, "label": "2 Frascos", "price": 109900}
+]
+
+Si no encuentras ofertas claras del producto principal, responde: []`
+
+  try {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { text: prompt },
+              {
+                inline_data: {
+                  mime_type: 'image/jpeg',
+                  data: screenshotBase64
+                }
+              }
+            ]
+          }],
+          generationConfig: {
+            temperature: 0.1,
+            maxOutputTokens: 500
+          }
+        })
+      }
+    )
+
+    if (!response.ok) {
+      console.log('[Vision Extract] API error:', response.status)
+      return []
+    }
+
+    const data = await response.json()
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+
+    // Extraer JSON del response
+    const jsonMatch = text.match(/\[[\s\S]*\]/)
+    if (!jsonMatch) {
+      console.log('[Vision Extract] No JSON found in response')
+      return []
+    }
+
+    const prices = JSON.parse(jsonMatch[0])
+    console.log('[Vision Extract] Extracted prices:', JSON.stringify(prices))
+
+    return prices.map((p: any) => ({
+      label: p.label || `${p.quantity} unidad${p.quantity > 1 ? 'es' : ''}`,
+      quantity: p.quantity || 1,
+      price: typeof p.price === 'number' ? p.price : parseInt(String(p.price).replace(/\./g, ''))
+    })).filter((p: PriceOffer) => p.price >= 20000 && p.price <= 500000)
+
+  } catch (error: any) {
+    console.error('[Vision Extract] Error:', error.message)
+    return []
+  }
+}
+
 // NUEVA FUNCIÓN: Extraer precios usando Gemini
 async function extractPricesWithLLM(modalText: string, priceAreaText: string, fullText: string): Promise<PriceOffer[]> {
   const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY
@@ -143,10 +235,11 @@ export default async function({ page }) {
   await page.goto("${escapedUrl}", { waitUntil: "networkidle2", timeout: 25000 });
   await new Promise(r => setTimeout(r, 3000));
 
-  // PASO 1: Intentar EasySell primero (selector más común)
+  // PASO 1: Intentar EasySell primero (prefijo "es-")
+  const easySellSelector = '#es-popup-button, [class*="es-popup-button"], easysell-form [class*="button"], easysell-form button';
   try {
-    await page.waitForSelector('#es-popup-button', { timeout: 5000 });
-    const esBtn = await page.$('#es-popup-button');
+    await page.waitForSelector(easySellSelector, { timeout: 5000 });
+    const esBtn = await page.$(easySellSelector);
     if (esBtn) {
       await esBtn.click();
       clickedButton = "EASYSELL-BUTTON";
@@ -309,17 +402,27 @@ export default async function({ page }) {
     return "";
   });
 
-  // PASO 4: Texto completo como último recurso
+  // PASO 6: Texto completo como último recurso
   const fullText = await page.evaluate(() => {
     return (document.body.innerText || "").substring(0, 8000);
   });
+
+  // PASO 7: Tomar screenshot para Vision fallback
+  let screenshotBase64 = "";
+  try {
+    const screenshot = await page.screenshot({ type: "jpeg", quality: 80, fullPage: false });
+    screenshotBase64 = screenshot.toString("base64");
+  } catch (e) {
+    console.log("Screenshot failed:", e.message);
+  }
 
   return {
     modalText: modalText.substring(0, 4000),
     priceAreaText: priceAreaText.substring(0, 2000),
     fullText,
     clickedButton,
-    clickSuccess
+    clickSuccess,
+    screenshotBase64
   };
 }
 `;
@@ -344,15 +447,26 @@ export default async function({ page }) {
     console.log('[Browserless] Click success:', data.clickSuccess)
     console.log('[Browserless] Modal text length:', data.modalText?.length || 0)
     console.log('[Browserless] Modal text preview:', data.modalText?.substring(0, 500))
+    console.log('[Browserless] Screenshot captured:', data.screenshotBase64 ? 'YES' : 'NO')
 
     // USAR LLM PARA EXTRAER PRECIOS
-    const llmPrices = await extractPricesWithLLM(
+    let prices = await extractPricesWithLLM(
       data.modalText || '',
       data.priceAreaText || '',
       data.fullText || ''
     )
 
-    return buildResult(llmPrices, data)
+    // Si no encontramos suficientes precios con texto, intentar con Vision
+    if (prices.length <= 1 && data.screenshotBase64) {
+      console.log('[Browserless] LLM found <=1 prices, trying Vision fallback...')
+      const visionPrices = await extractPricesWithVision(data.screenshotBase64)
+      if (visionPrices.length > prices.length) {
+        console.log('[Browserless] Vision found more prices:', visionPrices.length)
+        prices = visionPrices
+      }
+    }
+
+    return buildResult(prices, data)
 
   } catch (error: any) {
     console.error('[Browserless] EXCEPTION:', error.message)
