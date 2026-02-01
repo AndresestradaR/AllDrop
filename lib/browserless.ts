@@ -141,12 +141,20 @@ export default async function({ page }) {
   let clickSuccess = false;
 
   await page.goto("${escapedUrl}", { waitUntil: "networkidle2", timeout: 25000 });
-  await new Promise(r => setTimeout(r, 2000));
 
-  // PASO 1: Click en botón de Releasit o EasySell (apps de checkout para dropshipping)
+  // Esperar 4 segundos para que JavaScript cargue los botones de EasySell/Releasit
+  await new Promise(r => setTimeout(r, 4000));
+
+  // PASO 1: Click en botón de EasySell o Releasit (apps de checkout para dropshipping)
+  // Intentar esperar explícitamente a que aparezca el botón
   try {
-    // Selectores de Releasit y EasySell - las dos apps más usadas en dropshipping colombiano
-    const codButton = await page.$('#es-popup-button, [class*="es-popup-button"], [id*="_rsi-buy-now-button"], [class*="_rsi-buy-now-button"], [id*="rsi-buy-now"], [class*="rsi-buy-now"], easysell-form button, [class*="easysell"] button');
+    await page.waitForSelector('#es-popup-button, [id*="_rsi-buy-now-button"]', { timeout: 3000 });
+  } catch (e) {
+    // Si no aparece después de 3s, continuar con el flujo normal
+  }
+
+  try {
+    const codButton = await page.$('#es-popup-button, [class*="es-popup-button"], [id*="_rsi-buy-now-button"], [class*="_rsi-buy-now-button"], [id*="rsi-buy-now"], [class*="rsi-buy-now"]');
     if (codButton) {
       const isVisible = await codButton.evaluate(e => {
         const rect = e.getBoundingClientRect();
@@ -214,49 +222,74 @@ export default async function({ page }) {
     } catch (e) {}
   }
 
-  // PASO 4: Capturar texto del modal/popup de Releasit, EasySell o genérico
+  // PASO 4: Capturar texto del modal/popup/drawer de EasySell, Releasit o genérico
   const modalText = await page.evaluate(() => {
     const modalSelectors = [
-      // EasySell selectors
+      // EasySell selectors (prioridad alta - muy usados en Colombia)
       '#es-popup-container',
-      '[class*="es-popup"]',
-      '[class*="easysell-popup"]',
-      '[class*="easysell-modal"]',
-      '[class*="easysell-drawer"]',
-      'easysell-form',
+      '#es-popup-content',
+      '[class*="es-popup-content"]',
+      '[class*="es-popup-body"]',
+      '[class*="es-modal"]',
+      '[class*="es-drawer"]',
+      '[class*="es-form-container"]',
+      '[class*="easysell"]',
       // Releasit selectors
       '[class*="rsi-drawer"]',
       '[class*="rsi-modal"]',
       '[class*="rsi-popup"]',
+      '[class*="rsi-content"]',
+      '[class*="rsi-form"]',
       '[id*="rsi-drawer"]',
-      // Generic modal selectors
+      '[id*="rsi-modal"]',
+      // Shopify app blocks que contienen formularios COD
+      '[class*="shopify-app-block"] [class*="offer"]',
+      '[class*="shopify-app-block"] [class*="variant"]',
+      '[class*="shopify-app-block"] [class*="option"]',
+      // Generic modal/drawer selectors
       '[class*="modal"]:not([style*="display: none"])',
       '[class*="popup"]:not([style*="display: none"])',
       '[class*="drawer"]:not([style*="display: none"])',
       '[role="dialog"]',
       '[class*="cart-drawer"]',
       '[class*="slideout"]',
+      '[class*="side-panel"]',
       '[class*="overlay"][class*="active"]',
-      '[class*="lightbox"]'
+      '[class*="lightbox"]',
+      '[class*="offcanvas"]'
     ];
 
     for (const sel of modalSelectors) {
       try {
-        const el = document.querySelector(sel);
-        if (el) {
+        const els = document.querySelectorAll(sel);
+        for (const el of els) {
           const rect = el.getBoundingClientRect();
           const style = window.getComputedStyle(el);
-          const isVisible = rect.width > 100 &&
-                           rect.height > 100 &&
+          const isVisible = rect.width > 50 &&
+                           rect.height > 50 &&
                            style.display !== 'none' &&
                            style.visibility !== 'hidden' &&
                            style.opacity !== '0';
-          if (isVisible && el.innerText.length > 50) {
-            return el.innerText;
+          if (isVisible && el.innerText && el.innerText.length > 30) {
+            // Verificar si contiene precios (patrón $XX.XXX)
+            if (/\$[\d.,]+/.test(el.innerText)) {
+              return el.innerText;
+            }
           }
         }
       } catch (e) {}
     }
+
+    // Fallback: buscar cualquier elemento visible que contenga precios y opciones
+    try {
+      const allElements = document.querySelectorAll('[class*="offer"], [class*="variant"], [class*="option"], [class*="package"], [class*="bundle"]');
+      for (const el of allElements) {
+        if (el.innerText && el.innerText.length > 30 && /\$[\d.,]+/.test(el.innerText)) {
+          return el.innerText;
+        }
+      }
+    } catch (e) {}
+
     return "";
   });
 
