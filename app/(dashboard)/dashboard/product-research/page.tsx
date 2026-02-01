@@ -106,7 +106,9 @@ export default function ProductResearchPage() {
   const [costCPA, setCostCPA] = useState<number | ''>('')
   const [effectiveRate, setEffectiveRate] = useState<number>(65)
   const [cancellationRate, setCancellationRate] = useState<number>(20)
-  const [simulatedPrice, setSimulatedPrice] = useState<number | ''>('')
+  const [simPrice1, setSimPrice1] = useState<number | ''>('')
+  const [simPrice2, setSimPrice2] = useState<number | ''>('')
+  const [simPrice3, setSimPrice3] = useState<number | ''>('')
 
   const handleSearch = async (filters: Filters) => {
     if (!cookies) {
@@ -439,35 +441,44 @@ export default function ProductResearchPage() {
     }
   }, [analysisStats, costProduct, costShipping, costCPA, cancellationRate, effectiveRate])
 
-  // Cálculos del simulador de precio
-  const simulatedCalc = useMemo(() => {
-    if (simulatedPrice === '' || costProduct === '' || costShipping === '' || costCPA === '') {
+  // Cálculos del simulador de precio (para 1, 2 y 3 unidades)
+  const simulatedCalcs = useMemo(() => {
+    if (costProduct === '' || costShipping === '' || costCPA === '') {
       return null
     }
 
-    const price = Number(simulatedPrice)
-    const totalCost = Number(costProduct) + Number(costShipping)
     const adjustedCPA = Number(costCPA) / (1 - cancellationRate / 100)
-    const totalCostWithCPA = totalCost + adjustedCPA
+    const results: { [qty: number]: { price: number; totalCost: number; marginBruto: number; marginPercent: number; marginReal: number; marginRealPercent: number } } = {}
 
-    const marginBruto = price - totalCostWithCPA
-    const marginPercent = (marginBruto / price) * 100
-    const marginReal = marginBruto * (effectiveRate / 100) - (totalCost * ((100 - effectiveRate) / 100))
+    const prices = [
+      { qty: 1, price: simPrice1 },
+      { qty: 2, price: simPrice2 },
+      { qty: 3, price: simPrice3 }
+    ]
 
-    // Comparación con promedio de competencia
-    const avgPrice = pricesByQuantity?.[1]?.avg || analysisStats?.priceAvg || 0
-    const diffVsAvg = avgPrice ? price - avgPrice : 0
-    const diffPercentVsAvg = avgPrice ? ((price - avgPrice) / avgPrice) * 100 : 0
+    prices.forEach(({ qty, price }) => {
+      if (price !== '' && Number(price) > 0) {
+        const p = Number(price)
+        const productCost = Number(costProduct) * qty
+        const totalCost = productCost + Number(costShipping) + adjustedCPA
+        const marginBruto = p - totalCost
+        const marginPercent = (marginBruto / p) * 100
+        const marginReal = marginBruto * (effectiveRate / 100) - ((productCost + Number(costShipping)) * ((100 - effectiveRate) / 100))
+        const marginRealPercent = (marginReal / p) * 100
 
-    return {
-      marginBruto,
-      marginPercent,
-      marginReal,
-      avgPrice,
-      diffVsAvg,
-      diffPercentVsAvg
-    }
-  }, [simulatedPrice, costProduct, costShipping, costCPA, cancellationRate, effectiveRate, pricesByQuantity, analysisStats])
+        results[qty] = {
+          price: p,
+          totalCost,
+          marginBruto,
+          marginPercent,
+          marginReal,
+          marginRealPercent
+        }
+      }
+    })
+
+    return Object.keys(results).length > 0 ? results : null
+  }, [simPrice1, simPrice2, simPrice3, costProduct, costShipping, costCPA, cancellationRate, effectiveRate])
 
   // Score badge color
   const getScoreBadge = (score: number) => {
@@ -1412,56 +1423,108 @@ export default function ProductResearchPage() {
                     </div>
                   )}
 
-                  {/* Simulador de precio personalizado */}
+                  {/* Simulador de precio personalizado - 3 inputs */}
                   <div className="mt-6 p-4 bg-background rounded-lg border border-border">
-                    <h4 className="text-sm font-medium text-text-secondary mb-3 flex items-center gap-2">
+                    <h4 className="text-sm font-medium text-text-secondary mb-4 flex items-center gap-2">
                       <DollarSign className="w-4 h-4" />
-                      Simulador de Precio
+                      Simulador de Precio - ¿A cuánto venderías?
                     </h4>
-                    <div className="flex flex-wrap items-end gap-4">
-                      <div className="flex-1 min-w-[200px]">
-                        <label className="text-xs text-text-secondary mb-1 block">¿A cuánto quieres venderlo?</label>
+
+                    {/* 3 inputs independientes */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                      <div>
+                        <label className="text-xs text-text-secondary mb-1 block">¿A cuánto venderías 1 unidad?</label>
                         <div className="relative">
                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary">$</span>
                           <input
                             type="number"
-                            value={simulatedPrice}
-                            onChange={(e) => setSimulatedPrice(e.target.value ? Number(e.target.value) : '')}
-                            placeholder="Ej: 89900"
+                            value={simPrice1}
+                            onChange={(e) => setSimPrice1(e.target.value ? Number(e.target.value) : '')}
+                            placeholder="Ej: 79900"
                             className="w-full pl-8 pr-4 py-2.5 bg-surface border border-border rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50"
                           />
                         </div>
                       </div>
-
-                      {simulatedCalc && (
-                        <>
-                          <div className="text-center px-4 py-2 bg-surface rounded-lg">
-                            <p className="text-xs text-text-secondary">Margen bruto</p>
-                            <p className={`text-lg font-bold ${simulatedCalc.marginBruto >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                              ${Math.round(simulatedCalc.marginBruto).toLocaleString()}
-                            </p>
-                            <p className="text-xs text-text-secondary">({simulatedCalc.marginPercent.toFixed(0)}%)</p>
-                          </div>
-
-                          <div className="text-center px-4 py-2 bg-surface rounded-lg">
-                            <p className="text-xs text-text-secondary">Margen real ({effectiveRate}%)</p>
-                            <p className={`text-lg font-bold ${simulatedCalc.marginReal >= 15000 ? 'text-green-500' : simulatedCalc.marginReal >= 0 ? 'text-yellow-500' : 'text-red-500'}`}>
-                              ${Math.round(simulatedCalc.marginReal).toLocaleString()}
-                            </p>
-                          </div>
-
-                          {simulatedCalc.avgPrice > 0 && (
-                            <div className="text-center px-4 py-2 bg-surface rounded-lg">
-                              <p className="text-xs text-text-secondary">vs Promedio competencia</p>
-                              <p className={`text-lg font-bold ${simulatedCalc.diffVsAvg >= 0 ? 'text-orange-500' : 'text-green-500'}`}>
-                                {simulatedCalc.diffVsAvg >= 0 ? '+' : ''}{simulatedCalc.diffPercentVsAvg.toFixed(0)}%
-                              </p>
-                              <p className="text-xs text-text-secondary">(${simulatedCalc.avgPrice.toLocaleString()} prom.)</p>
-                            </div>
-                          )}
-                        </>
-                      )}
+                      <div>
+                        <label className="text-xs text-text-secondary mb-1 block">¿A cuánto venderías 2 unidades?</label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary">$</span>
+                          <input
+                            type="number"
+                            value={simPrice2}
+                            onChange={(e) => setSimPrice2(e.target.value ? Number(e.target.value) : '')}
+                            placeholder="Ej: 119900"
+                            className="w-full pl-8 pr-4 py-2.5 bg-surface border border-border rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-xs text-text-secondary mb-1 block">¿A cuánto venderías 3 unidades?</label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary">$</span>
+                          <input
+                            type="number"
+                            value={simPrice3}
+                            onChange={(e) => setSimPrice3(e.target.value ? Number(e.target.value) : '')}
+                            placeholder="Ej: 159900"
+                            className="w-full pl-8 pr-4 py-2.5 bg-surface border border-border rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50"
+                          />
+                        </div>
+                      </div>
                     </div>
+
+                    {/* Análisis de los precios ingresados */}
+                    {simulatedCalcs && (
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {[1, 2, 3].map(qty => {
+                          const calc = simulatedCalcs[qty]
+                          if (!calc) return null
+
+                          const marginRealPercent = (calc.marginReal / calc.price) * 100
+
+                          return (
+                            <div
+                              key={qty}
+                              className={`p-3 rounded-lg border ${calc.marginReal >= calc.price * 0.15 ? 'bg-green-500/5 border-green-500/30' : calc.marginReal >= 0 ? 'bg-yellow-500/5 border-yellow-500/30' : 'bg-red-500/5 border-red-500/30'}`}
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-sm font-medium text-text-primary">
+                                  Vendiendo {qty} unidad{qty > 1 ? 'es' : ''}
+                                </span>
+                                <span className="text-sm font-bold text-text-primary">${calc.price.toLocaleString()}</span>
+                              </div>
+                              <div className="space-y-1 text-xs">
+                                <div className="flex justify-between">
+                                  <span className="text-text-secondary">Tu costo:</span>
+                                  <span className="text-text-primary">${Math.round(calc.totalCost).toLocaleString()}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-text-secondary">Margen bruto:</span>
+                                  <span className={calc.marginBruto >= 0 ? 'text-green-500' : 'text-red-500'}>
+                                    ${Math.round(calc.marginBruto).toLocaleString()} ({calc.marginPercent.toFixed(0)}%)
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-text-secondary">Margen real ({effectiveRate}%):</span>
+                                  <span className={`font-semibold ${calc.marginReal >= calc.price * 0.15 ? 'text-green-500' : calc.marginReal >= 0 ? 'text-yellow-500' : 'text-red-500'}`}>
+                                    ${Math.round(calc.marginReal).toLocaleString()}
+                                  </span>
+                                </div>
+                                <div className={`mt-2 text-xs font-medium px-2 py-1 rounded text-center ${calc.marginReal >= calc.price * 0.15 ? 'bg-green-500/10 text-green-500' : calc.marginReal >= 0 ? 'bg-yellow-500/10 text-yellow-500' : 'bg-red-500/10 text-red-500'}`}>
+                                  {calc.marginReal >= calc.price * 0.15 ? '🟢 Rentable' : calc.marginReal >= 0 ? '🟡 Ajustado' : '🔴 No rentable'}
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+
+                    {!simulatedCalcs && (
+                      <p className="text-xs text-text-secondary/70 text-center">
+                        Ingresa al menos un precio para ver el análisis
+                      </p>
+                    )}
                   </div>
 
                   {!marginCalc && (
