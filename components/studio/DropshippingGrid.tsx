@@ -276,6 +276,207 @@ function ResenaUGCTool({ onBack }: { onBack: () => void }) {
 }
 
 // ============================================
+// DEEP FACE COMPONENT
+// ============================================
+function DeepFaceTool({ onBack }: { onBack: () => void }) {
+  const [sourceVideo, setSourceVideo] = useState<File | null>(null)
+  const [targetFace, setTargetFace] = useState<File | null>(null)
+  const [voiceAudio, setVoiceAudio] = useState<File | null>(null)
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [resultVideoUrl, setResultVideoUrl] = useState<string | null>(null)
+
+  const tool = DROPSHIPPING_TOOLS.find(t => t.id === 'deep-face')!
+
+  const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setSourceVideo(file)
+      setResultVideoUrl(null)
+    }
+  }
+
+  const handleFaceUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setTargetFace(file)
+      setResultVideoUrl(null)
+    }
+  }
+
+  const handleAudioUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) setVoiceAudio(file)
+  }
+
+  const handleProcess = async () => {
+    if (!sourceVideo || !targetFace) return
+    setIsProcessing(true)
+    // TODO: Implement API call
+    setTimeout(() => {
+      setIsProcessing(false)
+      // Placeholder: would set resultVideoUrl here
+    }, 2000)
+  }
+
+  return (
+    <div className="h-[calc(100vh-200px)] min-h-[600px]">
+      <div className="bg-surface rounded-2xl border border-border h-full flex flex-col">
+        {/* Header */}
+        <div className="flex items-center gap-4 px-6 py-4 border-b border-border">
+          <button onClick={onBack} className="p-2 hover:bg-border/50 rounded-lg transition-colors">
+            <ArrowLeft className="w-5 h-5 text-text-secondary" />
+          </button>
+          <div className="flex items-center gap-3">
+            <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center bg-gradient-to-br', tool.color)}>
+              <span className="text-xl">{tool.emoji}</span>
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-text-primary">{tool.name}</h2>
+              <p className="text-sm text-text-secondary">{tool.description}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 p-6 flex gap-6 overflow-hidden">
+          {/* Input Section */}
+          <div className="w-1/3 flex flex-col gap-4">
+            {/* Video Upload */}
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-2">
+                Video original *
+              </label>
+              {sourceVideo ? (
+                <div className="relative bg-surface-elevated rounded-xl overflow-hidden h-32">
+                  <video
+                    src={URL.createObjectURL(sourceVideo)}
+                    className="w-full h-full object-cover"
+                  />
+                  <button
+                    onClick={() => setSourceVideo(null)}
+                    className="absolute top-2 right-2 p-1.5 bg-error/80 hover:bg-error rounded-lg"
+                  >
+                    <span className="text-white text-xs">X</span>
+                  </button>
+                  <span className="absolute bottom-2 left-2 text-xs text-white bg-black/50 px-2 py-1 rounded">
+                    {sourceVideo.name}
+                  </span>
+                </div>
+              ) : (
+                <label className="flex flex-col items-center justify-center h-32 border-2 border-dashed border-border hover:border-accent/50 rounded-xl cursor-pointer transition-colors">
+                  <input type="file" accept="video/*" className="hidden" onChange={handleVideoUpload} />
+                  <Video className="w-8 h-8 text-text-secondary mb-2" />
+                  <p className="text-sm text-text-secondary">Subir video</p>
+                </label>
+              )}
+            </div>
+
+            {/* Face Upload */}
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-2">
+                Cara destino *
+              </label>
+              {targetFace ? (
+                <div className="relative bg-surface-elevated rounded-xl overflow-hidden h-32">
+                  <img
+                    src={URL.createObjectURL(targetFace)}
+                    alt="Target face"
+                    className="w-full h-full object-cover"
+                  />
+                  <button
+                    onClick={() => setTargetFace(null)}
+                    className="absolute top-2 right-2 p-1.5 bg-error/80 hover:bg-error rounded-lg"
+                  >
+                    <span className="text-white text-xs">X</span>
+                  </button>
+                </div>
+              ) : (
+                <label className="flex flex-col items-center justify-center h-32 border-2 border-dashed border-border hover:border-accent/50 rounded-xl cursor-pointer transition-colors">
+                  <input type="file" accept="image/*" className="hidden" onChange={handleFaceUpload} />
+                  <UserCircle className="w-8 h-8 text-text-secondary mb-2" />
+                  <p className="text-sm text-text-secondary">Subir imagen de cara</p>
+                </label>
+              )}
+            </div>
+
+            {/* Audio Upload (Optional) */}
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-2">
+                Audio de voz (opcional)
+              </label>
+              {voiceAudio ? (
+                <div className="relative bg-surface-elevated rounded-xl p-3 flex items-center gap-2">
+                  <span className="text-sm text-text-primary truncate flex-1">{voiceAudio.name}</span>
+                  <button onClick={() => setVoiceAudio(null)} className="text-error text-xs">X</button>
+                </div>
+              ) : (
+                <label className="flex items-center justify-center gap-2 h-12 border-2 border-dashed border-border hover:border-accent/50 rounded-xl cursor-pointer transition-colors">
+                  <input type="file" accept="audio/*" className="hidden" onChange={handleAudioUpload} />
+                  <span className="text-sm text-text-secondary">Subir audio para cambiar voz</span>
+                </label>
+              )}
+            </div>
+          </div>
+
+          {/* Output Section */}
+          <div className="flex-1 flex flex-col">
+            <label className="block text-sm font-medium text-text-secondary mb-2">
+              Video resultado
+            </label>
+            <div className="flex-1 bg-surface-elevated rounded-xl overflow-hidden flex items-center justify-center">
+              {resultVideoUrl ? (
+                <video src={resultVideoUrl} controls className="w-full h-full object-contain" autoPlay />
+              ) : (
+                <div className="text-center p-8">
+                  {isProcessing ? (
+                    <>
+                      <Loader2 className="w-12 h-12 text-accent mx-auto mb-3 animate-spin" />
+                      <p className="text-text-primary font-medium">Procesando video...</p>
+                      <p className="text-sm text-text-secondary mt-1">Esto puede tardar varios minutos</p>
+                    </>
+                  ) : (
+                    <>
+                      <Drama className="w-12 h-12 text-text-secondary mx-auto mb-3" />
+                      <p className="text-text-secondary">El video procesado aparecera aqui</p>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="px-6 py-4 border-t border-border flex items-center justify-end">
+          <button
+            onClick={handleProcess}
+            disabled={!sourceVideo || !targetFace || isProcessing}
+            className={cn(
+              'flex items-center gap-2 px-6 py-2.5 rounded-xl font-semibold transition-all',
+              !sourceVideo || !targetFace || isProcessing
+                ? 'bg-border text-text-secondary cursor-not-allowed'
+                : 'bg-accent hover:bg-accent-hover text-background'
+            )}
+          >
+            {isProcessing ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Procesando...
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4" />
+                Procesar Video
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ============================================
 // PLACEHOLDER TOOL COMPONENT
 // ============================================
 function PlaceholderTool({ toolId, onBack }: { toolId: string; onBack: () => void }) {
@@ -329,6 +530,10 @@ export function DropshippingGrid() {
   // Render specific tool UI
   if (activeTool === 'resena-ugc') {
     return <ResenaUGCTool onBack={handleBack} />
+  }
+
+  if (activeTool === 'deep-face') {
+    return <DeepFaceTool onBack={handleBack} />
   }
 
   if (activeTool) {
