@@ -222,74 +222,37 @@ export default async function({ page }) {
     } catch (e) {}
   }
 
-  // PASO 4: Capturar texto del modal/popup/drawer de EasySell, Releasit o genérico
+  // PASO 4: Capturar texto del modal/popup/drawer (versión simple que funcionaba)
   const modalText = await page.evaluate(() => {
     const modalSelectors = [
-      // EasySell selectors (prioridad alta - muy usados en Colombia)
-      '#es-popup-container',
-      '#es-popup-content',
-      '[class*="es-popup-content"]',
-      '[class*="es-popup-body"]',
-      '[class*="es-modal"]',
-      '[class*="es-drawer"]',
-      '[class*="es-form-container"]',
-      '[class*="easysell"]',
-      // Releasit selectors
-      '[class*="rsi-drawer"]',
-      '[class*="rsi-modal"]',
-      '[class*="rsi-popup"]',
-      '[class*="rsi-content"]',
-      '[class*="rsi-form"]',
-      '[id*="rsi-drawer"]',
-      '[id*="rsi-modal"]',
-      // Shopify app blocks que contienen formularios COD
-      '[class*="shopify-app-block"] [class*="offer"]',
-      '[class*="shopify-app-block"] [class*="variant"]',
-      '[class*="shopify-app-block"] [class*="option"]',
-      // Generic modal/drawer selectors
+      // Generic modal/drawer selectors (funcionaban bien)
       '[class*="modal"]:not([style*="display: none"])',
       '[class*="popup"]:not([style*="display: none"])',
       '[class*="drawer"]:not([style*="display: none"])',
       '[role="dialog"]',
       '[class*="cart-drawer"]',
       '[class*="slideout"]',
-      '[class*="side-panel"]',
       '[class*="overlay"][class*="active"]',
-      '[class*="lightbox"]',
-      '[class*="offcanvas"]'
+      '[class*="lightbox"]'
     ];
 
     for (const sel of modalSelectors) {
       try {
-        const els = document.querySelectorAll(sel);
-        for (const el of els) {
+        const el = document.querySelector(sel);
+        if (el) {
           const rect = el.getBoundingClientRect();
           const style = window.getComputedStyle(el);
-          const isVisible = rect.width > 50 &&
-                           rect.height > 50 &&
+          const isVisible = rect.width > 100 &&
+                           rect.height > 100 &&
                            style.display !== 'none' &&
                            style.visibility !== 'hidden' &&
                            style.opacity !== '0';
-          if (isVisible && el.innerText && el.innerText.length > 30) {
-            // Verificar si contiene precios (patrón $XX.XXX)
-            if (/\$[\d.,]+/.test(el.innerText)) {
-              return el.innerText;
-            }
+          if (isVisible && el.innerText.length > 50) {
+            return el.innerText;
           }
         }
       } catch (e) {}
     }
-
-    // Fallback: buscar cualquier elemento visible que contenga precios y opciones
-    try {
-      const allElements = document.querySelectorAll('[class*="offer"], [class*="variant"], [class*="option"], [class*="package"], [class*="bundle"]');
-      for (const el of allElements) {
-        if (el.innerText && el.innerText.length > 30 && /\$[\d.,]+/.test(el.innerText)) {
-          return el.innerText;
-        }
-      }
-    } catch (e) {}
-
     return "";
   });
 
