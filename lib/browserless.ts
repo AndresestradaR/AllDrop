@@ -48,7 +48,6 @@ export default async function({ page }) {
   const buttonKeywords = ["QUIERO", "OFERTA", "COMPRAR", "PEDIR", "AGREGAR", "AÑADIR", "VER PRECIO", "VER OFERTA", "OBTENER", "ORDENAR"];
 
   try {
-    // Selectores específicos para botones de compra
     const buttonSelectors = [
       "button",
       "a[href*='cart']",
@@ -88,7 +87,6 @@ export default async function({ page }) {
                   await el.click();
                   clickedButton = text.substring(0, 50);
                   clickSuccess = true;
-                  // Esperar 4 segundos para que cargue el modal/popup
                   await new Promise(r => setTimeout(r, 4000));
                   break;
                 }
@@ -101,68 +99,111 @@ export default async function({ page }) {
     }
   } catch (e) {}
 
-  // PASO 2: Remover precios tachados del DOM antes de extraer texto
+  // PASO 2: LIMPIEZA AGRESIVA de precios tachados del DOM
   await page.evaluate(() => {
-    // Tags HTML de tachado
+    // 2.1 Tags HTML de tachado
     document.querySelectorAll('del, s, strike, ins').forEach(el => el.remove());
 
-    // Clases comunes de precio anterior/tachado
+    // 2.2 Clases de precio anterior/tachado (más completo)
     const oldPriceSelectors = [
       '[class*="old"]', '[class*="was"]', '[class*="before"]',
       '[class*="compare"]', '[class*="regular"]', '[class*="original"]',
       '[class*="tachado"]', '[class*="crossed"]', '[class*="scratch"]',
       '[class*="previous"]', '[class*="retail"]', '[class*="msrp"]',
-      '[class*="list-price"]', '[class*="sale-price"]:not([class*="current"])',
-      '[data-price-type="old"]', '[data-compare]'
+      '[class*="list-price"]', '[class*="strike"]', '[class*="lined"]',
+      '[data-price-type="old"]', '[data-compare]', '[data-original]',
+      '.price-was', '.was-price', '.old-price', '.compare-price',
+      '[class*="antes"]', '[class*="anterior"]'
     ];
     document.querySelectorAll(oldPriceSelectors.join(',')).forEach(el => el.remove());
 
-    // Estilo line-through en cualquier elemento
-    document.querySelectorAll('*').forEach(el => {
+    // 2.3 Cualquier elemento con text-decoration: line-through (y sus hijos)
+    const allElements = document.querySelectorAll('*');
+    allElements.forEach(el => {
       try {
         const style = window.getComputedStyle(el);
-        if (style.textDecoration.includes('line-through')) {
+        if (style.textDecoration && style.textDecoration.includes('line-through')) {
+          el.remove();
+        }
+        if (style.textDecorationLine && style.textDecorationLine.includes('line-through')) {
           el.remove();
         }
       } catch (e) {}
     });
+
+    // 2.4 Remover elementos que contengan texto de ahorro/descuento
+    document.querySelectorAll('*').forEach(el => {
+      const text = (el.innerText || '').toLowerCase();
+      if (el.children.length === 0) { // Solo hojas
+        if (/ahorra|ahorras|descuento|antes|era\\s|was\\s|save\\s/i.test(text)) {
+          if (text.length < 100) { // Solo elementos pequeños
+            el.remove();
+          }
+        }
+      }
+    });
   });
 
-  // PASO 3: Extraer ofertas estructuradas (cantidad + precio)
+  // PASO 3: Extraer ofertas estructuradas (cantidad + precio) - MEJORADO
   const structuredOffers = await page.evaluate(() => {
     const offers = [];
 
-    // Buscar contenedores de opciones de producto
+    // Selectores para contenedores de opciones/variantes
     const optionSelectors = [
       '[class*="offer"]', '[class*="option"]', '[class*="variant"]',
       '[class*="package"]', '[class*="bundle"]', '[class*="quantity-option"]',
       '[class*="product-option"]', '[class*="price-option"]',
       '[role="radio"]', '[role="option"]', 'label:has(input[type="radio"])',
       '[class*="card"]:has([class*="price"])', '[class*="plan"]',
-      '[class*="frasco"]', '[class*="unidad"]'
+      '[class*="frasco"]', '[class*="unidad"]', '[class*="combo"]',
+      '[class*="selector"]', '[class*="choice"]', '[class*="tier"]',
+      'label', '.swatch', '[data-variant]', '[data-option]'
+    ];
+
+    // Patrones mejorados para detectar ofertas
+    const patterns = [
+      /(\\d+)\\s*(?:frasco|unidad|mes|paquete|caja|kit|botella|pote|sobre|tableta)[s]?[^\\$]*\\$\\s*([\\d][\\d.,]*)/i,
+      /(?:lleva|compra|pide)\\s*(\\d+)[^\\$]*\\$\\s*([\\d][\\d.,]*)/i,
+      /(\\d+)\\s*[xX]\\s*[^\\$]*\\$\\s*([\\d][\\d.,]*)/i,
+      /combo\\s*(?:de\\s*)?(\\d+)[^\\$]*\\$\\s*([\\d][\\d.,]*)/i,
+      /pack\\s*(?:de\\s*)?(\\d+)[^\\$]*\\$\\s*([\\d][\\d.,]*)/i,
+      /\\$\\s*([\\d][\\d.,]*).*?(\\d+)\\s*(?:frasco|unidad|mes|paquete|caja|kit|botella)[s]?/i
     ];
 
     document.querySelectorAll(optionSelectors.join(',')).forEach(el => {
-      const text = el.innerText || "";
+      // Verificar que no esté tachado
+      try {
+        const style = window.getComputedStyle(el);
+        if (style.textDecoration && style.textDecoration.includes('line-through')) return;
+      } catch (e) {}
 
-      // Múltiples patrones para detectar ofertas
-      const patterns = [
-        /(\\d+)\\s*(frasco|unidad|mes|paquete|caja|kit)[es]?.*?\\$\\s*([\\d.,]+)/i,
-        /lleva\\s*(\\d+).*?\\$\\s*([\\d.,]+)/i,
-        /(\\d+)\\s*x.*?\\$\\s*([\\d.,]+)/i
-      ];
+      const text = (el.innerText || "").replace(/\\n/g, ' ');
+      if (!text || text.length > 300) return;
+
+      // Ignorar si contiene palabras de descuento
+      if (/ahorra|descuento|antes|era\\s|was\\s|save/i.test(text)) return;
 
       for (const pattern of patterns) {
         const match = text.match(pattern);
         if (match) {
-          const priceStr = match[match.length - 1];
+          let quantity, priceStr;
+
+          // El último patrón tiene el precio primero
+          if (pattern.source.startsWith('\\\\\\$')) {
+            priceStr = match[1];
+            quantity = parseInt(match[2]) || 1;
+          } else {
+            quantity = parseInt(match[1]) || 1;
+            priceStr = match[2];
+          }
+
           const price = parseInt(priceStr.replace(/\\./g, '').replace(/,/g, ''));
           if (price >= 15000 && price <= 500000) {
             offers.push({
-              quantity: parseInt(match[1]) || 1,
-              unit: match[2] || 'unidad',
+              quantity: quantity,
+              unit: 'unidad',
               price: price,
-              text: text.substring(0, 100)
+              text: text.substring(0, 80)
             });
           }
           break;
@@ -170,12 +211,12 @@ export default async function({ page }) {
       }
     });
 
-    // Deduplicar por precio
+    // Deduplicar por precio (mantener el primero encontrado)
     const unique = [];
-    const seen = new Set();
+    const seenPrices = new Set();
     offers.forEach(o => {
-      if (!seen.has(o.price)) {
-        seen.add(o.price);
+      if (!seenPrices.has(o.price)) {
+        seenPrices.add(o.price);
         unique.push(o);
       }
     });
@@ -183,29 +224,32 @@ export default async function({ page }) {
     return unique.sort((a, b) => a.price - b.price);
   });
 
-  // PASO 3: Extraer todos los precios visibles (excluyendo tachados)
+  // PASO 4: Extraer precios del DOM (ya limpio de tachados)
   const allPrices = await page.evaluate(() => {
     const prices = [];
 
-    // Selectores de precio
-    const priceSelectors = '[class*="price"]:not([class*="old"]):not([class*="before"]):not([class*="compare"]), [class*="precio"]:not([class*="anterior"]), [class*="valor"], [class*="total"], [class*="amount"], [class*="cost"]';
+    // Selectores de precio (excluyendo clases de precio viejo)
+    const priceSelectors = '[class*="price"]:not([class*="old"]):not([class*="before"]):not([class*="compare"]):not([class*="was"]):not([class*="original"]), [class*="precio"]:not([class*="anterior"]), [class*="valor"], [class*="total"], [class*="amount"], [class*="cost"], [class*="monto"]';
 
     document.querySelectorAll(priceSelectors).forEach(el => {
-      // Ignorar elementos tachados
-      const style = window.getComputedStyle(el);
-      if (style.textDecoration.includes('line-through')) return;
+      // Doble verificación de tachado
+      try {
+        const style = window.getComputedStyle(el);
+        if (style.textDecoration && style.textDecoration.includes('line-through')) return;
+        if (style.textDecorationLine && style.textDecorationLine.includes('line-through')) return;
+      } catch (e) {}
 
-      // Ignorar si está dentro de del, s, o tiene clase de precio viejo
-      if (el.closest('del, s, strike, [class*="old"], [class*="before"], [class*="tachado"], [class*="compare"], [class*="was"]')) return;
+      // Verificar ancestros tachados
+      if (el.closest('del, s, strike, [class*="old"], [class*="before"], [class*="tachado"], [class*="compare"], [class*="was"], [class*="original"]')) return;
 
       const text = el.innerText || "";
 
-      // Ignorar si contiene palabras de descuento
-      if (/ahorra|descuento|antes|era|was|save/i.test(text)) return;
+      // Ignorar si contiene palabras de descuento/ahorro
+      if (/ahorra|descuento|antes|era\\s|was\\s|save/i.test(text)) return;
 
-      // Extraer precios
-      const matches = text.matchAll(/\\$\\s*([\\d]{1,3}(?:[.,]\\d{3})*)/g);
-      for (const match of matches) {
+      // Extraer precios con regex
+      const priceMatches = text.matchAll(/\\$\\s*([\\d]{1,3}(?:[.,]\\d{3})*)/g);
+      for (const match of priceMatches) {
         const price = parseInt(match[1].replace(/\\./g, '').replace(/,/g, ''));
         if (price >= 15000 && price <= 500000) {
           prices.push(price);
@@ -216,16 +260,16 @@ export default async function({ page }) {
     return [...new Set(prices)].sort((a, b) => a - b);
   });
 
-  // PASO 4: Extraer texto completo
+  // PASO 5: Extraer texto completo (ya limpio)
   const fullText = await page.evaluate(() => document.body.innerText);
 
-  // PASO 5: Extraer texto de modals/popups
+  // PASO 6: Extraer texto de modals/popups
   const modalText = await page.evaluate(() => {
     const els = document.querySelectorAll('[class*="modal"], [class*="popup"], [class*="drawer"], [role="dialog"], [class*="overlay"][style*="visible"], [class*="lightbox"]');
     return Array.from(els).map(e => e.innerText).join(" | ");
   });
 
-  // PASO 6: Extraer texto de elementos de precio
+  // PASO 7: Extraer texto de elementos de precio
   const priceText = await page.evaluate(() => {
     const els = document.querySelectorAll('[class*="price"], [class*="precio"], [class*="offer"], [class*="total"]');
     return Array.from(els).map(e => e.innerText).join(" | ");
