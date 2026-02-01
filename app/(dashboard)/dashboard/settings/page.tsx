@@ -22,8 +22,9 @@ export default function SettingsPage() {
   const [openaiKey, setOpenaiKey] = useState<ApiKeyState>({ value: '', hasKey: false, isSaving: false })
   const [kieKey, setKieKey] = useState<ApiKeyState>({ value: '', hasKey: false, isSaving: false })
   const [bflKey, setBflKey] = useState<ApiKeyState>({ value: '', hasKey: false, isSaving: false })
-  const [rtrvrKey, setRtrvrKey] = useState<ApiKeyState>({ value: '', hasKey: false, isSaving: false })
   const [elevenlabsKey, setElevenlabsKey] = useState<ApiKeyState>({ value: '', hasKey: false, isSaving: false })
+  const [apifyKey, setApifyKey] = useState<ApiKeyState>({ value: '', hasKey: false, isSaving: false })
+  const [browserlessKey, setBrowserlessKey] = useState<ApiKeyState>({ value: '', hasKey: false, isSaving: false })
 
   useEffect(() => {
     fetchKeys()
@@ -46,11 +47,14 @@ export default function SettingsPage() {
       if (data.hasBflApiKey) {
         setBflKey(prev => ({ ...prev, hasKey: true, value: data.maskedBflApiKey || '' }))
       }
-      if (data.hasRtrvrApiKey) {
-        setRtrvrKey(prev => ({ ...prev, hasKey: true, value: data.maskedRtrvrApiKey || '' }))
-      }
       if (data.hasElevenlabsApiKey) {
         setElevenlabsKey(prev => ({ ...prev, hasKey: true, value: data.maskedElevenlabsApiKey || '' }))
+      }
+      if (data.hasApifyApiKey) {
+        setApifyKey(prev => ({ ...prev, hasKey: true, value: data.maskedApifyApiKey || '' }))
+      }
+      if (data.hasBrowserlessApiKey) {
+        setBrowserlessKey(prev => ({ ...prev, hasKey: true, value: data.maskedBrowserlessApiKey || '' }))
       }
     } catch (error) {
       console.error('Error fetching keys:', error)
@@ -59,14 +63,15 @@ export default function SettingsPage() {
     }
   }
 
-  const handleSaveKey = async (keyType: 'google' | 'openai' | 'kie' | 'bfl' | 'rtrvr' | 'elevenlabs') => {
+  const handleSaveKey = async (keyType: 'google' | 'openai' | 'kie' | 'bfl' | 'elevenlabs' | 'apify' | 'browserless') => {
     const keyMap = {
       google: { state: googleKey, setter: setGoogleKey, field: 'googleApiKey' },
       openai: { state: openaiKey, setter: setOpenaiKey, field: 'openaiApiKey' },
       kie: { state: kieKey, setter: setKieKey, field: 'kieApiKey' },
       bfl: { state: bflKey, setter: setBflKey, field: 'bflApiKey' },
-      rtrvr: { state: rtrvrKey, setter: setRtrvrKey, field: 'rtrvrApiKey' },
       elevenlabs: { state: elevenlabsKey, setter: setElevenlabsKey, field: 'elevenlabsApiKey' },
+      apify: { state: apifyKey, setter: setApifyKey, field: 'apifyApiKey' },
+      browserless: { state: browserlessKey, setter: setBrowserlessKey, field: 'browserlessApiKey' },
     }
 
     const { state, setter, field } = keyMap[keyType]
@@ -376,15 +381,15 @@ export default function SettingsPage() {
         </h2>
       </div>
 
-      {/* rtrvr.ai API Key */}
+      {/* Apify API Key */}
       <Card className="mb-4">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <div className="p-2 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-500 text-white">
               <Globe className="w-4 h-4" />
             </div>
-            rtrvr.ai (Web Scraping)
-            {rtrvrKey.hasKey && (
+            Apify (Meta Ads Search)
+            {apifyKey.hasKey && (
               <span className="flex items-center gap-1 text-xs text-success ml-auto">
                 <Check className="w-3 h-3" />
                 Configurada
@@ -392,32 +397,78 @@ export default function SettingsPage() {
             )}
           </CardTitle>
           <CardDescription>
-            Para: Análisis de competencia - Scrapea landing pages y extrae precios (~$0.12/tarea)
+            Para: Buscar anuncios de competidores en Facebook/Instagram
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex gap-2">
             <Input
               type="password"
-              placeholder="rtrvr_..."
-              value={rtrvrKey.value}
-              onChange={(e) => setRtrvrKey(prev => ({ ...prev, value: e.target.value }))}
+              placeholder="apify_api_..."
+              value={apifyKey.value}
+              onChange={(e) => setApifyKey(prev => ({ ...prev, value: e.target.value }))}
               className="flex-1"
             />
             <Button
-              onClick={() => handleSaveKey('rtrvr')}
-              isLoading={rtrvrKey.isSaving}
+              onClick={() => handleSaveKey('apify')}
+              isLoading={apifyKey.isSaving}
             >
               Guardar
             </Button>
           </div>
           <a
-            href="https://www.rtrvr.ai/cloud"
+            href="https://console.apify.com/account/integrations"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1 text-xs text-accent hover:text-accent-hover transition-colors"
           >
-            Obtener API Key (Cloud → API Keys) <ExternalLink className="w-3 h-3" />
+            Obtener API Key <ExternalLink className="w-3 h-3" />
+          </a>
+        </CardContent>
+      </Card>
+
+      {/* Browserless API Key */}
+      <Card className="mb-4">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <div className="p-2 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-500 text-white">
+              <Globe className="w-4 h-4" />
+            </div>
+            Browserless (Web Scraping)
+            {browserlessKey.hasKey && (
+              <span className="flex items-center gap-1 text-xs text-success ml-auto">
+                <Check className="w-3 h-3" />
+                Configurada
+              </span>
+            )}
+          </CardTitle>
+          <CardDescription>
+            Para: Extraer precios de landing pages (~$0.01/pagina)
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex gap-2">
+            <Input
+              type="password"
+              placeholder="..."
+              value={browserlessKey.value}
+              onChange={(e) => setBrowserlessKey(prev => ({ ...prev, value: e.target.value }))}
+              className="flex-1"
+            />
+            <Button
+              onClick={() => handleSaveKey('browserless')}
+              isLoading={browserlessKey.isSaving}
+            >
+              Guardar
+            </Button>
+          </div>
+          <a
+            href="https://www.browserless.io/dashboard"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-xs text-accent hover:text-accent-hover transition-colors"
+          >
+            Obtener API Key <ExternalLink className="w-3 h-3" />
           </a>
         </CardContent>
       </Card>
@@ -490,15 +541,19 @@ export default function SettingsPage() {
             </li>
             <li className="flex items-start gap-2">
               <span className="text-pink-500">•</span>
-              <span><strong>FLUX</strong> - Generación rápida con buenos resultados</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-cyan-500">•</span>
-              <span><strong>rtrvr.ai</strong> - Espía a tu competencia con scraping inteligente</span>
+              <span><strong>FLUX</strong> - Generacion rapida con buenos resultados</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-violet-500">•</span>
               <span><strong>ElevenLabs</strong> - Voces ultra realistas para tus videos</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-cyan-500">•</span>
+              <span><strong>Apify</strong> - Busca anuncios de competidores en Meta Ads</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-emerald-500">•</span>
+              <span><strong>Browserless</strong> - Extrae precios de landing pages</span>
             </li>
           </ul>
         </CardContent>
