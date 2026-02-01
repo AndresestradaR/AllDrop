@@ -6,6 +6,7 @@ import { ImageGenerator } from '@/components/studio/ImageGenerator'
 import { VideoGenerator } from '@/components/studio/VideoGenerator'
 import { AudioGenerator } from '@/components/studio/AudioGenerator'
 import { ToolsGrid } from '@/components/studio/ToolsGrid'
+import { DropshippingGrid } from '@/components/studio/DropshippingGrid'
 import { Wand2 } from 'lucide-react'
 
 export default function StudioPage() {
@@ -35,6 +36,7 @@ export default function StudioPage() {
         {activeTab === 'video' && <VideoGenerator />}
         {activeTab === 'audio' && <AudioGenerator />}
         {activeTab === 'herramientas' && <ToolsGrid />}
+        {activeTab === 'dropshipping' && <DropshippingGrid />}
       </div>
     </div>
   )

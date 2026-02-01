@@ -1,9 +1,9 @@
 'use client'
 
 import { cn } from '@/lib/utils/cn'
-import { ImageIcon, Video, AudioLines, Wrench } from 'lucide-react'
+import { ImageIcon, Video, AudioLines, Wrench, Package } from 'lucide-react'
 
-export type StudioTab = 'imagen' | 'video' | 'audio' | 'herramientas'
+export type StudioTab = 'imagen' | 'video' | 'audio' | 'herramientas' | 'dropshipping'
 
 interface StudioTabsProps {
   activeTab: StudioTab
@@ -15,6 +15,7 @@ const tabs: { id: StudioTab; label: string; icon: React.ElementType }[] = [
   { id: 'video', label: 'Video', icon: Video },
   { id: 'audio', label: 'Audio', icon: AudioLines },
   { id: 'herramientas', label: 'Herramientas', icon: Wrench },
+  { id: 'dropshipping', label: 'Dropshipping', icon: Package },
 ]
 
 export function StudioTabs({ activeTab, onTabChange }: StudioTabsProps) {
