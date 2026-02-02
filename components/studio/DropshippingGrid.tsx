@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { cn } from '@/lib/utils/cn'
 import {
   Star,
@@ -13,7 +13,10 @@ import {
   Copy,
   Check,
   Loader2,
+  Download,
+  AlertCircle,
 } from 'lucide-react'
+import toast from 'react-hot-toast'
 
 interface DropshippingTool {
   id: string
@@ -97,8 +100,21 @@ function ResenaUGCTool({ onBack }: { onBack: () => void }) {
   const [isGenerating, setIsGenerating] = useState(false)
   const [generationStep, setGenerationStep] = useState('')
   const [resultVideoUrl, setResultVideoUrl] = useState<string | null>(null)
+  const [generatedScript, setGeneratedScript] = useState('')
+  const [generatedFaceUrl, setGeneratedFaceUrl] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const pollingRef = useRef<NodeJS.Timeout | null>(null)
 
   const tool = DROPSHIPPING_TOOLS.find(t => t.id === 'resena-ugc')!
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current)
+      }
+    }
+  }, [])
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -108,36 +124,156 @@ function ResenaUGCTool({ onBack }: { onBack: () => void }) {
     }
   }
 
+  // Convert file to base64
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.readAsDataURL(file)
+      reader.onload = () => {
+        const result = reader.result as string
+        // Remove data URL prefix
+        const base64 = result.split(',')[1]
+        resolve(base64)
+      }
+      reader.onerror = reject
+    })
+  }
+
+  // Poll for video status
+  const pollVideoStatus = async (taskId: string) => {
+    let attempts = 0
+    const maxAttempts = 200 // ~10 minutes with 3s interval
+
+    pollingRef.current = setInterval(async () => {
+      attempts++
+
+      if (attempts > maxAttempts) {
+        clearInterval(pollingRef.current!)
+        pollingRef.current = null
+        setIsGenerating(false)
+        setGenerationStep('')
+        setError('Tiempo de espera agotado. El video puede seguir procesandose.')
+        toast.error('Tiempo de espera agotado')
+        return
+      }
+
+      try {
+        const response = await fetch(`/api/studio/video-status?taskId=${taskId}`)
+        const data = await response.json()
+
+        console.log('[ResenaUGC] Poll status:', data.status)
+
+        if (data.status === 'completed' && data.videoUrl) {
+          clearInterval(pollingRef.current!)
+          pollingRef.current = null
+          setResultVideoUrl(data.videoUrl)
+          setIsGenerating(false)
+          setGenerationStep('')
+          toast.success('Video generado exitosamente!')
+        } else if (data.status === 'failed' || (!data.success && data.error)) {
+          clearInterval(pollingRef.current!)
+          pollingRef.current = null
+          setIsGenerating(false)
+          setGenerationStep('')
+          setError(data.error || 'Error generando video')
+          toast.error(data.error || 'Error generando video')
+        } else {
+          // Still processing - update progress
+          const progress = Math.min(Math.round((attempts / maxAttempts) * 100), 95)
+          setGenerationStep(`Generando video... ${progress}%`)
+        }
+      } catch (err) {
+        console.error('[ResenaUGC] Polling error:', err)
+      }
+    }, 3000)
+  }
+
   const handleGenerate = async () => {
     if (!productName.trim()) return
     if (imageSource === 'upload' && !uploadedImage) return
 
     setIsGenerating(true)
     setResultVideoUrl(null)
+    setError(null)
+    setGeneratedScript('')
+    setGeneratedFaceUrl(null)
 
-    // TODO: Implement full API flow
-    // Step 1: Generate face if needed
-    setGenerationStep('Generando cara...')
-    await new Promise(r => setTimeout(r, 1500))
+    try {
+      // Prepare image if uploaded
+      let imageBase64: string | undefined
+      if (imageSource === 'upload' && uploadedImage) {
+        setGenerationStep('Preparando imagen...')
+        imageBase64 = await fileToBase64(uploadedImage)
+      } else {
+        setGenerationStep('Iniciando generacion...')
+      }
 
-    // Step 2: Create character profile
-    setGenerationStep('Creando perfil de personaje...')
-    await new Promise(r => setTimeout(r, 1500))
+      // Call the API
+      const response = await fetch('/api/studio/resena-ugc', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productName,
+          productBenefit,
+          imageSource,
+          imageBase64,
+          imageModel,
+          persona,
+          videoModel,
+          tone,
+          duration,
+          customScript: useCustomScript ? customScript : undefined,
+        }),
+      })
 
-    // Step 3: Generate script if needed
-    if (!useCustomScript) {
-      setGenerationStep('Generando guion...')
-      await new Promise(r => setTimeout(r, 1000))
+      const data = await response.json()
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Error en la generacion')
+      }
+
+      // Save generated data
+      if (data.script) setGeneratedScript(data.script)
+      if (data.faceImageUrl) setGeneratedFaceUrl(data.faceImageUrl)
+
+      // Start polling for video result
+      if (data.taskId) {
+        setGenerationStep('Video en proceso de generacion...')
+        toast.success('Proceso iniciado! El video puede tardar varios minutos.')
+        pollVideoStatus(data.taskId)
+      } else {
+        throw new Error('No se recibio taskId del servidor')
+      }
+
+    } catch (err: any) {
+      console.error('[ResenaUGC] Error:', err)
+      setIsGenerating(false)
+      setGenerationStep('')
+      setError(err.message || 'Error desconocido')
+      toast.error(err.message || 'Error generando video')
     }
+  }
 
-    // Step 4: Generate video
-    setGenerationStep('Generando video con dialogo...')
-    await new Promise(r => setTimeout(r, 3000))
+  const handleDownload = () => {
+    if (resultVideoUrl) {
+      const link = document.createElement('a')
+      link.href = resultVideoUrl
+      link.download = `resena-ugc-${Date.now()}.mp4`
+      link.click()
+    }
+  }
 
-    // Step 5: Done (placeholder)
-    setGenerationStep('')
+  const handleReset = () => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current)
+      pollingRef.current = null
+    }
     setIsGenerating(false)
-    // setResultVideoUrl would be set here with actual URL
+    setGenerationStep('')
+    setResultVideoUrl(null)
+    setError(null)
+    setGeneratedScript('')
+    setGeneratedFaceUrl(null)
   }
 
   const canGenerate = productName.trim() && (imageSource === 'generate' || uploadedImage)
@@ -401,26 +537,51 @@ function ResenaUGCTool({ onBack }: { onBack: () => void }) {
           {/* Output Section */}
           <div className="w-1/2 flex flex-col">
             <label className="block text-sm font-medium text-text-secondary mb-2">Video generado</label>
-            <div className="flex-1 bg-surface-elevated rounded-xl overflow-hidden flex items-center justify-center">
-              {resultVideoUrl ? (
-                <video src={resultVideoUrl} controls className="w-full h-full object-contain" autoPlay />
-              ) : (
-                <div className="text-center p-8">
-                  {isGenerating ? (
-                    <>
-                      <Loader2 className="w-12 h-12 text-accent mx-auto mb-3 animate-spin" />
-                      <p className="text-text-primary font-medium">{generationStep}</p>
-                      <p className="text-sm text-text-secondary mt-1">Esto puede tardar varios minutos</p>
-                    </>
-                  ) : (
-                    <>
-                      <Video className="w-12 h-12 text-text-secondary mx-auto mb-3" />
-                      <p className="text-text-secondary">El video de la resena aparecera aqui</p>
-                      <p className="text-xs text-text-secondary/70 mt-2">
-                        Persona hablando a camara con tu guion
-                      </p>
-                    </>
-                  )}
+            <div className="flex-1 bg-surface-elevated rounded-xl overflow-hidden flex flex-col">
+              {/* Video/Preview Area */}
+              <div className="flex-1 flex items-center justify-center min-h-[300px]">
+                {resultVideoUrl ? (
+                  <video src={resultVideoUrl} controls className="w-full h-full object-contain" autoPlay />
+                ) : error ? (
+                  <div className="text-center p-8">
+                    <AlertCircle className="w-12 h-12 text-error mx-auto mb-3" />
+                    <p className="text-error font-medium">Error</p>
+                    <p className="text-sm text-text-secondary mt-1 max-w-xs">{error}</p>
+                    <button
+                      onClick={handleReset}
+                      className="mt-4 px-4 py-2 text-sm text-accent hover:bg-accent/10 rounded-lg transition-colors"
+                    >
+                      Intentar de nuevo
+                    </button>
+                  </div>
+                ) : isGenerating ? (
+                  <div className="text-center p-8">
+                    <Loader2 className="w-12 h-12 text-accent mx-auto mb-3 animate-spin" />
+                    <p className="text-text-primary font-medium">{generationStep}</p>
+                    <p className="text-sm text-text-secondary mt-1">Esto puede tardar varios minutos</p>
+                    {generatedFaceUrl && (
+                      <div className="mt-4">
+                        <p className="text-xs text-text-secondary mb-2">Cara generada:</p>
+                        <img src={generatedFaceUrl} alt="Cara generada" className="w-20 h-20 rounded-lg mx-auto object-cover" />
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center p-8">
+                    <Video className="w-12 h-12 text-text-secondary mx-auto mb-3" />
+                    <p className="text-text-secondary">El video de la resena aparecera aqui</p>
+                    <p className="text-xs text-text-secondary/70 mt-2">
+                      Persona hablando a camara con tu guion
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Generated Script Preview */}
+              {generatedScript && (
+                <div className="border-t border-border p-4">
+                  <p className="text-xs font-medium text-text-secondary mb-1">Guion generado:</p>
+                  <p className="text-sm text-text-primary line-clamp-3">{generatedScript}</p>
                 </div>
               )}
             </div>
@@ -429,33 +590,54 @@ function ResenaUGCTool({ onBack }: { onBack: () => void }) {
 
         {/* Actions */}
         <div className="px-6 py-4 border-t border-border flex items-center justify-between">
-          <p className="text-xs text-text-secondary">
-            {videoModel === 'kling' && 'Kling 2.6 Pro - Mejor calidad para personas hablando'}
-            {videoModel === 'veo' && 'Veo 3.1 - Cinematografia de alta calidad'}
-            {videoModel === 'sora' && 'Sora 2 - Bueno para estilos creativos'}
-          </p>
-          <button
-            onClick={handleGenerate}
-            disabled={!canGenerate || isGenerating}
-            className={cn(
-              'flex items-center gap-2 px-6 py-2.5 rounded-xl font-semibold transition-all',
-              !canGenerate || isGenerating
-                ? 'bg-border text-text-secondary cursor-not-allowed'
-                : 'bg-accent hover:bg-accent-hover text-background'
+          <div className="flex items-center gap-4">
+            <p className="text-xs text-text-secondary">
+              {videoModel === 'kling' && 'Kling 2.6 Pro - Mejor calidad para personas hablando'}
+              {videoModel === 'veo' && 'Veo 3.1 - Cinematografia de alta calidad'}
+              {videoModel === 'sora' && 'Sora 2 - Bueno para estilos creativos'}
+            </p>
+            {isGenerating && (
+              <button
+                onClick={handleReset}
+                className="text-xs text-error hover:text-error/80 transition-colors"
+              >
+                Cancelar
+              </button>
             )}
-          >
-            {isGenerating ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Generando...
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-4 h-4" />
-                Generar Video
-              </>
+          </div>
+          <div className="flex items-center gap-3">
+            {resultVideoUrl && (
+              <button
+                onClick={handleDownload}
+                className="flex items-center gap-2 px-4 py-2 bg-surface-elevated border border-border rounded-lg text-sm font-medium text-text-primary hover:bg-border/50 transition-colors"
+              >
+                <Download className="w-4 h-4" />
+                Descargar
+              </button>
             )}
-          </button>
+            <button
+              onClick={handleGenerate}
+              disabled={!canGenerate || isGenerating}
+              className={cn(
+                'flex items-center gap-2 px-6 py-2.5 rounded-xl font-semibold transition-all',
+                !canGenerate || isGenerating
+                  ? 'bg-border text-text-secondary cursor-not-allowed'
+                  : 'bg-accent hover:bg-accent-hover text-background'
+              )}
+            >
+              {isGenerating ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Generando...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4" />
+                  Generar Video
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>
