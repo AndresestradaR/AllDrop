@@ -48,9 +48,12 @@ async function uploadImageToStorage(
   return urlData.publicUrl
 }
 
+// Veo generation types
+type VeoGenerationType = 'TEXT_2_VIDEO' | 'FIRST_AND_LAST_FRAMES_2_VIDEO' | 'REFERENCE_2_VIDEO'
+
 export async function POST(request: Request) {
   const startTime = Date.now()
-  
+
   try {
     const supabase = await createClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -69,6 +72,10 @@ export async function POST(request: Request) {
       enableAudio = true,
       imageBase64,
       imageBase64End,
+      // Veo-specific parameters
+      veoGenerationType,
+      veoSeed,
+      veoImages,
     } = body as {
       modelId: VideoModelId
       prompt: string
@@ -78,7 +85,12 @@ export async function POST(request: Request) {
       enableAudio?: boolean
       imageBase64?: string
       imageBase64End?: string
+      veoGenerationType?: VeoGenerationType
+      veoSeed?: number
+      veoImages?: string[]
     }
+
+    const isVeoModel = modelId.startsWith('veo')
 
     if (!modelId || !prompt) {
       return NextResponse.json(
@@ -119,11 +131,23 @@ export async function POST(request: Request) {
     console.log(`[Video] Starting - Model: ${modelId}, User: ${user.id.substring(0, 8)}...`)
     console.log(`[Video] Prompt: ${prompt.substring(0, 100)}...`)
     console.log(`[Video] Duration: ${duration}s, Aspect: ${aspectRatio}, Audio: ${enableAudio}`)
+    if (isVeoModel) {
+      console.log(`[Video] Veo Type: ${veoGenerationType}, Seed: ${veoSeed}`)
+    }
 
     // Upload images to get public URLs
     const imageUrls: string[] = []
 
-    if (imageBase64 && modelConfig.supportsStartEndFrames) {
+    // Handle Veo images
+    if (isVeoModel && veoImages && veoImages.length > 0) {
+      console.log(`[Video] Uploading ${veoImages.length} Veo images...`)
+      for (let i = 0; i < veoImages.length; i++) {
+        const url = await uploadImageToStorage(supabase, veoImages[i], user.id, i)
+        imageUrls.push(url)
+      }
+    }
+    // Handle regular image-to-video
+    else if (imageBase64 && modelConfig.supportsStartEndFrames) {
       console.log('[Video] Uploading start image...')
       const url = await uploadImageToStorage(supabase, imageBase64, user.id, 0)
       imageUrls.push(url)
@@ -137,19 +161,25 @@ export async function POST(request: Request) {
 
     console.log(`[Video] Image URLs: ${imageUrls.length}`)
 
+    // Build generation params
+    const generationParams: Parameters<typeof generateVideo>[0] = {
+      modelId,
+      prompt,
+      duration,
+      aspectRatio,
+      resolution: resolution || modelConfig.defaultResolution,
+      enableAudio: modelConfig.supportsAudio ? enableAudio : false,
+      imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
+    }
+
+    // Add Veo-specific params
+    if (isVeoModel) {
+      generationParams.veoGenerationType = veoGenerationType
+      generationParams.veoSeed = veoSeed
+    }
+
     // Create video task (returns taskId for async processing)
-    const result = await generateVideo(
-      {
-        modelId,
-        prompt,
-        duration,
-        aspectRatio,
-        resolution: resolution || modelConfig.defaultResolution,
-        enableAudio: modelConfig.supportsAudio ? enableAudio : false,
-        imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
-      },
-      kieApiKey
-    )
+    const result = await generateVideo(generationParams, kieApiKey)
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
 

@@ -358,6 +358,9 @@ export function modelRequiresImage(modelId: VideoModelId): boolean {
   return model?.requiresImage === true
 }
 
+// Veo generation types
+export type VeoGenerationType = 'TEXT_2_VIDEO' | 'FIRST_AND_LAST_FRAMES_2_VIDEO' | 'REFERENCE_2_VIDEO'
+
 // Generation request interface
 export interface GenerateVideoRequest {
   modelId: VideoModelId
@@ -367,6 +370,9 @@ export interface GenerateVideoRequest {
   aspectRatio?: '16:9' | '9:16' | '1:1'
   imageUrls?: string[] // Public URLs for reference images
   enableAudio?: boolean
+  // Veo-specific parameters
+  veoGenerationType?: VeoGenerationType
+  veoSeed?: number // 10000-99999
 }
 
 export interface GenerateVideoResult {

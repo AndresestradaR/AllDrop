@@ -18,6 +18,10 @@ import {
   VolumeX,
   Layers,
   Play,
+  Type,
+  Images,
+  Users,
+  Hash,
 } from 'lucide-react'
 import {
   VIDEO_MODELS,
@@ -27,6 +31,37 @@ import {
 } from '@/lib/video-providers/types'
 
 type VideoAspectRatio = '16:9' | '9:16' | '1:1'
+
+// Veo generation types
+type VeoGenerationType = 'TEXT_2_VIDEO' | 'FIRST_AND_LAST_FRAMES_2_VIDEO' | 'REFERENCE_2_VIDEO'
+
+const VEO_GENERATION_TYPES = [
+  {
+    id: 'TEXT_2_VIDEO' as VeoGenerationType,
+    name: 'Text to Video',
+    description: 'Genera video solo con prompt',
+    icon: Type,
+    imagesRequired: 0,
+    imagesMax: 0,
+  },
+  {
+    id: 'FIRST_AND_LAST_FRAMES_2_VIDEO' as VeoGenerationType,
+    name: 'First/Last Frames',
+    description: '1-2 imágenes como frames inicial/final',
+    icon: Film,
+    imagesRequired: 1,
+    imagesMax: 2,
+  },
+  {
+    id: 'REFERENCE_2_VIDEO' as VeoGenerationType,
+    name: 'Reference to Video',
+    description: '1-3 imágenes de referencia (solo veo3_fast)',
+    icon: Images,
+    imagesRequired: 1,
+    imagesMax: 3,
+    modelRestriction: 'veo3_fast',
+  },
+]
 
 interface GeneratedVideo {
   id: string
@@ -55,7 +90,12 @@ export function VideoGenerator() {
   const [selectedModel, setSelectedModel] = useState<VideoModelId>('hailuo-2.3-standard')
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false)
 
-  // Input image (for image-to-video)
+  // Veo-specific options
+  const [veoGenerationType, setVeoGenerationType] = useState<VeoGenerationType>('TEXT_2_VIDEO')
+  const [veoImages, setVeoImages] = useState<{ file: File; preview: string }[]>([])
+  const [veoSeed, setVeoSeed] = useState<number>(Math.floor(Math.random() * (99999 - 10000 + 1)) + 10000)
+
+  // Input image (for image-to-video - legacy for non-Veo models)
   const [inputImage, setInputImage] = useState<{ file: File; preview: string } | null>(null)
 
   // Generation options
@@ -73,6 +113,10 @@ export function VideoGenerator() {
 
   // Refs
   const inputImageRef = useRef<HTMLInputElement>(null)
+  const veoImageRefs = useRef<(HTMLInputElement | null)[]>([])
+
+  // Check if current model is Veo
+  const isVeoModel = selectedModel.startsWith('veo')
 
   const currentModel = VIDEO_MODELS[selectedModel]
 
@@ -111,33 +155,58 @@ export function VideoGenerator() {
   const handleGenerate = async () => {
     if (!prompt.trim()) return
 
+    // Validate Veo images if applicable
+    if (isVeoModel && !validateVeoImages()) {
+      setError(`Se requieren ${currentVeoType?.imagesRequired}-${currentVeoType?.imagesMax} imágenes para este modo`)
+      return
+    }
+
     setIsGenerating(true)
     setError(null)
     setGeneratingStatus('Iniciando generación...')
 
     try {
-      // Convert image to base64 if present
+      // Convert image to base64 if present (for non-Veo models)
       let imageBase64: string | undefined
+      let veoImagesBase64: string[] = []
 
-      if (inputImage && currentModel.supportsStartEndFrames) {
+      if (isVeoModel && veoImages.length > 0) {
+        setGeneratingStatus('Subiendo imágenes...')
+        veoImagesBase64 = await Promise.all(
+          veoImages.filter(img => img).map(img => fileToBase64(img.file))
+        )
+      } else if (inputImage && currentModel.supportsStartEndFrames) {
         setGeneratingStatus('Subiendo imagen...')
         imageBase64 = await fileToBase64(inputImage.file)
       }
 
       setGeneratingStatus('Creando tarea de video...')
 
+      // Build request body
+      const requestBody: Record<string, any> = {
+        modelId: selectedModel,
+        prompt,
+        duration,
+        aspectRatio,
+        resolution,
+        enableAudio: currentModel.supportsAudio ? enableAudio : false,
+      }
+
+      // Add Veo-specific parameters
+      if (isVeoModel) {
+        requestBody.veoGenerationType = veoGenerationType
+        requestBody.veoSeed = veoSeed
+        if (veoImagesBase64.length > 0) {
+          requestBody.veoImages = veoImagesBase64
+        }
+      } else if (imageBase64) {
+        requestBody.imageBase64 = imageBase64
+      }
+
       const response = await fetch('/api/studio/generate-video', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          modelId: selectedModel,
-          prompt,
-          duration,
-          aspectRatio,
-          resolution,
-          enableAudio: currentModel.supportsAudio ? enableAudio : false,
-          imageBase64,
-        }),
+        body: JSON.stringify(requestBody),
       })
 
       const data = await response.json()
@@ -201,6 +270,44 @@ export function VideoGenerator() {
     if (file) {
       setter({ file, preview: URL.createObjectURL(file) })
     }
+  }
+
+  // Handle Veo image selection
+  const handleVeoImageSelect = (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      const newImages = [...veoImages]
+      newImages[index] = { file, preview: URL.createObjectURL(file) }
+      setVeoImages(newImages)
+    }
+  }
+
+  // Remove Veo image
+  const removeVeoImage = (index: number) => {
+    const newImages = veoImages.filter((_, i) => i !== index)
+    setVeoImages(newImages)
+  }
+
+  // Get current Veo generation type config
+  const currentVeoType = VEO_GENERATION_TYPES.find(t => t.id === veoGenerationType)
+
+  // Validate Veo images
+  const validateVeoImages = () => {
+    if (!isVeoModel) return true
+    if (!currentVeoType) return true
+
+    const validImages = veoImages.filter(img => img !== null && img !== undefined)
+
+    if (veoGenerationType === 'TEXT_2_VIDEO') return true
+    if (validImages.length < currentVeoType.imagesRequired) return false
+    if (validImages.length > currentVeoType.imagesMax) return false
+
+    return true
+  }
+
+  // Generate random seed
+  const generateNewSeed = () => {
+    setVeoSeed(Math.floor(Math.random() * (99999 - 10000 + 1)) + 10000)
   }
 
   const getDurationOptions = () => {
@@ -267,6 +374,16 @@ export function VideoGenerator() {
                             const range = model.durationRange.match(/(\d+)-(\d+)/)
                             if (range) {
                               setDuration(parseInt(range[1]))
+                            }
+                            // Reset Veo generation type if switching to veo-3.1 and current type is REFERENCE_2_VIDEO
+                            if (model.id === 'veo-3.1' && veoGenerationType === 'REFERENCE_2_VIDEO') {
+                              setVeoGenerationType('TEXT_2_VIDEO')
+                              setVeoImages([])
+                            }
+                            // Reset Veo settings when switching away from Veo models
+                            if (!model.id.startsWith('veo') && selectedModel.startsWith('veo')) {
+                              setVeoGenerationType('TEXT_2_VIDEO')
+                              setVeoImages([])
                             }
                             setIsModelDropdownOpen(false)
                           }}
@@ -338,8 +455,191 @@ export function VideoGenerator() {
             )}
           </div>
 
-          {/* Input Image (for image-to-video) */}
-          {currentModel.supportsStartEndFrames && (
+          {/* Veo Generation Type Selector */}
+          {isVeoModel && (
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-2">
+                Tipo de Generación
+              </label>
+              <div className="grid grid-cols-1 gap-2">
+                {VEO_GENERATION_TYPES.map((type) => {
+                  const Icon = type.icon
+                  const isRestricted = type.modelRestriction && !selectedModel.includes(type.modelRestriction.replace('veo3_', ''))
+                  const isSelected = veoGenerationType === type.id
+
+                  return (
+                    <button
+                      key={type.id}
+                      onClick={() => {
+                        if (!isRestricted) {
+                          setVeoGenerationType(type.id)
+                          setVeoImages([]) // Reset images when changing type
+                        }
+                      }}
+                      disabled={isRestricted}
+                      className={cn(
+                        'flex items-center gap-3 p-3 rounded-xl border transition-all text-left',
+                        isSelected
+                          ? 'border-accent bg-accent/10'
+                          : isRestricted
+                          ? 'border-border/50 bg-surface-elevated/50 opacity-50 cursor-not-allowed'
+                          : 'border-border hover:border-accent/50 bg-surface-elevated'
+                      )}
+                    >
+                      <div className={cn(
+                        'w-10 h-10 rounded-lg flex items-center justify-center',
+                        isSelected ? 'bg-accent/20 text-accent' : 'bg-border/50 text-text-secondary'
+                      )}>
+                        <Icon className="w-5 h-5" />
+                      </div>
+                      <div className="flex-1">
+                        <p className={cn(
+                          'text-sm font-medium',
+                          isSelected ? 'text-accent' : 'text-text-primary'
+                        )}>
+                          {type.name}
+                        </p>
+                        <p className="text-xs text-text-secondary">
+                          {type.description}
+                        </p>
+                      </div>
+                      {isSelected && (
+                        <Check className="w-4 h-4 text-accent" />
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Veo Images Upload */}
+          {isVeoModel && veoGenerationType !== 'TEXT_2_VIDEO' && currentVeoType && (
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-2">
+                {veoGenerationType === 'FIRST_AND_LAST_FRAMES_2_VIDEO'
+                  ? 'Frames (Inicial / Final)'
+                  : 'Imágenes de Referencia'
+                }
+                <span className="text-xs text-text-muted ml-2">
+                  ({currentVeoType.imagesRequired}-{currentVeoType.imagesMax} imágenes)
+                </span>
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {Array.from({ length: currentVeoType.imagesMax }).map((_, index) => (
+                  <div key={index}>
+                    <input
+                      ref={(el) => { veoImageRefs.current[index] = el }}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => handleVeoImageSelect(e, index)}
+                    />
+                    <button
+                      onClick={() => veoImageRefs.current[index]?.click()}
+                      className={cn(
+                        'w-full aspect-square rounded-xl border border-dashed transition-all flex flex-col items-center justify-center gap-1',
+                        veoImages[index]
+                          ? 'border-accent bg-accent/5 p-0 overflow-hidden'
+                          : index < currentVeoType.imagesRequired
+                          ? 'border-accent/50 hover:border-accent bg-accent/5'
+                          : 'border-border hover:border-accent/50'
+                      )}
+                    >
+                      {veoImages[index] ? (
+                        <div className="relative w-full h-full">
+                          <img
+                            src={veoImages[index].preview}
+                            alt={`Image ${index + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              removeVeoImage(index)
+                            }}
+                            className="absolute top-1 right-1 p-1 bg-error/90 rounded-full hover:bg-error transition-colors"
+                          >
+                            <X className="w-3 h-3 text-white" />
+                          </button>
+                          <span className="absolute bottom-1 left-1 text-[10px] bg-black/70 text-white px-1.5 py-0.5 rounded">
+                            {veoGenerationType === 'FIRST_AND_LAST_FRAMES_2_VIDEO'
+                              ? index === 0 ? 'Inicio' : 'Final'
+                              : `Ref ${index + 1}`
+                            }
+                          </span>
+                        </div>
+                      ) : (
+                        <>
+                          <ImageIcon className="w-5 h-5 text-text-secondary" />
+                          <span className="text-[10px] text-text-secondary">
+                            {veoGenerationType === 'FIRST_AND_LAST_FRAMES_2_VIDEO'
+                              ? index === 0 ? 'Inicio' : 'Final'
+                              : `Ref ${index + 1}`
+                            }
+                          </span>
+                          {index < currentVeoType.imagesRequired && (
+                            <span className="text-[9px] text-accent">Requerido</span>
+                          )}
+                        </>
+                      )}
+                    </button>
+                  </div>
+                ))}
+              </div>
+              {veoGenerationType === 'FIRST_AND_LAST_FRAMES_2_VIDEO' && (
+                <p className="text-xs text-text-muted mt-2">
+                  Primera imagen = frame inicial. Segunda imagen (opcional) = frame final.
+                </p>
+              )}
+              {veoGenerationType === 'REFERENCE_2_VIDEO' && (
+                <p className="text-xs text-text-muted mt-2">
+                  Las imágenes de referencia guían el estilo visual del video.
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Veo Seed */}
+          {isVeoModel && (
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-2">
+                Seed
+                <span className="text-xs text-text-muted ml-2">(10000-99999)</span>
+              </label>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
+                  <input
+                    type="number"
+                    min={10000}
+                    max={99999}
+                    value={veoSeed}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value)
+                      if (val >= 10000 && val <= 99999) {
+                        setVeoSeed(val)
+                      }
+                    }}
+                    className="w-full pl-9 pr-4 py-2.5 bg-surface-elevated border border-border rounded-xl text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent"
+                  />
+                </div>
+                <button
+                  onClick={generateNewSeed}
+                  className="px-4 py-2.5 bg-surface-elevated border border-border rounded-xl hover:border-accent/50 transition-colors"
+                  title="Generar nuevo seed"
+                >
+                  <Sparkles className="w-4 h-4 text-text-secondary" />
+                </button>
+              </div>
+              <p className="text-xs text-text-muted mt-1">
+                Usa el mismo seed para resultados reproducibles.
+              </p>
+            </div>
+          )}
+
+          {/* Input Image (for image-to-video - non-Veo models) */}
+          {!isVeoModel && currentModel.supportsStartEndFrames && (
             <div>
               <label className="block text-sm font-medium text-text-secondary mb-2">
                 Imagen de entrada (opcional)
@@ -389,6 +689,23 @@ export function VideoGenerator() {
               <p className="text-xs text-text-muted mt-1">
                 Sin imagen = text-to-video. Con imagen = image-to-video.
               </p>
+            </div>
+          )}
+
+          {/* Veo Mode Info */}
+          {isVeoModel && (
+            <div className="p-3 bg-accent/5 border border-accent/20 rounded-xl">
+              <div className="flex items-start gap-2">
+                <Video className="w-4 h-4 text-accent mt-0.5" />
+                <div>
+                  <p className="text-xs font-medium text-accent">Modo Veo Activo</p>
+                  <p className="text-xs text-text-secondary mt-0.5">
+                    {veoGenerationType === 'TEXT_2_VIDEO' && 'Generación de video solo con texto.'}
+                    {veoGenerationType === 'FIRST_AND_LAST_FRAMES_2_VIDEO' && 'El video interpolará entre los frames inicial y final.'}
+                    {veoGenerationType === 'REFERENCE_2_VIDEO' && 'Las imágenes guiarán el estilo visual del video.'}
+                  </p>
+                </div>
+              </div>
             </div>
           )}
 
@@ -506,10 +823,10 @@ export function VideoGenerator() {
           {/* Generate Button */}
           <button
             onClick={handleGenerate}
-            disabled={isGenerating || !prompt.trim()}
+            disabled={isGenerating || !prompt.trim() || (isVeoModel && !validateVeoImages())}
             className={cn(
               'w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-semibold transition-all duration-200',
-              isGenerating || !prompt.trim()
+              isGenerating || !prompt.trim() || (isVeoModel && !validateVeoImages())
                 ? 'bg-border text-text-secondary cursor-not-allowed'
                 : 'bg-accent hover:bg-accent-hover text-background shadow-lg shadow-accent/25 hover:shadow-accent/40'
             )}

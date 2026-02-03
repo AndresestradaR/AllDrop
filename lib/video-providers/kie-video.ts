@@ -89,16 +89,19 @@ export async function generateVideo(
 /**
  * Generate video with Veo 3.1 (special endpoint)
  * Endpoint: POST /api/v1/veo/generate
- * 
+ *
  * From KIE docs (https://docs.kie.ai/veo3-api/generate-veo-3-video):
  * - model: "veo3" (Quality, 250 credits) or "veo3_fast" (Fast, 60 credits)
  * - aspect_ratio: "16:9", "9:16", or "Auto"
  * - generationType: TEXT_2_VIDEO, FIRST_AND_LAST_FRAMES_2_VIDEO, REFERENCE_2_VIDEO
  * - imageUrls: array of public URLs (for image-to-video)
  * - enableTranslation: boolean (translate prompt to English)
- * 
- * IMPORTANT: Parameter is "model" NOT "mode"!
- * Valid values: "veo3" or "veo3_fast"
+ * - seed: number (10000-99999) for reproducible results
+ *
+ * IMPORTANT:
+ * - Parameter is "model" NOT "mode"!
+ * - Valid values: "veo3" or "veo3_fast"
+ * - REFERENCE_2_VIDEO only works with veo3_fast
  */
 async function generateVeoVideo(
   request: GenerateVideoRequest,
@@ -109,7 +112,7 @@ async function generateVeoVideo(
   // veo-3.1 -> "veo3" (Quality, 250 credits)
   // veo-3-fast -> "veo3_fast" (Fast, 60 credits)
   const kieModel = modelId === 'veo-3.1' ? 'veo3' : 'veo3_fast'
-  
+
   const body: Record<string, any> = {
     model: kieModel, // "veo3" or "veo3_fast"
     prompt: request.prompt,
@@ -117,13 +120,39 @@ async function generateVeoVideo(
     enableTranslation: true,
   }
 
-  // Determine generation type based on images
-  if (request.imageUrls && request.imageUrls.length > 0) {
-    body.imageUrls = request.imageUrls
-    // 1 or 2 images: first/last frame mode
-    body.generationType = 'FIRST_AND_LAST_FRAMES_2_VIDEO'
+  // Add seed if provided (10000-99999)
+  if (request.veoSeed && request.veoSeed >= 10000 && request.veoSeed <= 99999) {
+    body.seed = request.veoSeed
+  }
+
+  // Determine generation type - use explicit type if provided, otherwise infer from images
+  if (request.veoGenerationType) {
+    body.generationType = request.veoGenerationType
+
+    // Add images based on generation type
+    if (request.veoGenerationType === 'FIRST_AND_LAST_FRAMES_2_VIDEO') {
+      // 1-2 images for first/last frame
+      if (request.imageUrls && request.imageUrls.length > 0) {
+        body.imageUrls = request.imageUrls.slice(0, 2)
+      }
+    } else if (request.veoGenerationType === 'REFERENCE_2_VIDEO') {
+      // 1-3 images for reference (only veo3_fast)
+      if (kieModel !== 'veo3_fast') {
+        throw new Error('REFERENCE_2_VIDEO solo funciona con Veo 3 Fast')
+      }
+      if (request.imageUrls && request.imageUrls.length > 0) {
+        body.imageUrls = request.imageUrls.slice(0, 3)
+      }
+    }
+    // TEXT_2_VIDEO doesn't need images
   } else {
-    body.generationType = 'TEXT_2_VIDEO'
+    // Fallback: infer from images (legacy behavior)
+    if (request.imageUrls && request.imageUrls.length > 0) {
+      body.imageUrls = request.imageUrls
+      body.generationType = 'FIRST_AND_LAST_FRAMES_2_VIDEO'
+    } else {
+      body.generationType = 'TEXT_2_VIDEO'
+    }
   }
 
   console.log('[Video/Veo] Request:', JSON.stringify({
