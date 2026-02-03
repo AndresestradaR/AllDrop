@@ -166,7 +166,7 @@ export default function SettingsPage() {
             </button>
             <div className="rounded-xl overflow-hidden shadow-2xl">
               <video
-                src="https://papfcbiswvdgalfteujm.supabase.co/storage/v1/object/public/Videos/Tutorial%20Apis%20keys.mp4"
+                src="https://papfcbiswvdgalfteujm.supabase.co/storage/v1/object/public/Videos/Tutorial%20Apis%20keys%202.mp4"
                 controls
                 autoPlay
                 className="w-full aspect-video bg-black"
