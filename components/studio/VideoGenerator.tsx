@@ -464,7 +464,7 @@ export function VideoGenerator() {
               <div className="grid grid-cols-1 gap-2">
                 {VEO_GENERATION_TYPES.map((type) => {
                   const Icon = type.icon
-                  const isRestricted = type.modelRestriction && !selectedModel.includes(type.modelRestriction.replace('veo3_', ''))
+                  const isRestricted = !!(type.modelRestriction && !selectedModel.includes(type.modelRestriction.replace('veo3_', '')))
                   const isSelected = veoGenerationType === type.id
 
                   return (
