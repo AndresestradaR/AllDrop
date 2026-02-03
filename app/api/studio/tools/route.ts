@@ -32,8 +32,8 @@ async function generateWithGemini(
     return { success: false, error: 'Herramienta no soportada para Gemini' }
   }
 
-  // Use gemini-2.0-flash for image generation (more reliable)
-  const apiModelId = 'gemini-2.0-flash-exp-image-generation'
+  // Use gemini-2.5-flash for image generation
+  const apiModelId = 'gemini-2.5-flash-preview-image-generation'
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${apiModelId}:generateContent`
 
   const parts = [
