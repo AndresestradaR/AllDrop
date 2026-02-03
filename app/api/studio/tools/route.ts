@@ -322,6 +322,7 @@ async function checkLipSyncStatus(
 
 /**
  * Upload file to Supabase and return public URL
+ * Uses 'landing-images' bucket which is already configured as public
  */
 async function uploadToSupabase(
   supabase: any,
@@ -330,25 +331,35 @@ async function uploadToSupabase(
   filename: string,
   contentType: string
 ): Promise<string | null> {
-  const bucket = 'generations'
-  const path = `${userId}/tools/${Date.now()}-${filename}`
+  const bucket = 'landing-images' // Use existing public bucket
+  const path = `studio/lip-sync/${userId}/${Date.now()}-${filename}`
 
-  const fileBuffer = file instanceof File ? Buffer.from(await file.arrayBuffer()) : file
+  try {
+    const fileBuffer = file instanceof File ? Buffer.from(await file.arrayBuffer()) : file
 
-  const { error } = await supabase.storage
-    .from(bucket)
-    .upload(path, fileBuffer, {
-      contentType,
-      upsert: true,
-    })
+    console.log(`[Upload] Uploading to ${bucket}/${path} (${contentType}, ${fileBuffer.length} bytes)`)
 
-  if (error) {
-    console.error('[Upload] Error:', error)
+    const { error } = await supabase.storage
+      .from(bucket)
+      .upload(path, fileBuffer, {
+        contentType,
+        upsert: true,
+      })
+
+    if (error) {
+      console.error('[Upload] Supabase error:', error.message, error)
+      return null
+    }
+
+    const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(path)
+    const publicUrl = urlData?.publicUrl || null
+
+    console.log(`[Upload] Success: ${publicUrl}`)
+    return publicUrl
+  } catch (err: any) {
+    console.error('[Upload] Exception:', err.message)
     return null
   }
-
-  const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(path)
-  return urlData?.publicUrl || null
 }
 
 export async function POST(request: Request) {
