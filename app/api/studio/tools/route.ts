@@ -240,7 +240,7 @@ async function generateLipSync(
         input: {
           image_url: imageUrl,
           audio_url: audioUrl,
-          prompt: '', // Required field, even if empty
+          prompt: prompt || '', // Use provided prompt or empty string
         },
       }
     }

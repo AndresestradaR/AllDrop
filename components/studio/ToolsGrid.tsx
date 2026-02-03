@@ -226,8 +226,8 @@ export function ToolsGrid() {
       // Add lip sync specific fields
       if (activeTool === 'lip-sync') {
         formData.append('lipSyncModel', lipSyncModel)
+        formData.append('prompt', infinitalkPrompt) // Send prompt for both models
         if (lipSyncModel === 'infinitalk') {
-          formData.append('prompt', infinitalkPrompt)
           formData.append('resolution', infinitalkResolution)
           formData.append('seed', infinitalkSeed.toString())
         }
@@ -492,27 +492,29 @@ export function ToolsGrid() {
               )}
 
               {/* Infinitalk-specific fields */}
+              {/* Prompt (for both Lip Sync models) */}
+              {isLipSync && (
+                <div className="mt-5">
+                  <label className="block text-sm font-medium text-text-secondary mb-2">
+                    Prompt <span className="text-text-muted">(opcional)</span>
+                  </label>
+                  <textarea
+                    value={infinitalkPrompt}
+                    onChange={(e) => setInfinitalkPrompt(e.target.value)}
+                    placeholder="Describe el estilo o contexto del video..."
+                    rows={2}
+                    maxLength={5000}
+                    className="w-full px-3 py-2 bg-surface-elevated border border-border rounded-xl text-sm text-text-primary placeholder:text-text-muted resize-none focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent"
+                  />
+                  <p className="text-xs text-text-muted mt-1">
+                    {infinitalkPrompt.length}/5000 caracteres
+                  </p>
+                </div>
+              )}
+
+              {/* Resolution & Seed (Infinitalk only) */}
               {isLipSync && lipSyncModel === 'infinitalk' && (
                 <>
-                  {/* Prompt */}
-                  <div className="mt-5">
-                    <label className="block text-sm font-medium text-text-secondary mb-2">
-                      Prompt <span className="text-text-muted">(opcional)</span>
-                    </label>
-                    <textarea
-                      value={infinitalkPrompt}
-                      onChange={(e) => setInfinitalkPrompt(e.target.value)}
-                      placeholder="Describe el estilo o contexto del video..."
-                      rows={2}
-                      maxLength={5000}
-                      className="w-full px-3 py-2 bg-surface-elevated border border-border rounded-xl text-sm text-text-primary placeholder:text-text-muted resize-none focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent"
-                    />
-                    <p className="text-xs text-text-muted mt-1">
-                      {infinitalkPrompt.length}/5000 caracteres
-                    </p>
-                  </div>
-
-                  {/* Resolution & Seed */}
                   <div className="mt-4 grid grid-cols-2 gap-3">
                     {/* Resolution */}
                     <div>
