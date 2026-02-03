@@ -18,8 +18,28 @@ import {
   Download,
   Play,
   Pause,
+  Check,
+  Hash,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+
+// Lip Sync Models
+type LipSyncModel = 'kling' | 'infinitalk'
+
+const LIP_SYNC_MODELS = [
+  {
+    id: 'kling' as LipSyncModel,
+    name: 'Kling AI Avatar',
+    description: 'Sincronización básica de labios',
+    apiModel: 'kling/ai-avatar-standard',
+  },
+  {
+    id: 'infinitalk' as LipSyncModel,
+    name: 'Infinitalk',
+    description: 'Alta calidad con prompt y configuración avanzada',
+    apiModel: 'infinitalk/from-audio',
+  },
+]
 
 interface Tool {
   id: string
@@ -93,6 +113,12 @@ export function ToolsGrid() {
   const audioPreviewRef = useRef<HTMLAudioElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const pollingRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Lip Sync specific state
+  const [lipSyncModel, setLipSyncModel] = useState<LipSyncModel>('kling')
+  const [infinitalkPrompt, setInfinitalkPrompt] = useState('')
+  const [infinitalkResolution, setInfinitalkResolution] = useState<'480p' | '720p'>('720p')
+  const [infinitalkSeed, setInfinitalkSeed] = useState<number>(Math.floor(Math.random() * (1000000 - 10000 + 1)) + 10000)
 
   const currentTool = TOOLS.find((t) => t.id === activeTool)
 
@@ -197,6 +223,16 @@ export function ToolsGrid() {
         formData.append('audio', uploadedAudio)
       }
 
+      // Add lip sync specific fields
+      if (activeTool === 'lip-sync') {
+        formData.append('lipSyncModel', lipSyncModel)
+        if (lipSyncModel === 'infinitalk') {
+          formData.append('prompt', infinitalkPrompt)
+          formData.append('resolution', infinitalkResolution)
+          formData.append('seed', infinitalkSeed.toString())
+        }
+      }
+
       const response = await fetch('/api/studio/tools', {
         method: 'POST',
         body: formData,
@@ -251,10 +287,19 @@ export function ToolsGrid() {
     setResultVideo(null)
     setProcessingStatus('')
     setIsPlaying(false)
+    // Reset lip sync specific state
+    setLipSyncModel('kling')
+    setInfinitalkPrompt('')
+    setInfinitalkResolution('720p')
+    setInfinitalkSeed(Math.floor(Math.random() * (1000000 - 10000 + 1)) + 10000)
     if (pollingRef.current) {
       clearInterval(pollingRef.current)
       pollingRef.current = null
     }
+  }
+
+  const generateNewSeed = () => {
+    setInfinitalkSeed(Math.floor(Math.random() * (1000000 - 10000 + 1)) + 10000)
   }
 
   // Tool interface view
