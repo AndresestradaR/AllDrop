@@ -388,11 +388,49 @@ export function ToolsGrid() {
                 </label>
               )}
 
+              {/* Lip Sync Model Selector */}
+              {isLipSync && (
+                <div className="mt-5">
+                  <label className="block text-sm font-medium text-text-secondary mb-2">
+                    Modelo
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {LIP_SYNC_MODELS.map((model) => (
+                      <button
+                        key={model.id}
+                        onClick={() => setLipSyncModel(model.id)}
+                        className={cn(
+                          'p-3 rounded-xl border text-left transition-all',
+                          lipSyncModel === model.id
+                            ? 'border-accent bg-accent/10'
+                            : 'border-border hover:border-accent/50 bg-surface-elevated'
+                        )}
+                      >
+                        <div className="flex items-center justify-between">
+                          <p className={cn(
+                            'text-sm font-medium',
+                            lipSyncModel === model.id ? 'text-accent' : 'text-text-primary'
+                          )}>
+                            {model.name}
+                          </p>
+                          {lipSyncModel === model.id && (
+                            <Check className="w-4 h-4 text-accent" />
+                          )}
+                        </div>
+                        <p className="text-xs text-text-secondary mt-0.5">
+                          {model.description}
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Audio Upload (for Lip Sync) */}
               {isLipSync && (
                 <>
-                  <label className="block text-sm font-medium text-text-secondary mb-3 mt-6">
-                    Audio (voz para sincronizar)
+                  <label className="block text-sm font-medium text-text-secondary mb-3 mt-5">
+                    Audio (voz para sincronizar) *
                   </label>
                   {uploadedAudio ? (
                     <div className="relative bg-surface-elevated rounded-xl p-4">
@@ -446,10 +484,83 @@ export function ToolsGrid() {
                         Subir audio
                       </p>
                       <p className="text-xs text-text-secondary mt-1">
-                        MP3, WAV, M4A
+                        MP3, WAV, M4A {lipSyncModel === 'infinitalk' && '(máx 15s)'}
                       </p>
                     </label>
                   )}
+                </>
+              )}
+
+              {/* Infinitalk-specific fields */}
+              {isLipSync && lipSyncModel === 'infinitalk' && (
+                <>
+                  {/* Prompt */}
+                  <div className="mt-5">
+                    <label className="block text-sm font-medium text-text-secondary mb-2">
+                      Prompt <span className="text-text-muted">(opcional)</span>
+                    </label>
+                    <textarea
+                      value={infinitalkPrompt}
+                      onChange={(e) => setInfinitalkPrompt(e.target.value)}
+                      placeholder="Describe el estilo o contexto del video..."
+                      rows={2}
+                      maxLength={5000}
+                      className="w-full px-3 py-2 bg-surface-elevated border border-border rounded-xl text-sm text-text-primary placeholder:text-text-muted resize-none focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent"
+                    />
+                    <p className="text-xs text-text-muted mt-1">
+                      {infinitalkPrompt.length}/5000 caracteres
+                    </p>
+                  </div>
+
+                  {/* Resolution & Seed */}
+                  <div className="mt-4 grid grid-cols-2 gap-3">
+                    {/* Resolution */}
+                    <div>
+                      <label className="block text-xs font-medium text-text-secondary mb-1.5">
+                        Resolución
+                      </label>
+                      <select
+                        value={infinitalkResolution}
+                        onChange={(e) => setInfinitalkResolution(e.target.value as '480p' | '720p')}
+                        className="w-full px-3 py-2 bg-surface-elevated border border-border rounded-lg text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50"
+                      >
+                        <option value="480p">480p</option>
+                        <option value="720p">720p</option>
+                      </select>
+                    </div>
+
+                    {/* Seed */}
+                    <div>
+                      <label className="block text-xs font-medium text-text-secondary mb-1.5">
+                        Seed <span className="text-text-muted">(opcional)</span>
+                      </label>
+                      <div className="flex gap-1">
+                        <div className="relative flex-1">
+                          <Hash className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" />
+                          <input
+                            type="number"
+                            min={10000}
+                            max={1000000}
+                            value={infinitalkSeed}
+                            onChange={(e) => {
+                              const val = parseInt(e.target.value)
+                              if (val >= 10000 && val <= 1000000) {
+                                setInfinitalkSeed(val)
+                              }
+                            }}
+                            className="w-full pl-7 pr-2 py-2 bg-surface-elevated border border-border rounded-lg text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50"
+                          />
+                        </div>
+                        <button
+                          onClick={generateNewSeed}
+                          className="px-2.5 py-2 bg-surface-elevated border border-border rounded-lg hover:border-accent/50 transition-colors"
+                          title="Nuevo seed"
+                        >
+                          <Sparkles className="w-3.5 h-3.5 text-text-secondary" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </>
               )}
             </div>
