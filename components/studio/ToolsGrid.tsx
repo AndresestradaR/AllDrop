@@ -341,7 +341,7 @@ export function ToolsGrid() {
           {/* Content */}
           <div className="flex-1 p-6 flex gap-6 overflow-hidden">
             {/* Upload / Input Section */}
-            <div className={cn('flex flex-col', isLipSync ? 'w-1/3' : 'flex-1')}>
+            <div className={cn('flex flex-col', isLipSync ? 'w-1/3 overflow-y-auto' : 'flex-1')}>
               {/* Image Upload */}
               <label className="block text-sm font-medium text-text-secondary mb-3">
                 {isLipSync ? 'Imagen (cara/persona)' : 'Imagen original'}
@@ -501,7 +501,7 @@ export function ToolsGrid() {
                   <textarea
                     value={infinitalkPrompt}
                     onChange={(e) => setInfinitalkPrompt(e.target.value)}
-                    placeholder="Describe el estilo o contexto del video..."
+                    placeholder="Describe gestos o expresiones adicionales..."
                     rows={2}
                     maxLength={5000}
                     className="w-full px-3 py-2 bg-surface-elevated border border-border rounded-xl text-sm text-text-primary placeholder:text-text-muted resize-none focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent"
