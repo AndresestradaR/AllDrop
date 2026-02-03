@@ -189,33 +189,68 @@ async function removeBackground(
   }
 }
 
+// Lip Sync model types
+type LipSyncModelType = 'kling' | 'infinitalk'
+
+interface LipSyncOptions {
+  imageUrl: string
+  audioUrl: string
+  model: LipSyncModelType
+  // Infinitalk-specific options
+  prompt?: string
+  resolution?: '480p' | '720p'
+  seed?: number
+}
+
 /**
- * Generate lip sync video using Hailuo via KIE.ai
+ * Generate lip sync video using KIE.ai
+ * Supports both Kling AI Avatar and Infinitalk models
  * Returns taskId for async polling
  */
 async function generateLipSync(
-  imageUrl: string,
-  audioUrl: string,
+  options: LipSyncOptions,
   apiKey: string
 ): Promise<{ success: boolean; taskId?: string; error?: string }> {
-  console.log('[Tools/LipSync] Starting lip sync generation')
+  const { imageUrl, audioUrl, model, prompt, resolution, seed } = options
+
+  console.log(`[Tools/LipSync] Starting with model: ${model}`)
   console.log('[Tools/LipSync] Image URL:', imageUrl)
   console.log('[Tools/LipSync] Audio URL:', audioUrl)
 
   try {
+    let payload: Record<string, any>
+
+    if (model === 'infinitalk') {
+      // Infinitalk model with additional options
+      payload = {
+        model: 'infinitalk/from-audio',
+        input: {
+          image_url: imageUrl,
+          audio_url: audioUrl,
+          ...(prompt && { prompt }),
+          resolution: resolution || '720p',
+          ...(seed && { seed }),
+        },
+      }
+      console.log('[Tools/LipSync] Infinitalk config:', { prompt: prompt?.substring(0, 50), resolution, seed })
+    } else {
+      // Kling AI Avatar (default)
+      payload = {
+        model: 'kling/ai-avatar-standard',
+        input: {
+          image_url: imageUrl,
+          audio_url: audioUrl,
+        },
+      }
+    }
+
     const response = await fetch(`${KIE_API_BASE}/jobs/createTask`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${apiKey}`,
       },
-      body: JSON.stringify({
-        model: 'hailuo/lip-sync',
-        input: {
-          image_url: imageUrl,
-          audio_url: audioUrl,
-        },
-      }),
+      body: JSON.stringify(payload),
     })
 
     const responseText = await response.text()
@@ -473,7 +508,7 @@ export async function POST(request: Request) {
       }
 
       // ========================================
-      // KIE.ai Hailuo - Lip Sync
+      // KIE.ai - Lip Sync (Kling AI Avatar / Infinitalk)
       // ========================================
       case 'lip-sync': {
         if (!profile.kie_api_key) {
@@ -484,6 +519,15 @@ export async function POST(request: Request) {
         }
 
         const apiKey = decrypt(profile.kie_api_key)
+
+        // Extract lip sync specific fields
+        const lipSyncModel = (formData.get('lipSyncModel') as LipSyncModelType) || 'kling'
+        const prompt = formData.get('prompt') as string | null
+        const resolution = (formData.get('resolution') as '480p' | '720p') || '720p'
+        const seedStr = formData.get('seed') as string | null
+        const seed = seedStr ? parseInt(seedStr) : undefined
+
+        console.log(`[Tools/LipSync] Model: ${lipSyncModel}, Resolution: ${resolution}, Seed: ${seed}`)
 
         // Upload image and audio to Supabase to get public URLs
         const imageUrl = await uploadToSupabase(
@@ -509,7 +553,17 @@ export async function POST(request: Request) {
           )
         }
 
-        const result = await generateLipSync(imageUrl, audioUrl, apiKey)
+        const result = await generateLipSync(
+          {
+            imageUrl,
+            audioUrl,
+            model: lipSyncModel,
+            prompt: prompt || undefined,
+            resolution,
+            seed,
+          },
+          apiKey
+        )
 
         if (result.success && result.taskId) {
           return NextResponse.json({
