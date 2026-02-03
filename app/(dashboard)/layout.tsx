@@ -29,8 +29,8 @@ const mainNavigation = [
 const creatorNavigation = [
   { name: 'Crea tu Banner', href: '/dashboard/banner', icon: ImageIcon, soon: true },
   { name: 'Crea tu Landing', href: '/dashboard/landing', icon: LayoutTemplate },
-  { name: 'Estudio IA', href: '/dashboard/studio', icon: Wand2 },
-  { name: 'Encuentra tu Producto Ganador', href: '/dashboard/product-research', icon: Target },
+  { name: 'Estudio IA', href: '/dashboard/studio', icon: Wand2, isNew: true },
+  { name: 'Encuentra tu Producto Ganador', href: '/dashboard/product-research', icon: Target, isNew: true },
 ]
 
 const otherNavigation = [
@@ -55,9 +55,9 @@ export default function DashboardLayout({
     router.refresh()
   }
 
-  const NavLink = ({ item }: { item: typeof mainNavigation[0] & { soon?: boolean } }) => {
+  const NavLink = ({ item }: { item: typeof mainNavigation[0] & { soon?: boolean; isNew?: boolean } }) => {
     const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
-    
+
     if (item.soon) {
       return (
         <div className="flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium text-text-secondary/50 cursor-not-allowed">
@@ -75,14 +75,22 @@ export default function DashboardLayout({
         href={item.href}
         onClick={() => setSidebarOpen(false)}
         className={cn(
-          'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
-          isActive 
-            ? 'bg-accent/10 text-accent' 
+          'flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+          isActive
+            ? 'bg-accent/10 text-accent'
             : 'text-text-secondary hover:text-text-primary hover:bg-border/50'
         )}
       >
-        <item.icon className="w-5 h-5" />
-        {item.name}
+        <div className="flex items-center gap-3">
+          <item.icon className="w-5 h-5" />
+          {item.name}
+        </div>
+        {item.isNew && (
+          <span className="inline-flex items-center gap-1 bg-emerald-500 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full animate-pulse-glow">
+            <span className="animate-bounce-left">←</span>
+            Nuevo
+          </span>
+        )}
       </Link>
     )
   }
