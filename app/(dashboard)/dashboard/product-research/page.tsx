@@ -21,15 +21,12 @@ function ProductImage({ src, alt, sales }: { src: string; alt: string; sales: nu
 
   if (!src || hasError) {
     return (
-      <div className="relative h-48 bg-gradient-to-br from-orange-500/20 to-accent/20 flex items-center justify-center">
-        <div className="text-center">
-          <Flame className="w-10 h-10 text-orange-500/60 mx-auto mb-2" />
-          <span className="text-xs text-text-secondary">TikTok Shop</span>
-        </div>
+      <div className="relative w-full h-full bg-gradient-to-br from-orange-500/20 to-accent/20 flex items-center justify-center">
+        <Flame className="w-8 h-8 text-orange-500/60" />
         {sales > 0 && (
-          <div className="absolute top-2 right-2 px-2 py-1 bg-orange-500/90 text-white text-xs font-medium rounded-full flex items-center gap-1">
-            <Flame className="w-3 h-3" />
-            {sales.toLocaleString()} /7d
+          <div className="absolute top-1 right-1 px-1.5 py-0.5 bg-orange-500/90 text-white text-[10px] font-medium rounded-full flex items-center gap-0.5">
+            <Flame className="w-2.5 h-2.5" />
+            {sales.toLocaleString()}
           </div>
         )}
       </div>
@@ -37,7 +34,7 @@ function ProductImage({ src, alt, sales }: { src: string; alt: string; sales: nu
   }
 
   return (
-    <div className="relative h-48 bg-background">
+    <div className="relative w-full h-full bg-background">
       <img
         src={`/api/image-proxy?url=${encodeURIComponent(src)}`}
         alt={alt}
@@ -45,9 +42,9 @@ function ProductImage({ src, alt, sales }: { src: string; alt: string; sales: nu
         onError={() => setHasError(true)}
       />
       {sales > 0 && (
-        <div className="absolute top-2 right-2 px-2 py-1 bg-orange-500/90 text-white text-xs font-medium rounded-full flex items-center gap-1">
-          <Flame className="w-3 h-3" />
-          {sales.toLocaleString()} /7d
+        <div className="absolute top-1 right-1 px-1.5 py-0.5 bg-orange-500/90 text-white text-[10px] font-medium rounded-full flex items-center gap-0.5">
+          <Flame className="w-2.5 h-2.5" />
+          {sales.toLocaleString()}
         </div>
       )}
     </div>
@@ -63,9 +60,13 @@ interface TikTokProduct {
   currency: string
   sold_count: number
   day7_sold_count: number
+  day7_sale_amount: number
   category_l1: string
   category_l2: string
   shop_name: string
+  product_rating: number
+  relate_author_count: number
+  commission_rate: string
   detail_url: string
   last_synced_at: string
 }
@@ -767,47 +768,91 @@ export default function ProductResearchPage() {
 
           {/* Products Grid */}
           {!tiktokLoading && filteredTiktokProducts.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredTiktokProducts.map((product) => (
                 <div
                   key={product.product_id}
-                  className="bg-surface rounded-xl border border-border overflow-hidden hover:border-accent/50 transition-all group"
+                  className="bg-surface rounded-xl border border-border overflow-hidden hover:border-accent/50 transition-all"
                 >
-                  {/* Image */}
-                  <ProductImage src={product.img} alt={product.title} sales={product.day7_sold_count} />
-
-                  {/* Content */}
-                  <div className="p-4">
-                    <h3 className="font-medium text-text-primary text-sm line-clamp-2 mb-2 min-h-[40px]">
-                      {product.title}
-                    </h3>
-
-                    <div className="flex items-center justify-between text-xs text-text-secondary mb-3">
-                      <span className="px-2 py-1 bg-accent/10 text-accent rounded truncate max-w-[120px]">
-                        {product.category_l1 || 'Sin categoría'}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <TrendingUp className="w-3 h-3" />
-                        {(product.sold_count || 0).toLocaleString()} total
-                      </span>
+                  <div className="flex">
+                    {/* Image */}
+                    <div className="w-32 h-32 flex-shrink-0">
+                      <ProductImage src={product.img} alt={product.title} sales={0} />
                     </div>
 
-                    {product.price > 0 && (
-                      <p className="text-lg font-bold text-text-primary mb-3">
-                        ${product.price.toLocaleString()} <span className="text-xs font-normal text-text-secondary">{product.currency || 'USD'}</span>
-                      </p>
-                    )}
-
-                    <a
-                      href={product.detail_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block w-full text-center px-4 py-2 bg-accent hover:bg-accent/90 text-background font-medium rounded-lg transition-colors text-sm"
-                    >
-                      Ver en FastMoss
-                      <ExternalLink className="w-3 h-3 inline ml-1" />
-                    </a>
+                    {/* Content */}
+                    <div className="flex-1 p-3">
+                      <h3 className="font-medium text-text-primary text-sm line-clamp-2 mb-2">
+                        {product.title}
+                      </h3>
+                      <span className="inline-block px-2 py-0.5 bg-accent/10 text-accent rounded text-xs mb-2">
+                        {product.category_l1 || 'Sin categoría'}
+                      </span>
+                      {product.price > 0 && (
+                        <p className="text-lg font-bold text-accent">
+                          ${product.price.toLocaleString()} <span className="text-xs font-normal text-text-secondary">{product.currency || 'USD'}</span>
+                        </p>
+                      )}
+                    </div>
                   </div>
+
+                  {/* Metrics Grid */}
+                  <div className="grid grid-cols-3 gap-px bg-border">
+                    <div className="bg-surface p-3 text-center">
+                      <div className="flex items-center justify-center gap-1 text-orange-500 mb-1">
+                        <Flame className="w-4 h-4" />
+                      </div>
+                      <p className="text-lg font-bold text-text-primary">{(product.day7_sold_count || 0).toLocaleString()}</p>
+                      <p className="text-xs text-text-secondary">Ventas 7d</p>
+                    </div>
+                    <div className="bg-surface p-3 text-center">
+                      <div className="flex items-center justify-center gap-1 text-green-500 mb-1">
+                        <TrendingUp className="w-4 h-4" />
+                      </div>
+                      <p className="text-lg font-bold text-text-primary">{(product.sold_count || 0).toLocaleString()}</p>
+                      <p className="text-xs text-text-secondary">Ventas Total</p>
+                    </div>
+                    <div className="bg-surface p-3 text-center">
+                      <div className="flex items-center justify-center gap-1 text-yellow-500 mb-1">
+                        <DollarSign className="w-4 h-4" />
+                      </div>
+                      <p className="text-lg font-bold text-text-primary">${((product.day7_sale_amount || 0) / 1000).toFixed(0)}k</p>
+                      <p className="text-xs text-text-secondary">Revenue 7d</p>
+                    </div>
+                  </div>
+
+                  {/* Additional Info */}
+                  <div className="p-3 border-t border-border space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-text-secondary">Tienda:</span>
+                      <span className="text-text-primary font-medium truncate max-w-[150px]">{product.shop_name || 'N/A'}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-text-secondary">Rating:</span>
+                      <span className="text-yellow-500 font-medium">⭐ {product.product_rating || 'N/A'}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-text-secondary">Creadores:</span>
+                      <span className="text-text-primary font-medium">{(product.relate_author_count || 0).toLocaleString()}</span>
+                    </div>
+                    {product.commission_rate && (
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-text-secondary">Comisión:</span>
+                        <span className="text-green-500 font-medium">{product.commission_rate}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Action - Link to TikTok Shop */}
+                  <a
+                    href={product.detail_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block w-full text-center px-4 py-2.5 bg-background hover:bg-accent/10 text-text-secondary hover:text-accent font-medium transition-colors text-xs border-t border-border"
+                  >
+                    Ver en TikTok Shop
+                    <ExternalLink className="w-3 h-3 inline ml-1" />
+                  </a>
                 </div>
               ))}
             </div>
