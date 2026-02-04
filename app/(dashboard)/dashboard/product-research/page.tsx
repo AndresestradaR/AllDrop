@@ -15,6 +15,45 @@ type TabType = 'catalog' | 'tiktok' | 'competitor'
 const FASTMOSS_SUPABASE_URL = 'https://papfcbiswvdgalfteujm.supabase.co'
 const FASTMOSS_SUPABASE_KEY = 'sb_publishable_WVUzDgFTG0naCP8PJHc0kg_pT1dIXHf'
 
+// Product image component with proxy and fallback
+function ProductImage({ src, alt, sales }: { src: string; alt: string; sales: number }) {
+  const [hasError, setHasError] = useState(false)
+
+  if (!src || hasError) {
+    return (
+      <div className="relative h-48 bg-gradient-to-br from-orange-500/20 to-accent/20 flex items-center justify-center">
+        <div className="text-center">
+          <Flame className="w-10 h-10 text-orange-500/60 mx-auto mb-2" />
+          <span className="text-xs text-text-secondary">TikTok Shop</span>
+        </div>
+        {sales > 0 && (
+          <div className="absolute top-2 right-2 px-2 py-1 bg-orange-500/90 text-white text-xs font-medium rounded-full flex items-center gap-1">
+            <Flame className="w-3 h-3" />
+            {sales.toLocaleString()} /7d
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="relative h-48 bg-background">
+      <img
+        src={`/api/image-proxy?url=${encodeURIComponent(src)}`}
+        alt={alt}
+        className="w-full h-full object-cover"
+        onError={() => setHasError(true)}
+      />
+      {sales > 0 && (
+        <div className="absolute top-2 right-2 px-2 py-1 bg-orange-500/90 text-white text-xs font-medium rounded-full flex items-center gap-1">
+          <Flame className="w-3 h-3" />
+          {sales.toLocaleString()} /7d
+        </div>
+      )}
+    </div>
+  )
+}
+
 // TikTok Viral product type
 interface TikTokProduct {
   product_id: string
@@ -735,19 +774,7 @@ export default function ProductResearchPage() {
                   className="bg-surface rounded-xl border border-border overflow-hidden hover:border-accent/50 transition-all group"
                 >
                   {/* Image */}
-                  <div className="relative h-48 bg-gradient-to-br from-orange-500/20 to-accent/20 flex items-center justify-center">
-                    <div className="text-center">
-                      <Flame className="w-10 h-10 text-orange-500/60 mx-auto mb-2" />
-                      <span className="text-xs text-text-secondary">TikTok Shop</span>
-                    </div>
-                    {/* Sales badge */}
-                    {product.day7_sold_count > 0 && (
-                      <div className="absolute top-2 right-2 px-2 py-1 bg-orange-500/90 text-white text-xs font-medium rounded-full flex items-center gap-1">
-                        <Flame className="w-3 h-3" />
-                        {product.day7_sold_count.toLocaleString()} /7d
-                      </div>
-                    )}
-                  </div>
+                  <ProductImage src={product.img} alt={product.title} sales={product.day7_sold_count} />
 
                   {/* Content */}
                   <div className="p-4">
