@@ -677,14 +677,18 @@ function DeepFaceTool({ onBack }: { onBack: () => void }) {
     const { createClient } = await import('@/lib/supabase/client')
     const supabase = createClient()
 
-    const fileExt = file.name.split('.').pop() || 'bin'
+    // Get file extension and ensure it's valid for KIE
+    const fileExt = file.name.split('.').pop()?.toLowerCase() || 'bin'
     const fileName = `${folder}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`
 
+    // IMPORTANT: Pass contentType so Supabase sets correct MIME type
+    // KIE validates files by Content-Type header
     const { error: uploadError } = await supabase.storage
       .from('landing-images')
       .upload(fileName, file, {
         cacheControl: '3600',
         upsert: false,
+        contentType: file.type, // Critical for KIE to recognize file type
       })
 
     if (uploadError) {
@@ -696,12 +700,28 @@ function DeepFaceTool({ onBack }: { onBack: () => void }) {
       .from('landing-images')
       .getPublicUrl(fileName)
 
+    console.log(`[DeepFace] Uploaded ${file.name} (${file.type}) -> ${publicUrl}`)
     return publicUrl
   }
 
   const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+
+    // Validate video format (KIE supports .mp4/.mov)
+    const validVideoTypes = ['video/mp4', 'video/quicktime', 'video/x-matroska']
+    if (!validVideoTypes.includes(file.type)) {
+      toast.error('Formato no soportado. Usa MP4 o MOV.')
+      setError('Formato de video no soportado. Usa MP4 o MOV.')
+      return
+    }
+
+    // Validate size (max 100MB)
+    if (file.size > 100 * 1024 * 1024) {
+      toast.error('Video muy grande. Máximo 100MB.')
+      setError('Video muy grande. Máximo 100MB.')
+      return
+    }
 
     setSourceVideo(file)
     setVideoUrl(null)
@@ -727,6 +747,21 @@ function DeepFaceTool({ onBack }: { onBack: () => void }) {
   const handleFaceUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+
+    // Validate image format (KIE supports .jpg/.jpeg/.png)
+    const validImageTypes = ['image/jpeg', 'image/png', 'image/jpg']
+    if (!validImageTypes.includes(file.type)) {
+      toast.error('Formato no soportado. Usa JPG o PNG.')
+      setError('Formato de imagen no soportado. Usa JPG o PNG.')
+      return
+    }
+
+    // Validate size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Imagen muy grande. Máximo 10MB.')
+      setError('Imagen muy grande. Máximo 10MB.')
+      return
+    }
 
     setTargetFace(file)
     setFaceUrl(null)
