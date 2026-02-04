@@ -735,18 +735,11 @@ export default function ProductResearchPage() {
                   className="bg-surface rounded-xl border border-border overflow-hidden hover:border-accent/50 transition-all group"
                 >
                   {/* Image */}
-                  <div className="relative h-48 bg-background">
-                    {product.img ? (
-                      <img
-                        src={product.img}
-                        alt={product.title}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <Package className="w-12 h-12 text-text-secondary/30" />
-                      </div>
-                    )}
+                  <div className="relative h-48 bg-gradient-to-br from-orange-500/20 to-accent/20 flex items-center justify-center">
+                    <div className="text-center">
+                      <Flame className="w-10 h-10 text-orange-500/60 mx-auto mb-2" />
+                      <span className="text-xs text-text-secondary">TikTok Shop</span>
+                    </div>
                     {/* Sales badge */}
                     {product.day7_sold_count > 0 && (
                       <div className="absolute top-2 right-2 px-2 py-1 bg-orange-500/90 text-white text-xs font-medium rounded-full flex items-center gap-1">
