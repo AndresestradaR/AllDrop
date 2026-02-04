@@ -9,9 +9,11 @@ import { Product, ProductFilters as Filters } from '@/lib/dropkiller/types'
 import { Target, AlertCircle, Search, Users, TrendingUp, DollarSign, ExternalLink, Loader2, CheckCircle, XCircle, BarChart3, Calculator, Truck, Package, Megaphone, PiggyBank, Flame, Sparkles, TrendingDown, Settings, Gift, Tag, Check, Square, CheckSquare, ArrowRight, Database } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
-
 type TabType = 'catalog' | 'tiktok' | 'competitor'
+
+// FastMoss Supabase config (separate from app's Supabase)
+const FASTMOSS_SUPABASE_URL = 'https://papfcbiswvdgalfteujm.supabase.co'
+const FASTMOSS_SUPABASE_KEY = 'sb_publishable_WVUzDgFTG0naCP8PJHc0kg_pT1dIXHf'
 
 // TikTok Viral product type
 interface TikTokProduct {
@@ -134,23 +136,27 @@ export default function ProductResearchPage() {
   const loadTiktokProducts = async () => {
     setTiktokLoading(true)
     try {
-      const supabase = createClient()
-      const { data, error } = await supabase
-        .from('fastmoss_products')
-        .select('*')
-        .order('day7_sold_count', { ascending: false })
-        .limit(200)
+      const response = await fetch(
+        `${FASTMOSS_SUPABASE_URL}/rest/v1/fastmoss_products?select=*&order=day7_sold_count.desc&limit=200`,
+        {
+          headers: {
+            'apikey': FASTMOSS_SUPABASE_KEY,
+            'Content-Type': 'application/json'
+          }
+        }
+      )
 
-      if (error) {
-        console.error('Error loading TikTok products:', error)
+      if (!response.ok) {
+        console.error('Error loading TikTok products:', response.statusText)
         toast.error('Error al cargar productos de TikTok')
         return
       }
 
+      const data = await response.json()
       setTiktokProducts(data || [])
     } catch (err) {
       console.error('Error:', err)
-      toast.error('Error al conectar con Supabase')
+      toast.error('Error al conectar con FastMoss')
     } finally {
       setTiktokLoading(false)
     }
