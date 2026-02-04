@@ -586,11 +586,12 @@ export async function POST(request: Request) {
     if (isJson) {
       // Parse JSON body (for deep-face with pre-uploaded URLs)
       jsonBody = await request.json()
-      tool = jsonBody.tool
 
-      if (!tool) {
+      if (!jsonBody || !jsonBody.tool) {
         return NextResponse.json({ error: 'Herramienta es requerida' }, { status: 400 })
       }
+
+      tool = jsonBody.tool
 
       // Deep face via JSON requires URLs
       if (tool === 'deep-face') {
