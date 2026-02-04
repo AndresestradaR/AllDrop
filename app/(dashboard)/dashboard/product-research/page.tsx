@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { ProductFilters } from '@/components/productos/ProductFilters'
 import { ProductTable } from '@/components/productos/ProductTable'
 import { CookieInput } from '@/components/productos/CookieInput'
@@ -9,8 +9,25 @@ import { Product, ProductFilters as Filters } from '@/lib/dropkiller/types'
 import { Target, AlertCircle, Search, Users, TrendingUp, DollarSign, ExternalLink, Loader2, CheckCircle, XCircle, BarChart3, Calculator, Truck, Package, Megaphone, PiggyBank, Flame, Sparkles, TrendingDown, Settings, Gift, Tag, Check, Square, CheckSquare, ArrowRight, Database } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Link from 'next/link'
+import { createClient } from '@/lib/supabase/client'
 
-type TabType = 'catalog' | 'search' | 'competitor'
+type TabType = 'catalog' | 'tiktok' | 'competitor'
+
+// TikTok Viral product type
+interface TikTokProduct {
+  product_id: string
+  title: string
+  img: string
+  price: number
+  currency: string
+  sold_count: number
+  day7_sold_count: number
+  category_l1: string
+  category_l2: string
+  shop_name: string
+  detail_url: string
+  last_synced_at: string
+}
 type AnalysisPhase = 'search' | 'select' | 'analyze' | 'results'
 
 // Fase 1: Resultados de búsqueda
@@ -99,6 +116,78 @@ export default function ProductResearchPage() {
     price2: '',
     price3: ''
   })
+
+  // TikTok Viral state
+  const [tiktokProducts, setTiktokProducts] = useState<TikTokProduct[]>([])
+  const [tiktokLoading, setTiktokLoading] = useState(false)
+  const [tiktokCategory, setTiktokCategory] = useState('')
+  const [tiktokSearch, setTiktokSearch] = useState('')
+  const [tiktokSort, setTiktokSort] = useState<'day7_sold_count' | 'sold_count' | 'last_synced_at'>('day7_sold_count')
+
+  // Load TikTok products from Supabase
+  useEffect(() => {
+    if (activeTab === 'tiktok') {
+      loadTiktokProducts()
+    }
+  }, [activeTab])
+
+  const loadTiktokProducts = async () => {
+    setTiktokLoading(true)
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('fastmoss_products')
+        .select('*')
+        .order('day7_sold_count', { ascending: false })
+        .limit(200)
+
+      if (error) {
+        console.error('Error loading TikTok products:', error)
+        toast.error('Error al cargar productos de TikTok')
+        return
+      }
+
+      setTiktokProducts(data || [])
+    } catch (err) {
+      console.error('Error:', err)
+      toast.error('Error al conectar con Supabase')
+    } finally {
+      setTiktokLoading(false)
+    }
+  }
+
+  // Filter and sort TikTok products
+  const filteredTiktokProducts = useMemo(() => {
+    let filtered = tiktokProducts
+
+    // Filter by category
+    if (tiktokCategory) {
+      filtered = filtered.filter(p => p.category_l1 === tiktokCategory)
+    }
+
+    // Filter by search
+    if (tiktokSearch) {
+      const searchLower = tiktokSearch.toLowerCase()
+      filtered = filtered.filter(p =>
+        p.title?.toLowerCase().includes(searchLower)
+      )
+    }
+
+    // Sort
+    filtered.sort((a, b) => {
+      if (tiktokSort === 'day7_sold_count') return (b.day7_sold_count || 0) - (a.day7_sold_count || 0)
+      if (tiktokSort === 'sold_count') return (b.sold_count || 0) - (a.sold_count || 0)
+      return new Date(b.last_synced_at).getTime() - new Date(a.last_synced_at).getTime()
+    })
+
+    return filtered
+  }, [tiktokProducts, tiktokCategory, tiktokSearch, tiktokSort])
+
+  // Get unique categories for filter dropdown
+  const tiktokCategories = useMemo(() => {
+    const cats = new Set(tiktokProducts.map(p => p.category_l1).filter(Boolean))
+    return Array.from(cats).sort()
+  }, [tiktokProducts])
 
   // State para calculadora de márgenes
   const [costProduct, setCostProduct] = useState<number | ''>('')
@@ -530,15 +619,16 @@ export default function ProductResearchPage() {
           Analizar Competencia
         </button>
         <button
-          onClick={() => setActiveTab('search')}
+          onClick={() => setActiveTab('tiktok')}
           className={`px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 ${
-            activeTab === 'search'
+            activeTab === 'tiktok'
               ? 'bg-accent text-background'
               : 'text-text-secondary hover:text-text-primary hover:bg-background'
           }`}
         >
-          <Search className="w-4 h-4" />
-          Buscar en Vivo
+          <Flame className="w-4 h-4" />
+          TikTok Viral
+          <span className="text-xs bg-orange-500/20 text-orange-500 px-1.5 py-0.5 rounded">NEW</span>
         </button>
       </div>
 
@@ -547,25 +637,160 @@ export default function ProductResearchPage() {
         <ProductExplorer />
       )}
 
-      {/* Tab Content: Buscar Productos */}
-      {activeTab === 'search' && (
-        <>
-          <CookieInput onCookiesChange={setCookies} />
-          <ProductFilters onSearch={handleSearch} isLoading={isLoading} />
-          {error && (
-            <div className="bg-error/10 border border-error/30 rounded-xl p-4 flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-error flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="font-medium text-error">Error en la búsqueda</p>
-                <p className="text-sm text-error/80">{error}</p>
+      {/* Tab Content: TikTok Viral */}
+      {activeTab === 'tiktok' && (
+        <div className="space-y-6">
+          {/* Filters */}
+          <div className="bg-surface rounded-xl border border-border p-4">
+            <div className="flex flex-wrap gap-4 items-center">
+              <div className="flex-1 min-w-[200px]">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
+                  <input
+                    type="text"
+                    value={tiktokSearch}
+                    onChange={(e) => setTiktokSearch(e.target.value)}
+                    placeholder="Buscar producto..."
+                    className="w-full pl-10 pr-4 py-2.5 bg-background border border-border rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50"
+                  />
+                </div>
               </div>
+              <select
+                value={tiktokCategory}
+                onChange={(e) => setTiktokCategory(e.target.value)}
+                className="px-4 py-2.5 bg-background border border-border rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50"
+              >
+                <option value="">Todas las categorías</option>
+                {tiktokCategories.map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
+              <select
+                value={tiktokSort}
+                onChange={(e) => setTiktokSort(e.target.value as typeof tiktokSort)}
+                className="px-4 py-2.5 bg-background border border-border rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50"
+              >
+                <option value="day7_sold_count">Ventas 7 días</option>
+                <option value="sold_count">Ventas totales</option>
+                <option value="last_synced_at">Más recientes</option>
+              </select>
+              <button
+                onClick={loadTiktokProducts}
+                disabled={tiktokLoading}
+                className="px-4 py-2.5 bg-accent/10 text-accent hover:bg-accent/20 rounded-lg transition-colors flex items-center gap-2"
+              >
+                {tiktokLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <TrendingUp className="w-4 h-4" />
+                )}
+                Actualizar
+              </button>
+            </div>
+          </div>
+
+          {/* Stats */}
+          <div className="text-text-secondary text-sm">
+            {filteredTiktokProducts.length} productos encontrados
+            {tiktokCategory && ` en ${tiktokCategory}`}
+          </div>
+
+          {/* Loading state */}
+          {tiktokLoading && (
+            <div className="bg-surface rounded-xl border border-border p-12 text-center">
+              <Loader2 className="w-8 h-8 text-accent animate-spin mx-auto mb-4" />
+              <p className="text-text-secondary">Cargando productos virales de TikTok...</p>
             </div>
           )}
-          <ProductTable products={products} isLoading={isLoading} />
+
+          {/* Empty state */}
+          {!tiktokLoading && filteredTiktokProducts.length === 0 && (
+            <div className="bg-surface rounded-xl border border-border p-12 text-center">
+              <div className="w-16 h-16 bg-orange-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <Flame className="w-8 h-8 text-orange-500" />
+              </div>
+              <h3 className="text-lg font-semibold text-text-primary mb-2">
+                No hay productos disponibles
+              </h3>
+              <p className="text-text-secondary max-w-md mx-auto">
+                {tiktokSearch || tiktokCategory
+                  ? 'No se encontraron productos con esos filtros. Intenta con otros criterios.'
+                  : 'Los productos de TikTok Shop se sincronizan automáticamente. Vuelve más tarde.'}
+              </p>
+            </div>
+          )}
+
+          {/* Products Grid */}
+          {!tiktokLoading && filteredTiktokProducts.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {filteredTiktokProducts.map((product) => (
+                <div
+                  key={product.product_id}
+                  className="bg-surface rounded-xl border border-border overflow-hidden hover:border-accent/50 transition-all group"
+                >
+                  {/* Image */}
+                  <div className="relative h-48 bg-background">
+                    {product.img ? (
+                      <img
+                        src={product.img}
+                        alt={product.title}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Package className="w-12 h-12 text-text-secondary/30" />
+                      </div>
+                    )}
+                    {/* Sales badge */}
+                    {product.day7_sold_count > 0 && (
+                      <div className="absolute top-2 right-2 px-2 py-1 bg-orange-500/90 text-white text-xs font-medium rounded-full flex items-center gap-1">
+                        <Flame className="w-3 h-3" />
+                        {product.day7_sold_count.toLocaleString()} /7d
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Content */}
+                  <div className="p-4">
+                    <h3 className="font-medium text-text-primary text-sm line-clamp-2 mb-2 min-h-[40px]">
+                      {product.title}
+                    </h3>
+
+                    <div className="flex items-center justify-between text-xs text-text-secondary mb-3">
+                      <span className="px-2 py-1 bg-accent/10 text-accent rounded truncate max-w-[120px]">
+                        {product.category_l1 || 'Sin categoría'}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <TrendingUp className="w-3 h-3" />
+                        {(product.sold_count || 0).toLocaleString()} total
+                      </span>
+                    </div>
+
+                    {product.price > 0 && (
+                      <p className="text-lg font-bold text-text-primary mb-3">
+                        ${product.price.toLocaleString()} <span className="text-xs font-normal text-text-secondary">{product.currency || 'USD'}</span>
+                      </p>
+                    )}
+
+                    <a
+                      href={product.detail_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block w-full text-center px-4 py-2 bg-accent hover:bg-accent/90 text-background font-medium rounded-lg transition-colors text-sm"
+                    >
+                      Ver en FastMoss
+                      <ExternalLink className="w-3 h-3 inline ml-1" />
+                    </a>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className="text-center text-sm text-text-secondary/70 py-4">
-            <p>Los datos provienen de DropKiller. Necesitas una suscripción activa para usar esta herramienta.</p>
+            <p>Productos sincronizados desde TikTok Shop via FastMoss</p>
           </div>
-        </>
+        </div>
       )}
 
       {/* Tab Content: Analizar Competencia */}
