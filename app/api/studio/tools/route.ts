@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { decrypt } from '@/lib/services/encryption'
 
-type ToolType = 'variations' | 'upscale' | 'remove-bg' | 'camera-angle' | 'mockup' | 'lip-sync'
+type ToolType = 'variations' | 'upscale' | 'remove-bg' | 'camera-angle' | 'mockup' | 'lip-sync' | 'deep-face'
 
 const KIE_API_BASE = 'https://api.kie.ai/api/v1'
 
@@ -356,6 +356,155 @@ async function checkLipSyncStatus(
   }
 }
 
+// Deep Face options for Kling 2.6 Motion Control
+interface DeepFaceOptions {
+  videoUrl: string
+  faceUrl: string
+  prompt?: string
+  orientation: 'video' | 'image'
+  mode: '720p' | '1080p'
+}
+
+/**
+ * Generate deep face video using KIE Kling 2.6 Motion Control
+ * Returns taskId for async polling
+ */
+async function generateDeepFace(
+  options: DeepFaceOptions,
+  apiKey: string
+): Promise<{ success: boolean; taskId?: string; error?: string }> {
+  const { videoUrl, faceUrl, prompt, orientation, mode } = options
+
+  console.log(`[Tools/DeepFace] Starting with Kling 2.6 Motion Control`)
+  console.log('[Tools/DeepFace] Video URL:', videoUrl)
+  console.log('[Tools/DeepFace] Face URL:', faceUrl)
+  console.log('[Tools/DeepFace] Orientation:', orientation, 'Mode:', mode)
+
+  try {
+    const payload = {
+      model: 'kling-2.6/motion-control',
+      input: {
+        prompt: prompt || '',
+        input_urls: [faceUrl],
+        video_urls: [videoUrl],
+        character_orientation: orientation,
+        mode,
+      },
+    }
+
+    console.log('[Tools/DeepFace] Payload:', JSON.stringify(payload, null, 2))
+
+    const response = await fetch(`${KIE_API_BASE}/jobs/createTask`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(payload),
+    })
+
+    const responseText = await response.text()
+    console.log('[Tools/DeepFace] Response:', response.status, responseText.substring(0, 500))
+
+    let data: any
+    try {
+      data = JSON.parse(responseText)
+    } catch (e) {
+      return { success: false, error: `Respuesta invalida: ${responseText.substring(0, 200)}` }
+    }
+
+    if (data.code !== 200 && data.code !== 0) {
+      return { success: false, error: data.msg || data.message || 'Error en KIE API' }
+    }
+
+    const taskId = data.data?.taskId || data.taskId
+    if (!taskId) {
+      return { success: false, error: 'No se recibio ID de tarea' }
+    }
+
+    console.log(`[Tools/DeepFace] Task created: ${taskId}`)
+    return { success: true, taskId }
+
+  } catch (error: any) {
+    console.error('[Tools/DeepFace] Error:', error.message)
+    return { success: false, error: error.message || 'Error en deep face' }
+  }
+}
+
+/**
+ * Check deep face task status (uses same endpoint as lip sync)
+ */
+async function checkDeepFaceStatus(
+  taskId: string,
+  apiKey: string
+): Promise<{ success: boolean; videoUrl?: string; status?: string; error?: string }> {
+  try {
+    const response = await fetch(`${KIE_API_BASE}/jobs/recordInfo?taskId=${taskId}`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+      },
+    })
+
+    if (!response.ok) {
+      return { success: false, error: `Status check failed: ${response.status}` }
+    }
+
+    const data = await response.json()
+    const taskData = data.data || data
+    const state = taskData.state || ''
+
+    console.log('[Tools/DeepFace] Status:', state)
+
+    // Processing states
+    if (['waiting', 'queuing', 'generating', 'processing', 'running', 'pending'].includes(state)) {
+      return { success: true, status: 'processing' }
+    }
+
+    // Failed states
+    if (['fail', 'failed', 'error'].includes(state)) {
+      return { success: false, error: taskData.failMsg || 'Deep face failed' }
+    }
+
+    // Success - extract video URL
+    if (state === 'success' || state === 'completed') {
+      let videoUrl: string | undefined
+
+      if (taskData.resultJson) {
+        try {
+          const result = typeof taskData.resultJson === 'string'
+            ? JSON.parse(taskData.resultJson)
+            : taskData.resultJson
+
+          videoUrl = result.videoUrl || result.video_url || result.resultUrls?.[0] || result.url
+        } catch (e) {
+          console.error('[Tools/DeepFace] Failed to parse resultJson')
+        }
+      }
+
+      if (!videoUrl) {
+        videoUrl = taskData.videoUrl || taskData.video_url || taskData.resultUrl
+      }
+
+      if (videoUrl) {
+        return { success: true, videoUrl, status: 'completed' }
+      }
+
+      return { success: false, error: 'Video completed but URL not found' }
+    }
+
+    // Still initializing
+    if (!state) {
+      return { success: true, status: 'processing' }
+    }
+
+    return { success: false, error: `Unknown status: ${state}` }
+
+  } catch (error: any) {
+    return { success: false, error: error.message || 'Status check failed' }
+  }
+}
+
 /**
  * Upload file to Supabase and return public URL
  * Uses 'landing-images' bucket which is already configured as public
@@ -411,6 +560,7 @@ export async function POST(request: Request) {
     const image = formData.get('image') as File | null
     const tool = formData.get('tool') as ToolType
     const audio = formData.get('audio') as File | null // For lip-sync
+    const video = formData.get('video') as File | null // For deep-face
 
     if (!tool) {
       return NextResponse.json({ error: 'Herramienta es requerida' }, { status: 400 })
@@ -421,6 +571,14 @@ export async function POST(request: Request) {
       if (!image || !audio) {
         return NextResponse.json(
           { error: 'Lip sync requiere una imagen y un audio' },
+          { status: 400 }
+        )
+      }
+    // Deep face requires video + image (face)
+    } else if (tool === 'deep-face') {
+      if (!video || !image) {
+        return NextResponse.json(
+          { error: 'Deep face requiere un video y una imagen de cara' },
           { status: 400 }
         )
       }
@@ -580,6 +738,75 @@ export async function POST(request: Request) {
         )
       }
 
+      // ========================================
+      // KIE.ai - Deep Face (Kling 2.6 Motion Control)
+      // ========================================
+      case 'deep-face': {
+        if (!profile.kie_api_key) {
+          return NextResponse.json(
+            { error: 'Necesitas configurar tu API key de KIE.ai para esta herramienta' },
+            { status: 400 }
+          )
+        }
+
+        const apiKey = decrypt(profile.kie_api_key)
+
+        // Extract deep face specific fields
+        const prompt = formData.get('prompt') as string | null
+        const orientation = (formData.get('orientation') as 'video' | 'image') || 'video'
+        const mode = (formData.get('mode') as '720p' | '1080p') || '1080p'
+
+        console.log(`[Tools/DeepFace] Orientation: ${orientation}, Mode: ${mode}`)
+
+        // Upload video and face image to Supabase to get public URLs
+        const videoUrl = await uploadToSupabase(
+          supabase,
+          user.id,
+          video!,
+          `deepface-video.${video!.name.split('.').pop() || 'mp4'}`,
+          video!.type || 'video/mp4'
+        )
+
+        const faceUrl = await uploadToSupabase(
+          supabase,
+          user.id,
+          image!,
+          `deepface-face.${image!.name.split('.').pop() || 'png'}`,
+          image!.type || 'image/png'
+        )
+
+        if (!videoUrl || !faceUrl) {
+          return NextResponse.json(
+            { error: 'Error al subir archivos' },
+            { status: 500 }
+          )
+        }
+
+        const result = await generateDeepFace(
+          {
+            videoUrl,
+            faceUrl,
+            prompt: prompt || undefined,
+            orientation,
+            mode,
+          },
+          apiKey
+        )
+
+        if (result.success && result.taskId) {
+          return NextResponse.json({
+            success: true,
+            taskId: result.taskId,
+            status: 'processing',
+          })
+        }
+
+        return NextResponse.json(
+          { error: result.error || 'Error al iniciar deep face' },
+          { status: 500 }
+        )
+      }
+
       default:
         return NextResponse.json({ error: 'Herramienta no soportada' }, { status: 400 })
     }
@@ -591,7 +818,8 @@ export async function POST(request: Request) {
 }
 
 /**
- * GET endpoint for checking lip-sync status
+ * GET endpoint for checking KIE task status (lip-sync and deep-face)
+ * Both use the same KIE recordInfo endpoint
  */
 export async function GET(request: Request) {
   try {
@@ -604,6 +832,7 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url)
     const taskId = searchParams.get('taskId')
+    const type = searchParams.get('type') || 'lip-sync' // 'lip-sync' or 'deep-face'
 
     if (!taskId) {
       return NextResponse.json({ error: 'taskId es requerido' }, { status: 400 })
@@ -621,7 +850,11 @@ export async function GET(request: Request) {
     }
 
     const apiKey = decrypt(profile.kie_api_key)
-    const result = await checkLipSyncStatus(taskId, apiKey)
+
+    // Both use the same endpoint, but use appropriate function for logging
+    const result = type === 'deep-face'
+      ? await checkDeepFaceStatus(taskId, apiKey)
+      : await checkLipSyncStatus(taskId, apiKey)
 
     return NextResponse.json(result)
 

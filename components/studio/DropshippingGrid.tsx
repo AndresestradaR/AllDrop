@@ -650,9 +650,13 @@ function ResenaUGCTool({ onBack }: { onBack: () => void }) {
 function DeepFaceTool({ onBack }: { onBack: () => void }) {
   const [sourceVideo, setSourceVideo] = useState<File | null>(null)
   const [targetFace, setTargetFace] = useState<File | null>(null)
-  const [voiceAudio, setVoiceAudio] = useState<File | null>(null)
+  const [prompt, setPrompt] = useState('')
+  const [orientation, setOrientation] = useState<'video' | 'image'>('video')
+  const [mode, setMode] = useState<'720p' | '1080p'>('1080p')
   const [isProcessing, setIsProcessing] = useState(false)
+  const [processingStatus, setProcessingStatus] = useState('')
   const [resultVideoUrl, setResultVideoUrl] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const tool = DROPSHIPPING_TOOLS.find(t => t.id === 'deep-face')!
 
@@ -661,6 +665,7 @@ function DeepFaceTool({ onBack }: { onBack: () => void }) {
     if (file) {
       setSourceVideo(file)
       setResultVideoUrl(null)
+      setError(null)
     }
   }
 
@@ -669,22 +674,87 @@ function DeepFaceTool({ onBack }: { onBack: () => void }) {
     if (file) {
       setTargetFace(file)
       setResultVideoUrl(null)
+      setError(null)
     }
   }
 
-  const handleAudioUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) setVoiceAudio(file)
+  const pollStatus = async (taskId: string) => {
+    const maxAttempts = 120 // 10 minutes (5 seconds * 120)
+    let attempts = 0
+
+    while (attempts < maxAttempts) {
+      try {
+        const res = await fetch(`/api/studio/tools?taskId=${taskId}&type=deep-face`)
+        const data = await res.json()
+
+        if (data.status === 'completed' && data.videoUrl) {
+          setResultVideoUrl(data.videoUrl)
+          setIsProcessing(false)
+          setProcessingStatus('')
+          return
+        }
+
+        if (data.error || data.status === 'failed') {
+          setError(data.error || 'Error al procesar video')
+          setIsProcessing(false)
+          setProcessingStatus('')
+          return
+        }
+
+        setProcessingStatus(`Procesando... (${Math.floor(attempts * 5 / 60)}:${String((attempts * 5) % 60).padStart(2, '0')})`)
+        await new Promise(r => setTimeout(r, 5000))
+        attempts++
+      } catch (err) {
+        console.error('Poll error:', err)
+        await new Promise(r => setTimeout(r, 5000))
+        attempts++
+      }
+    }
+
+    setError('Tiempo de espera agotado')
+    setIsProcessing(false)
+    setProcessingStatus('')
   }
 
   const handleProcess = async () => {
     if (!sourceVideo || !targetFace) return
+
     setIsProcessing(true)
-    // TODO: Implement API call
-    setTimeout(() => {
+    setError(null)
+    setResultVideoUrl(null)
+    setProcessingStatus('Subiendo archivos...')
+
+    try {
+      const formData = new FormData()
+      formData.append('tool', 'deep-face')
+      formData.append('video', sourceVideo)
+      formData.append('image', targetFace)
+      formData.append('orientation', orientation)
+      formData.append('mode', mode)
+      if (prompt.trim()) {
+        formData.append('prompt', prompt.trim())
+      }
+
+      const res = await fetch('/api/studio/tools', {
+        method: 'POST',
+        body: formData,
+      })
+
+      const data = await res.json()
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Error al procesar')
+      }
+
+      if (data.taskId) {
+        setProcessingStatus('Iniciando procesamiento...')
+        await pollStatus(data.taskId)
+      }
+    } catch (err: any) {
+      setError(err.message || 'Error al procesar')
       setIsProcessing(false)
-      // Placeholder: would set resultVideoUrl here
-    }, 2000)
+      setProcessingStatus('')
+    }
   }
 
   return (
@@ -709,7 +779,7 @@ function DeepFaceTool({ onBack }: { onBack: () => void }) {
         {/* Content */}
         <div className="flex-1 p-6 flex gap-6 overflow-hidden">
           {/* Input Section */}
-          <div className="w-1/3 flex flex-col gap-4">
+          <div className="w-1/3 flex flex-col gap-4 overflow-y-auto pr-2">
             {/* Video Upload */}
             <div>
               <label className="block text-sm font-medium text-text-secondary mb-2">
@@ -768,22 +838,85 @@ function DeepFaceTool({ onBack }: { onBack: () => void }) {
               )}
             </div>
 
-            {/* Audio Upload (Optional) */}
+            {/* Orientation Selector */}
             <div>
               <label className="block text-sm font-medium text-text-secondary mb-2">
-                Audio de voz (opcional)
+                Orientación del personaje
               </label>
-              {voiceAudio ? (
-                <div className="relative bg-surface-elevated rounded-xl p-3 flex items-center gap-2">
-                  <span className="text-sm text-text-primary truncate flex-1">{voiceAudio.name}</span>
-                  <button onClick={() => setVoiceAudio(null)} className="text-error text-xs">X</button>
-                </div>
-              ) : (
-                <label className="flex items-center justify-center gap-2 h-12 border-2 border-dashed border-border hover:border-accent/50 rounded-xl cursor-pointer transition-colors">
-                  <input type="file" accept="audio/*" className="hidden" onChange={handleAudioUpload} />
-                  <span className="text-sm text-text-secondary">Subir audio para cambiar voz</span>
-                </label>
-              )}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setOrientation('video')}
+                  className={cn(
+                    'px-3 py-2 rounded-lg text-sm font-medium transition-all',
+                    orientation === 'video'
+                      ? 'bg-accent text-background'
+                      : 'bg-surface-elevated text-text-secondary hover:bg-border/50'
+                  )}
+                >
+                  Desde video
+                </button>
+                <button
+                  onClick={() => setOrientation('image')}
+                  className={cn(
+                    'px-3 py-2 rounded-lg text-sm font-medium transition-all',
+                    orientation === 'image'
+                      ? 'bg-accent text-background'
+                      : 'bg-surface-elevated text-text-secondary hover:bg-border/50'
+                  )}
+                >
+                  Desde imagen
+                </button>
+              </div>
+              <p className="text-xs text-text-secondary mt-1">
+                {orientation === 'video' ? 'Usa la orientación del video original' : 'Usa la orientación de la imagen de cara'}
+              </p>
+            </div>
+
+            {/* Quality Selector */}
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-2">
+                Calidad de salida
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setMode('720p')}
+                  className={cn(
+                    'px-3 py-2 rounded-lg text-sm font-medium transition-all',
+                    mode === '720p'
+                      ? 'bg-accent text-background'
+                      : 'bg-surface-elevated text-text-secondary hover:bg-border/50'
+                  )}
+                >
+                  720p
+                </button>
+                <button
+                  onClick={() => setMode('1080p')}
+                  className={cn(
+                    'px-3 py-2 rounded-lg text-sm font-medium transition-all',
+                    mode === '1080p'
+                      ? 'bg-accent text-background'
+                      : 'bg-surface-elevated text-text-secondary hover:bg-border/50'
+                  )}
+                >
+                  1080p
+                </button>
+              </div>
+            </div>
+
+            {/* Prompt (Optional) */}
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-2">
+                Prompt (opcional)
+              </label>
+              <textarea
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value.slice(0, 2500))}
+                placeholder="Describe movimientos o acciones adicionales..."
+                className="w-full h-20 px-3 py-2 bg-surface-elevated border border-border rounded-lg text-text-primary placeholder:text-text-secondary/50 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-accent/50"
+              />
+              <p className="text-xs text-text-secondary mt-1">
+                {prompt.length}/2500 caracteres
+              </p>
             </div>
           </div>
 
@@ -801,12 +934,20 @@ function DeepFaceTool({ onBack }: { onBack: () => void }) {
                     <>
                       <Loader2 className="w-12 h-12 text-accent mx-auto mb-3 animate-spin" />
                       <p className="text-text-primary font-medium">Procesando video...</p>
-                      <p className="text-sm text-text-secondary mt-1">Esto puede tardar varios minutos</p>
+                      <p className="text-sm text-text-secondary mt-1">{processingStatus || 'Esto puede tardar varios minutos'}</p>
+                    </>
+                  ) : error ? (
+                    <>
+                      <div className="w-12 h-12 rounded-full bg-error/20 flex items-center justify-center mx-auto mb-3">
+                        <span className="text-error text-xl">✕</span>
+                      </div>
+                      <p className="text-error font-medium">Error</p>
+                      <p className="text-sm text-text-secondary mt-1">{error}</p>
                     </>
                   ) : (
                     <>
                       <Drama className="w-12 h-12 text-text-secondary mx-auto mb-3" />
-                      <p className="text-text-secondary">El video procesado aparecera aqui</p>
+                      <p className="text-text-secondary">El video procesado aparecerá aquí</p>
                     </>
                   )}
                 </div>
