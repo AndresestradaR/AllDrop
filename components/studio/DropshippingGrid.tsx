@@ -648,8 +648,20 @@ function ResenaUGCTool({ onBack }: { onBack: () => void }) {
 // DEEP FACE COMPONENT
 // ============================================
 function DeepFaceTool({ onBack }: { onBack: () => void }) {
+  // File states (for preview)
   const [sourceVideo, setSourceVideo] = useState<File | null>(null)
   const [targetFace, setTargetFace] = useState<File | null>(null)
+
+  // URL states (after upload to Supabase)
+  const [videoUrl, setVideoUrl] = useState<string | null>(null)
+  const [faceUrl, setFaceUrl] = useState<string | null>(null)
+
+  // Upload progress states
+  const [isUploadingVideo, setIsUploadingVideo] = useState(false)
+  const [isUploadingFace, setIsUploadingFace] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState<string>('')
+
+  // Other states
   const [prompt, setPrompt] = useState('')
   const [orientation, setOrientation] = useState<'video' | 'image'>('video')
   const [mode, setMode] = useState<'720p' | '1080p'>('1080p')
@@ -660,22 +672,91 @@ function DeepFaceTool({ onBack }: { onBack: () => void }) {
 
   const tool = DROPSHIPPING_TOOLS.find(t => t.id === 'deep-face')!
 
-  const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Upload file directly to Supabase Storage (bypasses Vercel 4.5MB limit)
+  const uploadToSupabase = async (file: File, folder: string): Promise<string> => {
+    const { createClient } = await import('@/lib/supabase/client')
+    const supabase = createClient()
+
+    const fileExt = file.name.split('.').pop() || 'bin'
+    const fileName = `${folder}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`
+
+    const { error: uploadError } = await supabase.storage
+      .from('landing-images')
+      .upload(fileName, file, {
+        cacheControl: '3600',
+        upsert: false,
+      })
+
+    if (uploadError) {
+      console.error('Upload error:', uploadError)
+      throw new Error(`Error al subir archivo: ${uploadError.message}`)
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('landing-images')
+      .getPublicUrl(fileName)
+
+    return publicUrl
+  }
+
+  const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file) {
-      setSourceVideo(file)
-      setResultVideoUrl(null)
-      setError(null)
+    if (!file) return
+
+    setSourceVideo(file)
+    setVideoUrl(null)
+    setResultVideoUrl(null)
+    setError(null)
+    setIsUploadingVideo(true)
+    setUploadProgress('Subiendo video...')
+
+    try {
+      const url = await uploadToSupabase(file, 'deep-face/videos')
+      setVideoUrl(url)
+      setUploadProgress('')
+      toast.success('Video subido correctamente')
+    } catch (err: any) {
+      setError(err.message || 'Error al subir video')
+      setSourceVideo(null)
+      toast.error('Error al subir video')
+    } finally {
+      setIsUploadingVideo(false)
     }
   }
 
-  const handleFaceUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFaceUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file) {
-      setTargetFace(file)
-      setResultVideoUrl(null)
-      setError(null)
+    if (!file) return
+
+    setTargetFace(file)
+    setFaceUrl(null)
+    setResultVideoUrl(null)
+    setError(null)
+    setIsUploadingFace(true)
+    setUploadProgress('Subiendo imagen...')
+
+    try {
+      const url = await uploadToSupabase(file, 'deep-face/faces')
+      setFaceUrl(url)
+      setUploadProgress('')
+      toast.success('Imagen subida correctamente')
+    } catch (err: any) {
+      setError(err.message || 'Error al subir imagen')
+      setTargetFace(null)
+      toast.error('Error al subir imagen')
+    } finally {
+      setIsUploadingFace(false)
     }
+  }
+
+  const clearVideo = () => {
+    setSourceVideo(null)
+    setVideoUrl(null)
+  }
+
+  const clearFace = () => {
+    setTargetFace(null)
+    setFaceUrl(null)
   }
 
   const pollStatus = async (taskId: string) => {
@@ -717,27 +798,32 @@ function DeepFaceTool({ onBack }: { onBack: () => void }) {
   }
 
   const handleProcess = async () => {
-    if (!sourceVideo || !targetFace) return
+    // Verify URLs are ready (files uploaded to Supabase)
+    if (!videoUrl || !faceUrl) {
+      setError('Espera a que los archivos terminen de subir')
+      return
+    }
 
     setIsProcessing(true)
     setError(null)
     setResultVideoUrl(null)
-    setProcessingStatus('Subiendo archivos...')
+    setProcessingStatus('Iniciando procesamiento...')
 
     try {
-      const formData = new FormData()
-      formData.append('tool', 'deep-face')
-      formData.append('video', sourceVideo)
-      formData.append('image', targetFace)
-      formData.append('orientation', orientation)
-      formData.append('mode', mode)
-      if (prompt.trim()) {
-        formData.append('prompt', prompt.trim())
-      }
-
+      // Send only URLs to backend (small JSON payload, no file data)
       const res = await fetch('/api/studio/tools', {
         method: 'POST',
-        body: formData,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          tool: 'deep-face',
+          videoUrl,
+          imageUrl: faceUrl,
+          orientation,
+          mode,
+          prompt: prompt.trim() || undefined,
+        }),
       })
 
       const data = await res.json()
@@ -747,7 +833,7 @@ function DeepFaceTool({ onBack }: { onBack: () => void }) {
       }
 
       if (data.taskId) {
-        setProcessingStatus('Iniciando procesamiento...')
+        setProcessingStatus('Procesando video con IA...')
         await pollStatus(data.taskId)
       }
     } catch (err: any) {
@@ -756,6 +842,9 @@ function DeepFaceTool({ onBack }: { onBack: () => void }) {
       setProcessingStatus('')
     }
   }
+
+  // Check if ready to process
+  const isReadyToProcess = videoUrl && faceUrl && !isUploadingVideo && !isUploadingFace
 
   return (
     <div className="h-[calc(100vh-200px)] min-h-[600px]">
@@ -784,6 +873,7 @@ function DeepFaceTool({ onBack }: { onBack: () => void }) {
             <div>
               <label className="block text-sm font-medium text-text-secondary mb-2">
                 Video original *
+                {videoUrl && <Check className="inline w-4 h-4 text-green-500 ml-2" />}
               </label>
               {sourceVideo ? (
                 <div className="relative bg-surface-elevated rounded-xl overflow-hidden h-32">
@@ -791,12 +881,20 @@ function DeepFaceTool({ onBack }: { onBack: () => void }) {
                     src={URL.createObjectURL(sourceVideo)}
                     className="w-full h-full object-cover"
                   />
-                  <button
-                    onClick={() => setSourceVideo(null)}
-                    className="absolute top-2 right-2 p-1.5 bg-error/80 hover:bg-error rounded-lg"
-                  >
-                    <span className="text-white text-xs">X</span>
-                  </button>
+                  {isUploadingVideo && (
+                    <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center">
+                      <Loader2 className="w-8 h-8 text-white animate-spin mb-2" />
+                      <span className="text-white text-xs">Subiendo video...</span>
+                    </div>
+                  )}
+                  {!isUploadingVideo && (
+                    <button
+                      onClick={clearVideo}
+                      className="absolute top-2 right-2 p-1.5 bg-error/80 hover:bg-error rounded-lg"
+                    >
+                      <span className="text-white text-xs">X</span>
+                    </button>
+                  )}
                   <span className="absolute bottom-2 left-2 text-xs text-white bg-black/50 px-2 py-1 rounded">
                     {sourceVideo.name}
                   </span>
@@ -814,6 +912,7 @@ function DeepFaceTool({ onBack }: { onBack: () => void }) {
             <div>
               <label className="block text-sm font-medium text-text-secondary mb-2">
                 Cara destino *
+                {faceUrl && <Check className="inline w-4 h-4 text-green-500 ml-2" />}
               </label>
               {targetFace ? (
                 <div className="relative bg-surface-elevated rounded-xl overflow-hidden h-32">
@@ -822,12 +921,20 @@ function DeepFaceTool({ onBack }: { onBack: () => void }) {
                     alt="Target face"
                     className="w-full h-full object-cover"
                   />
-                  <button
-                    onClick={() => setTargetFace(null)}
-                    className="absolute top-2 right-2 p-1.5 bg-error/80 hover:bg-error rounded-lg"
-                  >
-                    <span className="text-white text-xs">X</span>
-                  </button>
+                  {isUploadingFace && (
+                    <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center">
+                      <Loader2 className="w-8 h-8 text-white animate-spin mb-2" />
+                      <span className="text-white text-xs">Subiendo imagen...</span>
+                    </div>
+                  )}
+                  {!isUploadingFace && (
+                    <button
+                      onClick={clearFace}
+                      className="absolute top-2 right-2 p-1.5 bg-error/80 hover:bg-error rounded-lg"
+                    >
+                      <span className="text-white text-xs">X</span>
+                    </button>
+                  )}
                 </div>
               ) : (
                 <label className="flex flex-col items-center justify-center h-32 border-2 border-dashed border-border hover:border-accent/50 rounded-xl cursor-pointer transition-colors">
@@ -957,13 +1064,26 @@ function DeepFaceTool({ onBack }: { onBack: () => void }) {
         </div>
 
         {/* Actions */}
-        <div className="px-6 py-4 border-t border-border flex items-center justify-end">
+        <div className="px-6 py-4 border-t border-border flex items-center justify-between">
+          {/* Upload status hint */}
+          <div className="text-sm text-text-secondary">
+            {(isUploadingVideo || isUploadingFace) && (
+              <span className="flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                {uploadProgress || 'Subiendo archivos...'}
+              </span>
+            )}
+            {!isUploadingVideo && !isUploadingFace && sourceVideo && targetFace && !videoUrl && !faceUrl && (
+              <span className="text-amber-500">Esperando subida...</span>
+            )}
+          </div>
+
           <button
             onClick={handleProcess}
-            disabled={!sourceVideo || !targetFace || isProcessing}
+            disabled={!isReadyToProcess || isProcessing}
             className={cn(
               'flex items-center gap-2 px-6 py-2.5 rounded-xl font-semibold transition-all',
-              !sourceVideo || !targetFace || isProcessing
+              !isReadyToProcess || isProcessing
                 ? 'bg-border text-text-secondary cursor-not-allowed'
                 : 'bg-accent hover:bg-accent-hover text-background'
             )}
@@ -971,7 +1091,7 @@ function DeepFaceTool({ onBack }: { onBack: () => void }) {
             {isProcessing ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                Procesando...
+                {processingStatus || 'Procesando...'}
               </>
             ) : (
               <>

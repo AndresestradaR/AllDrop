@@ -556,34 +556,80 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    const formData = await request.formData()
-    const image = formData.get('image') as File | null
-    const tool = formData.get('tool') as ToolType
-    const audio = formData.get('audio') as File | null // For lip-sync
-    const video = formData.get('video') as File | null // For deep-face
+    // Check Content-Type to determine how to parse the request
+    const contentType = request.headers.get('content-type') || ''
+    const isJson = contentType.includes('application/json')
 
-    if (!tool) {
-      return NextResponse.json({ error: 'Herramienta es requerida' }, { status: 400 })
-    }
+    // Variables for form data
+    let image: File | null = null
+    let audio: File | null = null
+    let video: File | null = null
+    let tool: ToolType
+    let formData: FormData | null = null
 
-    // Lip sync requires image + audio
-    if (tool === 'lip-sync') {
-      if (!image || !audio) {
-        return NextResponse.json(
-          { error: 'Lip sync requiere una imagen y un audio' },
-          { status: 400 }
-        )
+    // Variables for JSON data (deep-face with pre-uploaded URLs)
+    let jsonBody: {
+      tool: ToolType
+      videoUrl?: string
+      imageUrl?: string
+      orientation?: 'video' | 'image'
+      mode?: '720p' | '1080p'
+      prompt?: string
+    } | null = null
+
+    // Lip sync specific fields from FormData
+    let lipSyncModel: LipSyncModelType = 'kling'
+    let lipSyncPrompt: string | null = null
+    let lipSyncResolution: '480p' | '720p' = '720p'
+    let lipSyncSeed: number | undefined = undefined
+
+    if (isJson) {
+      // Parse JSON body (for deep-face with pre-uploaded URLs)
+      jsonBody = await request.json()
+      tool = jsonBody.tool
+
+      if (!tool) {
+        return NextResponse.json({ error: 'Herramienta es requerida' }, { status: 400 })
       }
-    // Deep face requires video + image (face)
-    } else if (tool === 'deep-face') {
-      if (!video || !image) {
-        return NextResponse.json(
-          { error: 'Deep face requiere un video y una imagen de cara' },
-          { status: 400 }
-        )
+
+      // Deep face via JSON requires URLs
+      if (tool === 'deep-face') {
+        if (!jsonBody.videoUrl || !jsonBody.imageUrl) {
+          return NextResponse.json(
+            { error: 'Deep face requiere videoUrl e imageUrl' },
+            { status: 400 }
+          )
+        }
       }
-    } else if (!image) {
-      return NextResponse.json({ error: 'Imagen es requerida' }, { status: 400 })
+    } else {
+      // Parse FormData (for other tools)
+      formData = await request.formData()
+      image = formData.get('image') as File | null
+      tool = formData.get('tool') as ToolType
+      audio = formData.get('audio') as File | null // For lip-sync
+      video = formData.get('video') as File | null // For deep-face (legacy, not used anymore)
+
+      if (!tool) {
+        return NextResponse.json({ error: 'Herramienta es requerida' }, { status: 400 })
+      }
+
+      // Lip sync requires image + audio
+      if (tool === 'lip-sync') {
+        if (!image || !audio) {
+          return NextResponse.json(
+            { error: 'Lip sync requiere una imagen y un audio' },
+            { status: 400 }
+          )
+        }
+        // Extract lip sync specific fields
+        lipSyncModel = (formData.get('lipSyncModel') as LipSyncModelType) || 'kling'
+        lipSyncPrompt = formData.get('prompt') as string | null
+        lipSyncResolution = (formData.get('resolution') as '480p' | '720p') || '720p'
+        const seedStr = formData.get('seed') as string | null
+        lipSyncSeed = seedStr ? parseInt(seedStr) : undefined
+      } else if (!image) {
+        return NextResponse.json({ error: 'Imagen es requerida' }, { status: 400 })
+      }
     }
 
     // Get user's API keys
@@ -597,10 +643,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Perfil no encontrado' }, { status: 404 })
     }
 
-    // Convert image to base64 (for non-lip-sync tools)
+    // Convert image to base64 (for non-lip-sync, non-deep-face tools)
     let imageBase64 = ''
     let mimeType = ''
-    if (image) {
+    if (image && !isJson) {
       const imageBuffer = await image.arrayBuffer()
       imageBase64 = Buffer.from(imageBuffer).toString('base64')
       mimeType = image.type || 'image/png'
@@ -679,14 +725,8 @@ export async function POST(request: Request) {
 
         const apiKey = decrypt(profile.kie_api_key)
 
-        // Extract lip sync specific fields
-        const lipSyncModel = (formData.get('lipSyncModel') as LipSyncModelType) || 'kling'
-        const prompt = formData.get('prompt') as string | null
-        const resolution = (formData.get('resolution') as '480p' | '720p') || '720p'
-        const seedStr = formData.get('seed') as string | null
-        const seed = seedStr ? parseInt(seedStr) : undefined
-
-        console.log(`[Tools/LipSync] Model: ${lipSyncModel}, Resolution: ${resolution}, Seed: ${seed}`)
+        // Use lip sync specific fields extracted earlier
+        console.log(`[Tools/LipSync] Model: ${lipSyncModel}, Resolution: ${lipSyncResolution}, Seed: ${lipSyncSeed}`)
 
         // Upload image and audio to Supabase to get public URLs
         const imageUrl = await uploadToSupabase(
@@ -717,9 +757,9 @@ export async function POST(request: Request) {
             imageUrl,
             audioUrl,
             model: lipSyncModel,
-            prompt: prompt || undefined,
-            resolution,
-            seed,
+            prompt: lipSyncPrompt || undefined,
+            resolution: lipSyncResolution,
+            seed: lipSyncSeed,
           },
           apiKey
         )
@@ -740,6 +780,7 @@ export async function POST(request: Request) {
 
       // ========================================
       // KIE.ai - Deep Face (Kling 2.6 Motion Control)
+      // URLs are pre-uploaded from frontend to Supabase (bypasses Vercel limit)
       // ========================================
       case 'deep-face': {
         if (!profile.kie_api_key) {
@@ -749,43 +790,27 @@ export async function POST(request: Request) {
           )
         }
 
-        const apiKey = decrypt(profile.kie_api_key)
-
-        // Extract deep face specific fields
-        const prompt = formData.get('prompt') as string | null
-        const orientation = (formData.get('orientation') as 'video' | 'image') || 'video'
-        const mode = (formData.get('mode') as '720p' | '1080p') || '1080p'
-
-        console.log(`[Tools/DeepFace] Orientation: ${orientation}, Mode: ${mode}`)
-
-        // Upload video and face image to Supabase to get public URLs
-        const videoUrl = await uploadToSupabase(
-          supabase,
-          user.id,
-          video!,
-          `deepface-video.${video!.name.split('.').pop() || 'mp4'}`,
-          video!.type || 'video/mp4'
-        )
-
-        const faceUrl = await uploadToSupabase(
-          supabase,
-          user.id,
-          image!,
-          `deepface-face.${image!.name.split('.').pop() || 'png'}`,
-          image!.type || 'image/png'
-        )
-
-        if (!videoUrl || !faceUrl) {
+        // Deep face expects JSON with pre-uploaded URLs
+        if (!jsonBody || !jsonBody.videoUrl || !jsonBody.imageUrl) {
           return NextResponse.json(
-            { error: 'Error al subir archivos' },
-            { status: 500 }
+            { error: 'Deep face requiere videoUrl e imageUrl (subidos previamente a Supabase)' },
+            { status: 400 }
           )
         }
+
+        const apiKey = decrypt(profile.kie_api_key)
+
+        // Extract deep face specific fields from JSON body
+        const { videoUrl, imageUrl, prompt, orientation = 'video', mode = '1080p' } = jsonBody
+
+        console.log(`[Tools/DeepFace] Orientation: ${orientation}, Mode: ${mode}`)
+        console.log(`[Tools/DeepFace] Video URL: ${videoUrl}`)
+        console.log(`[Tools/DeepFace] Image URL: ${imageUrl}`)
 
         const result = await generateDeepFace(
           {
             videoUrl,
-            faceUrl,
+            faceUrl: imageUrl,
             prompt: prompt || undefined,
             orientation,
             mode,
