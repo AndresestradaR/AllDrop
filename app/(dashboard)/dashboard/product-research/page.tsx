@@ -246,7 +246,7 @@ export default function ProductResearchPage() {
   const [tiktokLoading, setTiktokLoading] = useState(false)
   const [tiktokCategory, setTiktokCategory] = useState('')
   const [tiktokSearch, setTiktokSearch] = useState('')
-  const [tiktokSort, setTiktokSort] = useState<'day7_sold_count' | 'sold_count' | 'last_synced_at'>('last_synced_at')
+  const [tiktokSort, setTiktokSort] = useState<'day7_sold_count' | 'sold_count' | 'last_synced_at' | 'category_rank' | 'viral_index' | 'popularity_index' | 'price_asc' | 'price_desc' | 'day7_revenue'>('day7_sold_count')
   const [selectedTikTokProduct, setSelectedTikTokProduct] = useState<TikTokProduct | null>(null)
 
   // Load TikTok products from Supabase
@@ -315,9 +315,30 @@ export default function ProductResearchPage() {
 
     // Sort
     filtered.sort((a, b) => {
-      if (tiktokSort === 'day7_sold_count') return (b.day7_sold_count || 0) - (a.day7_sold_count || 0)
-      if (tiktokSort === 'sold_count') return (b.sold_count || 0) - (a.sold_count || 0)
-      return new Date(b.last_synced_at).getTime() - new Date(a.last_synced_at).getTime()
+      switch (tiktokSort) {
+        case 'day7_sold_count':
+          return (b.day7_sold_count || 0) - (a.day7_sold_count || 0)
+        case 'sold_count':
+          return (b.sold_count || 0) - (a.sold_count || 0)
+        case 'category_rank':
+          // Lower rank is better (1 is best), products without rank go to end
+          const rankA = a.category_rank_show ? parseInt(a.category_rank_show) : 99999
+          const rankB = b.category_rank_show ? parseInt(b.category_rank_show) : 99999
+          return rankA - rankB
+        case 'viral_index':
+          return (b.viral_index || 0) - (a.viral_index || 0)
+        case 'popularity_index':
+          return (b.popularity_index || 0) - (a.popularity_index || 0)
+        case 'price_asc':
+          return (a.price || 0) - (b.price || 0)
+        case 'price_desc':
+          return (b.price || 0) - (a.price || 0)
+        case 'day7_revenue':
+          return (b.day7_sale_amount || 0) - (a.day7_sale_amount || 0)
+        case 'last_synced_at':
+        default:
+          return new Date(b.last_synced_at).getTime() - new Date(a.last_synced_at).getTime()
+      }
     })
 
     return filtered
@@ -812,6 +833,12 @@ export default function ProductResearchPage() {
               >
                 <option value="day7_sold_count">Ventas 7 días</option>
                 <option value="sold_count">Ventas totales</option>
+                <option value="day7_revenue">Revenue 7 días</option>
+                <option value="category_rank">Ranking Categoría</option>
+                <option value="viral_index">Viral Index</option>
+                <option value="popularity_index">Popularity Index</option>
+                <option value="price_asc">Precio: Menor a Mayor</option>
+                <option value="price_desc">Precio: Mayor a Menor</option>
                 <option value="last_synced_at">Más recientes</option>
               </select>
               <button
