@@ -164,7 +164,8 @@ export default function ProductResearchPage() {
   const [tiktokLoading, setTiktokLoading] = useState(false)
   const [tiktokCategory, setTiktokCategory] = useState('')
   const [tiktokSearch, setTiktokSearch] = useState('')
-  const [tiktokSort, setTiktokSort] = useState<'day7_sold_count' | 'sold_count' | 'last_synced_at'>('day7_sold_count')
+  const [tiktokSort, setTiktokSort] = useState<'day7_sold_count' | 'sold_count' | 'last_synced_at'>('last_synced_at')
+  const [selectedTikTokProduct, setSelectedTikTokProduct] = useState<TikTokProduct | null>(null)
 
   // Load TikTok products from Supabase
   useEffect(() => {
@@ -177,7 +178,7 @@ export default function ProductResearchPage() {
     setTiktokLoading(true)
     try {
       const response = await fetch(
-        `${FASTMOSS_SUPABASE_URL}/rest/v1/fastmoss_products?select=*&order=day7_sold_count.desc&limit=200`,
+        `${FASTMOSS_SUPABASE_URL}/rest/v1/fastmoss_products?select=*&order=last_synced_at.desc&limit=200`,
         {
           headers: {
             'apikey': FASTMOSS_SUPABASE_KEY,
@@ -768,91 +769,32 @@ export default function ProductResearchPage() {
 
           {/* Products Grid */}
           {!tiktokLoading && filteredTiktokProducts.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {filteredTiktokProducts.map((product) => (
                 <div
                   key={product.product_id}
-                  className="bg-surface rounded-xl border border-border overflow-hidden hover:border-accent/50 transition-all"
+                  onClick={() => setSelectedTikTokProduct(product)}
+                  className="bg-[#1a1a2e] rounded-xl overflow-hidden cursor-pointer border-2 border-transparent hover:border-amber-500/50 transition-all duration-200 hover:scale-[1.02]"
                 >
-                  <div className="flex">
-                    {/* Image */}
-                    <div className="w-32 h-32 flex-shrink-0">
-                      <ProductImage src={product.img} alt={product.title} sales={0} />
-                    </div>
-
-                    {/* Content */}
-                    <div className="flex-1 p-3">
-                      <h3 className="font-medium text-text-primary text-sm line-clamp-2 mb-2">
-                        {product.title}
-                      </h3>
-                      <span className="inline-block px-2 py-0.5 bg-accent/10 text-accent rounded text-xs mb-2">
-                        {product.category_l1 || 'Sin categoría'}
-                      </span>
-                      {product.price > 0 && (
-                        <p className="text-lg font-bold text-accent">
-                          ${product.price.toLocaleString()} <span className="text-xs font-normal text-text-secondary">{product.currency || 'USD'}</span>
-                        </p>
-                      )}
-                    </div>
+                  {/* Square Image */}
+                  <div className="aspect-square w-full">
+                    <ProductImage src={product.img} alt={product.title} sales={0} />
                   </div>
 
-                  {/* Metrics Grid */}
-                  <div className="grid grid-cols-3 gap-px bg-border">
-                    <div className="bg-surface p-3 text-center">
-                      <div className="flex items-center justify-center gap-1 text-orange-500 mb-1">
-                        <Flame className="w-4 h-4" />
-                      </div>
-                      <p className="text-lg font-bold text-text-primary">{(product.day7_sold_count || 0).toLocaleString()}</p>
-                      <p className="text-xs text-text-secondary">Ventas 7d</p>
-                    </div>
-                    <div className="bg-surface p-3 text-center">
-                      <div className="flex items-center justify-center gap-1 text-green-500 mb-1">
-                        <TrendingUp className="w-4 h-4" />
-                      </div>
-                      <p className="text-lg font-bold text-text-primary">{(product.sold_count || 0).toLocaleString()}</p>
-                      <p className="text-xs text-text-secondary">Ventas Total</p>
-                    </div>
-                    <div className="bg-surface p-3 text-center">
-                      <div className="flex items-center justify-center gap-1 text-yellow-500 mb-1">
-                        <DollarSign className="w-4 h-4" />
-                      </div>
-                      <p className="text-lg font-bold text-text-primary">${((product.day7_sale_amount || 0) / 1000).toFixed(0)}k</p>
-                      <p className="text-xs text-text-secondary">Revenue 7d</p>
-                    </div>
-                  </div>
-
-                  {/* Additional Info */}
-                  <div className="p-3 border-t border-border space-y-2">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-text-secondary">Tienda:</span>
-                      <span className="text-text-primary font-medium truncate max-w-[150px]">{product.shop_name || 'N/A'}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-text-secondary">Rating:</span>
-                      <span className="text-yellow-500 font-medium">⭐ {product.product_rating || 'N/A'}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-text-secondary">Creadores:</span>
-                      <span className="text-text-primary font-medium">{(product.relate_author_count || 0).toLocaleString()}</span>
-                    </div>
-                    {product.commission_rate && (
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-text-secondary">Comisión:</span>
-                        <span className="text-green-500 font-medium">{product.commission_rate}</span>
-                      </div>
+                  {/* Content */}
+                  <div className="p-3">
+                    <h3 className="font-medium text-white text-sm line-clamp-2 mb-2 min-h-[2.5rem]">
+                      {product.title}
+                    </h3>
+                    <span className="inline-block px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded text-xs">
+                      {product.category_l1 || 'General'}
+                    </span>
+                    {product.price > 0 && (
+                      <p className="text-lg font-bold text-white mt-2">
+                        ${product.price.toLocaleString()} <span className="text-xs font-normal text-gray-400">{product.currency || 'USD'}</span>
+                      </p>
                     )}
                   </div>
-
-                  {/* Action - Link to TikTok Shop */}
-                  <a
-                    href={product.detail_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block w-full text-center px-4 py-2.5 bg-background hover:bg-accent/10 text-text-secondary hover:text-accent font-medium transition-colors text-xs border-t border-border"
-                  >
-                    Ver en TikTok Shop
-                    <ExternalLink className="w-3 h-3 inline ml-1" />
-                  </a>
                 </div>
               ))}
             </div>
