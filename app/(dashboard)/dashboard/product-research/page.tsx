@@ -6,7 +6,7 @@ import { ProductTable } from '@/components/productos/ProductTable'
 import { CookieInput } from '@/components/productos/CookieInput'
 import { ProductExplorer } from '@/components/productos/ProductExplorer'
 import { Product, ProductFilters as Filters } from '@/lib/dropkiller/types'
-import { Target, AlertCircle, Search, Users, TrendingUp, DollarSign, ExternalLink, Loader2, CheckCircle, XCircle, BarChart3, Calculator, Truck, Package, Megaphone, PiggyBank, Flame, Sparkles, TrendingDown, Settings, Gift, Tag, Check, Square, CheckSquare, ArrowRight, Database } from 'lucide-react'
+import { Target, AlertCircle, Search, Users, TrendingUp, DollarSign, ExternalLink, Loader2, CheckCircle, XCircle, BarChart3, Calculator, Truck, Package, Megaphone, PiggyBank, Flame, Sparkles, TrendingDown, Settings, Gift, Tag, Check, Square, CheckSquare, ArrowRight, Database, X, Star, Store, MessageSquare, Percent, Globe } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Link from 'next/link'
 type TabType = 'catalog' | 'tiktok' | 'competitor'
@@ -51,6 +51,19 @@ function ProductImage({ src, alt, sales }: { src: string; alt: string; sales: nu
   )
 }
 
+// Format large numbers for display
+function formatNumber(num: number): string {
+  if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`
+  if (num >= 1000) return `${(num / 1000).toFixed(0)}k`
+  return num.toLocaleString()
+}
+
+function formatCurrency(num: number): string {
+  if (num >= 1000000) return `$${(num / 1000000).toFixed(1)}M`
+  if (num >= 1000) return `$${(num / 1000).toFixed(0)}k`
+  return `$${num.toLocaleString()}`
+}
+
 // TikTok Viral product type
 interface TikTokProduct {
   product_id: string
@@ -60,11 +73,16 @@ interface TikTokProduct {
   currency: string
   sold_count: number
   day7_sold_count: number
+  day28_sold_count: number
   day7_sale_amount: number
+  sale_amount: number
   category_l1: string
   category_l2: string
+  category_l3: string
+  region: string
   shop_name: string
   product_rating: number
+  review_count: number
   relate_author_count: number
   commission_rate: string
   detail_url: string
@@ -173,6 +191,17 @@ export default function ProductResearchPage() {
       loadTiktokProducts()
     }
   }, [activeTab])
+
+  // Close modal on Escape key
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && selectedTikTokProduct) {
+        setSelectedTikTokProduct(null)
+      }
+    }
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [selectedTikTokProduct])
 
   const loadTiktokProducts = async () => {
     setTiktokLoading(true)
@@ -1824,6 +1853,212 @@ export default function ProductResearchPage() {
               </ol>
             </div>
           )}
+        </div>
+      )}
+
+      {/* TikTok Viral Product Detail Modal */}
+      {selectedTikTokProduct && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          onClick={() => setSelectedTikTokProduct(null)}
+        >
+          {/* Overlay */}
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+
+          {/* Modal */}
+          <div
+            className="relative bg-[#0f0f23] rounded-2xl max-w-[900px] w-full max-h-[90vh] overflow-y-auto border border-gray-800"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close Button */}
+            <button
+              onClick={() => setSelectedTikTokProduct(null)}
+              className="absolute top-4 right-4 z-10 p-2 rounded-full bg-gray-800/50 hover:bg-gray-700 transition-colors"
+            >
+              <X className="w-5 h-5 text-gray-400" />
+            </button>
+
+            {/* Header */}
+            <div className="p-6 flex gap-6">
+              {/* Product Image */}
+              <div className="w-[250px] h-[250px] flex-shrink-0 rounded-xl overflow-hidden bg-[#1a1a2e]">
+                <ProductImage src={selectedTikTokProduct.img} alt={selectedTikTokProduct.title} sales={0} />
+              </div>
+
+              {/* Product Info */}
+              <div className="flex-1 min-w-0">
+                <h2 className="text-xl font-bold text-white mb-3 line-clamp-3">{selectedTikTokProduct.title}</h2>
+
+                {/* Categories */}
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {selectedTikTokProduct.category_l1 && (
+                    <span className="px-2 py-1 bg-amber-500/20 text-amber-400 rounded text-xs">
+                      {selectedTikTokProduct.category_l1}
+                    </span>
+                  )}
+                  {selectedTikTokProduct.category_l2 && (
+                    <span className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs">
+                      {selectedTikTokProduct.category_l2}
+                    </span>
+                  )}
+                  {selectedTikTokProduct.category_l3 && (
+                    <span className="px-2 py-1 bg-purple-500/20 text-purple-400 rounded text-xs">
+                      {selectedTikTokProduct.category_l3}
+                    </span>
+                  )}
+                </div>
+
+                {/* Region Badge */}
+                <div className="flex items-center gap-2 mb-4">
+                  <Globe className="w-4 h-4 text-gray-400" />
+                  <span className="px-2 py-1 bg-green-500/20 text-green-400 rounded text-xs font-medium">
+                    {selectedTikTokProduct.region || 'US'}
+                  </span>
+                </div>
+
+                {/* Rating */}
+                {selectedTikTokProduct.product_rating > 0 && (
+                  <div className="flex items-center gap-2">
+                    <Star className="w-5 h-5 text-yellow-400 fill-yellow-400" />
+                    <span className="text-lg font-semibold text-white">{selectedTikTokProduct.product_rating.toFixed(1)}</span>
+                    <span className="text-gray-400">/ 5.0</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Metrics Grid */}
+            <div className="px-6 pb-6">
+              <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Métricas de Rendimiento</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {/* Ventas 7d */}
+                <div className="bg-[#1a1a2e] rounded-xl p-4 border border-gray-800/50">
+                  <div className="flex items-center gap-2 mb-2">
+                    <TrendingUp className="w-4 h-4 text-green-400" />
+                    <span className="text-xs text-gray-400">Ventas 7d</span>
+                  </div>
+                  <p className="text-xl font-bold text-white">{formatNumber(selectedTikTokProduct.day7_sold_count)}</p>
+                </div>
+
+                {/* Ventas 28d */}
+                <div className="bg-[#1a1a2e] rounded-xl p-4 border border-gray-800/50">
+                  <div className="flex items-center gap-2 mb-2">
+                    <TrendingUp className="w-4 h-4 text-blue-400" />
+                    <span className="text-xs text-gray-400">Ventas 28d</span>
+                  </div>
+                  <p className="text-xl font-bold text-white">{formatNumber(selectedTikTokProduct.day28_sold_count)}</p>
+                </div>
+
+                {/* Ventas Total */}
+                <div className="bg-[#1a1a2e] rounded-xl p-4 border border-gray-800/50">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Package className="w-4 h-4 text-purple-400" />
+                    <span className="text-xs text-gray-400">Ventas Total</span>
+                  </div>
+                  <p className="text-xl font-bold text-white">{formatNumber(selectedTikTokProduct.sold_count)}</p>
+                </div>
+
+                {/* Precio */}
+                <div className="bg-[#1a1a2e] rounded-xl p-4 border border-gray-800/50">
+                  <div className="flex items-center gap-2 mb-2">
+                    <DollarSign className="w-4 h-4 text-green-400" />
+                    <span className="text-xs text-gray-400">Precio</span>
+                  </div>
+                  <p className="text-xl font-bold text-white">
+                    ${selectedTikTokProduct.price.toLocaleString()}
+                    <span className="text-xs font-normal text-gray-400 ml-1">{selectedTikTokProduct.currency || 'USD'}</span>
+                  </p>
+                </div>
+
+                {/* Revenue 7d */}
+                <div className="bg-[#1a1a2e] rounded-xl p-4 border border-gray-800/50">
+                  <div className="flex items-center gap-2 mb-2">
+                    <DollarSign className="w-4 h-4 text-amber-400" />
+                    <span className="text-xs text-gray-400">Revenue 7d</span>
+                  </div>
+                  <p className="text-xl font-bold text-white">{formatCurrency(selectedTikTokProduct.day7_sale_amount)}</p>
+                </div>
+
+                {/* Revenue Total */}
+                <div className="bg-[#1a1a2e] rounded-xl p-4 border border-gray-800/50">
+                  <div className="flex items-center gap-2 mb-2">
+                    <DollarSign className="w-4 h-4 text-orange-400" />
+                    <span className="text-xs text-gray-400">Revenue Total</span>
+                  </div>
+                  <p className="text-xl font-bold text-white">{formatCurrency(selectedTikTokProduct.sale_amount)}</p>
+                </div>
+
+                {/* Rating */}
+                <div className="bg-[#1a1a2e] rounded-xl p-4 border border-gray-800/50">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Star className="w-4 h-4 text-yellow-400" />
+                    <span className="text-xs text-gray-400">Rating</span>
+                  </div>
+                  <p className="text-xl font-bold text-white">
+                    {selectedTikTokProduct.product_rating > 0 ? selectedTikTokProduct.product_rating.toFixed(1) : '-'}
+                    <span className="text-xs font-normal text-gray-400 ml-1">/ 5.0</span>
+                  </p>
+                </div>
+
+                {/* Reviews */}
+                <div className="bg-[#1a1a2e] rounded-xl p-4 border border-gray-800/50">
+                  <div className="flex items-center gap-2 mb-2">
+                    <MessageSquare className="w-4 h-4 text-blue-400" />
+                    <span className="text-xs text-gray-400">Reviews</span>
+                  </div>
+                  <p className="text-xl font-bold text-white">{formatNumber(selectedTikTokProduct.review_count)}</p>
+                </div>
+
+                {/* Creadores */}
+                <div className="bg-[#1a1a2e] rounded-xl p-4 border border-gray-800/50">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Users className="w-4 h-4 text-pink-400" />
+                    <span className="text-xs text-gray-400">Creadores</span>
+                  </div>
+                  <p className="text-xl font-bold text-white">{formatNumber(selectedTikTokProduct.relate_author_count)}</p>
+                </div>
+
+                {/* Comisión */}
+                <div className="bg-[#1a1a2e] rounded-xl p-4 border border-gray-800/50">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Percent className="w-4 h-4 text-green-400" />
+                    <span className="text-xs text-gray-400">Comisión</span>
+                  </div>
+                  <p className="text-xl font-bold text-white">{selectedTikTokProduct.commission_rate || '-'}</p>
+                </div>
+
+                {/* Tienda */}
+                <div className="bg-[#1a1a2e] rounded-xl p-4 border border-gray-800/50 col-span-2">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Store className="w-4 h-4 text-cyan-400" />
+                    <span className="text-xs text-gray-400">Tienda</span>
+                  </div>
+                  <p className="text-base font-medium text-white truncate">{selectedTikTokProduct.shop_name || '-'}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 pb-6 flex gap-3">
+              {selectedTikTokProduct.detail_url && (
+                <a
+                  href={selectedTikTokProduct.detail_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-amber-500 hover:bg-amber-600 text-black font-semibold rounded-xl transition-colors"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  Ver en FastMoss
+                </a>
+              )}
+              <button
+                onClick={() => setSelectedTikTokProduct(null)}
+                className="flex-1 px-4 py-3 bg-gray-800 hover:bg-gray-700 text-white font-medium rounded-xl transition-colors"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
