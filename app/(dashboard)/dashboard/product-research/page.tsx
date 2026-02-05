@@ -54,14 +54,16 @@ function ProductImage({ src, alt, sales }: { src: string; alt: string; sales: nu
   )
 }
 
-// Format large numbers for display
-function formatNumber(num: number): string {
+// Format large numbers for display (with null/undefined safety)
+function formatNumber(num: number | null | undefined): string {
+  if (num == null || isNaN(num)) return '0'
   if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`
   if (num >= 1000) return `${(num / 1000).toFixed(0)}k`
   return num.toLocaleString()
 }
 
-function formatCurrency(num: number): string {
+function formatCurrency(num: number | null | undefined): string {
+  if (num == null || isNaN(num)) return '$0'
   if (num >= 1000000) return `$${(num / 1000000).toFixed(1)}M`
   if (num >= 1000) return `$${(num / 1000).toFixed(0)}k`
   return `$${num.toLocaleString()}`
@@ -2164,19 +2166,37 @@ export default function ProductResearchPage() {
             )}
 
             {/* Top Videos Virales Section */}
-            {selectedTikTokProduct.top_videos && selectedTikTokProduct.top_videos.length > 0 && (
-              <div className="px-6 pb-6">
-                <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">
-                  <span className="flex items-center gap-2">
-                    <Video className="w-4 h-4 text-pink-400" />
-                    Top Videos Virales ({selectedTikTokProduct.top_videos.filter(v => v.video_id !== '7233883445674396955').length})
-                  </span>
-                </h3>
-                <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
-                  {selectedTikTokProduct.top_videos
-                    .filter(video => video.video_id !== '7233883445674396955') // Filter out fake video
-                    .slice(0, 10) // Show max 10 videos
-                    .map((video, idx) => (
+            {(() => {
+              // Safely parse top_videos (might come as string from JSONB)
+              let topVideos: TopVideo[] = []
+              try {
+                if (selectedTikTokProduct.top_videos) {
+                  const parsed = typeof selectedTikTokProduct.top_videos === 'string'
+                    ? JSON.parse(selectedTikTokProduct.top_videos)
+                    : selectedTikTokProduct.top_videos
+                  topVideos = Array.isArray(parsed) ? parsed : []
+                }
+              } catch (e) {
+                topVideos = []
+              }
+
+              // Filter out fake video and limit to 10
+              const filteredVideos = topVideos
+                .filter(v => v && v.video_id !== '7233883445674396955')
+                .slice(0, 10)
+
+              if (filteredVideos.length === 0) return null
+
+              return (
+                <div className="px-6 pb-6">
+                  <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">
+                    <span className="flex items-center gap-2">
+                      <Video className="w-4 h-4 text-pink-400" />
+                      Top Videos Virales ({filteredVideos.length})
+                    </span>
+                  </h3>
+                  <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+                    {filteredVideos.map((video, idx) => (
                       <div key={video.video_id || idx} className="bg-[#1a1a2e] rounded-xl p-4 border border-gray-800/50">
                         <div className="flex gap-4">
                           {/* Video Thumbnail */}
@@ -2211,7 +2231,7 @@ export default function ProductResearchPage() {
                           <div className="flex-1 min-w-0">
                             {/* Creator Info */}
                             <div className="flex items-center gap-2 mb-2">
-                              <span className="text-sm font-medium text-white truncate">@{video.creator_user || video.creator}</span>
+                              <span className="text-sm font-medium text-white truncate">@{video.creator_user || video.creator || 'unknown'}</span>
                               {video.creator_followers_show && (
                                 <span className="text-xs text-gray-400 flex-shrink-0">
                                   {video.creator_followers_show} seguidores
@@ -2275,9 +2295,10 @@ export default function ProductResearchPage() {
                         </div>
                       </div>
                     ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )
+            })()}
 
             {/* Footer */}
             <div className="px-6 pb-6">
