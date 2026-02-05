@@ -271,7 +271,7 @@ export default function ProductResearchPage() {
     setTiktokLoading(true)
     try {
       const response = await fetch(
-        `${FASTMOSS_SUPABASE_URL}/rest/v1/fastmoss_products?select=*&order=last_synced_at.desc&limit=500`,
+        `${FASTMOSS_SUPABASE_URL}/rest/v1/fastmoss_products?select=*&order=last_synced_at.desc&limit=1000`,
         {
           headers: {
             'apikey': FASTMOSS_SUPABASE_KEY,
