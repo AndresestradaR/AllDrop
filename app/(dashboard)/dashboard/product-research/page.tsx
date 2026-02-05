@@ -64,6 +64,41 @@ function formatCurrency(num: number): string {
   return `$${num.toLocaleString()}`
 }
 
+// Category translations (English to Spanish)
+const CATEGORY_TRANSLATIONS: Record<string, string> = {
+  // Main L1 Categories from TikTok Shop
+  'Beauty': 'Belleza',
+  'Health': 'Salud',
+  'Home': 'Hogar',
+  'Phones & Electronics': 'Electrónicos',
+  'Automotive': 'Automotriz',
+  "Women's Clothing": 'Ropa Mujer',
+  'Food & Beverages': 'Alimentos',
+  'Baby & Kids': 'Bebés y Niños',
+  'Sports': 'Deportes',
+  'Pet Supplies': 'Mascotas',
+  "Men's Clothing": 'Ropa Hombre',
+  'Toys & Games': 'Juguetes',
+  'Jewelry & Accessories': 'Joyería',
+  'Books & Magazines': 'Libros',
+  'Office & School Supplies': 'Oficina',
+  'Furniture': 'Muebles',
+  'Outdoor & Garden': 'Jardín',
+  'Kitchen': 'Cocina',
+  'Appliances': 'Electrodomésticos',
+  'Bags & Luggage': 'Bolsos',
+  'Shoes': 'Zapatos',
+  'Watches': 'Relojes',
+  'Tools & Home Improvement': 'Herramientas',
+  'Womenswear': 'Ropa Mujer',
+  'Menswear': 'Ropa Hombre',
+}
+
+function translateCategory(category: string): string {
+  if (!category) return ''
+  return CATEGORY_TRANSLATIONS[category] || category
+}
+
 // TikTok Viral product type
 interface TikTokProduct {
   product_id: string
@@ -738,7 +773,7 @@ export default function ProductResearchPage() {
               >
                 <option value="">Todas las categorías</option>
                 {tiktokCategories.map(cat => (
-                  <option key={cat} value={cat}>{cat}</option>
+                  <option key={cat} value={cat}>{translateCategory(cat)}</option>
                 ))}
               </select>
               <select
@@ -816,7 +851,7 @@ export default function ProductResearchPage() {
                       {product.title}
                     </h3>
                     <span className="inline-block px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded text-xs">
-                      {product.category_l1 || 'General'}
+                      {translateCategory(product.category_l1) || 'General'}
                     </span>
                     {product.price > 0 && (
                       <p className="text-lg font-bold text-white mt-2">
@@ -1893,17 +1928,17 @@ export default function ProductResearchPage() {
                 <div className="flex flex-wrap gap-2 mb-4">
                   {selectedTikTokProduct.category_l1 && (
                     <span className="px-2 py-1 bg-amber-500/20 text-amber-400 rounded text-xs">
-                      {selectedTikTokProduct.category_l1}
+                      {translateCategory(selectedTikTokProduct.category_l1)}
                     </span>
                   )}
                   {selectedTikTokProduct.category_l2 && (
                     <span className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs">
-                      {selectedTikTokProduct.category_l2}
+                      {translateCategory(selectedTikTokProduct.category_l2)}
                     </span>
                   )}
                   {selectedTikTokProduct.category_l3 && (
                     <span className="px-2 py-1 bg-purple-500/20 text-purple-400 rounded text-xs">
-                      {selectedTikTokProduct.category_l3}
+                      {translateCategory(selectedTikTokProduct.category_l3)}
                     </span>
                   )}
                 </div>
