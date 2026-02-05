@@ -17,36 +17,55 @@ export async function GET() {
       .eq('id', user.id)
       .single()
 
-    if (profileError) {
-      return NextResponse.json({ error: 'Perfil no encontrado' }, { status: 404 })
+    // If profile doesn't exist, return empty state (not an error)
+    if (profileError || !profile) {
+      return NextResponse.json({
+        hasGoogleApiKey: false,
+        hasOpenaiApiKey: false,
+        hasKieApiKey: false,
+        hasBflApiKey: false,
+        hasElevenlabsApiKey: false,
+        hasApifyApiKey: false,
+        hasBrowserlessApiKey: false,
+      })
+    }
+
+    // Safely mask keys (catch any decryption errors)
+    const safeMask = (key: string | null) => {
+      try {
+        return mask(key)
+      } catch {
+        return key ? '••••••••••••' : ''
+      }
     }
 
     // Return masked keys
     return NextResponse.json({
       // Google/Gemini
-      maskedGoogleApiKey: mask(profile.google_api_key),
+      maskedGoogleApiKey: safeMask(profile.google_api_key),
       hasGoogleApiKey: !!profile.google_api_key,
       // OpenAI
-      maskedOpenaiApiKey: mask(profile.openai_api_key),
+      maskedOpenaiApiKey: safeMask(profile.openai_api_key),
       hasOpenaiApiKey: !!profile.openai_api_key,
       // KIE.ai
-      maskedKieApiKey: mask(profile.kie_api_key),
+      maskedKieApiKey: safeMask(profile.kie_api_key),
       hasKieApiKey: !!profile.kie_api_key,
       // BFL
-      maskedBflApiKey: mask(profile.bfl_api_key),
+      maskedBflApiKey: safeMask(profile.bfl_api_key),
       hasBflApiKey: !!profile.bfl_api_key,
       // ElevenLabs
-      maskedElevenlabsApiKey: mask(profile.elevenlabs_api_key),
+      maskedElevenlabsApiKey: safeMask(profile.elevenlabs_api_key),
       hasElevenlabsApiKey: !!profile.elevenlabs_api_key,
       // Apify
-      maskedApifyApiKey: mask(profile.apify_api_key),
+      maskedApifyApiKey: safeMask(profile.apify_api_key),
       hasApifyApiKey: !!profile.apify_api_key,
       // Browserless
-      maskedBrowserlessApiKey: mask(profile.browserless_api_key),
+      maskedBrowserlessApiKey: safeMask(profile.browserless_api_key),
       hasBrowserlessApiKey: !!profile.browserless_api_key,
     })
-  } catch (error) {
-    return NextResponse.json({ error: 'Error interno' }, { status: 500 })
+  } catch (error: any) {
+    console.error('GET /api/keys error:', error)
+    return NextResponse.json({ error: `Error interno: ${error.message}` }, { status: 500 })
   }
 }
 
@@ -65,26 +84,31 @@ export async function POST(request: Request) {
     // Build update object with only provided keys
     const updateData: Record<string, string> = {}
 
-    if (googleApiKey) {
-      updateData.google_api_key = encrypt(googleApiKey)
-    }
-    if (openaiApiKey) {
-      updateData.openai_api_key = encrypt(openaiApiKey)
-    }
-    if (kieApiKey) {
-      updateData.kie_api_key = encrypt(kieApiKey)
-    }
-    if (bflApiKey) {
-      updateData.bfl_api_key = encrypt(bflApiKey)
-    }
-    if (elevenlabsApiKey) {
-      updateData.elevenlabs_api_key = encrypt(elevenlabsApiKey)
-    }
-    if (apifyApiKey) {
-      updateData.apify_api_key = encrypt(apifyApiKey)
-    }
-    if (browserlessApiKey) {
-      updateData.browserless_api_key = encrypt(browserlessApiKey)
+    try {
+      if (googleApiKey) {
+        updateData.google_api_key = encrypt(googleApiKey)
+      }
+      if (openaiApiKey) {
+        updateData.openai_api_key = encrypt(openaiApiKey)
+      }
+      if (kieApiKey) {
+        updateData.kie_api_key = encrypt(kieApiKey)
+      }
+      if (bflApiKey) {
+        updateData.bfl_api_key = encrypt(bflApiKey)
+      }
+      if (elevenlabsApiKey) {
+        updateData.elevenlabs_api_key = encrypt(elevenlabsApiKey)
+      }
+      if (apifyApiKey) {
+        updateData.apify_api_key = encrypt(apifyApiKey)
+      }
+      if (browserlessApiKey) {
+        updateData.browserless_api_key = encrypt(browserlessApiKey)
+      }
+    } catch (encryptError: any) {
+      console.error('Encryption error:', encryptError)
+      return NextResponse.json({ error: `Error de encriptación: ${encryptError.message}` }, { status: 500 })
     }
 
     if (Object.keys(updateData).length === 0) {
@@ -95,11 +119,17 @@ export async function POST(request: Request) {
     const serviceClient = await createServiceClient()
 
     // First check if profile exists
-    const { data: existingProfile } = await serviceClient
+    const { data: existingProfile, error: selectError } = await serviceClient
       .from('profiles')
       .select('id')
       .eq('id', user.id)
       .single()
+
+    if (selectError && selectError.code !== 'PGRST116') {
+      // PGRST116 = no rows returned, which is fine
+      console.error('Select error:', selectError)
+      return NextResponse.json({ error: `Error al buscar perfil: ${selectError.message}` }, { status: 500 })
+    }
 
     if (!existingProfile) {
       // Profile doesn't exist, create it
@@ -109,7 +139,7 @@ export async function POST(request: Request) {
 
       if (insertError) {
         console.error('Insert error:', insertError)
-        return NextResponse.json({ error: 'Error al crear perfil' }, { status: 500 })
+        return NextResponse.json({ error: `Error al crear perfil: ${insertError.message}` }, { status: 500 })
       }
     } else {
       // Profile exists, update it
@@ -120,13 +150,13 @@ export async function POST(request: Request) {
 
       if (updateError) {
         console.error('Update error:', updateError)
-        return NextResponse.json({ error: 'Error al guardar key' }, { status: 500 })
+        return NextResponse.json({ error: `Error al guardar: ${updateError.message}` }, { status: 500 })
       }
     }
 
     return NextResponse.json({ success: true })
-  } catch (error) {
+  } catch (error: any) {
     console.error('API error:', error)
-    return NextResponse.json({ error: 'Error interno' }, { status: 500 })
+    return NextResponse.json({ error: `Error interno: ${error.message}` }, { status: 500 })
   }
 }
