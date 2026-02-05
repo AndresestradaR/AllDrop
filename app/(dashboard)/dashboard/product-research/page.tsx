@@ -70,17 +70,19 @@ function formatCurrency(num: number): string {
 // Category translations (English to Spanish)
 // Only categories with actual products in the database
 const CATEGORY_TRANSLATIONS: Record<string, string> = {
-  'General': 'General',
+  'Home': 'Hogar',
   'Beauty': 'Belleza',
   'Health': 'Salud',
-  'Home': 'Hogar',
-  'Electronics': 'Electrónicos',
-  'Automotive': 'Automotriz',
-  'Fashion': 'Moda',
-  'Food': 'Alimentos',
-  'Baby & Kids': 'Bebés y Niños',
   'Sports': 'Deportes',
+  'Tools': 'Herramientas',
+  'Fashion': 'Moda',
+  'Bags & Luggage': 'Bolsos y Equipaje',
+  'Automotive': 'Automotriz',
+  'Kitchen': 'Cocina',
   'Pets': 'Mascotas',
+  'Jewelry': 'Joyería',
+  'Baby': 'Bebés y Maternidad',
+  'Toys': 'Juguetes',
 }
 
 function translateCategory(category: string): string {
