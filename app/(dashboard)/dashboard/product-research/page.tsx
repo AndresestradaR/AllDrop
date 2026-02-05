@@ -70,11 +70,13 @@ function formatCurrency(num: number): string {
 // Category translations (English to Spanish)
 const CATEGORY_TRANSLATIONS: Record<string, string> = {
   // Main L1 Categories from TikTok Shop
+  'General': 'General',
   'Beauty': 'Belleza',
   'Health': 'Salud',
   'Home': 'Hogar',
   'Phones & Electronics': 'Electrónicos',
   'Automotive': 'Automotriz',
+  'Automotive & Motorcycle': 'Automotriz',
   "Women's Clothing": 'Ropa Mujer',
   'Food & Beverages': 'Alimentos',
   'Baby & Kids': 'Bebés y Niños',
