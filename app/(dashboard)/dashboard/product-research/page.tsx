@@ -6,7 +6,7 @@ import { ProductTable } from '@/components/productos/ProductTable'
 import { CookieInput } from '@/components/productos/CookieInput'
 import { ProductExplorer } from '@/components/productos/ProductExplorer'
 import { Product, ProductFilters as Filters } from '@/lib/dropkiller/types'
-import { Target, AlertCircle, Search, Users, TrendingUp, DollarSign, ExternalLink, Loader2, CheckCircle, XCircle, BarChart3, Calculator, Truck, Package, Megaphone, PiggyBank, Flame, Sparkles, TrendingDown, Settings, Gift, Tag, Check, Square, CheckSquare, ArrowRight, Database, X, Star, Store, MessageSquare, Percent, Globe } from 'lucide-react'
+import { Target, AlertCircle, Search, Users, TrendingUp, DollarSign, ExternalLink, Loader2, CheckCircle, XCircle, BarChart3, Calculator, Truck, Package, Megaphone, PiggyBank, Flame, Sparkles, TrendingDown, Settings, Gift, Tag, Check, Square, CheckSquare, ArrowRight, Database, X, Star, Store, MessageSquare, Percent, Globe, Trophy, Play, Heart, Eye, Video } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Link from 'next/link'
 type TabType = 'catalog' | 'tiktok' | 'competitor'
@@ -91,6 +91,31 @@ function translateCategory(category: string): string {
 }
 
 // TikTok Viral product type
+interface TopVideo {
+  video_id: string
+  tiktok_url: string
+  plays: number
+  plays_show: string
+  likes: number
+  likes_show: string
+  comments: number
+  shares: number
+  video_sales: number
+  video_sales_show: string
+  video_revenue: number
+  video_revenue_show: string
+  interaction_rate: string
+  creator: string
+  creator_user: string
+  creator_followers: number
+  creator_followers_show: string
+  cover: string
+  duration: string
+  description: string
+  is_ad: boolean
+  date: string
+}
+
 interface TikTokProduct {
   product_id: string
   title: string
@@ -113,6 +138,17 @@ interface TikTokProduct {
   commission_rate: string
   detail_url: string
   last_synced_at: string
+  // Enrichment fields
+  country_rank_show?: string
+  category_rank_show?: string
+  viral_index?: number
+  popularity_index?: number
+  stock_count_show?: string
+  author_count?: number
+  aweme_count?: number
+  top_videos?: TopVideo[]
+  best_video_sales?: number
+  enriched_at?: string
 }
 type AnalysisPhase = 'search' | 'select' | 'analyze' | 'results'
 
@@ -2064,25 +2100,211 @@ export default function ProductResearchPage() {
               </div>
             </div>
 
+            {/* Rankings Section */}
+            {(selectedTikTokProduct.viral_index || selectedTikTokProduct.country_rank_show || selectedTikTokProduct.category_rank_show) && (
+              <div className="px-6 pb-6">
+                <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Rankings y Popularidad</h3>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                  {/* Ranking US */}
+                  <div className="bg-[#1a1a2e] rounded-xl p-4 border border-gray-800/50">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Trophy className="w-4 h-4 text-yellow-400" />
+                      <span className="text-xs text-gray-400">Ranking US</span>
+                    </div>
+                    <p className="text-xl font-bold text-white">{selectedTikTokProduct.country_rank_show || '-'}</p>
+                  </div>
+
+                  {/* Ranking Categoría */}
+                  <div className="bg-[#1a1a2e] rounded-xl p-4 border border-gray-800/50">
+                    <div className="flex items-center gap-2 mb-2">
+                      <BarChart3 className="w-4 h-4 text-blue-400" />
+                      <span className="text-xs text-gray-400">Ranking Cat.</span>
+                    </div>
+                    <p className="text-xl font-bold text-white">{selectedTikTokProduct.category_rank_show || '-'}</p>
+                  </div>
+
+                  {/* Viral Index */}
+                  <div className="bg-[#1a1a2e] rounded-xl p-4 border border-gray-800/50">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Flame className="w-4 h-4 text-orange-400" />
+                      <span className="text-xs text-gray-400">Viral Index</span>
+                    </div>
+                    <p className={`text-xl font-bold ${
+                      (selectedTikTokProduct.viral_index || 0) >= 80 ? 'text-green-400' :
+                      (selectedTikTokProduct.viral_index || 0) >= 50 ? 'text-yellow-400' : 'text-red-400'
+                    }`}>
+                      {selectedTikTokProduct.viral_index || '-'}
+                    </p>
+                  </div>
+
+                  {/* Popularity Index */}
+                  <div className="bg-[#1a1a2e] rounded-xl p-4 border border-gray-800/50">
+                    <div className="flex items-center gap-2 mb-2">
+                      <TrendingUp className="w-4 h-4 text-purple-400" />
+                      <span className="text-xs text-gray-400">Popularity</span>
+                    </div>
+                    <p className={`text-xl font-bold ${
+                      (selectedTikTokProduct.popularity_index || 0) >= 80 ? 'text-green-400' :
+                      (selectedTikTokProduct.popularity_index || 0) >= 50 ? 'text-yellow-400' : 'text-red-400'
+                    }`}>
+                      {selectedTikTokProduct.popularity_index || '-'}
+                    </p>
+                  </div>
+
+                  {/* Stock */}
+                  <div className="bg-[#1a1a2e] rounded-xl p-4 border border-gray-800/50">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Package className="w-4 h-4 text-cyan-400" />
+                      <span className="text-xs text-gray-400">Stock</span>
+                    </div>
+                    <p className="text-xl font-bold text-white">{selectedTikTokProduct.stock_count_show || '-'}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Top Videos Virales Section */}
+            {selectedTikTokProduct.top_videos && selectedTikTokProduct.top_videos.length > 0 && (
+              <div className="px-6 pb-6">
+                <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">
+                  <span className="flex items-center gap-2">
+                    <Video className="w-4 h-4 text-pink-400" />
+                    Top Videos Virales ({selectedTikTokProduct.top_videos.filter(v => v.video_id !== '7233883445674396955').length})
+                  </span>
+                </h3>
+                <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+                  {selectedTikTokProduct.top_videos
+                    .filter(video => video.video_id !== '7233883445674396955') // Filter out fake video
+                    .slice(0, 10) // Show max 10 videos
+                    .map((video, idx) => (
+                      <div key={video.video_id || idx} className="bg-[#1a1a2e] rounded-xl p-4 border border-gray-800/50">
+                        <div className="flex gap-4">
+                          {/* Video Thumbnail */}
+                          <div className="w-20 h-28 flex-shrink-0 rounded-lg overflow-hidden bg-gray-800 relative">
+                            {video.cover ? (
+                              <img
+                                src={video.cover}
+                                alt="Video thumbnail"
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).style.display = 'none'
+                                }}
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <Play className="w-8 h-8 text-gray-600" />
+                              </div>
+                            )}
+                            {video.duration && (
+                              <span className="absolute bottom-1 right-1 px-1.5 py-0.5 bg-black/70 text-white text-[10px] rounded">
+                                {video.duration}
+                              </span>
+                            )}
+                            {video.is_ad && (
+                              <span className="absolute top-1 left-1 px-1.5 py-0.5 bg-yellow-500/90 text-black text-[10px] font-bold rounded">
+                                AD
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Video Info */}
+                          <div className="flex-1 min-w-0">
+                            {/* Creator Info */}
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-sm font-medium text-white truncate">@{video.creator_user || video.creator}</span>
+                              {video.creator_followers_show && (
+                                <span className="text-xs text-gray-400 flex-shrink-0">
+                                  {video.creator_followers_show} seguidores
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Video Description */}
+                            {video.description && (
+                              <p className="text-xs text-gray-400 line-clamp-2 mb-3">{video.description}</p>
+                            )}
+
+                            {/* Video Metrics */}
+                            <div className="flex flex-wrap gap-3 text-xs">
+                              <span className="flex items-center gap-1 text-blue-400">
+                                <Eye className="w-3 h-3" />
+                                {video.plays_show || formatNumber(video.plays)}
+                              </span>
+                              <span className="flex items-center gap-1 text-pink-400">
+                                <Heart className="w-3 h-3" />
+                                {video.likes_show || formatNumber(video.likes)}
+                              </span>
+                              <span className="flex items-center gap-1 text-green-400">
+                                <DollarSign className="w-3 h-3" />
+                                {video.video_sales_show || formatNumber(video.video_sales)} ventas
+                              </span>
+                              {video.video_revenue_show && (
+                                <span className="flex items-center gap-1 text-amber-400">
+                                  <DollarSign className="w-3 h-3" />
+                                  {video.video_revenue_show}
+                                </span>
+                              )}
+                              {video.interaction_rate && (
+                                <span className="flex items-center gap-1 text-purple-400">
+                                  <BarChart3 className="w-3 h-3" />
+                                  {video.interaction_rate}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Date and TikTok Link */}
+                            <div className="flex items-center justify-between mt-3">
+                              {video.date && (
+                                <span className="text-[10px] text-gray-500">
+                                  {new Date(video.date).toLocaleDateString()}
+                                </span>
+                              )}
+                              {video.tiktok_url && (
+                                <a
+                                  href={video.tiktok_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-1 text-xs text-[#4DBEA4] hover:text-[#3da88f] transition-colors"
+                                >
+                                  <ExternalLink className="w-3 h-3" />
+                                  Ver en TikTok
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+
             {/* Footer */}
-            <div className="px-6 pb-6 flex gap-3">
-              {selectedTikTokProduct.detail_url && (
+            <div className="px-6 pb-6">
+              <div className="flex items-center justify-between mb-4">
+                {selectedTikTokProduct.enriched_at && (
+                  <span className="text-xs text-gray-500">
+                    Actualizado: {new Date(selectedTikTokProduct.enriched_at).toLocaleDateString()}
+                  </span>
+                )}
+              </div>
+              <div className="flex gap-3">
                 <a
-                  href={selectedTikTokProduct.detail_url}
+                  href={`https://shop.tiktok.com/view/product/${selectedTikTokProduct.product_id}?region=US`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-amber-500 hover:bg-amber-600 text-black font-semibold rounded-xl transition-colors"
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-[#4DBEA4] hover:bg-[#3da88f] text-black font-semibold rounded-xl transition-colors"
                 >
                   <ExternalLink className="w-4 h-4" />
-                  Ver en FastMoss
+                  Ver en TikTok Shop
                 </a>
-              )}
-              <button
-                onClick={() => setSelectedTikTokProduct(null)}
-                className="flex-1 px-4 py-3 bg-gray-800 hover:bg-gray-700 text-white font-medium rounded-xl transition-colors"
-              >
-                Cerrar
-              </button>
+                <button
+                  onClick={() => setSelectedTikTokProduct(null)}
+                  className="flex-1 px-4 py-3 bg-gray-800 hover:bg-gray-700 text-white font-medium rounded-xl transition-colors"
+                >
+                  Cerrar
+                </button>
+              </div>
             </div>
           </div>
         </div>

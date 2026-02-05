@@ -16,8 +16,7 @@ import {
   Menu,
   Clock,
   Target,
-  Wand2,
-  Flame
+  Wand2
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -31,8 +30,7 @@ const creatorNavigation = [
   { name: 'Crea tu Banner', href: '/dashboard/banner', icon: ImageIcon, soon: true },
   { name: 'Crea tu Landing', href: '/dashboard/landing', icon: LayoutTemplate },
   { name: 'Estudio IA', href: '/dashboard/studio', icon: Wand2, isNew: true },
-  { name: 'Encuentra tu Producto Ganador', href: '/dashboard/product-research', icon: Target },
-  { name: 'Productos Virales', href: '/dashboard/viral-products', icon: Flame, isNew: true },
+  { name: 'Encuentra tu Producto Ganador', href: '/dashboard/product-research', icon: Target, isNew: true },
 ]
 
 const otherNavigation = [
