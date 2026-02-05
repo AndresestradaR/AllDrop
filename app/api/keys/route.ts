@@ -93,14 +93,35 @@ export async function POST(request: Request) {
 
     // Use service client to update (bypasses RLS for update)
     const serviceClient = await createServiceClient()
-    const { error: updateError } = await serviceClient
-      .from('profiles')
-      .update(updateData)
-      .eq('id', user.id)
 
-    if (updateError) {
-      console.error('Update error:', updateError)
-      return NextResponse.json({ error: 'Error al guardar key' }, { status: 500 })
+    // First check if profile exists
+    const { data: existingProfile } = await serviceClient
+      .from('profiles')
+      .select('id')
+      .eq('id', user.id)
+      .single()
+
+    if (!existingProfile) {
+      // Profile doesn't exist, create it
+      const { error: insertError } = await serviceClient
+        .from('profiles')
+        .insert({ id: user.id, ...updateData })
+
+      if (insertError) {
+        console.error('Insert error:', insertError)
+        return NextResponse.json({ error: 'Error al crear perfil' }, { status: 500 })
+      }
+    } else {
+      // Profile exists, update it
+      const { error: updateError } = await serviceClient
+        .from('profiles')
+        .update(updateData)
+        .eq('id', user.id)
+
+      if (updateError) {
+        console.error('Update error:', updateError)
+        return NextResponse.json({ error: 'Error al guardar key' }, { status: 500 })
+      }
     }
 
     return NextResponse.json({ success: true })

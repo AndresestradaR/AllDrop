@@ -34,7 +34,16 @@ export function decrypt(encryptedText: string): string {
   return decrypted
 }
 
-export function mask(key: string | null): string {
-  if (!key || key.length < 8) return '••••••••'
-  return '••••' + key.slice(-4)
+export function mask(encryptedKey: string | null): string {
+  if (!encryptedKey) return ''
+
+  // The key is encrypted, so we need to decrypt it first to show last 4 chars
+  try {
+    const decrypted = decrypt(encryptedKey)
+    if (decrypted.length < 4) return '••••••••'
+    return '••••••••' + decrypted.slice(-4)
+  } catch {
+    // If decryption fails, just show that there's a key configured
+    return '••••••••••••'
+  }
 }
