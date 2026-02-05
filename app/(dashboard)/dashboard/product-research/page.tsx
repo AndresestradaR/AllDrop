@@ -33,10 +33,13 @@ function ProductImage({ src, alt, sales }: { src: string; alt: string; sales: nu
     )
   }
 
+  // Use Supabase URLs directly (no proxy needed), proxy only for external CDN URLs
+  const imageUrl = src.includes('supabase') ? src : `/api/image-proxy?url=${encodeURIComponent(src)}`
+
   return (
     <div className="relative w-full h-full bg-background">
       <img
-        src={`/api/image-proxy?url=${encodeURIComponent(src)}`}
+        src={imageUrl}
         alt={alt}
         className="w-full h-full object-cover"
         onError={() => setHasError(true)}
