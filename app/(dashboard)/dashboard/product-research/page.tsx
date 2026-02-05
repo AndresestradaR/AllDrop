@@ -68,39 +68,19 @@ function formatCurrency(num: number): string {
 }
 
 // Category translations (English to Spanish)
+// Only categories with actual products in the database
 const CATEGORY_TRANSLATIONS: Record<string, string> = {
-  // Main L1 Categories from TikTok Shop
   'General': 'General',
   'Beauty': 'Belleza',
   'Health': 'Salud',
   'Home': 'Hogar',
   'Electronics': 'Electrónicos',
-  'Phones & Electronics': 'Electrónicos',
   'Automotive': 'Automotriz',
-  'Automotive & Motorcycle': 'Automotriz',
   'Fashion': 'Moda',
-  "Women's Clothing": 'Ropa Mujer',
   'Food': 'Alimentos',
-  'Food & Beverages': 'Alimentos',
   'Baby & Kids': 'Bebés y Niños',
   'Sports': 'Deportes',
   'Pets': 'Mascotas',
-  'Pet Supplies': 'Mascotas',
-  "Men's Clothing": 'Ropa Hombre',
-  'Toys & Games': 'Juguetes',
-  'Jewelry & Accessories': 'Joyería',
-  'Books & Magazines': 'Libros',
-  'Office & School Supplies': 'Oficina',
-  'Furniture': 'Muebles',
-  'Outdoor & Garden': 'Jardín',
-  'Kitchen': 'Cocina',
-  'Appliances': 'Electrodomésticos',
-  'Bags & Luggage': 'Bolsos',
-  'Shoes': 'Zapatos',
-  'Watches': 'Relojes',
-  'Tools & Home Improvement': 'Herramientas',
-  'Womenswear': 'Ropa Mujer',
-  'Menswear': 'Ropa Hombre',
 }
 
 function translateCategory(category: string): string {
