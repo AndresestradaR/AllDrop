@@ -24,5 +24,10 @@
     "app/api/competitor-analysis/route.ts": {
       "maxDuration": 120
     }
-  }
+  },
+  "rewrites": [
+    { "source": "/constructor", "destination": "https://shopiestrategas.vercel.app/constructor/" },
+    { "source": "/constructor/:path*", "destination": "https://shopiestrategas.vercel.app/constructor/:path*" },
+    { "source": "/tienda/:path*", "destination": "https://shopiestrategas-i1em.vercel.app/tienda/:path*" }
+  ]
 }
