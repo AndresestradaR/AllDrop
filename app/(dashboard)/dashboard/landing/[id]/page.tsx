@@ -578,10 +578,10 @@ export default function ProductGeneratePage() {
         // Remove and recompute order numbers
         next.delete(section.id)
         let order = 1
-        const sorted = [...next.entries()].sort((a, b) => a[1] - b[1])
+        const sorted = Array.from(next).sort((a, b) => a[1] - b[1])
         const reordered = new Map<string, number>()
-        for (const [id] of sorted) {
-          reordered.set(id, order++)
+        for (const entry of sorted) {
+          reordered.set(entry[0], order++)
         }
         return reordered
       } else {
@@ -595,7 +595,7 @@ export default function ProductGeneratePage() {
     if (selectedForExport.size === 0) return
     setIsSendingToEditor(true)
     try {
-      const sections = [...selectedForExport.entries()]
+      const sections = Array.from(selectedForExport)
         .sort((a, b) => a[1] - b[1])
         .map(([sectionId, order]) => {
           const section = generatedSections.find(s => s.id === sectionId)
