@@ -1001,12 +1001,11 @@ export default function ProductGeneratePage() {
                     const isSelected = exportOrder !== undefined
                     return (
                     <div key={section.id} className="flex flex-col">
-                      {/* Thumbnail - Clickable to open modal */}
+                      {/* Thumbnail */}
                       <div
-                        className="relative cursor-pointer aspect-[9/16] rounded-xl overflow-hidden border-2 transition-all bg-surface"
-                        style={{
-                          borderColor: isSelected ? 'var(--color-accent, #7c3aed)' : 'transparent',
-                        }}
+                        className={`relative cursor-pointer aspect-[9/16] rounded-xl overflow-hidden border-2 transition-all bg-surface ${
+                          isSelected ? 'border-emerald-500 ring-2 ring-emerald-500/30' : 'border-border hover:border-accent/50'
+                        }`}
                       >
                         <div
                           onClick={() => {
@@ -1020,20 +1019,25 @@ export default function ProductGeneratePage() {
                             className="w-full h-full object-cover"
                           />
                         </div>
-                        {/* Selection badge */}
+                        {/* Selection badge — always visible */}
                         <button
                           onClick={(e) => {
                             e.stopPropagation()
                             toggleSectionExport(section)
                           }}
-                          className={`absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                          title={isSelected ? `Seccion #${exportOrder} — clic para quitar` : 'Seleccionar para enviar al editor'}
+                          className={`absolute top-2 left-2 z-10 w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold transition-all shadow-md ${
                             isSelected
-                              ? 'bg-accent text-white shadow-lg'
-                              : 'bg-black/40 text-white/80 hover:bg-black/60'
+                              ? 'bg-emerald-500 text-white'
+                              : 'bg-white/90 text-gray-600 hover:bg-emerald-500 hover:text-white border border-gray-200'
                           }`}
                         >
-                          {isSelected ? exportOrder : <Check className="w-3.5 h-3.5" />}
+                          {isSelected ? exportOrder : '+'}
                         </button>
+                        {/* Dim overlay when selected */}
+                        {isSelected && (
+                          <div className="absolute inset-0 bg-emerald-500/10 pointer-events-none" />
+                        )}
                       </div>
 
                       {/* Action buttons below thumbnail */}
