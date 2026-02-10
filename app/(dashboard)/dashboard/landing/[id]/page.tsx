@@ -23,7 +23,8 @@ import {
   Share2,
   MessageCircle,
   ImagePlus,
-  ExternalLink
+  ExternalLink,
+  Send
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import ModelSelector from '@/components/generator/ModelSelector'
@@ -142,6 +143,10 @@ export default function ProductGeneratePage() {
   const [editInstruction, setEditInstruction] = useState('')
   const [editReferenceImage, setEditReferenceImage] = useState<string | null>(null)
   const [isEditing, setIsEditing] = useState(false)
+
+  // Export to MiniShop editor
+  const [selectedForExport, setSelectedForExport] = useState<Map<string, number>>(new Map())
+  const [isSendingToEditor, setIsSendingToEditor] = useState(false)
 
   const templateInputRef = useRef<HTMLInputElement>(null)
   const photoInputRefs = [useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null)]
@@ -565,6 +570,68 @@ export default function ProductGeneratePage() {
     }
   }
 
+  // Toggle section selection for export
+  const toggleSectionExport = (section: GeneratedSection) => {
+    setSelectedForExport(prev => {
+      const next = new Map(prev)
+      if (next.has(section.id)) {
+        // Remove and recompute order numbers
+        next.delete(section.id)
+        let order = 1
+        const sorted = [...next.entries()].sort((a, b) => a[1] - b[1])
+        const reordered = new Map<string, number>()
+        for (const [id] of sorted) {
+          reordered.set(id, order++)
+        }
+        return reordered
+      } else {
+        next.set(section.id, next.size + 1)
+        return next
+      }
+    })
+  }
+
+  const handleSendToEditor = async () => {
+    if (selectedForExport.size === 0) return
+    setIsSendingToEditor(true)
+    try {
+      const sections = [...selectedForExport.entries()]
+        .sort((a, b) => a[1] - b[1])
+        .map(([sectionId, order]) => {
+          const section = generatedSections.find(s => s.id === sectionId)
+          return {
+            url: section?.generated_image_url || '',
+            category: section?.template?.category || 'sin categoria',
+            order,
+          }
+        })
+        .filter(s => s.url)
+
+      const response = await fetch('/api/minishop/import-sections', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sections }),
+      })
+
+      if (!response.ok) {
+        const err = await response.json()
+        throw new Error(err.error || 'Error al enviar')
+      }
+
+      const data = await response.json()
+      toast.success('Secciones enviadas al editor')
+      setSelectedForExport(new Map())
+
+      // Open MiniShop constructor in new tab
+      window.open(data.redirect_url, '_blank')
+    } catch (error: any) {
+      console.error('Error sending to editor:', error)
+      toast.error(error.message || 'Error al enviar secciones')
+    } finally {
+      setIsSendingToEditor(false)
+    }
+  }
+
   // Group sections by category
   const sectionsByCategory = generatedSections.reduce((acc, section) => {
     const category = section.template?.category || 'hero'
@@ -929,23 +996,46 @@ export default function ProductGeneratePage() {
                   <div className="h-px flex-1 bg-border" />
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                  {sections.map((section) => (
+                  {sections.map((section) => {
+                    const exportOrder = selectedForExport.get(section.id)
+                    const isSelected = exportOrder !== undefined
+                    return (
                     <div key={section.id} className="flex flex-col">
                       {/* Thumbnail - Clickable to open modal */}
-                      <div 
-                        onClick={() => {
-                          setSelectedSection(section)
-                          setShowSectionModal(true)
+                      <div
+                        className="relative cursor-pointer aspect-[9/16] rounded-xl overflow-hidden border-2 transition-all bg-surface"
+                        style={{
+                          borderColor: isSelected ? 'var(--color-accent, #7c3aed)' : 'transparent',
                         }}
-                        className="cursor-pointer aspect-[9/16] rounded-xl overflow-hidden border border-border hover:border-accent/50 transition-all bg-surface"
                       >
-                        <img
-                          src={section.generated_image_url}
-                          alt="Sección generada"
-                          className="w-full h-full object-cover"
-                        />
+                        <div
+                          onClick={() => {
+                            setSelectedSection(section)
+                            setShowSectionModal(true)
+                          }}
+                        >
+                          <img
+                            src={section.generated_image_url}
+                            alt="Seccion generada"
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        {/* Selection badge */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            toggleSectionExport(section)
+                          }}
+                          className={`absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                            isSelected
+                              ? 'bg-accent text-white shadow-lg'
+                              : 'bg-black/40 text-white/80 hover:bg-black/60'
+                          }`}
+                        >
+                          {isSelected ? exportOrder : <Check className="w-3.5 h-3.5" />}
+                        </button>
                       </div>
-                      
+
                       {/* Action buttons below thumbnail */}
                       <div className="flex items-center justify-center gap-2 mt-2">
                         <button
@@ -966,7 +1056,8 @@ export default function ProductGeneratePage() {
                         </button>
                       </div>
                     </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
             ))}
@@ -1201,6 +1292,47 @@ export default function ProductGeneratePage() {
                   alt="Sección generada"
                   className="max-w-full max-h-full object-contain"
                 />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sticky bottom bar — Send to Editor */}
+      {selectedForExport.size > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 lg:left-64">
+          <div className="mx-auto max-w-4xl px-4 pb-4">
+            <div className="flex items-center justify-between gap-4 rounded-2xl border border-accent/30 bg-surface/95 px-6 py-4 shadow-2xl backdrop-blur-xl">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-accent/10">
+                  <Send className="w-4 h-4 text-accent" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-text-primary">
+                    {selectedForExport.size} {selectedForExport.size === 1 ? 'seccion seleccionada' : 'secciones seleccionadas'}
+                  </p>
+                  <p className="text-xs text-text-secondary">Se enviaran a tu editor MiniShop</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setSelectedForExport(new Map())}
+                  className="px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-primary transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleSendToEditor}
+                  disabled={isSendingToEditor}
+                  className="flex items-center gap-2 rounded-xl bg-accent px-5 py-2.5 text-sm font-bold text-white shadow-lg transition-all hover:opacity-90 disabled:opacity-50"
+                >
+                  {isSendingToEditor ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Send className="w-4 h-4" />
+                  )}
+                  Enviar a mi editor
+                </button>
               </div>
             </div>
           </div>

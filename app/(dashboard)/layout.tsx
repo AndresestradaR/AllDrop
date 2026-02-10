@@ -16,7 +16,8 @@ import {
   Menu,
   Clock,
   Target,
-  Wand2
+  Wand2,
+  Store
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -34,6 +35,7 @@ const creatorNavigation = [
 ]
 
 const otherNavigation = [
+  { name: 'Mi Tienda', href: '/constructor/', icon: Store, external: true },
   { name: 'Galería', href: '/dashboard/gallery', icon: Images },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
 ]
@@ -55,7 +57,7 @@ export default function DashboardLayout({
     router.refresh()
   }
 
-  const NavLink = ({ item }: { item: typeof mainNavigation[0] & { soon?: boolean; isNew?: boolean } }) => {
+  const NavLink = ({ item }: { item: typeof mainNavigation[0] & { soon?: boolean; isNew?: boolean; external?: boolean } }) => {
     const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
 
     if (item.soon) {
@@ -67,6 +69,21 @@ export default function DashboardLayout({
           </div>
           <span className="text-xs bg-border/50 px-2 py-0.5 rounded text-text-secondary/70">Pronto</span>
         </div>
+      )
+    }
+
+    if (item.external) {
+      return (
+        <a
+          href={item.href}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={() => setSidebarOpen(false)}
+          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-text-secondary hover:text-text-primary hover:bg-border/50"
+        >
+          <item.icon className="w-5 h-5" />
+          {item.name}
+        </a>
       )
     }
 
