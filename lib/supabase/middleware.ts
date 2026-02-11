@@ -54,15 +54,18 @@ export async function updateSession(request: NextRequest) {
     }
   )
 
-  const { data: { user } } = await supabase.auth.getUser()
+  // Use getSession() instead of getUser() to avoid network calls to Supabase
+  // getSession() reads the JWT locally from cookies - no network request needed
+  // This prevents MIDDLEWARE_INVOCATION_TIMEOUT (504) when Supabase is slow
+  const { data: { session } } = await supabase.auth.getSession()
 
   // Protected routes
-  if (!user && request.nextUrl.pathname.startsWith('/dashboard')) {
+  if (!session && request.nextUrl.pathname.startsWith('/dashboard')) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
   // Redirect authenticated users away from auth pages
-  if (user && (request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/register')) {
+  if (session && (request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/register')) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
