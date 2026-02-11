@@ -308,9 +308,16 @@ export async function POST(request: Request) {
       }, { status: 200 })
     }
 
-    // Build data URL
-    const generatedImageUrl = `data:${result.mimeType};base64,${result.imageBase64}`
-    console.log(`Banner generated successfully with ${selectedProvider}`)
+    // Upload to Supabase Storage and get public URL
+    const storageUrl = await uploadToStorage(
+      await createClient(),
+      result.imageBase64,
+      result.mimeType || 'image/png',
+      user.id,
+      0
+    )
+    const generatedImageUrl = storageUrl || `data:${result.mimeType};base64,${result.imageBase64}`
+    console.log(`Banner generated successfully with ${selectedProvider}, storage: ${!!storageUrl}`)
 
     // Save to database (use service client for bypassing RLS)
     const serviceClient = await createServiceClient()

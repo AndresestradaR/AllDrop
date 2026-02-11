@@ -595,22 +595,15 @@ export default function ProductGeneratePage() {
     if (selectedForExport.size === 0) return
     setIsSendingToEditor(true)
     try {
-      const sections = Array.from(selectedForExport)
+      // Send only IDs — backend looks up images and uploads to Storage
+      const section_ids = Array.from(selectedForExport)
         .sort((a, b) => a[1] - b[1])
-        .map(([sectionId, order]) => {
-          const section = generatedSections.find(s => s.id === sectionId)
-          return {
-            url: section?.generated_image_url || '',
-            category: section?.template?.category || 'sin categoria',
-            order,
-          }
-        })
-        .filter(s => s.url)
+        .map(([sectionId, order]) => ({ id: sectionId, order }))
 
       const response = await fetch('/api/minishop/import-sections', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sections }),
+        body: JSON.stringify({ section_ids }),
       })
 
       if (!response.ok) {

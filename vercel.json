@@ -23,6 +23,9 @@
     },
     "app/api/competitor-analysis/route.ts": {
       "maxDuration": 120
+    },
+    "app/api/minishop/import-sections/route.ts": {
+      "maxDuration": 60
     }
   },
   "rewrites": [
