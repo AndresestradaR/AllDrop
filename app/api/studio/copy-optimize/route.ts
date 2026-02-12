@@ -354,15 +354,22 @@ export async function POST(request: Request) {
       }
     }
 
-    // Add selected banner images (parallel download)
+    // Add selected banner images (parallel download, max 10, skip >2MB)
+    const MAX_BANNER_IMAGES = 10
+    const MAX_IMAGE_SIZE = 2 * 1024 * 1024 // 2MB
     const bannerCategories: string[] = []
     if (selected_banners && selected_banners.length > 0) {
+      const bannersToProcess = selected_banners.slice(0, MAX_BANNER_IMAGES)
       const imageResults = await Promise.all(
-        selected_banners.map(async (banner) => {
+        bannersToProcess.map(async (banner) => {
           try {
             const imgResponse = await fetch(banner.url)
             if (!imgResponse.ok) return null
             const imgBuffer = await imgResponse.arrayBuffer()
+            if (imgBuffer.byteLength > MAX_IMAGE_SIZE) {
+              console.log(`[CopyOptimizer] Skipping large image (${(imgBuffer.byteLength / 1024 / 1024).toFixed(1)}MB): ${banner.url.substring(0, 80)}...`)
+              return null
+            }
             const imgBase64 = Buffer.from(imgBuffer).toString('base64')
             const mimeType = imgResponse.headers.get('content-type') || 'image/png'
             const mappedCategory = CATEGORY_TO_KEY[banner.category] || banner.category

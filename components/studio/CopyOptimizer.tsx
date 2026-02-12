@@ -276,7 +276,8 @@ export function CopyOptimizer() {
         if (targetAudience) body.target_audience = targetAudience
       }
 
-      if (productPhotos.length > 0) {
+      // Only send product photos when no banners selected (avoids large base64 payload)
+      if (productPhotos.length > 0 && !(mode === 'from_landing' && selectedBanners.size > 0)) {
         body.product_photos = productPhotos
       }
 
