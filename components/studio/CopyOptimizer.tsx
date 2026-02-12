@@ -52,7 +52,51 @@ interface LandingProduct {
   sections_count: number
 }
 
+interface GeneratedSection {
+  id: string
+  template_id: string | null
+  generated_image_url: string
+  prompt_used: string
+  output_size: string
+  status: string
+  created_at: string
+  template: {
+    id: string
+    name: string
+    image_url: string
+    category: string
+    dimensions: string
+  } | null
+}
+
 type CopyMode = 'from_landing' | 'from_scratch'
+
+// Map landing_sections categories to copy-optimize section keys
+const CATEGORY_MAP: Record<string, string> = {
+  'hero': 'hero',
+  'oferta': 'oferta',
+  'antes-despues': 'antes_despues',
+  'beneficios': 'beneficios',
+  'tabla-comparativa': 'comparativa',
+  'autoridad': 'autoridad',
+  'testimonios': 'testimonios',
+  'modo-uso': 'modo_uso',
+  'logistica': 'logistica',
+  'faq': 'preguntas',
+}
+
+const CATEGORY_LABELS: Record<string, string> = {
+  'hero': 'Hero',
+  'oferta': 'Oferta',
+  'antes-despues': 'Antes/Despues',
+  'beneficios': 'Beneficios',
+  'tabla-comparativa': 'Comparativa',
+  'autoridad': 'Autoridad',
+  'testimonios': 'Testimonios',
+  'modo-uso': 'Modo de Uso',
+  'logistica': 'Logistica',
+  'faq': 'Preguntas',
+}
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -100,6 +144,11 @@ export function CopyOptimizer() {
   const [selectedLandingId, setSelectedLandingId] = useState('')
   const [isLoadingLandings, setIsLoadingLandings] = useState(false)
 
+  // Banner selector
+  const [bannerSections, setBannerSections] = useState<GeneratedSection[]>([])
+  const [isLoadingBanners, setIsLoadingBanners] = useState(false)
+  const [selectedBanner, setSelectedBanner] = useState<GeneratedSection | null>(null)
+
   // From Scratch mode
   const [productName, setProductName] = useState('')
   const [price, setPrice] = useState('')
@@ -128,6 +177,16 @@ export function CopyOptimizer() {
     }
   }, [mode])
 
+  // Fetch banner sections when a landing is selected
+  useEffect(() => {
+    if (mode === 'from_landing' && selectedLandingId) {
+      fetchSections(selectedLandingId)
+    } else {
+      setBannerSections([])
+      setSelectedBanner(null)
+    }
+  }, [selectedLandingId])
+
   const fetchLandings = async () => {
     setIsLoadingLandings(true)
     try {
@@ -140,6 +199,23 @@ export function CopyOptimizer() {
       console.error('Error fetching landings:', err)
     } finally {
       setIsLoadingLandings(false)
+    }
+  }
+
+  const fetchSections = async (productId: string) => {
+    setIsLoadingBanners(true)
+    setBannerSections([])
+    setSelectedBanner(null)
+    try {
+      const response = await fetch(`/api/products/${productId}/sections`)
+      const data = await response.json()
+      if (data.sections) {
+        setBannerSections(data.sections)
+      }
+    } catch (err) {
+      console.error('Error fetching sections:', err)
+    } finally {
+      setIsLoadingBanners(false)
     }
   }
 
@@ -184,6 +260,13 @@ export function CopyOptimizer() {
         if (currency) body.currency = currency
         if (problemSolved) body.problem_solved = problemSolved
         if (targetAudience) body.target_audience = targetAudience
+        if (selectedBanner) {
+          body.selected_banner_url = selectedBanner.generated_image_url
+          const templateCategory = selectedBanner.template?.category
+          if (templateCategory && CATEGORY_MAP[templateCategory]) {
+            body.selected_banner_category = CATEGORY_MAP[templateCategory]
+          }
+        }
       } else {
         body.product_name = productName
         if (price) body.price = parseFloat(price.replace(/[^0-9.]/g, ''))
@@ -212,7 +295,17 @@ export function CopyOptimizer() {
       // New format: sections object
       if (data.sections) {
         setResult(data)
-        setActiveSection('hero')
+        // Auto-select the relevant section if a banner was selected
+        if (selectedBanner && selectedBanner.template?.category) {
+          const mappedSection = CATEGORY_MAP[selectedBanner.template.category]
+          if (mappedSection && data.sections[mappedSection]) {
+            setActiveSection(mappedSection)
+          } else {
+            setActiveSection(Object.keys(data.sections)[0] || 'hero')
+          }
+        } else {
+          setActiveSection('hero')
+        }
       } else {
         throw new Error('Formato de respuesta no reconocido')
       }
@@ -340,6 +433,88 @@ export function CopyOptimizer() {
                     </option>
                   ))}
                 </select>
+              )}
+            </div>
+          )}
+
+          {/* Banner Selector (from_landing mode) */}
+          {mode === 'from_landing' && selectedLandingId && (
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-1.5">
+                Optimizar para un banner especifico
+                <span className="text-text-muted ml-1">(opcional)</span>
+              </label>
+              {isLoadingBanners ? (
+                <div className="flex items-center gap-2 px-4 py-3 bg-surface-elevated border border-border rounded-xl">
+                  <Loader2 className="w-4 h-4 animate-spin text-text-muted" />
+                  <span className="text-sm text-text-muted">Cargando banners...</span>
+                </div>
+              ) : bannerSections.length === 0 ? (
+                <div className="px-4 py-3 bg-surface-elevated border border-border rounded-xl">
+                  <p className="text-xs text-text-muted">Esta landing no tiene banners generados aun.</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {selectedBanner && (
+                    <div className="flex items-center gap-2 px-3 py-2 bg-accent/10 border border-accent/30 rounded-xl">
+                      <img
+                        src={selectedBanner.generated_image_url}
+                        alt="Banner seleccionado"
+                        className="w-10 h-10 rounded object-cover flex-shrink-0"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-accent truncate">
+                          {CATEGORY_LABELS[selectedBanner.template?.category || ''] || selectedBanner.template?.category || 'Banner'}
+                        </p>
+                        <p className="text-[10px] text-text-muted">La IA optimizara solo esta seccion</p>
+                      </div>
+                      <button
+                        onClick={() => setSelectedBanner(null)}
+                        className="p-1 rounded-lg hover:bg-border/50"
+                      >
+                        <X className="w-3.5 h-3.5 text-text-muted" />
+                      </button>
+                    </div>
+                  )}
+                  <div className="max-h-[180px] overflow-y-auto rounded-xl border border-border bg-surface-elevated p-2 space-y-2 scrollbar-thin">
+                    {Object.entries(
+                      bannerSections.reduce((acc, section) => {
+                        const cat = section.template?.category || 'otros'
+                        if (!acc[cat]) acc[cat] = []
+                        acc[cat].push(section)
+                        return acc
+                      }, {} as Record<string, GeneratedSection[]>)
+                    ).map(([category, sections]) => (
+                      <div key={category}>
+                        <p className="text-[10px] font-semibold text-text-muted uppercase tracking-wider mb-1 px-1">
+                          {CATEGORY_LABELS[category] || category}
+                        </p>
+                        <div className="flex gap-1.5 flex-wrap">
+                          {sections.map((section) => (
+                            <button
+                              key={section.id}
+                              onClick={() => setSelectedBanner(
+                                selectedBanner?.id === section.id ? null : section
+                              )}
+                              className={cn(
+                                'w-14 h-14 rounded-lg overflow-hidden border-2 transition-all flex-shrink-0',
+                                selectedBanner?.id === section.id
+                                  ? 'border-accent ring-2 ring-accent/30 scale-105'
+                                  : 'border-transparent hover:border-accent/50'
+                              )}
+                            >
+                              <img
+                                src={section.generated_image_url}
+                                alt={category}
+                                className="w-full h-full object-cover"
+                              />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
           )}
@@ -556,6 +731,16 @@ export function CopyOptimizer() {
           </div>
         ) : (
           <div className="flex flex-col flex-1 overflow-hidden">
+            {/* Single-section badge */}
+            {result.sections && Object.keys(result.sections).length === 1 && (
+              <div className="flex items-center gap-2 px-3 py-2 mb-3 bg-accent/10 border border-accent/30 rounded-xl">
+                <Sparkles className="w-4 h-4 text-accent flex-shrink-0" />
+                <p className="text-xs text-accent font-medium">
+                  Optimizado para banner seleccionado: {SECTION_TABS.find(t => t.id === Object.keys(result.sections)[0])?.label || Object.keys(result.sections)[0]}
+                </p>
+              </div>
+            )}
+
             {/* Section Tabs — scrollable */}
             <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1 scrollbar-thin">
               {SECTION_TABS.map((tab) => {

@@ -237,6 +237,8 @@ export async function POST(request: Request) {
       target_audience,
       tone = 'urgente',
       product_photos,
+      selected_banner_url,
+      selected_banner_category,
     } = body as {
       mode?: 'from_landing' | 'from_scratch'
       product_id?: string
@@ -248,6 +250,8 @@ export async function POST(request: Request) {
       target_audience?: string
       tone?: string
       product_photos?: string[]
+      selected_banner_url?: string
+      selected_banner_category?: string
     }
 
     // Get user's Google API key
@@ -335,6 +339,21 @@ export async function POST(request: Request) {
       }
     }
 
+    // Add selected banner image
+    if (selected_banner_url) {
+      try {
+        const bannerResponse = await fetch(selected_banner_url)
+        if (bannerResponse.ok) {
+          const bannerBuffer = await bannerResponse.arrayBuffer()
+          const bannerBase64 = Buffer.from(bannerBuffer).toString('base64')
+          const bannerContentType = bannerResponse.headers.get('content-type') || 'image/png'
+          parts.push({ inline_data: { mime_type: bannerContentType, data: bannerBase64 } })
+        }
+      } catch (err: any) {
+        console.error('[CopyOptimizer] Error fetching banner image:', err.message)
+      }
+    }
+
     // Build user prompt
     const promptLines: string[] = [
       `Producto: ${resolvedProductName}`,
@@ -350,11 +369,16 @@ export async function POST(request: Request) {
       promptLines.push(`\nSe adjuntan ${product_photos.length} foto(s) del producto — analiza empaques, textos visibles, ingredientes, marca, beneficios impresos`)
     }
 
-    promptLines.push('\nGenera los Controles Creativos optimizados para las 10 secciones de la galeria de banners, en JSON.')
+    if (selected_banner_url && selected_banner_category) {
+      promptLines.push(`\nSe adjunta la imagen del banner generado para la seccion "${selected_banner_category}". Analiza esta imagen y genera Controles Creativos OPTIMIZADOS especificamente para esta seccion.`)
+      promptLines.push(`Responde SOLO con la seccion "${selected_banner_category}" en el JSON (dentro de "sections").`)
+    } else {
+      promptLines.push('\nGenera los Controles Creativos optimizados para las 10 secciones de la galeria de banners, en JSON.')
+    }
 
     parts.push({ text: promptLines.join('\n') })
 
-    console.log(`[CopyOptimizer] User: ${user.id.substring(0, 8)}..., Mode: ${mode}, Product: ${resolvedProductName}`)
+    console.log(`[CopyOptimizer] User: ${user.id.substring(0, 8)}..., Mode: ${mode}, Product: ${resolvedProductName}${selected_banner_category ? `, Banner: ${selected_banner_category}` : ''}`)
 
     // Try Gemini 2.5 Pro first, fallback to 2.0 Flash
     const models = [
