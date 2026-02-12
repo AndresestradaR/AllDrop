@@ -33,7 +33,18 @@
 
 ## 2.4 Rate Limiting
 
-_Pending — see next commit._
+### Status: IMPLEMENTED
+
+**In-memory rate limiter (`lib/rate-limit.ts`):**
+- AI endpoints (generate-landing, enhance-prompt, edit-section): 10 req/min per IP
+- Uses plain object store with lazy cleanup (no setInterval in serverless)
+- 429 response with Spanish error message
+
+**Files:**
+- `lib/rate-limit.ts` — createRateLimiter factory + pre-configured limiters
+- `app/api/generate-landing/route.ts` — aiLimiter applied
+- `app/api/enhance-prompt/route.ts` — aiLimiter applied
+- `app/api/edit-section/route.ts` — aiLimiter applied
 
 ## 2.5 Security Headers & CORS
 

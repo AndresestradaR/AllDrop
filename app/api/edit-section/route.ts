@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { decrypt } from '@/lib/services/encryption'
+import { aiLimiter, getClientIp } from '@/lib/rate-limit'
 
 // Call Gemini 2.5 Flash Image API for editing
 async function editImageWithGemini(
@@ -89,6 +90,12 @@ async function editImageWithGemini(
 
 export async function POST(request: Request) {
   try {
+    const ip = getClientIp(request)
+    const { success } = aiLimiter.check(ip)
+    if (!success) {
+      return NextResponse.json({ error: 'Demasiadas solicitudes. Intenta de nuevo en un momento.' }, { status: 429 })
+    }
+
     const supabase = await createClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 

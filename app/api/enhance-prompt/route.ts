@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { decrypt } from '@/lib/services/encryption'
+import { aiLimiter, getClientIp } from '@/lib/rate-limit'
 
 const ENHANCE_SYSTEM_PROMPT = `Eres un experto en marketing y copywriting para e-commerce en español.
 
@@ -31,6 +32,12 @@ function parseDataUrl(dataUrl: string): { data: string; mimeType: string } | nul
 
 export async function POST(request: Request) {
   try {
+    const ip = getClientIp(request)
+    const { success } = aiLimiter.check(ip)
+    if (!success) {
+      return NextResponse.json({ error: 'Demasiadas solicitudes. Intenta de nuevo en un momento.' }, { status: 429 })
+    }
+
     const supabase = await createClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 
