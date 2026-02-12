@@ -5,6 +5,7 @@ import { StudioTabs, type StudioTab } from '@/components/studio/StudioTabs'
 import { ImageGenerator } from '@/components/studio/ImageGenerator'
 import { VideoGenerator } from '@/components/studio/VideoGenerator'
 import { AudioGenerator } from '@/components/studio/AudioGenerator'
+import { CopyOptimizer } from '@/components/studio/CopyOptimizer'
 import { ToolsGrid } from '@/components/studio/ToolsGrid'
 import { DropshippingGrid } from '@/components/studio/DropshippingGrid'
 import { Wand2 } from 'lucide-react'
@@ -35,6 +36,7 @@ export default function StudioPage() {
         {activeTab === 'imagen' && <ImageGenerator />}
         {activeTab === 'video' && <VideoGenerator />}
         {activeTab === 'audio' && <AudioGenerator />}
+        {activeTab === 'copy' && <CopyOptimizer />}
         {activeTab === 'herramientas' && <ToolsGrid />}
         {activeTab === 'dropshipping' && <DropshippingGrid />}
       </div>

@@ -8,6 +8,7 @@ export type VideoModelId =
   | 'veo-3.1'
   | 'veo-3-fast'
   // Kling (Kuaishou)
+  | 'kling-3.0'
   | 'kling-2.6'
   | 'kling-v25-turbo'
   // OpenAI Sora
@@ -98,6 +99,25 @@ export const VIDEO_MODELS: Record<VideoModelId, VideoModelConfig> = {
   },
 
   // ============ KLING (KUAISHOU) ============
+  'kling-3.0': {
+    id: 'kling-3.0',
+    apiModelId: 'kling-3.0/video',
+    apiModelIdText: 'kling-3.0/video',
+    name: 'Kling 3.0',
+    description: 'Multi-shot, consistencia de personaje, audio nativo en español. Hasta 15s.',
+    company: 'kuaishou',
+    companyName: 'Kling',
+    priceRange: '$0.07-0.42',
+    durationRange: '3-15',
+    resolutions: ['720p', '1080p'],
+    defaultResolution: '1080p',
+    supportsAudio: true,
+    supportsReferences: true,
+    supportsStartEndFrames: true,
+    supportsMultiShots: true,
+    tags: ['NEW', 'PREMIUM', 'AUDIO', 'REFERENCES', 'MULTI_SHOTS'],
+    recommended: true,
+  },
   'kling-2.6': {
     id: 'kling-2.6',
     apiModelId: 'kling-2.6/image-to-video',
@@ -294,6 +314,7 @@ export const VIDEO_COMPANY_GROUPS: VideoCompanyGroup[] = [
     icon: 'Zap',
     color: 'from-purple-500 to-purple-600',
     models: [
+      VIDEO_MODELS['kling-3.0'],
       VIDEO_MODELS['kling-2.6'],
       VIDEO_MODELS['kling-v25-turbo'],
     ],
@@ -373,6 +394,16 @@ export interface GenerateVideoRequest {
   // Veo-specific parameters
   veoGenerationType?: VeoGenerationType
   veoSeed?: number // 10000-99999
+  // Kling 3.0 multi-shot
+  multiShots?: boolean
+  multiPrompt?: Array<{ prompt: string; duration: number }>
+  // Kling 3.0 element references
+  klingElements?: Array<{
+    name: string
+    description: string
+    element_input_urls?: string[]
+    element_input_video_urls?: string[]
+  }>
 }
 
 export interface GenerateVideoResult {

@@ -249,6 +249,7 @@ async function generateStandardVideo(
   }
 
   // Model type detection - be SPECIFIC about versions!
+  const isKling30 = request.modelId === 'kling-3.0'
   const isKling26 = request.modelId === 'kling-2.6'
   const isKlingV25 = request.modelId === 'kling-v25-turbo'
   const isKling = request.modelId.startsWith('kling')
@@ -261,12 +262,12 @@ async function generateStandardVideo(
   const isSeedance10 = request.modelId === 'seedance-1.0-fast'
   const isSeedance = isSeedance15 || isSeedance10
 
-  console.log(`[Video] Model detection: isWan26=${isWan26}, isWan25=${isWan25}, isKling26=${isKling26}, isSora=${isSora}, isHailuo=${isHailuo}, isSeedance15=${isSeedance15}, isSeedance10=${isSeedance10}`)
+  console.log(`[Video] Model detection: isKling30=${isKling30}, isWan26=${isWan26}, isWan25=${isWan25}, isKling26=${isKling26}, isSora=${isSora}, isHailuo=${isHailuo}, isSeedance15=${isSeedance15}, isSeedance10=${isSeedance10}`)
 
   // Image URLs - DIFFERENT MODELS USE DIFFERENT FIELD NAMES!
   if (request.imageUrls && request.imageUrls.length > 0) {
-    if (isKling26 || isSora || isWan26) {
-      // Kling 2.6, Sora 2, and Wan 2.6 use image_urls (plural array)
+    if (isKling30 || isKling26 || isSora || isWan26) {
+      // Kling 3.0, Kling 2.6, Sora 2, and Wan 2.6 use image_urls (plural array)
       input.image_urls = request.imageUrls
       console.log(`[Video] Using image_urls (array) for ${request.modelId}`)
     } else if (isWan25) {
@@ -335,8 +336,8 @@ async function generateStandardVideo(
   }
 
   // Audio parameter - different names for different models
-  if (isKling26) {
-    // Kling 2.6 uses "sound" (boolean) - THIS IS REQUIRED!
+  if (isKling30 || isKling26) {
+    // Kling 3.0 and 2.6 use "sound" (boolean) - THIS IS REQUIRED!
     input.sound = request.enableAudio ?? false
   } else if (isSeedance15) {
     // Only Seedance 1.5 Pro supports generate_audio
@@ -350,6 +351,17 @@ async function generateStandardVideo(
   // Wan 2.6 specific: multi_shots option
   if (isWan26 && modelConfig.supportsMultiShots) {
     input.multi_shots = false // default to single shot
+  }
+
+  // Kling 3.0 multi-shot support
+  if (isKling30 && request.multiShots && request.multiPrompt && request.multiPrompt.length > 0) {
+    input.multi_shots = true
+    input.multi_prompt = request.multiPrompt
+  }
+
+  // Kling 3.0 element references
+  if (isKling30 && request.klingElements && request.klingElements.length > 0) {
+    input.kling_elements = request.klingElements
   }
 
   // Resolution - ONLY if model accepts it

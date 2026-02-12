@@ -22,6 +22,9 @@ import {
   Images,
   Users,
   Hash,
+  Plus,
+  Trash2,
+  UserCircle,
 } from 'lucide-react'
 import {
   VIDEO_MODELS,
@@ -111,12 +114,28 @@ export function VideoGenerator() {
   const [generatedVideos, setGeneratedVideos] = useState<GeneratedVideo[]>([])
   const [error, setError] = useState<string | null>(null)
 
+  // Kling 3.0 multi-shot state
+  const [multiShotEnabled, setMultiShotEnabled] = useState(false)
+  const [multiPrompts, setMultiPrompts] = useState<{ prompt: string; duration: number }[]>([
+    { prompt: '', duration: 3 },
+    { prompt: '', duration: 3 },
+  ])
+
+  // Kling 3.0 element references state
+  const [klingElements, setKlingElements] = useState<{
+    name: string
+    description: string
+    images: { file: File; preview: string }[]
+  }[]>([])
+
   // Refs
   const inputImageRef = useRef<HTMLInputElement>(null)
   const veoImageRefs = useRef<(HTMLInputElement | null)[]>([])
+  const elementImageRefs = useRef<(HTMLInputElement | null)[]>([])
 
   // Check if current model is Veo
   const isVeoModel = selectedModel.startsWith('veo')
+  const isKling30 = selectedModel === 'kling-3.0'
 
   const currentModel = VIDEO_MODELS[selectedModel]
 
@@ -201,6 +220,25 @@ export function VideoGenerator() {
         }
       } else if (imageBase64) {
         requestBody.imageBase64 = imageBase64
+      }
+
+      // Kling 3.0 multi-shot and element references
+      if (isKling30) {
+        if (multiShotEnabled && multiPrompts.some(p => p.prompt.trim())) {
+          requestBody.multiShots = true
+          requestBody.multiPrompt = multiPrompts.filter(p => p.prompt.trim())
+        }
+        if (klingElements.length > 0) {
+          // Convert element images to base64
+          const elementsWithBase64 = await Promise.all(
+            klingElements.map(async (el) => ({
+              name: el.name,
+              description: el.description,
+              images: await Promise.all(el.images.map(img => fileToBase64(img.file))),
+            }))
+          )
+          requestBody.klingElements = elementsWithBase64
+        }
       }
 
       const response = await fetch('/api/studio/generate-video', {
@@ -384,6 +422,12 @@ export function VideoGenerator() {
                             if (!model.id.startsWith('veo') && selectedModel.startsWith('veo')) {
                               setVeoGenerationType('TEXT_2_VIDEO')
                               setVeoImages([])
+                            }
+                            // Reset Kling 3.0 settings when switching away
+                            if (model.id !== 'kling-3.0' && selectedModel === 'kling-3.0') {
+                              setMultiShotEnabled(false)
+                              setMultiPrompts([{ prompt: '', duration: 3 }, { prompt: '', duration: 3 }])
+                              setKlingElements([])
                             }
                             setIsModelDropdownOpen(false)
                           }}
@@ -810,6 +854,184 @@ export function VideoGenerator() {
                   )}
                 />
               </button>
+            </div>
+          )}
+
+          {/* Kling 3.0 Multi-Shot */}
+          {isKling30 && (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm font-medium text-text-secondary flex items-center gap-2">
+                  <Layers className="w-4 h-4" />
+                  Multi-Shot
+                </label>
+                <button
+                  onClick={() => setMultiShotEnabled(!multiShotEnabled)}
+                  className={cn(
+                    'w-12 h-6 rounded-full transition-colors relative',
+                    multiShotEnabled ? 'bg-accent' : 'bg-border'
+                  )}
+                >
+                  <div
+                    className={cn(
+                      'absolute top-1 w-4 h-4 rounded-full bg-white transition-transform',
+                      multiShotEnabled ? 'translate-x-7' : 'translate-x-1'
+                    )}
+                  />
+                </button>
+              </div>
+              {multiShotEnabled && (
+                <div className="space-y-2">
+                  <p className="text-xs text-text-muted">
+                    Hasta 6 tomas. Cada una con su prompt y duración.
+                  </p>
+                  {multiPrompts.map((shot, idx) => (
+                    <div key={idx} className="flex gap-2 items-start">
+                      <div className="flex-1">
+                        <input
+                          value={shot.prompt}
+                          onChange={(e) => {
+                            const next = [...multiPrompts]
+                            next[idx] = { ...next[idx], prompt: e.target.value }
+                            setMultiPrompts(next)
+                          }}
+                          placeholder={`Toma ${idx + 1}: describe la escena...`}
+                          className="w-full px-3 py-2 bg-surface-elevated border border-border rounded-lg text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/50"
+                        />
+                      </div>
+                      <select
+                        value={shot.duration}
+                        onChange={(e) => {
+                          const next = [...multiPrompts]
+                          next[idx] = { ...next[idx], duration: parseInt(e.target.value) }
+                          setMultiPrompts(next)
+                        }}
+                        className="w-16 px-2 py-2 bg-surface-elevated border border-border rounded-lg text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50"
+                      >
+                        {[3, 5, 8].map(d => (
+                          <option key={d} value={d}>{d}s</option>
+                        ))}
+                      </select>
+                      {multiPrompts.length > 2 && (
+                        <button
+                          onClick={() => setMultiPrompts(multiPrompts.filter((_, i) => i !== idx))}
+                          className="p-2 text-text-muted hover:text-error transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  {multiPrompts.length < 6 && (
+                    <button
+                      onClick={() => setMultiPrompts([...multiPrompts, { prompt: '', duration: 3 }])}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-accent hover:bg-accent/10 rounded-lg transition-colors"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      Agregar toma
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Kling 3.0 Element References */}
+          {isKling30 && (
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-2 flex items-center gap-2">
+                <UserCircle className="w-4 h-4" />
+                Element References
+                <span className="text-xs text-text-muted">(opcional)</span>
+              </label>
+              <p className="text-xs text-text-muted mb-2">
+                Sube imágenes de referencia para mantener consistencia. Usa @nombre en el prompt.
+              </p>
+              {klingElements.map((el, elIdx) => (
+                <div key={elIdx} className="mb-3 p-3 bg-surface-elevated border border-border rounded-xl">
+                  <div className="flex items-center gap-2 mb-2">
+                    <input
+                      value={el.name}
+                      onChange={(e) => {
+                        const next = [...klingElements]
+                        next[elIdx] = { ...next[elIdx], name: e.target.value.replace(/\s/g, '_') }
+                        setKlingElements(next)
+                      }}
+                      placeholder="nombre_elemento"
+                      className="flex-1 px-3 py-1.5 bg-background border border-border rounded-lg text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/50"
+                    />
+                    <button
+                      onClick={() => setKlingElements(klingElements.filter((_, i) => i !== elIdx))}
+                      className="p-1.5 text-text-muted hover:text-error transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <input
+                    value={el.description}
+                    onChange={(e) => {
+                      const next = [...klingElements]
+                      next[elIdx] = { ...next[elIdx], description: e.target.value }
+                      setKlingElements(next)
+                    }}
+                    placeholder="Descripción del elemento..."
+                    className="w-full px-3 py-1.5 mb-2 bg-background border border-border rounded-lg text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/50"
+                  />
+                  <div className="flex gap-2">
+                    {el.images.map((img, imgIdx) => (
+                      <div key={imgIdx} className="relative w-16 h-16 rounded-lg overflow-hidden border border-border">
+                        <img src={img.preview} alt="" className="w-full h-full object-cover" />
+                        <button
+                          onClick={() => {
+                            const next = [...klingElements]
+                            next[elIdx] = { ...next[elIdx], images: next[elIdx].images.filter((_, i) => i !== imgIdx) }
+                            setKlingElements(next)
+                          }}
+                          className="absolute top-0.5 right-0.5 p-0.5 bg-error/90 rounded-full"
+                        >
+                          <X className="w-2.5 h-2.5 text-white" />
+                        </button>
+                      </div>
+                    ))}
+                    {el.images.length < 4 && (
+                      <>
+                        <input
+                          ref={(r) => { elementImageRefs.current[elIdx] = r }}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            if (file) {
+                              const next = [...klingElements]
+                              next[elIdx] = { ...next[elIdx], images: [...next[elIdx].images, { file, preview: URL.createObjectURL(file) }] }
+                              setKlingElements(next)
+                            }
+                          }}
+                        />
+                        <button
+                          onClick={() => elementImageRefs.current[elIdx]?.click()}
+                          className="w-16 h-16 flex items-center justify-center rounded-lg border border-dashed border-border hover:border-accent/50 transition-colors"
+                        >
+                          <Plus className="w-4 h-4 text-text-muted" />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-text-muted mt-1">
+                    Usa <span className="text-accent">@{el.name || 'nombre'}</span> en el prompt
+                  </p>
+                </div>
+              ))}
+              {klingElements.length < 3 && (
+                <button
+                  onClick={() => setKlingElements([...klingElements, { name: '', description: '', images: [] }])}
+                  className="flex items-center gap-1.5 px-3 py-2 text-xs text-accent hover:bg-accent/10 rounded-lg border border-dashed border-accent/30 transition-colors w-full justify-center"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Agregar elemento de referencia
+                </button>
+              )}
             </div>
           )}
 

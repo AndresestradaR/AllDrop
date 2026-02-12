@@ -76,6 +76,10 @@ export async function POST(request: Request) {
       veoGenerationType,
       veoSeed,
       veoImages,
+      // Kling 3.0 parameters
+      multiShots,
+      multiPrompt,
+      klingElements,
     } = body as {
       modelId: VideoModelId
       prompt: string
@@ -88,6 +92,13 @@ export async function POST(request: Request) {
       veoGenerationType?: VeoGenerationType
       veoSeed?: number
       veoImages?: string[]
+      multiShots?: boolean
+      multiPrompt?: Array<{ prompt: string; duration: number }>
+      klingElements?: Array<{
+        name: string
+        description: string
+        images: string[] // base64 images
+      }>
     }
 
     const isVeoModel = modelId.startsWith('veo')
@@ -176,6 +187,33 @@ export async function POST(request: Request) {
     if (isVeoModel) {
       generationParams.veoGenerationType = veoGenerationType
       generationParams.veoSeed = veoSeed
+    }
+
+    // Add Kling 3.0 params
+    const isKling30 = modelId === 'kling-3.0'
+    if (isKling30) {
+      if (multiShots && multiPrompt && multiPrompt.length > 0) {
+        generationParams.multiShots = true
+        generationParams.multiPrompt = multiPrompt
+      }
+      if (klingElements && klingElements.length > 0) {
+        // Upload element reference images to get public URLs
+        const processedElements = await Promise.all(
+          klingElements.map(async (el) => {
+            const urls = await Promise.all(
+              (el.images || []).map((img, i) =>
+                uploadImageToStorage(supabase, img, user.id, Date.now() + i)
+              )
+            )
+            return {
+              name: el.name,
+              description: el.description,
+              element_input_urls: urls,
+            }
+          })
+        )
+        generationParams.klingElements = processedElements
+      }
     }
 
     // Create video task (returns taskId for async processing)
