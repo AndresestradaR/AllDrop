@@ -1142,37 +1142,277 @@ function DeepFaceTool({ onBack }: { onBack: () => void }) {
 }
 
 // ============================================
-// CLONAR VIRAL COMPONENT
+// CLONAR VIRAL COMPONENT (5-step pipeline)
 // ============================================
+type CloneStep = 'upload' | 'transcribe' | 'translate' | 'generate' | 'result'
+
+interface CloneInfluencer {
+  id: string
+  name: string
+  image_url?: string
+  character_profile: any
+}
+
 function ClonarViralTool({ onBack }: { onBack: () => void }) {
-  const [viralUrl, setViralUrl] = useState('')
-  const [productImages, setProductImages] = useState<File[]>([])
-  const [productDescription, setProductDescription] = useState('')
-  const [isProcessing, setIsProcessing] = useState(false)
+  const [step, setStep] = useState<CloneStep>('upload')
+  const [error, setError] = useState<string | null>(null)
+
+  // Step 1: Upload
+  const [viralVideo, setViralVideo] = useState<File | null>(null)
+  const [viralVideoUrl, setViralVideoUrl] = useState<string | null>(null)
+  const [isUploadingVideo, setIsUploadingVideo] = useState(false)
+  const [productName, setProductName] = useState('')
+
+  // Step 2: Transcribe
+  const [isTranscribing, setIsTranscribing] = useState(false)
+  const [transcript, setTranscript] = useState('')
+  const [detectedLanguage, setDetectedLanguage] = useState('')
+
+  // Step 3: Translate
+  const [isTranslating, setIsTranslating] = useState(false)
+  const [translatedScript, setTranslatedScript] = useState('')
+
+  // Step 4: Generate (influencer selection + generation)
+  const [influencers, setInfluencers] = useState<CloneInfluencer[]>([])
+  const [selectedInfluencer, setSelectedInfluencer] = useState<string>('')
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [generationStatus, setGenerationStatus] = useState('')
+
+  // Step 5: Result
   const [resultVideoUrl, setResultVideoUrl] = useState<string | null>(null)
+  const [resultAudioUrl, setResultAudioUrl] = useState<string | null>(null)
 
   const tool = DROPSHIPPING_TOOLS.find(t => t.id === 'clonar-viral')!
+  const pollingRef = useRef<NodeJS.Timeout | null>(null)
 
-  const handleImagesUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || [])
-    if (files.length > 0) {
-      setProductImages(prev => [...prev, ...files].slice(0, 5))
-      setResultVideoUrl(null)
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current)
+    }
+  }, [])
+
+  // Fetch influencers
+  useEffect(() => {
+    const fetchInfluencers = async () => {
+      try {
+        const res = await fetch('/api/studio/influencer')
+        const data = await res.json()
+        if (data.influencers) setInfluencers(data.influencers)
+      } catch (err) {
+        console.error('Error fetching influencers:', err)
+      }
+    }
+    fetchInfluencers()
+  }, [])
+
+  const uploadToSupabase = async (file: File, folder: string): Promise<string> => {
+    const { createClient } = await import('@/lib/supabase/client')
+    const supabase = createClient()
+
+    const ext = file.name.split('.').pop()?.toLowerCase() || 'bin'
+    const filename = `${folder}/${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`
+
+    const { error: uploadError } = await supabase.storage
+      .from('landing-images')
+      .upload(filename, file, {
+        contentType: file.type,
+        upsert: false,
+      })
+
+    if (uploadError) throw new Error(`Error al subir: ${uploadError.message}`)
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('landing-images')
+      .getPublicUrl(filename)
+
+    return publicUrl
+  }
+
+  const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setViralVideo(file)
+    setViralVideoUrl(null)
+    setError(null)
+    setIsUploadingVideo(true)
+
+    try {
+      const url = await uploadToSupabase(file, 'clone-viral/source')
+      setViralVideoUrl(url)
+      toast.success('Video subido')
+    } catch (err: any) {
+      setError(err.message)
+      setViralVideo(null)
+    } finally {
+      setIsUploadingVideo(false)
     }
   }
 
-  const removeImage = (index: number) => {
-    setProductImages(prev => prev.filter((_, i) => i !== index))
+  const handleTranscribe = async () => {
+    if (!viralVideoUrl) return
+
+    setIsTranscribing(true)
+    setError(null)
+
+    try {
+      const res = await fetch('/api/studio/clone-viral/transcribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ video_url: viralVideoUrl }),
+      })
+
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Error al transcribir')
+
+      setTranscript(data.transcript || '')
+      setDetectedLanguage(data.language || '')
+      setStep('transcribe')
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setIsTranscribing(false)
+    }
   }
 
-  const handleProcess = async () => {
-    if (!viralUrl.trim() || productImages.length === 0) return
-    setIsProcessing(true)
-    // TODO: Implement API call
-    setTimeout(() => {
-      setIsProcessing(false)
-    }, 2000)
+  const handleTranslate = async () => {
+    if (!transcript) return
+
+    setIsTranslating(true)
+    setError(null)
+
+    try {
+      const res = await fetch('/api/studio/clone-viral/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transcript,
+          product_name: productName || undefined,
+        }),
+      })
+
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Error al traducir')
+
+      setTranslatedScript(data.translated_script || transcript)
+      setStep('translate')
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setIsTranslating(false)
+    }
   }
+
+  const pollKieTask = async (taskId: string): Promise<string | null> => {
+    return new Promise((resolve, reject) => {
+      let attempts = 0
+      const maxAttempts = 120
+
+      pollingRef.current = setInterval(async () => {
+        attempts++
+        if (attempts > maxAttempts) {
+          clearInterval(pollingRef.current!)
+          pollingRef.current = null
+          reject(new Error('Tiempo de espera agotado'))
+          return
+        }
+
+        try {
+          const res = await fetch(`/api/studio/video-status?taskId=${taskId}`)
+          const data = await res.json()
+
+          if (data.status === 'completed') {
+            clearInterval(pollingRef.current!)
+            pollingRef.current = null
+            resolve(data.videoUrl || data.audioUrl || data.imageUrl || null)
+          } else if (data.status === 'failed' || data.error) {
+            clearInterval(pollingRef.current!)
+            pollingRef.current = null
+            reject(new Error(data.error || 'Tarea fallida'))
+          }
+        } catch (err) {
+          // Keep polling
+        }
+      }, 5000)
+    })
+  }
+
+  const handleGenerate = async () => {
+    if (!selectedInfluencer || !viralVideoUrl || !translatedScript) return
+
+    const influencer = influencers.find(i => i.id === selectedInfluencer)
+    if (!influencer) return
+
+    setIsGenerating(true)
+    setError(null)
+    setGenerationStatus('Generando voz...')
+
+    try {
+      // Step 1: Generate voice
+      const voiceRes = await fetch('/api/studio/clone-viral/generate-voice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: translatedScript,
+          voice_id: influencer.character_profile?.gender === 'male'
+            ? 'pNInz6obpgDQGcFmaJgB'  // Adam (male)
+            : 'EXAVITQu4vr4xnSDxMaL',  // Bella (female)
+        }),
+      })
+
+      const voiceData = await voiceRes.json()
+      if (!voiceRes.ok) throw new Error(voiceData.error || 'Error generando voz')
+
+      if (voiceData.taskId) {
+        setGenerationStatus('Procesando voz... (puede tardar 1-2 min)')
+        const audioUrl = await pollKieTask(voiceData.taskId)
+        if (audioUrl) setResultAudioUrl(audioUrl)
+      }
+
+      // Step 2: Generate motion-controlled video
+      if (influencer.image_url) {
+        setGenerationStatus('Generando video con motion control...')
+
+        const motionRes = await fetch('/api/studio/clone-viral/motion-control', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            pose_image_url: influencer.image_url,
+            motion_video_url: viralVideoUrl,
+            prompt: influencer.character_profile?.prompt_descriptor || undefined,
+          }),
+        })
+
+        const motionData = await motionRes.json()
+        if (!motionRes.ok) throw new Error(motionData.error || 'Error en motion control')
+
+        if (motionData.taskId) {
+          setGenerationStatus('Procesando video... (puede tardar 3-5 min)')
+          const videoUrl = await pollKieTask(motionData.taskId)
+          if (videoUrl) setResultVideoUrl(videoUrl)
+        }
+      }
+
+      setStep('result')
+      toast.success('Video clonado generado')
+
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setIsGenerating(false)
+      setGenerationStatus('')
+    }
+  }
+
+  const STEPS: { id: CloneStep; label: string; num: number }[] = [
+    { id: 'upload', label: 'Subir', num: 1 },
+    { id: 'transcribe', label: 'Transcribir', num: 2 },
+    { id: 'translate', label: 'Traducir', num: 3 },
+    { id: 'generate', label: 'Generar', num: 4 },
+    { id: 'result', label: 'Resultado', num: 5 },
+  ]
+
+  const currentStepIndex = STEPS.findIndex(s => s.id === step)
 
   return (
     <div className="h-[calc(100vh-200px)] min-h-[600px]">
@@ -1188,123 +1428,307 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
             </div>
             <div>
               <h2 className="text-lg font-semibold text-text-primary">{tool.name}</h2>
-              <p className="text-sm text-text-secondary">{tool.description}</p>
+              <p className="text-sm text-text-secondary">Pipeline completo para clonar videos virales</p>
             </div>
+          </div>
+        </div>
+
+        {/* Step Progress */}
+        <div className="px-6 py-3 border-b border-border">
+          <div className="flex items-center gap-2">
+            {STEPS.map((s, i) => (
+              <div key={s.id} className="flex items-center gap-2">
+                <button
+                  onClick={() => i <= currentStepIndex && setStep(s.id)}
+                  disabled={i > currentStepIndex}
+                  className={cn(
+                    'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all',
+                    i === currentStepIndex
+                      ? 'bg-accent text-background'
+                      : i < currentStepIndex
+                        ? 'bg-accent/20 text-accent cursor-pointer'
+                        : 'bg-border/50 text-text-muted cursor-not-allowed'
+                  )}
+                >
+                  <span className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] bg-current/20">
+                    {i < currentStepIndex ? (
+                      <Check className="w-3 h-3" />
+                    ) : (
+                      s.num
+                    )}
+                  </span>
+                  {s.label}
+                </button>
+                {i < STEPS.length - 1 && (
+                  <div className={cn('w-4 h-0.5 rounded', i < currentStepIndex ? 'bg-accent' : 'bg-border')} />
+                )}
+              </div>
+            ))}
           </div>
         </div>
 
         {/* Content */}
-        <div className="flex-1 p-6 flex gap-6 overflow-hidden">
-          {/* Input Section */}
-          <div className="w-1/2 flex flex-col gap-4">
-            {/* Viral URL */}
-            <div>
-              <label className="block text-sm font-medium text-text-secondary mb-2">
-                URL del video viral *
-              </label>
-              <input
-                type="url"
-                value={viralUrl}
-                onChange={(e) => setViralUrl(e.target.value)}
-                placeholder="https://tiktok.com/... o https://instagram.com/..."
-                className="w-full px-4 py-3 bg-surface-elevated border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-accent"
-              />
-              <p className="text-xs text-text-secondary mt-1">TikTok, Instagram Reels, YouTube Shorts</p>
+        <div className="flex-1 p-6 overflow-y-auto">
+          {error && (
+            <div className="p-3 bg-error/10 border border-error/20 rounded-xl mb-4">
+              <p className="text-sm text-error">{error}</p>
             </div>
+          )}
 
-            {/* Product Images */}
-            <div>
-              <label className="block text-sm font-medium text-text-secondary mb-2">
-                Imagenes de tu producto * (max 5)
-              </label>
-              <div className="grid grid-cols-3 gap-2">
-                {productImages.map((file, index) => (
-                  <div key={index} className="relative aspect-square bg-surface-elevated rounded-lg overflow-hidden">
-                    <img src={URL.createObjectURL(file)} alt="" className="w-full h-full object-cover" />
-                    <button
-                      onClick={() => removeImage(index)}
-                      className="absolute top-1 right-1 w-5 h-5 bg-error/80 hover:bg-error rounded-full flex items-center justify-center"
-                    >
-                      <span className="text-white text-xs">X</span>
-                    </button>
-                  </div>
-                ))}
-                {productImages.length < 5 && (
-                  <label className="aspect-square border-2 border-dashed border-border hover:border-accent/50 rounded-lg cursor-pointer flex items-center justify-center transition-colors">
-                    <input type="file" accept="image/*" multiple className="hidden" onChange={handleImagesUpload} />
-                    <span className="text-2xl text-text-secondary">+</span>
-                  </label>
+          {/* STEP 1: Upload */}
+          {step === 'upload' && (
+            <div className="max-w-lg mx-auto space-y-4">
+              <p className="text-sm text-text-secondary">Sube el video viral que quieres clonar.</p>
+
+              {viralVideo ? (
+                <div className="relative bg-surface-elevated rounded-xl overflow-hidden">
+                  <video src={URL.createObjectURL(viralVideo)} controls className="w-full max-h-[300px] object-contain" />
+                  {isUploadingVideo && (
+                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                      <Loader2 className="w-8 h-8 text-white animate-spin" />
+                    </div>
+                  )}
+                  {viralVideoUrl && (
+                    <div className="absolute top-2 right-2 p-1 bg-green-500 rounded-full">
+                      <Check className="w-4 h-4 text-white" />
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <label className="flex flex-col items-center justify-center h-48 border-2 border-dashed border-border hover:border-accent/50 rounded-xl cursor-pointer transition-colors">
+                  <input type="file" accept="video/*" className="hidden" onChange={handleVideoUpload} />
+                  <Video className="w-10 h-10 text-text-secondary mb-3" />
+                  <p className="text-text-primary font-medium">Subir video viral</p>
+                  <p className="text-xs text-text-secondary mt-1">MP4, MOV hasta 100MB</p>
+                </label>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-1.5">
+                  Nombre de tu producto (para adaptar el guion)
+                </label>
+                <input
+                  value={productName}
+                  onChange={(e) => setProductName(e.target.value)}
+                  placeholder="Ej: Serum Vitamina C"
+                  className="w-full px-4 py-2.5 bg-surface-elevated border border-border rounded-xl text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/50 text-sm"
+                />
+              </div>
+
+              <button
+                onClick={handleTranscribe}
+                disabled={!viralVideoUrl || isTranscribing}
+                className={cn(
+                  'w-full flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold transition-all',
+                  !viralVideoUrl || isTranscribing
+                    ? 'bg-border text-text-secondary cursor-not-allowed'
+                    : 'bg-accent hover:bg-accent-hover text-background shadow-lg shadow-accent/25'
+                )}
+              >
+                {isTranscribing ? (
+                  <><Loader2 className="w-5 h-5 animate-spin" /> Transcribiendo...</>
+                ) : (
+                  <><Sparkles className="w-5 h-5" /> Transcribir audio</>
+                )}
+              </button>
+            </div>
+          )}
+
+          {/* STEP 2: Transcribe result */}
+          {step === 'transcribe' && (
+            <div className="max-w-lg mx-auto space-y-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-text-secondary">Transcripcion del video</p>
+                {detectedLanguage && (
+                  <span className="text-xs bg-accent/20 text-accent px-2 py-1 rounded-lg">
+                    Idioma: {detectedLanguage}
+                  </span>
                 )}
               </div>
-            </div>
 
-            {/* Product Description */}
-            <div>
-              <label className="block text-sm font-medium text-text-secondary mb-2">
-                Descripcion del producto (opcional)
-              </label>
               <textarea
-                value={productDescription}
-                onChange={(e) => setProductDescription(e.target.value)}
-                placeholder="Describe brevemente tu producto y sus beneficios..."
-                rows={3}
-                className="w-full px-4 py-3 bg-surface-elevated border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-accent resize-none"
+                value={transcript}
+                onChange={(e) => setTranscript(e.target.value)}
+                rows={8}
+                className="w-full px-4 py-3 bg-surface-elevated border border-border rounded-xl text-text-primary resize-none focus:outline-none focus:ring-2 focus:ring-accent/50 text-sm"
               />
-            </div>
-          </div>
 
-          {/* Output Section */}
-          <div className="w-1/2 flex flex-col">
-            <label className="block text-sm font-medium text-text-secondary mb-2">
-              Video clonado
-            </label>
-            <div className="flex-1 bg-surface-elevated rounded-xl overflow-hidden flex items-center justify-center">
-              {resultVideoUrl ? (
-                <video src={resultVideoUrl} controls className="w-full h-full object-contain" autoPlay />
+              <button
+                onClick={handleTranslate}
+                disabled={!transcript.trim() || isTranslating}
+                className={cn(
+                  'w-full flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold transition-all',
+                  !transcript.trim() || isTranslating
+                    ? 'bg-border text-text-secondary cursor-not-allowed'
+                    : 'bg-accent hover:bg-accent-hover text-background shadow-lg shadow-accent/25'
+                )}
+              >
+                {isTranslating ? (
+                  <><Loader2 className="w-5 h-5 animate-spin" /> Traduciendo...</>
+                ) : (
+                  <><Sparkles className="w-5 h-5" /> Traducir y adaptar</>
+                )}
+              </button>
+            </div>
+          )}
+
+          {/* STEP 3: Translate result */}
+          {step === 'translate' && (
+            <div className="max-w-lg mx-auto space-y-4">
+              <p className="text-sm text-text-secondary">Guion traducido y adaptado. Puedes editarlo antes de continuar.</p>
+
+              <textarea
+                value={translatedScript}
+                onChange={(e) => setTranslatedScript(e.target.value)}
+                rows={8}
+                className="w-full px-4 py-3 bg-surface-elevated border border-border rounded-xl text-text-primary resize-none focus:outline-none focus:ring-2 focus:ring-accent/50 text-sm"
+              />
+
+              <button
+                onClick={() => setStep('generate')}
+                disabled={!translatedScript.trim()}
+                className={cn(
+                  'w-full flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold transition-all',
+                  !translatedScript.trim()
+                    ? 'bg-border text-text-secondary cursor-not-allowed'
+                    : 'bg-accent hover:bg-accent-hover text-background shadow-lg shadow-accent/25'
+                )}
+              >
+                Continuar a generacion
+              </button>
+            </div>
+          )}
+
+          {/* STEP 4: Generate */}
+          {step === 'generate' && (
+            <div className="max-w-lg mx-auto space-y-4">
+              <p className="text-sm text-text-secondary">Selecciona tu influencer virtual y genera el video clonado.</p>
+
+              {influencers.length === 0 ? (
+                <div className="text-center py-8">
+                  <UserCircle className="w-12 h-12 text-text-secondary mx-auto mb-3" />
+                  <p className="text-text-secondary mb-2">No tienes influencers creados</p>
+                  <p className="text-xs text-text-muted">
+                    Ve a la herramienta "Mi Influencer" para crear un personaje virtual primero.
+                  </p>
+                </div>
               ) : (
-                <div className="text-center p-8">
-                  {isProcessing ? (
-                    <>
-                      <Loader2 className="w-12 h-12 text-accent mx-auto mb-3 animate-spin" />
-                      <p className="text-text-primary font-medium">Clonando video viral...</p>
-                      <p className="text-sm text-text-secondary mt-1">Analizando estilo y creando version</p>
-                    </>
-                  ) : (
-                    <>
-                      <RefreshCw className="w-12 h-12 text-text-secondary mx-auto mb-3" />
-                      <p className="text-text-secondary">El video clonado aparecera aqui</p>
-                    </>
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-text-secondary mb-2">Selecciona influencer</label>
+                    <div className="grid grid-cols-3 gap-3">
+                      {influencers.map((inf) => (
+                        <button
+                          key={inf.id}
+                          onClick={() => setSelectedInfluencer(inf.id)}
+                          className={cn(
+                            'p-3 rounded-xl border text-center transition-all',
+                            selectedInfluencer === inf.id
+                              ? 'border-accent bg-accent/10'
+                              : 'border-border bg-surface-elevated hover:border-accent/50'
+                          )}
+                        >
+                          {inf.image_url ? (
+                            <img src={inf.image_url} alt={inf.name} className="w-16 h-16 mx-auto rounded-lg object-cover mb-2" />
+                          ) : (
+                            <div className="w-16 h-16 mx-auto rounded-lg bg-border/50 flex items-center justify-center mb-2">
+                              <UserCircle className="w-8 h-8 text-text-muted" />
+                            </div>
+                          )}
+                          <p className={cn('text-xs font-medium', selectedInfluencer === inf.id ? 'text-accent' : 'text-text-primary')}>
+                            {inf.name}
+                          </p>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleGenerate}
+                    disabled={!selectedInfluencer || isGenerating}
+                    className={cn(
+                      'w-full flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold transition-all',
+                      !selectedInfluencer || isGenerating
+                        ? 'bg-border text-text-secondary cursor-not-allowed'
+                        : 'bg-accent hover:bg-accent-hover text-background shadow-lg shadow-accent/25'
+                    )}
+                  >
+                    {isGenerating ? (
+                      <><Loader2 className="w-5 h-5 animate-spin" /> {generationStatus || 'Generando...'}</>
+                    ) : (
+                      <><Sparkles className="w-5 h-5" /> Generar video clonado</>
+                    )}
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* STEP 5: Result */}
+          {step === 'result' && (
+            <div className="max-w-2xl mx-auto space-y-4">
+              <p className="text-sm text-text-secondary">Tu video clonado esta listo.</p>
+
+              <div className="grid grid-cols-2 gap-4">
+                {/* Video */}
+                <div>
+                  <label className="block text-sm font-medium text-text-secondary mb-2">Video generado</label>
+                  <div className="bg-surface-elevated rounded-xl overflow-hidden aspect-[9/16] flex items-center justify-center">
+                    {resultVideoUrl ? (
+                      <video src={resultVideoUrl} controls className="w-full h-full object-contain" />
+                    ) : (
+                      <div className="text-center p-4">
+                        <Video className="w-8 h-8 text-text-muted mx-auto mb-2" />
+                        <p className="text-xs text-text-muted">Video no disponible</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Audio */}
+                <div>
+                  <label className="block text-sm font-medium text-text-secondary mb-2">Audio generado</label>
+                  <div className="bg-surface-elevated rounded-xl p-4">
+                    {resultAudioUrl ? (
+                      <audio src={resultAudioUrl} controls className="w-full" />
+                    ) : (
+                      <p className="text-xs text-text-muted">Audio no disponible</p>
+                    )}
+                  </div>
+
+                  <div className="mt-4 p-4 bg-surface-elevated rounded-xl">
+                    <label className="block text-xs font-medium text-text-muted uppercase mb-2">Guion usado</label>
+                    <p className="text-sm text-text-secondary">{translatedScript}</p>
+                  </div>
+                </div>
+              </div>
+
+              {(resultVideoUrl || resultAudioUrl) && (
+                <div className="flex gap-3">
+                  {resultVideoUrl && (
+                    <a
+                      href={resultVideoUrl}
+                      download={`clone-viral-${Date.now()}.mp4`}
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-accent/30 text-accent hover:bg-accent/10 font-medium text-sm transition-colors"
+                    >
+                      <Download className="w-4 h-4" />
+                      Descargar video
+                    </a>
+                  )}
+                  {resultAudioUrl && (
+                    <a
+                      href={resultAudioUrl}
+                      download={`clone-viral-audio-${Date.now()}.mp3`}
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-accent/30 text-accent hover:bg-accent/10 font-medium text-sm transition-colors"
+                    >
+                      <Download className="w-4 h-4" />
+                      Descargar audio
+                    </a>
                   )}
                 </div>
               )}
             </div>
-          </div>
-        </div>
-
-        {/* Actions */}
-        <div className="px-6 py-4 border-t border-border flex items-center justify-end">
-          <button
-            onClick={handleProcess}
-            disabled={!viralUrl.trim() || productImages.length === 0 || isProcessing}
-            className={cn(
-              'flex items-center gap-2 px-6 py-2.5 rounded-xl font-semibold transition-all',
-              !viralUrl.trim() || productImages.length === 0 || isProcessing
-                ? 'bg-border text-text-secondary cursor-not-allowed'
-                : 'bg-accent hover:bg-accent-hover text-background'
-            )}
-          >
-            {isProcessing ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Clonando...
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-4 h-4" />
-                Clonar Video
-              </>
-            )}
-          </button>
+          )}
         </div>
       </div>
     </div>
@@ -1539,35 +1963,191 @@ function VideoProductoTool({ onBack }: { onBack: () => void }) {
 }
 
 // ============================================
-// MI INFLUENCER COMPONENT
+// MI INFLUENCER COMPONENT (3-step wizard)
 // ============================================
+interface Influencer {
+  id: string
+  name: string
+  description?: string
+  image_url?: string
+  character_profile: any
+  voice_id?: string
+  voice_name?: string
+  created_at: string
+}
+
 function MiInfluencerTool({ onBack }: { onBack: () => void }) {
+  // Wizard step: 'list' | 'upload' | 'analyze' | 'save'
+  const [step, setStep] = useState<'list' | 'upload' | 'analyze' | 'save'>('list')
+
+  // Saved influencers
+  const [influencers, setInfluencers] = useState<Influencer[]>([])
+  const [isLoadingList, setIsLoadingList] = useState(true)
+
+  // Upload step
+  const [uploadedImage, setUploadedImage] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+
+  // Analyze step
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [characterProfile, setCharacterProfile] = useState<any>(null)
+
+  // Save step
   const [characterName, setCharacterName] = useState('')
-  const [gender, setGender] = useState<'mujer' | 'hombre'>('mujer')
-  const [ageRange, setAgeRange] = useState<'18-25' | '25-35' | '35-45'>('25-35')
-  const [skinTone, setSkinTone] = useState<'clara' | 'media' | 'morena' | 'oscura'>('media')
-  const [hairStyle, setHairStyle] = useState<'corto' | 'largo' | 'ondulado' | 'rizado'>('largo')
-  const [style, setStyle] = useState<'casual' | 'elegante' | 'fitness' | 'profesional'>('casual')
-  const [referenceImage, setReferenceImage] = useState<File | null>(null)
-  const [isGenerating, setIsGenerating] = useState(false)
-  const [generatedImages, setGeneratedImages] = useState<string[]>([])
-  const [savedCharacters] = useState<{name: string; thumbnail: string}[]>([])
+  const [characterDescription, setCharacterDescription] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
+  const [imageUrl, setImageUrl] = useState<string | null>(null)
+
+  const [error, setError] = useState<string | null>(null)
 
   const tool = DROPSHIPPING_TOOLS.find(t => t.id === 'mi-influencer')!
 
-  const handleReferenceUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) setReferenceImage(file)
+  // Fetch influencers on mount
+  useEffect(() => {
+    fetchInfluencers()
+  }, [])
+
+  const fetchInfluencers = async () => {
+    setIsLoadingList(true)
+    try {
+      const res = await fetch('/api/studio/influencer')
+      const data = await res.json()
+      if (data.influencers) setInfluencers(data.influencers)
+    } catch (err) {
+      console.error('Error fetching influencers:', err)
+    } finally {
+      setIsLoadingList(false)
+    }
   }
 
-  const handleGenerate = async () => {
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setUploadedImage(file)
+      setImagePreview(URL.createObjectURL(file))
+      setCharacterProfile(null)
+      setError(null)
+    }
+  }
+
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.readAsDataURL(file)
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = reject
+    })
+  }
+
+  const handleAnalyze = async () => {
+    if (!uploadedImage) return
+
+    setIsAnalyzing(true)
+    setError(null)
+
+    try {
+      const base64 = await fileToBase64(uploadedImage)
+
+      const res = await fetch('/api/studio/influencer/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image_base64: base64 }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) throw new Error(data.error || 'Error al analizar')
+
+      setCharacterProfile(data.character_profile)
+      setStep('analyze')
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setIsAnalyzing(false)
+    }
+  }
+
+  const uploadImageToStorage = async (): Promise<string> => {
+    if (!uploadedImage) throw new Error('No hay imagen')
+
+    const { createClient } = await import('@/lib/supabase/client')
+    const supabase = createClient()
+
+    const ext = uploadedImage.name.split('.').pop()?.toLowerCase() || 'jpg'
+    const filename = `influencers/${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`
+
+    const { error: uploadError } = await supabase.storage
+      .from('landing-images')
+      .upload(filename, uploadedImage, {
+        contentType: uploadedImage.type,
+        upsert: false,
+      })
+
+    if (uploadError) throw new Error(`Error al subir: ${uploadError.message}`)
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('landing-images')
+      .getPublicUrl(filename)
+
+    return publicUrl
+  }
+
+  const handleSave = async () => {
     if (!characterName.trim()) return
-    setIsGenerating(true)
-    // TODO: Implement API call
-    setTimeout(() => {
-      setIsGenerating(false)
-      // Placeholder: would set generatedImages here
-    }, 2000)
+
+    setIsSaving(true)
+    setError(null)
+
+    try {
+      // Upload image to storage first
+      let storedImageUrl = imageUrl
+      if (!storedImageUrl && uploadedImage) {
+        storedImageUrl = await uploadImageToStorage()
+        setImageUrl(storedImageUrl)
+      }
+
+      const res = await fetch('/api/studio/influencer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: characterName,
+          description: characterDescription || undefined,
+          image_url: storedImageUrl,
+          character_profile: characterProfile,
+        }),
+      })
+
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Error al guardar')
+
+      toast.success('Influencer guardado')
+
+      // Reset and go back to list
+      setStep('list')
+      setUploadedImage(null)
+      setImagePreview(null)
+      setCharacterProfile(null)
+      setCharacterName('')
+      setCharacterDescription('')
+      setImageUrl(null)
+      fetchInfluencers()
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleDelete = async (id: string) => {
+    try {
+      const res = await fetch(`/api/studio/influencer?id=${id}`, { method: 'DELETE' })
+      if (res.ok) {
+        setInfluencers(prev => prev.filter(i => i.id !== id))
+        toast.success('Eliminado')
+      }
+    } catch (err) {
+      console.error('Delete error:', err)
+    }
   }
 
   return (
@@ -1575,7 +2155,13 @@ function MiInfluencerTool({ onBack }: { onBack: () => void }) {
       <div className="bg-surface rounded-2xl border border-border h-full flex flex-col">
         {/* Header */}
         <div className="flex items-center gap-4 px-6 py-4 border-b border-border">
-          <button onClick={onBack} className="p-2 hover:bg-border/50 rounded-lg transition-colors">
+          <button
+            onClick={() => {
+              if (step === 'list') onBack()
+              else setStep('list')
+            }}
+            className="p-2 hover:bg-border/50 rounded-lg transition-colors"
+          >
             <ArrowLeft className="w-5 h-5 text-text-secondary" />
           </button>
           <div className="flex items-center gap-3">
@@ -1584,255 +2170,250 @@ function MiInfluencerTool({ onBack }: { onBack: () => void }) {
             </div>
             <div>
               <h2 className="text-lg font-semibold text-text-primary">{tool.name}</h2>
-              <p className="text-sm text-text-secondary">{tool.description}</p>
+              <p className="text-sm text-text-secondary">
+                {step === 'list' && 'Tus personajes virtuales guardados'}
+                {step === 'upload' && 'Paso 1: Sube una imagen de referencia'}
+                {step === 'analyze' && 'Paso 2: Revisa el Character Profile'}
+                {step === 'save' && 'Paso 3: Nombra y guarda tu influencer'}
+              </p>
             </div>
           </div>
         </div>
 
         {/* Content */}
-        <div className="flex-1 p-6 flex gap-6 overflow-hidden">
-          {/* Input Section */}
-          <div className="w-1/2 flex flex-col gap-4 overflow-y-auto pr-2">
-            {/* Character Name */}
+        <div className="flex-1 p-6 overflow-y-auto">
+          {/* LIST VIEW */}
+          {step === 'list' && (
             <div>
-              <label className="block text-sm font-medium text-text-secondary mb-2">
-                Nombre del personaje *
-              </label>
-              <input
-                type="text"
-                value={characterName}
-                onChange={(e) => setCharacterName(e.target.value)}
-                placeholder="Ej: Sofia, Carlos, Maria..."
-                className="w-full px-4 py-3 bg-surface-elevated border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-accent"
-              />
-            </div>
-
-            {/* Gender */}
-            <div>
-              <label className="block text-sm font-medium text-text-secondary mb-2">Genero</label>
-              <div className="flex gap-2">
-                {[
-                  { id: 'mujer', label: 'Mujer' },
-                  { id: 'hombre', label: 'Hombre' },
-                ].map((g) => (
-                  <button
-                    key={g.id}
-                    onClick={() => setGender(g.id as typeof gender)}
-                    className={cn(
-                      'flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors',
-                      gender === g.id ? 'bg-accent text-background' : 'bg-surface-elevated text-text-secondary hover:text-text-primary'
-                    )}
-                  >
-                    {g.label}
-                  </button>
-                ))}
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-semibold text-text-primary uppercase tracking-wide">
+                  Mis Influencers ({influencers.length})
+                </h3>
+                <button
+                  onClick={() => setStep('upload')}
+                  className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-hover text-background rounded-xl text-sm font-semibold transition-colors"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  Crear nuevo
+                </button>
               </div>
-            </div>
 
-            {/* Age Range */}
-            <div>
-              <label className="block text-sm font-medium text-text-secondary mb-2">Rango de edad</label>
-              <div className="flex gap-2">
-                {[
-                  { id: '18-25', label: '18-25' },
-                  { id: '25-35', label: '25-35' },
-                  { id: '35-45', label: '35-45' },
-                ].map((age) => (
-                  <button
-                    key={age.id}
-                    onClick={() => setAgeRange(age.id as typeof ageRange)}
-                    className={cn(
-                      'flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors',
-                      ageRange === age.id ? 'bg-accent text-background' : 'bg-surface-elevated text-text-secondary hover:text-text-primary'
-                    )}
-                  >
-                    {age.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Skin Tone */}
-            <div>
-              <label className="block text-sm font-medium text-text-secondary mb-2">Tono de piel</label>
-              <div className="grid grid-cols-4 gap-2">
-                {[
-                  { id: 'clara', label: 'Clara' },
-                  { id: 'media', label: 'Media' },
-                  { id: 'morena', label: 'Morena' },
-                  { id: 'oscura', label: 'Oscura' },
-                ].map((tone) => (
-                  <button
-                    key={tone.id}
-                    onClick={() => setSkinTone(tone.id as typeof skinTone)}
-                    className={cn(
-                      'px-3 py-2 rounded-lg text-sm font-medium transition-colors',
-                      skinTone === tone.id ? 'bg-accent text-background' : 'bg-surface-elevated text-text-secondary hover:text-text-primary'
-                    )}
-                  >
-                    {tone.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Hair Style */}
-            <div>
-              <label className="block text-sm font-medium text-text-secondary mb-2">Estilo de cabello</label>
-              <div className="grid grid-cols-4 gap-2">
-                {[
-                  { id: 'corto', label: 'Corto' },
-                  { id: 'largo', label: 'Largo' },
-                  { id: 'ondulado', label: 'Ondulado' },
-                  { id: 'rizado', label: 'Rizado' },
-                ].map((hair) => (
-                  <button
-                    key={hair.id}
-                    onClick={() => setHairStyle(hair.id as typeof hairStyle)}
-                    className={cn(
-                      'px-3 py-2 rounded-lg text-sm font-medium transition-colors',
-                      hairStyle === hair.id ? 'bg-accent text-background' : 'bg-surface-elevated text-text-secondary hover:text-text-primary'
-                    )}
-                  >
-                    {hair.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Style */}
-            <div>
-              <label className="block text-sm font-medium text-text-secondary mb-2">Estilo personal</label>
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { id: 'casual', label: 'Casual', desc: 'Ropa comoda, natural' },
-                  { id: 'elegante', label: 'Elegante', desc: 'Sofisticado, formal' },
-                  { id: 'fitness', label: 'Fitness', desc: 'Deportivo, atletico' },
-                  { id: 'profesional', label: 'Profesional', desc: 'Ejecutivo, serio' },
-                ].map((s) => (
-                  <button
-                    key={s.id}
-                    onClick={() => setStyle(s.id as typeof style)}
-                    className={cn(
-                      'p-3 rounded-lg text-left transition-colors',
-                      style === s.id ? 'bg-accent text-background' : 'bg-surface-elevated text-text-secondary hover:text-text-primary'
-                    )}
-                  >
-                    <span className="text-sm font-medium block">{s.label}</span>
-                    <span className={cn('text-xs', style === s.id ? 'text-background/70' : 'text-text-secondary/70')}>{s.desc}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Reference Image */}
-            <div>
-              <label className="block text-sm font-medium text-text-secondary mb-2">
-                Imagen de referencia (opcional)
-              </label>
-              {referenceImage ? (
-                <div className="relative h-24 bg-surface-elevated rounded-xl overflow-hidden">
-                  <img src={URL.createObjectURL(referenceImage)} alt="" className="w-full h-full object-cover" />
-                  <button
-                    onClick={() => setReferenceImage(null)}
-                    className="absolute top-2 right-2 w-6 h-6 bg-error/80 hover:bg-error rounded-full flex items-center justify-center"
-                  >
-                    <span className="text-white text-xs">X</span>
-                  </button>
+              {isLoadingList ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-8 h-8 text-accent animate-spin" />
+                </div>
+              ) : influencers.length === 0 ? (
+                <div className="text-center py-16">
+                  <UserCircle className="w-16 h-16 text-text-secondary mx-auto mb-4" />
+                  <p className="text-text-secondary mb-2">No tienes influencers creados</p>
+                  <p className="text-xs text-text-muted">Crea un personaje virtual consistente para tus videos y contenido</p>
                 </div>
               ) : (
-                <label className="flex items-center justify-center h-20 border-2 border-dashed border-border hover:border-accent/50 rounded-xl cursor-pointer transition-colors">
-                  <input type="file" accept="image/*" className="hidden" onChange={handleReferenceUpload} />
-                  <span className="text-sm text-text-secondary">Subir imagen de referencia</span>
-                </label>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {influencers.map((inf) => (
+                    <div key={inf.id} className="relative p-4 bg-surface-elevated rounded-xl border border-border group">
+                      {inf.image_url && (
+                        <img
+                          src={inf.image_url}
+                          alt={inf.name}
+                          className="w-full aspect-square object-cover rounded-lg mb-3"
+                        />
+                      )}
+                      {!inf.image_url && (
+                        <div className="w-full aspect-square bg-border/50 rounded-lg mb-3 flex items-center justify-center">
+                          <UserCircle className="w-12 h-12 text-text-muted" />
+                        </div>
+                      )}
+                      <h4 className="text-sm font-semibold text-text-primary">{inf.name}</h4>
+                      {inf.description && (
+                        <p className="text-xs text-text-secondary mt-0.5 line-clamp-2">{inf.description}</p>
+                      )}
+                      {inf.character_profile?.prompt_descriptor && (
+                        <p className="text-[10px] text-text-muted mt-1 line-clamp-2 italic">
+                          {inf.character_profile.prompt_descriptor}
+                        </p>
+                      )}
+                      <button
+                        onClick={() => handleDelete(inf.id)}
+                        className="absolute top-2 right-2 p-1.5 bg-error/80 hover:bg-error rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <span className="text-white text-xs">X</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
+          )}
 
-            {/* Saved Characters */}
-            {savedCharacters.length > 0 && (
-              <div>
-                <label className="block text-sm font-medium text-text-secondary mb-2">
-                  Personajes guardados
-                </label>
-                <div className="flex gap-2 overflow-x-auto pb-2">
-                  {savedCharacters.map((char, i) => (
-                    <button
-                      key={i}
-                      className="flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 border-border hover:border-accent transition-colors"
-                    >
-                      <img src={char.thumbnail} alt={char.name} className="w-full h-full object-cover" />
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
+          {/* UPLOAD STEP */}
+          {step === 'upload' && (
+            <div className="max-w-lg mx-auto">
+              <p className="text-sm text-text-secondary mb-4">
+                Sube una imagen clara de la persona que quieres usar como influencer virtual. La IA analizara sus rasgos faciales.
+              </p>
 
-          {/* Output Section */}
-          <div className="w-1/2 flex flex-col">
-            <label className="block text-sm font-medium text-text-secondary mb-2">
-              Imagenes generadas
-            </label>
-            <div className="flex-1 bg-surface-elevated rounded-xl overflow-hidden flex items-center justify-center">
-              {generatedImages.length > 0 ? (
-                <div className="grid grid-cols-2 gap-2 p-4 w-full h-full">
-                  {generatedImages.map((img, i) => (
-                    <img key={i} src={img} alt="" className="w-full h-full object-cover rounded-lg" />
-                  ))}
+              {imagePreview ? (
+                <div className="relative mb-4">
+                  <img src={imagePreview} alt="Preview" className="w-full max-h-[400px] object-contain rounded-xl bg-surface-elevated" />
+                  <button
+                    onClick={() => { setUploadedImage(null); setImagePreview(null) }}
+                    className="absolute top-3 right-3 p-2 bg-error/80 hover:bg-error rounded-lg"
+                  >
+                    <span className="text-white text-sm">X</span>
+                  </button>
                 </div>
               ) : (
-                <div className="text-center p-8">
-                  {isGenerating ? (
-                    <>
-                      <Loader2 className="w-12 h-12 text-accent mx-auto mb-3 animate-spin" />
-                      <p className="text-text-primary font-medium">Creando personaje...</p>
-                      <p className="text-sm text-text-secondary mt-1">Generando variaciones</p>
-                    </>
-                  ) : (
-                    <>
-                      <UserCircle className="w-12 h-12 text-text-secondary mx-auto mb-3" />
-                      <p className="text-text-secondary">Las imagenes del personaje apareceran aqui</p>
-                    </>
+                <label className="flex flex-col items-center justify-center h-64 border-2 border-dashed border-border hover:border-accent/50 rounded-xl cursor-pointer transition-colors mb-4">
+                  <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                  <UserCircle className="w-12 h-12 text-text-secondary mb-3" />
+                  <p className="text-text-primary font-medium">Subir imagen de referencia</p>
+                  <p className="text-xs text-text-secondary mt-1">Cara frontal, buena iluminacion, JPG/PNG</p>
+                </label>
+              )}
+
+              {error && (
+                <div className="p-3 bg-error/10 border border-error/20 rounded-xl mb-4">
+                  <p className="text-sm text-error">{error}</p>
+                </div>
+              )}
+
+              <button
+                onClick={handleAnalyze}
+                disabled={!uploadedImage || isAnalyzing}
+                className={cn(
+                  'w-full flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold transition-all',
+                  !uploadedImage || isAnalyzing
+                    ? 'bg-border text-text-secondary cursor-not-allowed'
+                    : 'bg-accent hover:bg-accent-hover text-background shadow-lg shadow-accent/25'
+                )}
+              >
+                {isAnalyzing ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Analizando rostro...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-5 h-5" />
+                    Analizar con IA
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+
+          {/* ANALYZE STEP */}
+          {step === 'analyze' && characterProfile && (
+            <div className="max-w-2xl mx-auto">
+              <div className="flex gap-6">
+                {imagePreview && (
+                  <div className="w-48 flex-shrink-0">
+                    <img src={imagePreview} alt="Reference" className="w-full aspect-square object-cover rounded-xl" />
+                  </div>
+                )}
+                <div className="flex-1 space-y-3">
+                  <h3 className="text-sm font-semibold text-text-primary uppercase tracking-wide">Character Profile</h3>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      ['Genero', characterProfile.gender],
+                      ['Edad', characterProfile.estimated_age],
+                      ['Piel', characterProfile.skin_tone],
+                      ['Cabello', `${characterProfile.hair_color} - ${characterProfile.hair_style}`],
+                      ['Ojos', characterProfile.eye_color],
+                      ['Rostro', characterProfile.face_shape],
+                      ['Contextura', characterProfile.build],
+                    ].map(([label, value]) => (
+                      <div key={label} className="p-2 bg-surface-elevated rounded-lg">
+                        <span className="text-[10px] text-text-muted uppercase">{label}</span>
+                        <p className="text-sm text-text-primary">{value || '-'}</p>
+                      </div>
+                    ))}
+                  </div>
+                  {characterProfile.distinctive_features?.length > 0 && (
+                    <div className="p-2 bg-surface-elevated rounded-lg">
+                      <span className="text-[10px] text-text-muted uppercase">Rasgos distintivos</span>
+                      <p className="text-sm text-text-primary">{characterProfile.distinctive_features.join(', ')}</p>
+                    </div>
+                  )}
+                  {characterProfile.prompt_descriptor && (
+                    <div className="p-3 bg-accent/5 border border-accent/20 rounded-lg">
+                      <span className="text-[10px] text-accent uppercase font-medium">Prompt Descriptor</span>
+                      <p className="text-sm text-text-primary mt-1">{characterProfile.prompt_descriptor}</p>
+                    </div>
                   )}
                 </div>
-              )}
-            </div>
-          </div>
-        </div>
+              </div>
 
-        {/* Actions */}
-        <div className="px-6 py-4 border-t border-border flex items-center justify-between">
-          <button
-            disabled={generatedImages.length === 0}
-            className={cn(
-              'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors',
-              generatedImages.length === 0 ? 'text-text-secondary cursor-not-allowed' : 'text-accent hover:bg-accent/10'
-            )}
-          >
-            Guardar personaje
-          </button>
-          <button
-            onClick={handleGenerate}
-            disabled={!characterName.trim() || isGenerating}
-            className={cn(
-              'flex items-center gap-2 px-6 py-2.5 rounded-xl font-semibold transition-all',
-              !characterName.trim() || isGenerating
-                ? 'bg-border text-text-secondary cursor-not-allowed'
-                : 'bg-accent hover:bg-accent-hover text-background'
-            )}
-          >
-            {isGenerating ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Generando...
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-4 h-4" />
-                Crear Personaje
-              </>
-            )}
-          </button>
+              <button
+                onClick={() => setStep('save')}
+                className="w-full mt-6 flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold bg-accent hover:bg-accent-hover text-background shadow-lg shadow-accent/25 transition-all"
+              >
+                Continuar a guardar
+              </button>
+            </div>
+          )}
+
+          {/* SAVE STEP */}
+          {step === 'save' && (
+            <div className="max-w-lg mx-auto">
+              <div className="flex gap-4 mb-6">
+                {imagePreview && (
+                  <img src={imagePreview} alt="Reference" className="w-24 h-24 object-cover rounded-xl" />
+                )}
+                <div className="flex-1 space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-text-secondary mb-1.5">Nombre del influencer *</label>
+                    <input
+                      value={characterName}
+                      onChange={(e) => setCharacterName(e.target.value)}
+                      placeholder="Ej: Sofia, Carlos, Maria..."
+                      className="w-full px-4 py-2.5 bg-surface-elevated border border-border rounded-xl text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/50 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-text-secondary mb-1.5">Descripcion (opcional)</label>
+                    <textarea
+                      value={characterDescription}
+                      onChange={(e) => setCharacterDescription(e.target.value)}
+                      placeholder="Ej: Influencer fitness para productos de salud..."
+                      rows={2}
+                      className="w-full px-4 py-2.5 bg-surface-elevated border border-border rounded-xl text-text-primary placeholder:text-text-muted resize-none focus:outline-none focus:ring-2 focus:ring-accent/50 text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {error && (
+                <div className="p-3 bg-error/10 border border-error/20 rounded-xl mb-4">
+                  <p className="text-sm text-error">{error}</p>
+                </div>
+              )}
+
+              <button
+                onClick={handleSave}
+                disabled={!characterName.trim() || isSaving}
+                className={cn(
+                  'w-full flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold transition-all',
+                  !characterName.trim() || isSaving
+                    ? 'bg-border text-text-secondary cursor-not-allowed'
+                    : 'bg-accent hover:bg-accent-hover text-background shadow-lg shadow-accent/25'
+                )}
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Guardando...
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-5 h-5" />
+                    Guardar Influencer
+                  </>
+                )}
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils/cn'
 import {
   Sparkles,
@@ -12,13 +12,19 @@ import {
   Zap,
   Heart,
   Shield,
+  FileText,
+  PenTool,
+  ExternalLink,
 } from 'lucide-react'
 
 interface CopyVariant {
   label: string
   headline: string
   sub_headline: string
+  description: string
   bullets: string[]
+  objections: string[]
+  guarantee: string
   cta_primary: string
   cta_whatsapp: string
   short_ad_copy: string
@@ -29,6 +35,15 @@ interface CopyResult {
   variants: CopyVariant[]
   analysis: string
 }
+
+interface LandingProduct {
+  id: string
+  name: string
+  description?: string
+  sections_count: number
+}
+
+type CopyMode = 'from_landing' | 'from_scratch'
 
 const TONES = [
   { id: 'urgente', label: 'Urgente', icon: Zap, color: 'text-red-400' },
@@ -46,12 +61,23 @@ const VARIANT_ICONS = [
 ]
 
 export function CopyOptimizer() {
+  // Mode
+  const [mode, setMode] = useState<CopyMode>('from_scratch')
+
+  // From Landing mode
+  const [landings, setLandings] = useState<LandingProduct[]>([])
+  const [selectedLandingId, setSelectedLandingId] = useState('')
+  const [isLoadingLandings, setIsLoadingLandings] = useState(false)
+
+  // From Scratch mode
   const [productName, setProductName] = useState('')
   const [price, setPrice] = useState('')
   const [currency, setCurrency] = useState('COP')
   const [currentText, setCurrentText] = useState('')
   const [problemSolved, setProblemSolved] = useState('')
   const [targetAudience, setTargetAudience] = useState('')
+
+  // Common
   const [tone, setTone] = useState('urgente')
   const [isGenerating, setIsGenerating] = useState(false)
   const [result, setResult] = useState<CopyResult | null>(null)
@@ -60,26 +86,58 @@ export function CopyOptimizer() {
   const [error, setError] = useState<string | null>(null)
   const [copiedField, setCopiedField] = useState<string | null>(null)
 
+  // Fetch user's landings when switching to from_landing mode
+  useEffect(() => {
+    if (mode === 'from_landing' && landings.length === 0) {
+      fetchLandings()
+    }
+  }, [mode])
+
+  const fetchLandings = async () => {
+    setIsLoadingLandings(true)
+    try {
+      const response = await fetch('/api/products')
+      const data = await response.json()
+      if (data.products) {
+        setLandings(data.products)
+      }
+    } catch (err) {
+      console.error('Error fetching landings:', err)
+    } finally {
+      setIsLoadingLandings(false)
+    }
+  }
+
   const handleGenerate = async () => {
-    if (!productName.trim()) return
+    if (mode === 'from_scratch' && !productName.trim()) return
+    if (mode === 'from_landing' && !selectedLandingId) return
 
     setIsGenerating(true)
     setError(null)
     setResult(null)
 
     try {
+      const body: any = { mode, tone }
+
+      if (mode === 'from_landing') {
+        body.product_id = selectedLandingId
+        if (price) body.price = parseFloat(price.replace(/[^0-9.]/g, ''))
+        if (currency) body.currency = currency
+        if (problemSolved) body.problem_solved = problemSolved
+        if (targetAudience) body.target_audience = targetAudience
+      } else {
+        body.product_name = productName
+        if (price) body.price = parseFloat(price.replace(/[^0-9.]/g, ''))
+        if (currency) body.currency = currency
+        if (currentText) body.current_text = currentText
+        if (problemSolved) body.problem_solved = problemSolved
+        if (targetAudience) body.target_audience = targetAudience
+      }
+
       const response = await fetch('/api/studio/copy-optimize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          product_name: productName,
-          price: price ? parseFloat(price.replace(/[^0-9.]/g, '')) : undefined,
-          currency,
-          current_text: currentText || undefined,
-          problem_solved: problemSolved || undefined,
-          target_audience: targetAudience || undefined,
-          tone,
-        }),
+        body: JSON.stringify(body),
       })
 
       const data = await response.json()
@@ -109,19 +167,32 @@ export function CopyOptimizer() {
 
   const copyAllVariant = async (variant: CopyVariant) => {
     const text = [
-      variant.headline,
-      variant.sub_headline,
+      `HEADLINE: ${variant.headline}`,
+      `SUB-HEADLINE: ${variant.sub_headline}`,
       '',
-      ...variant.bullets,
+      `DESCRIPCION:`,
+      variant.description,
       '',
-      `CTA: ${variant.cta_primary}`,
-      `WhatsApp: ${variant.cta_whatsapp}`,
+      'BENEFICIOS:',
+      ...variant.bullets.map(b => `- ${b}`),
       '',
-      `Ad Copy: ${variant.short_ad_copy}`,
-      `Ad Headline: ${variant.ad_headline}`,
+      'OBJECIONES:',
+      ...(variant.objections || []).map(o => `- ${o}`),
+      '',
+      `GARANTIA: ${variant.guarantee || ''}`,
+      '',
+      `CTA PRINCIPAL: ${variant.cta_primary}`,
+      `CTA WHATSAPP: ${variant.cta_whatsapp}`,
+      '',
+      `AD COPY: ${variant.short_ad_copy}`,
+      `AD HEADLINE: ${variant.ad_headline}`,
     ].join('\n')
     await copyToClipboard(text, 'all')
   }
+
+  const canGenerate = mode === 'from_landing'
+    ? !!selectedLandingId
+    : !!productName.trim()
 
   const CopyButton = ({ text, fieldId }: { text: string; fieldId: string }) => (
     <button
@@ -145,24 +216,92 @@ export function CopyOptimizer() {
           <div>
             <h3 className="text-lg font-semibold text-text-primary mb-1">Copy Optimizer</h3>
             <p className="text-xs text-text-secondary">
-              Describe tu producto y genera 3 variantes de copy optimizado para LATAM.
+              Genera 3 variantes de copy optimizado para LATAM e-commerce.
             </p>
           </div>
 
-          {/* Product Name */}
-          <div>
-            <label className="block text-sm font-medium text-text-secondary mb-1.5">
-              Nombre del producto *
-            </label>
-            <input
-              value={productName}
-              onChange={(e) => setProductName(e.target.value)}
-              placeholder="Ej: Glucómetro Digital Pro"
-              className="w-full px-4 py-2.5 bg-surface-elevated border border-border rounded-xl text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all"
-            />
+          {/* Mode Selector */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => setMode('from_landing')}
+              className={cn(
+                'flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all',
+                mode === 'from_landing'
+                  ? 'border-accent bg-accent/10 text-accent'
+                  : 'border-border bg-surface-elevated text-text-secondary hover:text-text-primary hover:border-accent/50'
+              )}
+            >
+              <FileText className="w-4 h-4" />
+              Desde Landing
+            </button>
+            <button
+              onClick={() => setMode('from_scratch')}
+              className={cn(
+                'flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all',
+                mode === 'from_scratch'
+                  ? 'border-accent bg-accent/10 text-accent'
+                  : 'border-border bg-surface-elevated text-text-secondary hover:text-text-primary hover:border-accent/50'
+              )}
+            >
+              <PenTool className="w-4 h-4" />
+              Desde Cero
+            </button>
           </div>
 
-          {/* Price + Currency */}
+          {/* FROM LANDING MODE */}
+          {mode === 'from_landing' && (
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-1.5">
+                Selecciona tu landing *
+              </label>
+              {isLoadingLandings ? (
+                <div className="flex items-center gap-2 px-4 py-3 bg-surface-elevated border border-border rounded-xl">
+                  <Loader2 className="w-4 h-4 animate-spin text-text-muted" />
+                  <span className="text-sm text-text-muted">Cargando landings...</span>
+                </div>
+              ) : landings.length === 0 ? (
+                <div className="px-4 py-3 bg-surface-elevated border border-border rounded-xl">
+                  <p className="text-sm text-text-muted">No tienes landings creadas aun.</p>
+                  <a
+                    href="/dashboard/landing"
+                    className="text-xs text-accent hover:underline mt-1 inline-flex items-center gap-1"
+                  >
+                    Crear landing <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+              ) : (
+                <select
+                  value={selectedLandingId}
+                  onChange={(e) => setSelectedLandingId(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-surface-elevated border border-border rounded-xl text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all"
+                >
+                  <option value="">Selecciona una landing...</option>
+                  {landings.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.name} ({l.sections_count} secciones)
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          )}
+
+          {/* FROM SCRATCH MODE — Product Name */}
+          {mode === 'from_scratch' && (
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-1.5">
+                Nombre del producto *
+              </label>
+              <input
+                value={productName}
+                onChange={(e) => setProductName(e.target.value)}
+                placeholder="Ej: Glucometro Digital Pro"
+                className="w-full px-4 py-2.5 bg-surface-elevated border border-border rounded-xl text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all"
+              />
+            </div>
+          )}
+
+          {/* Price + Currency (both modes) */}
           <div className="flex gap-3">
             <div className="flex-1">
               <label className="block text-sm font-medium text-text-secondary mb-1.5">
@@ -201,7 +340,7 @@ export function CopyOptimizer() {
             <input
               value={problemSolved}
               onChange={(e) => setProblemSolved(e.target.value)}
-              placeholder="Ej: Monitoreo fácil de azúcar en sangre sin dolor"
+              placeholder="Ej: Monitoreo facil de azucar en sangre"
               className="w-full px-4 py-2.5 bg-surface-elevated border border-border rounded-xl text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all"
             />
           </div>
@@ -209,7 +348,7 @@ export function CopyOptimizer() {
           {/* Target Audience */}
           <div>
             <label className="block text-sm font-medium text-text-secondary mb-1.5">
-              Público objetivo
+              Publico objetivo
             </label>
             <input
               value={targetAudience}
@@ -251,20 +390,22 @@ export function CopyOptimizer() {
             </div>
           </div>
 
-          {/* Current Text */}
-          <div>
-            <label className="block text-sm font-medium text-text-secondary mb-1.5">
-              Texto actual de la landing
-              <span className="text-text-muted ml-1">(opcional)</span>
-            </label>
-            <textarea
-              value={currentText}
-              onChange={(e) => setCurrentText(e.target.value)}
-              placeholder="Pega aquí el texto actual de tu landing para que la IA lo analice y mejore..."
-              rows={4}
-              className="w-full px-4 py-3 bg-surface-elevated border border-border rounded-xl text-text-primary placeholder:text-text-muted resize-none focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all"
-            />
-          </div>
+          {/* Current Text (from_scratch only) */}
+          {mode === 'from_scratch' && (
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-1.5">
+                Texto actual de la landing
+                <span className="text-text-muted ml-1">(opcional)</span>
+              </label>
+              <textarea
+                value={currentText}
+                onChange={(e) => setCurrentText(e.target.value)}
+                placeholder="Pega aqui el texto actual de tu landing para que la IA lo analice y mejore..."
+                rows={4}
+                className="w-full px-4 py-3 bg-surface-elevated border border-border rounded-xl text-text-primary placeholder:text-text-muted resize-none focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all"
+              />
+            </div>
+          )}
 
           {/* Error */}
           {error && (
@@ -276,10 +417,10 @@ export function CopyOptimizer() {
           {/* Generate Button */}
           <button
             onClick={handleGenerate}
-            disabled={isGenerating || !productName.trim()}
+            disabled={isGenerating || !canGenerate}
             className={cn(
               'w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-semibold transition-all duration-200',
-              isGenerating || !productName.trim()
+              isGenerating || !canGenerate
                 ? 'bg-border text-text-secondary cursor-not-allowed'
                 : 'bg-accent hover:bg-accent-hover text-background shadow-lg shadow-accent/25 hover:shadow-accent/40'
             )}
@@ -308,7 +449,7 @@ export function CopyOptimizer() {
                 <Sparkles className="w-8 h-8 text-text-secondary" />
               </div>
               <p className="text-text-secondary">
-                Tus variantes de copy optimizado aparecerán aquí
+                Tus variantes de copy optimizado apareceran aqui
               </p>
               <p className="text-xs text-text-muted mt-1">
                 3 enfoques: Urgencia, Historia, Autoridad
@@ -367,18 +508,61 @@ export function CopyOptimizer() {
                       <p className="text-sm text-text-secondary">{variant.sub_headline}</p>
                     </div>
 
+                    {/* Description */}
+                    {variant.description && (
+                      <div className="p-4 bg-surface-elevated rounded-xl border border-border">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs font-medium text-text-muted uppercase tracking-wider">Descripcion</span>
+                          <CopyButton text={variant.description} fieldId={`${vid}-desc`} />
+                        </div>
+                        <p className="text-sm text-text-secondary leading-relaxed">{variant.description}</p>
+                      </div>
+                    )}
+
                     {/* Bullets */}
                     <div className="p-4 bg-surface-elevated rounded-xl border border-border">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-medium text-text-muted uppercase tracking-wider">Bullets</span>
+                        <span className="text-xs font-medium text-text-muted uppercase tracking-wider">Beneficios</span>
                         <CopyButton text={variant.bullets.join('\n')} fieldId={`${vid}-bullets`} />
                       </div>
                       <ul className="space-y-1.5">
                         {variant.bullets.map((b, i) => (
-                          <li key={i} className="text-sm text-text-primary">{b}</li>
+                          <li key={i} className="text-sm text-text-primary flex items-start gap-2">
+                            <span className="text-accent mt-0.5">•</span>
+                            {b}
+                          </li>
                         ))}
                       </ul>
                     </div>
+
+                    {/* Objections */}
+                    {variant.objections && variant.objections.length > 0 && (
+                      <div className="p-4 bg-surface-elevated rounded-xl border border-border">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-medium text-text-muted uppercase tracking-wider">Objeciones resueltas</span>
+                          <CopyButton text={variant.objections.join('\n')} fieldId={`${vid}-objections`} />
+                        </div>
+                        <ul className="space-y-1.5">
+                          {variant.objections.map((o, i) => (
+                            <li key={i} className="text-sm text-text-secondary flex items-start gap-2">
+                              <Shield className="w-3.5 h-3.5 text-blue-400 mt-0.5 flex-shrink-0" />
+                              {o}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Guarantee */}
+                    {variant.guarantee && (
+                      <div className="p-4 bg-surface-elevated rounded-xl border border-border">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs font-medium text-text-muted uppercase tracking-wider">Garantia</span>
+                          <CopyButton text={variant.guarantee} fieldId={`${vid}-guarantee`} />
+                        </div>
+                        <p className="text-sm text-green-400 font-medium">{variant.guarantee}</p>
+                      </div>
+                    )}
 
                     {/* CTAs */}
                     <div className="grid grid-cols-2 gap-3">
@@ -446,7 +630,7 @@ export function CopyOptimizer() {
                     onClick={() => setShowAnalysis(!showAnalysis)}
                     className="w-full flex items-center justify-between p-4 hover:bg-surface-elevated/50 transition-colors"
                   >
-                    <span className="text-sm font-medium text-text-secondary">Análisis del texto original</span>
+                    <span className="text-sm font-medium text-text-secondary">Analisis</span>
                     {showAnalysis ? (
                       <ChevronUp className="w-4 h-4 text-text-muted" />
                     ) : (

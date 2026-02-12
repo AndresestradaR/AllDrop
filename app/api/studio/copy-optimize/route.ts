@@ -48,17 +48,20 @@ Responde SOLO en JSON válido con esta estructura exacta:
 {
   "variants": [
     {
-      "label": "string",
+      "label": "string (nombre del enfoque)",
       "headline": "string",
       "sub_headline": "string",
-      "bullets": ["string"],
+      "description": "string (párrafo de 2-3 oraciones describiendo el producto y su beneficio principal)",
+      "bullets": ["string (5-7 bullets de beneficios)"],
+      "objections": ["string (3-4 respuestas a objeciones comunes)"],
+      "guarantee": "string (texto de garantía de satisfacción)",
       "cta_primary": "string",
       "cta_whatsapp": "string",
       "short_ad_copy": "string (max 125 chars para ads)",
       "ad_headline": "string (max 40 chars)"
     }
   ],
-  "analysis": "string (análisis breve del texto original si fue proporcionado)"
+  "analysis": "string (análisis breve del producto/texto original)"
 }`
 
 export async function POST(request: Request) {
@@ -72,6 +75,8 @@ export async function POST(request: Request) {
 
     const body = await request.json()
     const {
+      mode = 'from_scratch',
+      product_id,
       product_name,
       price,
       currency = 'COP',
@@ -80,20 +85,15 @@ export async function POST(request: Request) {
       target_audience,
       tone = 'urgente',
     } = body as {
-      product_name: string
+      mode?: 'from_landing' | 'from_scratch'
+      product_id?: string
+      product_name?: string
       price?: number
       currency?: string
       current_text?: string
       problem_solved?: string
       target_audience?: string
       tone?: string
-    }
-
-    if (!product_name) {
-      return NextResponse.json(
-        { error: 'El nombre del producto es requerido' },
-        { status: 400 }
-      )
     }
 
     // Get user's Google API key
@@ -109,6 +109,61 @@ export async function POST(request: Request) {
       }, { status: 400 })
     }
 
+    let resolvedProductName = product_name
+    let resolvedDescription = ''
+
+    // For from_landing mode, fetch product info
+    if (mode === 'from_landing') {
+      if (!product_id) {
+        return NextResponse.json(
+          { error: 'Selecciona una landing' },
+          { status: 400 }
+        )
+      }
+
+      const { data: product, error: productError } = await supabase
+        .from('products')
+        .select('name, description')
+        .eq('id', product_id)
+        .eq('user_id', user.id)
+        .single()
+
+      if (productError || !product) {
+        return NextResponse.json(
+          { error: 'Landing no encontrada' },
+          { status: 404 }
+        )
+      }
+
+      resolvedProductName = product.name
+      resolvedDescription = product.description || ''
+
+      // Get template categories used for this product
+      const { data: sections } = await supabase
+        .from('landing_sections')
+        .select('template:templates(category, name)')
+        .eq('product_id', product_id)
+        .eq('user_id', user.id)
+
+      if (sections && sections.length > 0) {
+        const categories = sections
+          .map((s: any) => s.template?.category)
+          .filter(Boolean)
+          .filter((v: string, i: number, a: string[]) => a.indexOf(v) === i)
+
+        if (categories.length > 0) {
+          resolvedDescription += `\nSecciones de la landing actual: ${categories.join(', ')}`
+        }
+      }
+    } else {
+      if (!resolvedProductName) {
+        return NextResponse.json(
+          { error: 'El nombre del producto es requerido' },
+          { status: 400 }
+        )
+      }
+    }
+
     const apiKey = decrypt(profile.google_api_key)
     const genAI = new GoogleGenerativeAI(apiKey)
     const model = genAI.getGenerativeModel({
@@ -122,17 +177,22 @@ export async function POST(request: Request) {
 
     // Build the user prompt
     const parts: string[] = [
-      `Producto: ${product_name}`,
+      `Producto: ${resolvedProductName}`,
     ]
+    if (resolvedDescription) parts.push(`Descripción: ${resolvedDescription}`)
     if (price) parts.push(`Precio: ${new Intl.NumberFormat('es-CO', { style: 'decimal', maximumFractionDigits: 0 }).format(price)} ${currency}`)
     if (target_audience) parts.push(`Público objetivo: ${target_audience}`)
     if (problem_solved) parts.push(`Problema que resuelve: ${problem_solved}`)
     if (tone) parts.push(`Tono deseado: ${tone}`)
     if (current_text) parts.push(`\nTexto actual de la landing:\n"""${current_text}"""`)
 
+    if (mode === 'from_landing') {
+      parts.push('\nGenera copy optimizado para todas las secciones de esta landing de producto e-commerce.')
+    }
+
     const userPrompt = parts.join('\n')
 
-    console.log(`[CopyOptimizer] User: ${user.id.substring(0, 8)}..., Product: ${product_name}`)
+    console.log(`[CopyOptimizer] User: ${user.id.substring(0, 8)}..., Mode: ${mode}, Product: ${resolvedProductName}`)
 
     const result = await model.generateContent(userPrompt)
     const responseText = result.response.text()

@@ -20,8 +20,12 @@ import {
   Pause,
   Check,
   Hash,
+  Video,
+  MessageSquare,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { PromptGenerator } from './PromptGenerator'
+import { PromptBotGenerator } from './PromptBotGenerator'
 
 // Lip Sync Models
 type LipSyncModel = 'kling' | 'infinitalk'
@@ -96,6 +100,20 @@ const TOOLS: Tool[] = [
     color: 'from-rose-500 to-pink-500',
     requiresAudio: true,
     outputsVideo: true,
+  },
+  {
+    id: 'prompt-video',
+    name: 'Prompt Video',
+    description: 'Genera prompts cinematicos para video IA',
+    icon: Video,
+    color: 'from-violet-500 to-purple-500',
+  },
+  {
+    id: 'prompt-bot',
+    name: 'Prompt Bot',
+    description: 'Genera system prompts para bots de ventas',
+    icon: MessageSquare,
+    color: 'from-green-500 to-emerald-500',
   },
 ]
 
@@ -300,6 +318,15 @@ export function ToolsGrid() {
 
   const generateNewSeed = () => {
     setInfinitalkSeed(Math.floor(Math.random() * (1000000 - 10000 + 1)) + 10000)
+  }
+
+  // Prompt Generator tools (separate full-screen components)
+  if (activeTool === 'prompt-video') {
+    return <PromptGenerator onBack={() => { setActiveTool(null); resetTool() }} />
+  }
+
+  if (activeTool === 'prompt-bot') {
+    return <PromptBotGenerator onBack={() => { setActiveTool(null); resetTool() }} />
   }
 
   // Tool interface view
