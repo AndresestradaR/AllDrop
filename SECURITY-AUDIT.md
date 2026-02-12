@@ -48,4 +48,13 @@
 
 ## 2.5 Security Headers & CORS
 
-_Pending — see next commit._
+### Status: IMPLEMENTED
+
+**Security headers (via Next.js middleware):**
+- X-Content-Type-Options: nosniff
+- X-Frame-Options: DENY
+- X-XSS-Protection: 1; mode=block
+- Referrer-Policy: strict-origin-when-cross-origin
+- Permissions-Policy: camera=(), microphone=(), geolocation=()
+
+**Middleware matcher expanded** to cover all routes (not just auth pages).
