@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { Button, Card, CardHeader, CardTitle, CardContent } from '@/components/ui'
-import { ImagePlus, Zap, Clock, Images } from 'lucide-react'
+import { ImagePlus, Zap, Clock, Images, Store, ArrowRight } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
@@ -105,6 +105,29 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* DropPage Card */}
+      <Card>
+        <CardContent className="flex items-center gap-4 pt-6">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-teal-500/10">
+            <Store className="h-6 w-6 text-teal-500" />
+          </div>
+          <div className="flex-1">
+            <h3 className="font-semibold text-text-primary">DropPage</h3>
+            <p className="text-sm text-text-secondary">Crea tu tienda online en minutos</p>
+          </div>
+          <Link
+            href="https://estrategasia.com/constructor/"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <Button variant="secondary">
+              Ir al constructor
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </Link>
+        </CardContent>
+      </Card>
 
       {/* Recent generations */}
       <Card>

@@ -114,18 +114,21 @@ export async function generateImage(
     }
   } catch (error: any) {
     console.error('Image generation failed:', error)
-    
-    // Check for specific error types
-    if (error.message?.includes('not found') || error.message?.includes('404')) {
-      return {
-        success: false,
-        error: 'Modelo de imagen no disponible. Verifica que tu API key tenga acceso a Imagen 3.'
-      }
+    const msg = error.message || ''
+
+    if (msg.includes('API_KEY_INVALID') || msg.includes('invalid API key')) {
+      return { success: false, error: 'API key invalida. Copiala de nuevo desde console.cloud.google.com → Credentials → API Keys' }
     }
-    
-    return { 
-      success: false, 
-      error: error.message || 'Error generating image' 
+    if (msg.includes('not found') || msg.includes('404')) {
+      return { success: false, error: 'Modelo de imagen no disponible. Selecciona otro modelo en Settings.' }
     }
+    if (msg.includes('SAFETY') || msg.includes('blocked')) {
+      return { success: false, error: 'Contenido bloqueado por filtros de seguridad. Modifica tu prompt o plantilla.' }
+    }
+    if (msg.includes('quota') || msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED')) {
+      return { success: false, error: 'Limite de API alcanzado. Espera unos minutos o revisa tu cuota en console.cloud.google.com' }
+    }
+
+    return { success: false, error: `Error de generacion: ${msg.substring(0, 300)}` }
   }
 }

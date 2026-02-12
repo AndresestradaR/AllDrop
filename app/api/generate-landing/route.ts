@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import sharp from 'sharp'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { decrypt } from '@/lib/services/encryption'
 import {
@@ -7,6 +8,23 @@ import {
   ImageProviderType,
   GenerateImageRequest,
 } from '@/lib/image-providers'
+
+async function optimizeImage(
+  buffer: Buffer,
+  mimeType: string
+): Promise<{ buffer: Buffer; mimeType: string }> {
+  try {
+    const optimized = await sharp(buffer)
+      .resize({ width: 1200, withoutEnlargement: true })
+      .webp({ quality: 85 })
+      .toBuffer()
+    console.log(`[Optimize] ${buffer.length} -> ${optimized.length} bytes (WebP)`)
+    return { buffer: optimized, mimeType: 'image/webp' }
+  } catch (e) {
+    console.error('[Optimize] Failed, using original:', e)
+    return { buffer, mimeType }
+  }
+}
 
 function getAspectRatio(outputSize: string): '9:16' | '1:1' | '16:9' | '4:5' {
   if (outputSize === '1080x1920' || outputSize === '9:16') return '9:16'
@@ -33,19 +51,21 @@ async function uploadToStorage(
   index: number
 ): Promise<string | null> {
   try {
-    const ext = mimeType.split('/')[1] || 'png'
+    // Convert base64 to buffer and optimize
+    const rawBuffer = Buffer.from(base64Data, 'base64')
+    const optimized = await optimizeImage(rawBuffer, mimeType)
+    const uploadBuffer = optimized.buffer
+    const uploadMimeType = optimized.mimeType
+    const ext = uploadMimeType.split('/')[1] || 'png'
     const fileName = `temp-products/${userId}/${Date.now()}-${index}.${ext}`
-    
-    // Convert base64 to buffer
-    const buffer = Buffer.from(base64Data, 'base64')
-    
-    console.log(`[Storage] Uploading to landing-images bucket: ${fileName} (${buffer.length} bytes)`)
-    
+
+    console.log(`[Storage] Uploading to landing-images bucket: ${fileName} (${uploadBuffer.length} bytes)`)
+
     // Upload to 'landing-images' bucket (has INSERT policy for authenticated)
     const { data, error } = await supabase.storage
       .from('landing-images')
-      .upload(fileName, buffer, {
-        contentType: mimeType,
+      .upload(fileName, uploadBuffer, {
+        contentType: uploadMimeType,
         upsert: true,
       })
     
@@ -357,10 +377,10 @@ export async function POST(request: Request) {
 
 function getProviderTip(provider: ImageProviderType): string {
   const tips: Record<ImageProviderType, string> = {
-    gemini: 'Verifica tu API key y facturación de Google Cloud. El modelo gemini-2.5-flash-image requiere billing activo.',
-    openai: 'Verifica tu API key de OpenAI y que tengas créditos disponibles.',
-    seedream: 'Verifica tu API key de KIE.ai y que tengas créditos disponibles.',
-    flux: 'Verifica tu API key de Black Forest Labs y que tengas créditos disponibles.',
+    gemini: 'Para usar Gemini necesitas:\n1. API key de Google AI (console.cloud.google.com → Credentials)\n2. Facturacion activa (console.cloud.google.com/billing)\n3. Generative Language API habilitada\n\nSi acabas de activar billing, espera 2 minutos antes de reintentar.',
+    openai: 'Para usar OpenAI necesitas:\n1. API key de OpenAI (platform.openai.com → API Keys)\n2. Creditos disponibles (platform.openai.com/account/billing)',
+    seedream: 'Para usar Seedream necesitas:\n1. API key de KIE.ai\n2. Creditos disponibles en tu cuenta KIE',
+    flux: 'Para usar FLUX necesitas:\n1. API key de Black Forest Labs\n2. Creditos disponibles',
   }
   return tips[provider]
 }

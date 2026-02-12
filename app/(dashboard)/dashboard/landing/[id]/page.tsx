@@ -387,15 +387,70 @@ export default function ProductGeneratePage() {
 
   const handleDownload = async (imageUrl: string, quality: '2k' | 'optimized') => {
     try {
+      toast.loading('Preparando descarga...', { id: 'download' })
+
+      // Fetch image as blob to bypass cross-origin download restriction
+      const response = await fetch(imageUrl)
+      if (!response.ok) throw new Error('No se pudo obtener la imagen')
+      const blob = await response.blob()
+
+      let downloadBlob = blob
+      let extension = 'png'
+
+      if (quality === 'optimized') {
+        // Compress using canvas: resize to max 1080px width, convert to JPEG quality 0.82
+        try {
+          const imageBitmap = await createImageBitmap(blob)
+          const MAX_WIDTH = 1080
+          let width = imageBitmap.width
+          let height = imageBitmap.height
+
+          if (width > MAX_WIDTH) {
+            height = Math.round((height * MAX_WIDTH) / width)
+            width = MAX_WIDTH
+          }
+
+          const canvas = document.createElement('canvas')
+          canvas.width = width
+          canvas.height = height
+          const ctx = canvas.getContext('2d')!
+          ctx.drawImage(imageBitmap, 0, 0, width, height)
+
+          downloadBlob = await new Promise<Blob>((resolve) => {
+            canvas.toBlob(
+              (b) => resolve(b || blob),
+              'image/jpeg',
+              0.82
+            )
+          })
+          extension = 'jpg'
+        } catch {
+          // If canvas fails, download original
+          downloadBlob = blob
+        }
+      }
+
+      // Create object URL and trigger download
+      const url = URL.createObjectURL(downloadBlob)
       const link = document.createElement('a')
-      link.href = imageUrl
-      link.download = `${product?.name}-${quality === '2k' ? '2K' : 'optimized'}-${Date.now()}.png`
+      link.href = url
+      const safeName = (product?.name || 'banner').replace(/[^a-zA-Z0-9_-]/g, '_')
+      link.download = `${safeName}-${quality === '2k' ? '2K' : 'optimizado'}-${Date.now()}.${extension}`
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
-      toast.success(`Descargando en calidad ${quality === '2k' ? '2K' : 'optimizada'}`)
+      URL.revokeObjectURL(url)
+
+      const sizeMB = (downloadBlob.size / 1024 / 1024).toFixed(1)
+      toast.success(
+        quality === '2k'
+          ? `Descargado en calidad original (${sizeMB} MB)`
+          : `Descargado optimizado (${sizeMB} MB)`,
+        { id: 'download' }
+      )
     } catch (error) {
-      toast.error('Error al descargar')
+      console.error('Download error:', error)
+      toast.error('Error al descargar. Intenta de nuevo.', { id: 'download' })
     }
   }
 
@@ -1010,6 +1065,7 @@ export default function ProductGeneratePage() {
                             src={section.generated_image_url}
                             alt="Seccion generada"
                             className="w-full h-full object-cover"
+                            loading="lazy"
                           />
                         </div>
                         {/* Selection badge — always visible */}
@@ -1143,6 +1199,7 @@ export default function ProductGeneratePage() {
                         src={template.image_url}
                         alt={template.name}
                         className="w-full h-full object-cover"
+                        loading="lazy"
                       />
                       {selectedInGallery?.id === template.id && (
                         <div className="absolute top-2 right-2 w-6 h-6 bg-accent rounded-full flex items-center justify-center">
@@ -1308,7 +1365,7 @@ export default function ProductGeneratePage() {
                   <p className="text-sm font-semibold text-text-primary">
                     {selectedForExport.size} {selectedForExport.size === 1 ? 'seccion seleccionada' : 'secciones seleccionadas'}
                   </p>
-                  <p className="text-xs text-text-secondary">Se enviaran a tu editor MiniShop</p>
+                  <p className="text-xs text-text-secondary">Se enviaran a tu editor DropPage</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">

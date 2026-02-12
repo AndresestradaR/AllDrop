@@ -31,6 +31,9 @@ export default function RootLayout({
               color: '#FFFFFF',
               border: '1px solid #262626',
               fontFamily: 'Plus Jakarta Sans, system-ui, sans-serif',
+              whiteSpace: 'pre-line' as const,
+              maxWidth: '420px',
+              lineHeight: '1.5',
             },
             success: {
               iconTheme: {

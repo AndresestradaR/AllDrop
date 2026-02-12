@@ -1,148 +1,131 @@
 import Link from 'next/link'
-import { Button } from '@/components/ui'
-import { Sparkles, Zap, Shield, ArrowRight, Users } from 'lucide-react'
+import { Sparkles, ArrowRight, Store, Image as ImageIcon, Wrench } from 'lucide-react'
+import { GradientDots } from '@/components/ui/gradient-dots'
+
+const TOOLS = [
+  {
+    title: 'Generador de Banners',
+    description: 'Crea imagenes de producto profesionales con IA. Plantillas optimizadas para landing pages de dropshipping.',
+    icon: ImageIcon,
+    href: '/dashboard',
+    cta: 'Crear banners',
+    accent: '#10B981',
+  },
+  {
+    title: 'DropPage',
+    description: 'Construye tu tienda online y landing pages de venta con el editor visual. Checkout de contraentrega listo.',
+    icon: Store,
+    href: 'https://estrategasia.com/constructor/',
+    cta: 'Ir al constructor',
+    accent: '#4DBEA4',
+    external: true,
+  },
+  {
+    title: 'Mas herramientas',
+    description: 'Investigacion de productos, estudio creativo, asistentes de voz y mas. Todo en un solo lugar.',
+    icon: Wrench,
+    href: '/dashboard',
+    cta: 'Explorar',
+    accent: '#6366F1',
+  },
+]
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen bg-background">
-      {/* Navbar */}
-      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
+    <div className="relative min-h-screen overflow-hidden" style={{ backgroundColor: '#0a0a0a' }}>
+      {/* Animated background */}
+      <GradientDots duration={20} backgroundColor="#0a0a0a" className="pointer-events-none opacity-40" />
+
+      {/* Content */}
+      <div className="relative z-10">
+        {/* Navbar */}
+        <nav className="border-b border-white/5 backdrop-blur-md">
+          <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center">
-                <Sparkles className="w-5 h-5 text-background" />
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500">
+                <Sparkles className="h-5 w-5 text-white" />
               </div>
-              <span className="text-xl font-bold text-text-primary">Estrategas IA</span>
+              <span className="text-xl font-bold text-white">Estrategas IA</span>
             </div>
-            <Link href="/login">
-              <Button>Acceder</Button>
+            <Link
+              href="/login"
+              className="rounded-lg bg-white/10 px-5 py-2 text-sm font-medium text-white backdrop-blur transition-colors hover:bg-white/20"
+            >
+              Acceder
             </Link>
           </div>
-        </div>
-      </nav>
+        </nav>
 
-      {/* Hero */}
-      <section className="pt-32 pb-20 px-4">
-        <div className="max-w-7xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-surface border border-border mb-8">
-            <Users className="w-4 h-4 text-accent" />
-            <span className="text-sm text-text-secondary">Exclusivo para miembros Trucos Ecomm</span>
-          </div>
-          
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-text-primary mb-6 leading-tight">
-            Genera imágenes de producto
-            <br />
-            <span className="text-accent">profesionales con IA</span>
-          </h1>
-          
-          <p className="text-lg sm:text-xl text-text-secondary max-w-2xl mx-auto mb-10">
-            Crea imágenes verticales optimizadas para tus landings de dropshipping. 
-            Usa tus propias API keys y controla tus costos.
-          </p>
-          
-          <Link href="/login">
-            <Button size="lg">
-              Acceder con mi correo
-              <ArrowRight className="ml-2 w-5 h-5" />
-            </Button>
-          </Link>
-          
-          <p className="text-sm text-text-secondary mt-4">
-            Recibirás un código de acceso en tu correo
-          </p>
-        </div>
-      </section>
+        {/* Hero */}
+        <section className="px-4 pb-12 pt-24 text-center sm:pt-32">
+          <div className="mx-auto max-w-3xl">
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 backdrop-blur">
+              <Sparkles className="h-4 w-4 text-emerald-400" />
+              <span className="text-sm text-gray-300">Herramientas de IA para tu negocio de e-commerce</span>
+            </div>
 
-      {/* Features */}
-      <section className="py-20 px-4 border-t border-border">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold text-text-primary mb-4">
-              Todo lo que necesitas para crear landings que convierten
-            </h2>
-            <p className="text-text-secondary max-w-2xl mx-auto">
-              Herramientas profesionales sin complicaciones
+            <h1 className="mb-6 text-4xl font-bold leading-tight text-white sm:text-5xl lg:text-6xl">
+              Todo lo que necesitas
+              <br />
+              <span className="bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">
+                para vender online
+              </span>
+            </h1>
+
+            <p className="mx-auto mb-10 max-w-xl text-lg text-gray-400">
+              Genera banners con IA, construye tu tienda y gestiona pedidos.
+              El ecosistema completo para dropshipping en LATAM.
             </p>
+
+            <Link
+              href="/login"
+              className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-8 py-3.5 text-base font-semibold text-white transition-all hover:bg-emerald-400 hover:shadow-lg hover:shadow-emerald-500/25"
+            >
+              Empezar gratis
+              <ArrowRight className="h-5 w-5" />
+            </Link>
           </div>
-          
-          <div className="grid md:grid-cols-3 gap-8">
-            {/* Feature 1 */}
-            <div className="p-6 rounded-xl bg-surface border border-border hover:border-accent/50 transition-colors">
-              <div className="w-12 h-12 bg-accent/10 rounded-lg flex items-center justify-center mb-4">
-                <Sparkles className="w-6 h-6 text-accent" />
-              </div>
-              <h3 className="text-xl font-semibold text-text-primary mb-2">
-                IA de Última Generación
-              </h3>
-              <p className="text-text-secondary">
-                Gemini mejora tus prompts automáticamente. Nano Banana genera imágenes 
-                profesionales en formato 9:16.
-              </p>
-            </div>
+        </section>
 
-            {/* Feature 2 */}
-            <div className="p-6 rounded-xl bg-surface border border-border hover:border-accent/50 transition-colors">
-              <div className="w-12 h-12 bg-accent/10 rounded-lg flex items-center justify-center mb-4">
-                <Zap className="w-6 h-6 text-accent" />
-              </div>
-              <h3 className="text-xl font-semibold text-text-primary mb-2">
-                Modelo BYOK
-              </h3>
-              <p className="text-text-secondary">
-                Usa tus propias API keys. Tú controlas los costos, nosotros te damos 
-                el motor inteligente.
-              </p>
-            </div>
-
-            {/* Feature 3 */}
-            <div className="p-6 rounded-xl bg-surface border border-border hover:border-accent/50 transition-colors">
-              <div className="w-12 h-12 bg-accent/10 rounded-lg flex items-center justify-center mb-4">
-                <Shield className="w-6 h-6 text-accent" />
-              </div>
-              <h3 className="text-xl font-semibold text-text-primary mb-2">
-                Seguridad Total
-              </h3>
-              <p className="text-text-secondary">
-                Tus API keys están encriptadas con AES-256. Solo tú tienes acceso 
-                a tus generaciones.
-              </p>
-            </div>
+        {/* Tool Cards */}
+        <section className="px-4 pb-24 pt-8">
+          <div className="mx-auto grid max-w-5xl gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {TOOLS.map((tool) => (
+              <Link
+                key={tool.title}
+                href={tool.href}
+                {...(tool.external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+                className="group rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur transition-all hover:border-white/20 hover:bg-white/[0.08]"
+              >
+                <div
+                  className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl"
+                  style={{ backgroundColor: `${tool.accent}20` }}
+                >
+                  <tool.icon className="h-6 w-6" style={{ color: tool.accent }} />
+                </div>
+                <h3 className="mb-2 text-lg font-semibold text-white">{tool.title}</h3>
+                <p className="mb-4 text-sm leading-relaxed text-gray-400">{tool.description}</p>
+                <span
+                  className="inline-flex items-center gap-1 text-sm font-medium transition-transform group-hover:translate-x-1"
+                  style={{ color: tool.accent }}
+                >
+                  {tool.cta}
+                  <ArrowRight className="h-4 w-4" />
+                </span>
+              </Link>
+            ))}
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* CTA */}
-      <section className="py-20 px-4 border-t border-border">
-        <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-3xl font-bold text-text-primary mb-4">
-            ¿Eres miembro de Trucos Ecomm?
-          </h2>
-          <p className="text-text-secondary mb-8">
-            Accede con el correo registrado en la comunidad y comienza a generar
-          </p>
-          <Link href="/login">
-            <Button size="lg">
-              Acceder ahora
-              <ArrowRight className="ml-2 w-5 h-5" />
-            </Button>
-          </Link>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="py-8 px-4 border-t border-border">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 bg-accent rounded flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-background" />
-            </div>
-            <span className="text-sm text-text-secondary">
-              © 2024 Estrategas IA. Herramienta exclusiva de Trucos Ecomm.
+        {/* Footer */}
+        <footer className="border-t border-white/5 py-8">
+          <div className="mx-auto flex max-w-7xl items-center justify-center px-4">
+            <span className="text-sm text-gray-500">
+              © 2025 Estrategas IA — Herramientas de Trucos Ecomm & Drop
             </span>
           </div>
-        </div>
-      </footer>
+        </footer>
+      </div>
     </div>
   )
 }

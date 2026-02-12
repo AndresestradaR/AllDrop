@@ -225,17 +225,60 @@ async function generateWithGemini(
     const errorText = await response.text()
     console.error(`[Gemini] API error: ${response.status} - ${errorText}`)
     
+    // === ERRORES DETALLADOS Y ACCIONABLES ===
+    const errorLower = errorText.toLowerCase()
+
+    // --- 429: Rate Limit / Cuota ---
     if (response.status === 429) {
-      throw new Error('Limite de API excedido. Espera un momento e intenta de nuevo.')
+      if (errorLower.includes('resource_exhausted') || errorLower.includes('quota')) {
+        throw new Error('Limite diario de tu API de Google alcanzado. Opciones:\n1. Espera 24 horas para que se renueve\n2. Ve a console.cloud.google.com → APIs → Gemini API → Quotas para aumentar tu limite\n3. Prueba con otro modelo (OpenAI, Seedream)')
+      }
+      throw new Error('Demasiadas solicitudes seguidas. Espera 30 segundos e intenta de nuevo.')
     }
-    if (response.status === 400 && errorText.includes('SAFETY')) {
-      throw new Error('La imagen fue bloqueada por filtros de seguridad. Modifica el prompt.')
+
+    // --- 400: Bad Request ---
+    if (response.status === 400) {
+      if (errorLower.includes('safety') || errorLower.includes('block_reason')) {
+        throw new Error('Imagen bloqueada por filtros de seguridad de Google. Intenta:\n1. Cambiar la plantilla por una menos provocativa\n2. Modificar el texto/descripcion del producto\n3. Quitar instrucciones sobre personas en el prompt')
+      }
+      if (errorLower.includes('invalid') && (errorLower.includes('image') || errorLower.includes('mime'))) {
+        throw new Error('Formato de imagen no soportado. Google acepta: JPG, PNG, WebP y GIF.\nSi tu imagen es BMP, TIFF o SVG, conviertela a JPG antes de subir.')
+      }
+      if (errorLower.includes('size') || errorLower.includes('too large') || errorLower.includes('payload')) {
+        throw new Error('Imagen demasiado grande. El limite es 20MB por imagen.\nComprime tus fotos antes de subir (usa tinypng.com o similar).')
+      }
+      if (errorLower.includes('invalid_argument') || errorLower.includes('bad request')) {
+        throw new Error('Error en los datos enviados a Google. Intenta:\n1. Subir la foto del producto de nuevo\n2. Seleccionar otra plantilla\n3. Si persiste, cambia de modelo en la configuracion')
+      }
+      throw new Error(`Error de solicitud (400): ${errorText.substring(0, 200)}`)
     }
+
+    // --- 403: Permission / Billing ---
     if (response.status === 403) {
-      throw new Error('API key invalida o sin permisos para generacion de imagenes.')
+      if (errorLower.includes('billing') || errorLower.includes('payment') || errorLower.includes('account_billing')) {
+        throw new Error('Tu cuenta de Google Cloud NO tiene facturacion activa. Para generar imagenes:\n1. Ve a console.cloud.google.com/billing\n2. Click en "Establecer cuenta" o "Link a billing account"\n3. Agrega un metodo de pago\n4. Vuelve a intentar (el cambio aplica en 1-2 minutos)')
+      }
+      if (errorLower.includes('permission_denied') || errorLower.includes('forbidden')) {
+        throw new Error('Tu API key no tiene permisos para generacion de imagenes. Verifica:\n1. Que habilitaste la "Generative Language API" en console.cloud.google.com → APIs\n2. Que la API key no tiene restricciones de IP/referrer que bloqueen\n3. Que la facturacion este activa (requerida para Imagen 3)')
+      }
+      if (errorLower.includes('api_key')) {
+        throw new Error('API key invalida. Ve a Settings y verifica que copiaste la key correctamente desde console.cloud.google.com → Credentials')
+      }
+      throw new Error('Acceso denegado (403). Verifica tu API key y facturacion en console.cloud.google.com')
     }
-    
-    throw new Error(`Error de Gemini: ${response.status}`)
+
+    // --- 404: Model Not Found ---
+    if (response.status === 404) {
+      throw new Error(`Modelo "${apiModelId}" no disponible. Puede que Google lo haya cambiado de nombre o retirado.\nVe a Settings y selecciona otro modelo de la lista.`)
+    }
+
+    // --- 500/503: Server Error ---
+    if (response.status >= 500) {
+      throw new Error('Error temporal en los servidores de Google. Esto NO es tu culpa.\nEspera 2-3 minutos e intenta de nuevo. Si persiste, prueba con otro modelo.')
+    }
+
+    // --- Default ---
+    throw new Error(`Error inesperado de Google (codigo ${response.status}). Detalles: ${errorText.substring(0, 300)}\n\nSi este error persiste, copia este mensaje y envialo a soporte.`)
   }
 
   const data = await response.json()
@@ -322,7 +365,33 @@ async function generateWithImagen(
   if (!response.ok) {
     const errorText = await response.text()
     console.error(`[Imagen] API error: ${response.status} - ${errorText}`)
-    throw new Error(`Imagen API error: ${response.status} - ${errorText}`)
+    const errorLower = errorText.toLowerCase()
+
+    if (response.status === 429) {
+      if (errorLower.includes('resource_exhausted') || errorLower.includes('quota')) {
+        throw new Error('Limite diario de tu API de Google alcanzado. Opciones:\n1. Espera 24 horas para que se renueve\n2. Ve a console.cloud.google.com → APIs → Quotas para aumentar tu limite\n3. Prueba con otro modelo (OpenAI, Seedream)')
+      }
+      throw new Error('Demasiadas solicitudes seguidas. Espera 30 segundos e intenta de nuevo.')
+    }
+    if (response.status === 400) {
+      if (errorLower.includes('safety') || errorLower.includes('block_reason')) {
+        throw new Error('Imagen bloqueada por filtros de seguridad de Google. Intenta:\n1. Cambiar la plantilla por una menos provocativa\n2. Modificar el texto/descripcion del producto')
+      }
+      throw new Error(`Error de solicitud (400): ${errorText.substring(0, 200)}`)
+    }
+    if (response.status === 403) {
+      if (errorLower.includes('billing') || errorLower.includes('payment')) {
+        throw new Error('Tu cuenta de Google Cloud NO tiene facturacion activa.\nVe a console.cloud.google.com/billing para activarla.')
+      }
+      throw new Error('Acceso denegado (403). Verifica tu API key y facturacion en console.cloud.google.com')
+    }
+    if (response.status === 404) {
+      throw new Error(`Modelo "${apiModelId}" no disponible. Ve a Settings y selecciona otro modelo.`)
+    }
+    if (response.status >= 500) {
+      throw new Error('Error temporal en los servidores de Google. Espera 2-3 minutos e intenta de nuevo.')
+    }
+    throw new Error(`Error inesperado de Imagen (codigo ${response.status}): ${errorText.substring(0, 300)}`)
   }
 
   const data = await response.json()
