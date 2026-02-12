@@ -219,6 +219,27 @@ export function CopyOptimizer() {
     }
   }
 
+  const compressImage = (dataUrl: string): Promise<string> =>
+    new Promise((resolve) => {
+      const img = new Image()
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        let { width, height } = img
+        const MAX = 1024
+        if (width > MAX || height > MAX) {
+          const ratio = Math.min(MAX / width, MAX / height)
+          width = Math.round(width * ratio)
+          height = Math.round(height * ratio)
+        }
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext('2d')!
+        ctx.drawImage(img, 0, 0, width, height)
+        resolve(canvas.toDataURL('image/jpeg', 0.8))
+      }
+      img.src = dataUrl
+    })
+
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
     if (!files) return
@@ -228,9 +249,10 @@ export function CopyOptimizer() {
 
     toProcess.forEach((file) => {
       const reader = new FileReader()
-      reader.onload = () => {
+      reader.onload = async () => {
         const dataUrl = reader.result as string
-        setProductPhotos((prev) => [...prev, dataUrl].slice(0, 4))
+        const compressed = await compressImage(dataUrl)
+        setProductPhotos((prev) => [...prev, compressed].slice(0, 4))
       }
       reader.readAsDataURL(file)
     })
@@ -276,8 +298,8 @@ export function CopyOptimizer() {
         if (targetAudience) body.target_audience = targetAudience
       }
 
-      // Only send product photos when no banners selected (avoids large base64 payload)
-      if (productPhotos.length > 0 && !(mode === 'from_landing' && selectedBanners.size > 0)) {
+      // Product photos only in from_scratch mode (from_landing uses banner images server-side)
+      if (mode === 'from_scratch' && productPhotos.length > 0) {
         body.product_photos = productPhotos
       }
 
