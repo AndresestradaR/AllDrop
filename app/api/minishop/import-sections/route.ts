@@ -1,45 +1,56 @@
 import { NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
+import sharp from 'sharp'
 
-async function ensureStorageUrl(
+async function optimizeAndUpload(
   serviceClient: any,
-  url: string,
+  imageUrl: string,
   userId: string,
   index: number
 ): Promise<string> {
-  // Already an HTTPS URL — use as-is
-  if (url.startsWith('http')) return url
+  try {
+    let imageBuffer: Buffer
 
-  // Base64 data URL — upload to Storage
-  if (url.startsWith('data:')) {
-    try {
-      const [header, base64Data] = url.split(',')
-      const mimeType = header.split(':')[1]?.split(';')[0] || 'image/png'
-      const ext = mimeType.split('/')[1] || 'png'
-      const fileName = `imports/${userId}/${Date.now()}-${index}.${ext}`
-      const buffer = Buffer.from(base64Data, 'base64')
-
-      const { error } = await serviceClient.storage
-        .from('landing-images')
-        .upload(fileName, buffer, { contentType: mimeType, upsert: true })
-
-      if (error) {
-        console.error('[import-sections] Storage upload error:', error.message)
-        return url
-      }
-
-      const { data: urlData } = serviceClient.storage
-        .from('landing-images')
-        .getPublicUrl(fileName)
-
-      return urlData.publicUrl
-    } catch (e: any) {
-      console.error('[import-sections] Upload exception:', e.message)
-      return url
+    if (imageUrl.startsWith('data:')) {
+      const base64Data = imageUrl.split(',')[1]
+      imageBuffer = Buffer.from(base64Data, 'base64')
+    } else if (imageUrl.startsWith('http')) {
+      const response = await fetch(imageUrl)
+      if (!response.ok) return imageUrl
+      const arrayBuffer = await response.arrayBuffer()
+      imageBuffer = Buffer.from(arrayBuffer)
+    } else {
+      return imageUrl
     }
-  }
 
-  return url
+    const optimized = await sharp(imageBuffer)
+      .resize({ width: 1200, withoutEnlargement: true })
+      .webp({ quality: 80 })
+      .toBuffer()
+
+    const fileName = `imports/${userId}/${Date.now()}-${index}-optimized.webp`
+    const { error } = await serviceClient.storage
+      .from('landing-images')
+      .upload(fileName, optimized, { contentType: 'image/webp', upsert: true })
+
+    if (error) {
+      console.error('[import-sections] Upload optimized error:', error.message)
+      return imageUrl
+    }
+
+    const { data: urlData } = serviceClient.storage
+      .from('landing-images')
+      .getPublicUrl(fileName)
+
+    const originalKB = Math.round(imageBuffer.length / 1024)
+    const optimizedKB = Math.round(optimized.length / 1024)
+    console.log(`[import-sections] Optimized image ${index}: ${originalKB}KB → ${optimizedKB}KB`)
+
+    return urlData.publicUrl
+  } catch (e: any) {
+    console.error('[import-sections] Optimize exception:', e.message)
+    return imageUrl
+  }
 }
 
 export async function POST(request: Request) {
@@ -90,7 +101,7 @@ export async function POST(request: Request) {
       const idOrderMap = new Map(section_ids.map((s: any) => [s.id, s.order]))
       validSections = await Promise.all(
         dbSections.map(async (s, i) => ({
-          url: await ensureStorageUrl(serviceClient, s.generated_image_url, user.id, i),
+          url: await optimizeAndUpload(serviceClient, s.generated_image_url, user.id, i),
           category: templateMap[s.template_id] || 'sin categoria',
           order: idOrderMap.get(s.id) ?? i + 1,
         }))
@@ -99,7 +110,7 @@ export async function POST(request: Request) {
       // Legacy flow: receive full sections (backward compatible)
       validSections = await Promise.all(
         sections.map(async (s: any, i: number) => ({
-          url: await ensureStorageUrl(serviceClient, s.url, user.id, i),
+          url: await optimizeAndUpload(serviceClient, s.url, user.id, i),
           category: s.category || 'sin categoria',
           order: s.order ?? i + 1,
         }))
