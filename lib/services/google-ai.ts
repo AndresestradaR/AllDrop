@@ -27,7 +27,7 @@ export async function enhancePrompt(
   const genAI = new GoogleGenerativeAI(apiKey)
   
   const model = genAI.getGenerativeModel({ 
-    model: 'gemini-2.0-flash-exp',
+    model: 'gemini-2.0-flash',
     systemInstruction: `You are an expert at creating prompts for AI image generation, specifically for e-commerce product landing pages.
 Your task is to transform simple product descriptions into detailed, professional prompts that will generate high-quality hero images for landing pages.
 
