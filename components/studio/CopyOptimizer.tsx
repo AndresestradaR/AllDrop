@@ -283,11 +283,14 @@ export function CopyOptimizer() {
         if (problemSolved) body.problem_solved = problemSolved
         if (targetAudience) body.target_audience = targetAudience
         if (selectedBanners.size > 0) {
-          body.selected_banners = Array.from(selectedBanners.values()).map(banner => ({
-            url: banner.generated_image_url,
-            category: banner.template?.category || 'hero',
-            template_name: banner.template?.name || '',
-          }))
+          // Only send HTTP URLs, never data: URIs (which would bloat the request)
+          body.selected_banners = Array.from(selectedBanners.values())
+            .filter(banner => banner.generated_image_url && !banner.generated_image_url.startsWith('data:'))
+            .map(banner => ({
+              url: banner.generated_image_url,
+              category: banner.template?.category || 'hero',
+              template_name: banner.template?.name || '',
+            }))
         }
       } else {
         body.product_name = productName
@@ -303,10 +306,16 @@ export function CopyOptimizer() {
         body.product_photos = productPhotos
       }
 
+      // Safety: check body size before sending (Vercel limit ~4.5MB)
+      const bodyStr = JSON.stringify(body)
+      if (bodyStr.length > 4_000_000) {
+        throw new Error(`Request demasiado grande (${(bodyStr.length / 1024 / 1024).toFixed(1)}MB). Reduce las fotos del producto.`)
+      }
+
       const response = await fetch('/api/studio/copy-optimize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: bodyStr,
       })
 
       const data = await response.json()
