@@ -205,6 +205,19 @@ Responde SOLO en JSON valido:
 // Helpers
 // ---------------------------------------------------------------------------
 
+const CATEGORY_TO_KEY: Record<string, string> = {
+  'hero': 'hero',
+  'oferta': 'oferta',
+  'antes-despues': 'antes_despues',
+  'beneficios': 'beneficios',
+  'tabla-comparativa': 'comparativa',
+  'autoridad': 'autoridad',
+  'testimonios': 'testimonios',
+  'modo-uso': 'modo_uso',
+  'logistica': 'logistica',
+  'faq': 'preguntas',
+}
+
 function parseDataUrl(dataUrl: string): { data: string; mimeType: string } | null {
   if (!dataUrl.startsWith('data:')) return null
   const [header, data] = dataUrl.split(',')
@@ -237,8 +250,7 @@ export async function POST(request: Request) {
       target_audience,
       tone = 'urgente',
       product_photos,
-      selected_banner_url,
-      selected_banner_category,
+      selected_banners,
     } = body as {
       mode?: 'from_landing' | 'from_scratch'
       product_id?: string
@@ -250,8 +262,11 @@ export async function POST(request: Request) {
       target_audience?: string
       tone?: string
       product_photos?: string[]
-      selected_banner_url?: string
-      selected_banner_category?: string
+      selected_banners?: Array<{
+        url: string
+        category: string
+        template_name: string
+      }>
     }
 
     // Get user's Google API key
@@ -339,18 +354,30 @@ export async function POST(request: Request) {
       }
     }
 
-    // Add selected banner image
-    if (selected_banner_url) {
-      try {
-        const bannerResponse = await fetch(selected_banner_url)
-        if (bannerResponse.ok) {
-          const bannerBuffer = await bannerResponse.arrayBuffer()
-          const bannerBase64 = Buffer.from(bannerBuffer).toString('base64')
-          const bannerContentType = bannerResponse.headers.get('content-type') || 'image/png'
-          parts.push({ inline_data: { mime_type: bannerContentType, data: bannerBase64 } })
+    // Add selected banner images (parallel download)
+    const bannerCategories: string[] = []
+    if (selected_banners && selected_banners.length > 0) {
+      const imageResults = await Promise.all(
+        selected_banners.map(async (banner) => {
+          try {
+            const imgResponse = await fetch(banner.url)
+            if (!imgResponse.ok) return null
+            const imgBuffer = await imgResponse.arrayBuffer()
+            const imgBase64 = Buffer.from(imgBuffer).toString('base64')
+            const mimeType = imgResponse.headers.get('content-type') || 'image/png'
+            const mappedCategory = CATEGORY_TO_KEY[banner.category] || banner.category
+            return { inline_data: { mime_type: mimeType, data: imgBase64 }, category: mappedCategory }
+          } catch {
+            return null
+          }
+        })
+      )
+      for (const imgResult of imageResults) {
+        if (imgResult) {
+          parts.push({ inline_data: imgResult.inline_data })
+          parts.push({ text: `[Imagen: Banner existente de la seccion "${imgResult.category}"]` })
+          bannerCategories.push(imgResult.category)
         }
-      } catch (err: any) {
-        console.error('[CopyOptimizer] Error fetching banner image:', err.message)
       }
     }
 
@@ -369,16 +396,16 @@ export async function POST(request: Request) {
       promptLines.push(`\nSe adjuntan ${product_photos.length} foto(s) del producto — analiza empaques, textos visibles, ingredientes, marca, beneficios impresos`)
     }
 
-    if (selected_banner_url && selected_banner_category) {
-      promptLines.push(`\nSe adjunta la imagen del banner generado para la seccion "${selected_banner_category}". Analiza esta imagen y genera Controles Creativos OPTIMIZADOS especificamente para esta seccion.`)
-      promptLines.push(`Responde SOLO con la seccion "${selected_banner_category}" en el JSON (dentro de "sections").`)
+    if (bannerCategories.length > 0) {
+      const uniqueCategories = Array.from(new Set(bannerCategories))
+      promptLines.push(`\nIMPORTANTE: Te muestro ${bannerCategories.length} banner(s) ya generados de esta landing. Analiza CADA imagen y genera Controles Creativos OPTIMIZADOS para cada seccion correspondiente. Genera SOLO para estas secciones: ${uniqueCategories.join(', ')}. Usa la informacion visual de cada banner para crear textos mas precisos y especificos.`)
     } else {
       promptLines.push('\nGenera los Controles Creativos optimizados para las 10 secciones de la galeria de banners, en JSON.')
     }
 
     parts.push({ text: promptLines.join('\n') })
 
-    console.log(`[CopyOptimizer] User: ${user.id.substring(0, 8)}..., Mode: ${mode}, Product: ${resolvedProductName}${selected_banner_category ? `, Banner: ${selected_banner_category}` : ''}`)
+    console.log(`[CopyOptimizer] User: ${user.id.substring(0, 8)}..., Mode: ${mode}, Product: ${resolvedProductName}${bannerCategories.length > 0 ? `, Banners: ${bannerCategories.join(', ')}` : ''}`)
 
     // Try Gemini 2.5 Pro first, fallback to 2.0 Flash
     const models = [

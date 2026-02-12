@@ -144,10 +144,10 @@ export function CopyOptimizer() {
   const [selectedLandingId, setSelectedLandingId] = useState('')
   const [isLoadingLandings, setIsLoadingLandings] = useState(false)
 
-  // Banner selector
+  // Banner selector (multi-select)
   const [bannerSections, setBannerSections] = useState<GeneratedSection[]>([])
   const [isLoadingBanners, setIsLoadingBanners] = useState(false)
-  const [selectedBanner, setSelectedBanner] = useState<GeneratedSection | null>(null)
+  const [selectedBanners, setSelectedBanners] = useState<Map<string, GeneratedSection>>(new Map())
 
   // From Scratch mode
   const [productName, setProductName] = useState('')
@@ -183,7 +183,7 @@ export function CopyOptimizer() {
       fetchSections(selectedLandingId)
     } else {
       setBannerSections([])
-      setSelectedBanner(null)
+      setSelectedBanners(new Map())
     }
   }, [selectedLandingId])
 
@@ -205,7 +205,7 @@ export function CopyOptimizer() {
   const fetchSections = async (productId: string) => {
     setIsLoadingBanners(true)
     setBannerSections([])
-    setSelectedBanner(null)
+    setSelectedBanners(new Map())
     try {
       const response = await fetch(`/api/products/${productId}/sections`)
       const data = await response.json()
@@ -260,12 +260,12 @@ export function CopyOptimizer() {
         if (currency) body.currency = currency
         if (problemSolved) body.problem_solved = problemSolved
         if (targetAudience) body.target_audience = targetAudience
-        if (selectedBanner) {
-          body.selected_banner_url = selectedBanner.generated_image_url
-          const templateCategory = selectedBanner.template?.category
-          if (templateCategory && CATEGORY_MAP[templateCategory]) {
-            body.selected_banner_category = CATEGORY_MAP[templateCategory]
-          }
+        if (selectedBanners.size > 0) {
+          body.selected_banners = Array.from(selectedBanners.values()).map(banner => ({
+            url: banner.generated_image_url,
+            category: banner.template?.category || 'hero',
+            template_name: banner.template?.name || '',
+          }))
         }
       } else {
         body.product_name = productName
@@ -295,17 +295,9 @@ export function CopyOptimizer() {
       // New format: sections object
       if (data.sections) {
         setResult(data)
-        // Auto-select the relevant section if a banner was selected
-        if (selectedBanner && selectedBanner.template?.category) {
-          const mappedSection = CATEGORY_MAP[selectedBanner.template.category]
-          if (mappedSection && data.sections[mappedSection]) {
-            setActiveSection(mappedSection)
-          } else {
-            setActiveSection(Object.keys(data.sections)[0] || 'hero')
-          }
-        } else {
-          setActiveSection('hero')
-        }
+        // Auto-select first available section
+        const sectionKeys = Object.keys(data.sections)
+        setActiveSection(sectionKeys[0] || 'hero')
       } else {
         throw new Error('Formato de respuesta no reconocido')
       }
@@ -437,13 +429,31 @@ export function CopyOptimizer() {
             </div>
           )}
 
-          {/* Banner Selector (from_landing mode) */}
+          {/* Banner Selector — multi-select (from_landing mode) */}
           {mode === 'from_landing' && selectedLandingId && (
             <div>
-              <label className="block text-sm font-medium text-text-secondary mb-1.5">
-                Optimizar para un banner especifico
-                <span className="text-text-muted ml-1">(opcional)</span>
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-sm font-medium text-text-secondary">
+                  Optimizar para banners especificos
+                  <span className="text-text-muted ml-1">(opcional)</span>
+                </label>
+                {bannerSections.length > 0 && (
+                  <button
+                    onClick={() => {
+                      if (selectedBanners.size === bannerSections.length) {
+                        setSelectedBanners(new Map())
+                      } else {
+                        const all = new Map<string, GeneratedSection>()
+                        bannerSections.forEach(s => all.set(s.id, s))
+                        setSelectedBanners(all)
+                      }
+                    }}
+                    className="text-xs text-accent hover:underline cursor-pointer"
+                  >
+                    {selectedBanners.size === bannerSections.length ? 'Deseleccionar todos' : 'Seleccionar todos'}
+                  </button>
+                )}
+              </div>
               {isLoadingBanners ? (
                 <div className="flex items-center gap-2 px-4 py-3 bg-surface-elevated border border-border rounded-xl">
                   <Loader2 className="w-4 h-4 animate-spin text-text-muted" />
@@ -455,27 +465,6 @@ export function CopyOptimizer() {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {selectedBanner && (
-                    <div className="flex items-center gap-2 px-3 py-2 bg-accent/10 border border-accent/30 rounded-xl">
-                      <img
-                        src={selectedBanner.generated_image_url}
-                        alt="Banner seleccionado"
-                        className="w-10 h-10 rounded object-cover flex-shrink-0"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium text-accent truncate">
-                          {CATEGORY_LABELS[selectedBanner.template?.category || ''] || selectedBanner.template?.category || 'Banner'}
-                        </p>
-                        <p className="text-[10px] text-text-muted">La IA optimizara solo esta seccion</p>
-                      </div>
-                      <button
-                        onClick={() => setSelectedBanner(null)}
-                        className="p-1 rounded-lg hover:bg-border/50"
-                      >
-                        <X className="w-3.5 h-3.5 text-text-muted" />
-                      </button>
-                    </div>
-                  )}
                   <div className="max-h-[180px] overflow-y-auto rounded-xl border border-border bg-surface-elevated p-2 space-y-2 scrollbar-thin">
                     {Object.entries(
                       bannerSections.reduce((acc, section) => {
@@ -490,30 +479,54 @@ export function CopyOptimizer() {
                           {CATEGORY_LABELS[category] || category}
                         </p>
                         <div className="flex gap-1.5 flex-wrap">
-                          {sections.map((section) => (
-                            <button
-                              key={section.id}
-                              onClick={() => setSelectedBanner(
-                                selectedBanner?.id === section.id ? null : section
-                              )}
-                              className={cn(
-                                'w-14 h-14 rounded-lg overflow-hidden border-2 transition-all flex-shrink-0',
-                                selectedBanner?.id === section.id
-                                  ? 'border-accent ring-2 ring-accent/30 scale-105'
-                                  : 'border-transparent hover:border-accent/50'
-                              )}
-                            >
-                              <img
-                                src={section.generated_image_url}
-                                alt={category}
-                                className="w-full h-full object-cover"
-                              />
-                            </button>
-                          ))}
+                          {sections.map((section) => {
+                            const isSelected = selectedBanners.has(section.id)
+                            return (
+                              <button
+                                key={section.id}
+                                onClick={() => {
+                                  setSelectedBanners(prev => {
+                                    const next = new Map(prev)
+                                    if (next.has(section.id)) {
+                                      next.delete(section.id)
+                                    } else {
+                                      next.set(section.id, section)
+                                    }
+                                    return next
+                                  })
+                                }}
+                                className={cn(
+                                  'relative w-14 h-14 rounded-lg overflow-hidden border-2 transition-all flex-shrink-0',
+                                  isSelected
+                                    ? 'border-accent ring-2 ring-accent/30 scale-105'
+                                    : 'border-transparent hover:border-accent/50'
+                                )}
+                              >
+                                <img
+                                  src={section.generated_image_url}
+                                  alt={category}
+                                  className="w-full h-full object-cover"
+                                />
+                                {isSelected && (
+                                  <>
+                                    <div className="absolute inset-0 bg-accent/20" />
+                                    <div className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-accent flex items-center justify-center">
+                                      <Check className="w-2.5 h-2.5 text-white" />
+                                    </div>
+                                  </>
+                                )}
+                              </button>
+                            )
+                          })}
                         </div>
                       </div>
                     ))}
                   </div>
+                  {selectedBanners.size > 0 && (
+                    <p className="text-[10px] text-text-muted px-1">
+                      {selectedBanners.size} banner{selectedBanners.size > 1 ? 's' : ''} seleccionado{selectedBanners.size > 1 ? 's' : ''} — la IA analizara estas imagenes
+                    </p>
+                  )}
                 </div>
               )}
             </div>
@@ -731,12 +744,12 @@ export function CopyOptimizer() {
           </div>
         ) : (
           <div className="flex flex-col flex-1 overflow-hidden">
-            {/* Single-section badge */}
-            {result.sections && Object.keys(result.sections).length === 1 && (
+            {/* Selected banners badge */}
+            {result.sections && Object.keys(result.sections).length < 10 && (
               <div className="flex items-center gap-2 px-3 py-2 mb-3 bg-accent/10 border border-accent/30 rounded-xl">
                 <Sparkles className="w-4 h-4 text-accent flex-shrink-0" />
                 <p className="text-xs text-accent font-medium">
-                  Optimizado para banner seleccionado: {SECTION_TABS.find(t => t.id === Object.keys(result.sections)[0])?.label || Object.keys(result.sections)[0]}
+                  Optimizado para {Object.keys(result.sections).length} banner{Object.keys(result.sections).length > 1 ? 's' : ''} seleccionado{Object.keys(result.sections).length > 1 ? 's' : ''}
                 </p>
               </div>
             )}
