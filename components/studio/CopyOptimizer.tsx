@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { cn } from '@/lib/utils/cn'
 import {
   Sparkles,
@@ -15,24 +15,33 @@ import {
   FileText,
   PenTool,
   ExternalLink,
+  Star,
+  Tag,
+  ArrowRightLeft,
+  CheckCircle,
+  LayoutGrid,
+  Award,
+  MessageSquare,
+  BookOpen,
+  Truck,
+  HelpCircle,
+  ImagePlus,
+  X,
 } from 'lucide-react'
 
-interface CopyVariant {
-  label: string
-  headline: string
-  sub_headline: string
-  description: string
-  bullets: string[]
-  objections: string[]
-  guarantee: string
-  cta_primary: string
-  cta_whatsapp: string
-  short_ad_copy: string
-  ad_headline: string
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+interface ControlsCreativos {
+  productDetails: string
+  salesAngle: string
+  targetAvatar: string
+  additionalInstructions: string
 }
 
 interface CopyResult {
-  variants: CopyVariant[]
+  sections: Record<string, ControlsCreativos>
   analysis: string
 }
 
@@ -45,6 +54,30 @@ interface LandingProduct {
 
 type CopyMode = 'from_landing' | 'from_scratch'
 
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const SECTION_TABS = [
+  { id: 'hero', label: 'Hero', icon: Star },
+  { id: 'oferta', label: 'Oferta', icon: Tag },
+  { id: 'antes_despues', label: 'Antes/Despues', icon: ArrowRightLeft },
+  { id: 'beneficios', label: 'Beneficios', icon: CheckCircle },
+  { id: 'comparativa', label: 'Comparativa', icon: LayoutGrid },
+  { id: 'autoridad', label: 'Autoridad', icon: Award },
+  { id: 'testimonios', label: 'Testimonios', icon: MessageSquare },
+  { id: 'modo_uso', label: 'Modo de Uso', icon: BookOpen },
+  { id: 'logistica', label: 'Logistica', icon: Truck },
+  { id: 'preguntas', label: 'Preguntas', icon: HelpCircle },
+] as const
+
+const FIELD_LABELS: Record<string, { label: string; maxChars: number; color: string }> = {
+  productDetails: { label: 'Detalles del Producto', maxChars: 500, color: 'text-blue-400' },
+  salesAngle: { label: 'Angulo de Venta', maxChars: 150, color: 'text-amber-400' },
+  targetAvatar: { label: 'Avatar de Cliente Ideal', maxChars: 150, color: 'text-purple-400' },
+  additionalInstructions: { label: 'Instrucciones Adicionales', maxChars: 200, color: 'text-green-400' },
+}
+
 const TONES = [
   { id: 'urgente', label: 'Urgente', icon: Zap, color: 'text-red-400' },
   { id: 'profesional', label: 'Profesional', icon: Shield, color: 'text-blue-400' },
@@ -54,11 +87,9 @@ const TONES = [
 
 const CURRENCIES = ['COP', 'MXN', 'USD', 'GTQ', 'PEN', 'CLP', 'PYG', 'PAB']
 
-const VARIANT_ICONS = [
-  { icon: Zap, color: 'text-red-400 bg-red-500/10 border-red-500/20' },
-  { icon: Heart, color: 'text-pink-400 bg-pink-500/10 border-pink-500/20' },
-  { icon: Shield, color: 'text-blue-400 bg-blue-500/10 border-blue-500/20' },
-]
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
 
 export function CopyOptimizer() {
   // Mode
@@ -77,11 +108,15 @@ export function CopyOptimizer() {
   const [problemSolved, setProblemSolved] = useState('')
   const [targetAudience, setTargetAudience] = useState('')
 
+  // Product photos
+  const [productPhotos, setProductPhotos] = useState<string[]>([])
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   // Common
   const [tone, setTone] = useState('urgente')
   const [isGenerating, setIsGenerating] = useState(false)
   const [result, setResult] = useState<CopyResult | null>(null)
-  const [activeVariant, setActiveVariant] = useState(0)
+  const [activeSection, setActiveSection] = useState('hero')
   const [showAnalysis, setShowAnalysis] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [copiedField, setCopiedField] = useState<string | null>(null)
@@ -106,6 +141,30 @@ export function CopyOptimizer() {
     } finally {
       setIsLoadingLandings(false)
     }
+  }
+
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files) return
+
+    const remaining = 4 - productPhotos.length
+    const toProcess = Array.from(files).slice(0, remaining)
+
+    toProcess.forEach((file) => {
+      const reader = new FileReader()
+      reader.onload = () => {
+        const dataUrl = reader.result as string
+        setProductPhotos((prev) => [...prev, dataUrl].slice(0, 4))
+      }
+      reader.readAsDataURL(file)
+    })
+
+    // Reset input so same file can be re-selected
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  const removePhoto = (index: number) => {
+    setProductPhotos((prev) => prev.filter((_, i) => i !== index))
   }
 
   const handleGenerate = async () => {
@@ -134,6 +193,10 @@ export function CopyOptimizer() {
         if (targetAudience) body.target_audience = targetAudience
       }
 
+      if (productPhotos.length > 0) {
+        body.product_photos = productPhotos
+      }
+
       const response = await fetch('/api/studio/copy-optimize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -143,14 +206,15 @@ export function CopyOptimizer() {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || 'Error al optimizar copy')
+        throw new Error(data.error || 'Error al generar textos')
       }
 
-      if (data.variants && data.variants.length > 0) {
+      // New format: sections object
+      if (data.sections) {
         setResult(data)
-        setActiveVariant(0)
+        setActiveSection('hero')
       } else {
-        throw new Error('No se generaron variantes')
+        throw new Error('Formato de respuesta no reconocido')
       }
     } catch (err: any) {
       setError(err.message)
@@ -165,27 +229,19 @@ export function CopyOptimizer() {
     setTimeout(() => setCopiedField(null), 2000)
   }
 
-  const copyAllVariant = async (variant: CopyVariant) => {
+  const copyAllSection = async (section: ControlsCreativos) => {
     const text = [
-      `HEADLINE: ${variant.headline}`,
-      `SUB-HEADLINE: ${variant.sub_headline}`,
+      `DETALLES DEL PRODUCTO:`,
+      section.productDetails,
       '',
-      `DESCRIPCION:`,
-      variant.description,
+      `ANGULO DE VENTA:`,
+      section.salesAngle,
       '',
-      'BENEFICIOS:',
-      ...variant.bullets.map(b => `- ${b}`),
+      `AVATAR DE CLIENTE IDEAL:`,
+      section.targetAvatar,
       '',
-      'OBJECIONES:',
-      ...(variant.objections || []).map(o => `- ${o}`),
-      '',
-      `GARANTIA: ${variant.guarantee || ''}`,
-      '',
-      `CTA PRINCIPAL: ${variant.cta_primary}`,
-      `CTA WHATSAPP: ${variant.cta_whatsapp}`,
-      '',
-      `AD COPY: ${variant.short_ad_copy}`,
-      `AD HEADLINE: ${variant.ad_headline}`,
+      `INSTRUCCIONES ADICIONALES:`,
+      section.additionalInstructions,
     ].join('\n')
     await copyToClipboard(text, 'all')
   }
@@ -208,15 +264,17 @@ export function CopyOptimizer() {
     </button>
   )
 
+  const currentSection = result?.sections?.[activeSection]
+
   return (
     <div className="flex gap-6 h-[calc(100vh-200px)] min-h-[600px]">
       {/* Left Panel — Input */}
       <div className="w-[420px] flex-shrink-0 bg-surface rounded-2xl border border-border p-5 overflow-y-auto">
         <div className="space-y-4">
           <div>
-            <h3 className="text-lg font-semibold text-text-primary mb-1">Copy Optimizer</h3>
+            <h3 className="text-lg font-semibold text-text-primary mb-1">Textos para Banners</h3>
             <p className="text-xs text-text-secondary">
-              Genera 3 variantes de copy optimizado para LATAM e-commerce.
+              Genera Controles Creativos optimizados para las 10 secciones de tu landing.
             </p>
           </div>
 
@@ -401,11 +459,51 @@ export function CopyOptimizer() {
                 value={currentText}
                 onChange={(e) => setCurrentText(e.target.value)}
                 placeholder="Pega aqui el texto actual de tu landing para que la IA lo analice y mejore..."
-                rows={4}
+                rows={3}
                 className="w-full px-4 py-3 bg-surface-elevated border border-border rounded-xl text-text-primary placeholder:text-text-muted resize-none focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all"
               />
             </div>
           )}
+
+          {/* Product Photos Upload */}
+          <div>
+            <label className="block text-sm font-medium text-text-secondary mb-1.5">
+              Fotos del producto
+              <span className="text-text-muted ml-1">(opcional, max 4)</span>
+            </label>
+            {productPhotos.length > 0 && (
+              <div className="grid grid-cols-4 gap-2 mb-2">
+                {productPhotos.map((photo, i) => (
+                  <div key={i} className="relative aspect-square rounded-lg overflow-hidden border border-border group">
+                    <img src={photo} alt={`Producto ${i + 1}`} className="w-full h-full object-cover" />
+                    <button
+                      onClick={() => removePhoto(i)}
+                      className="absolute top-1 right-1 p-0.5 rounded-full bg-black/70 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {productPhotos.length < 4 && (
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-dashed border-border hover:border-accent/50 text-text-muted hover:text-text-secondary transition-all"
+              >
+                <ImagePlus className="w-4 h-4" />
+                <span className="text-sm">Subir fotos del producto</span>
+              </button>
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={handlePhotoUpload}
+              className="hidden"
+            />
+          </div>
 
           {/* Error */}
           {error && (
@@ -428,12 +526,12 @@ export function CopyOptimizer() {
             {isGenerating ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
-                Optimizando copy...
+                Generando textos...
               </>
             ) : (
               <>
                 <Sparkles className="w-5 h-5" />
-                Optimizar Copy
+                Generar Textos para Banners
               </>
             )}
           </button>
@@ -449,179 +547,96 @@ export function CopyOptimizer() {
                 <Sparkles className="w-8 h-8 text-text-secondary" />
               </div>
               <p className="text-text-secondary">
-                Tus variantes de copy optimizado apareceran aqui
+                Tus Controles Creativos apareceran aqui
               </p>
               <p className="text-xs text-text-muted mt-1">
-                3 enfoques: Urgencia, Historia, Autoridad
+                10 secciones: Hero, Oferta, Beneficios, Testimonios y mas
               </p>
             </div>
           </div>
         ) : (
           <div className="flex flex-col flex-1 overflow-hidden">
-            {/* Variant Tabs */}
-            <div className="flex gap-2 mb-4">
-              {result.variants.map((variant, idx) => {
-                const style = VARIANT_ICONS[idx] || VARIANT_ICONS[0]
-                const Icon = style.icon
+            {/* Section Tabs — scrollable */}
+            <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1 scrollbar-thin">
+              {SECTION_TABS.map((tab) => {
+                const Icon = tab.icon
+                const hasData = !!result.sections?.[tab.id]
                 return (
                   <button
-                    key={idx}
-                    onClick={() => setActiveVariant(idx)}
+                    key={tab.id}
+                    onClick={() => setActiveSection(tab.id)}
                     className={cn(
-                      'flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-medium transition-all',
-                      activeVariant === idx
+                      'flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-medium transition-all whitespace-nowrap flex-shrink-0',
+                      activeSection === tab.id
                         ? 'border-accent bg-accent/10 text-accent'
-                        : 'border-border bg-surface-elevated text-text-secondary hover:text-text-primary hover:border-accent/50'
+                        : hasData
+                          ? 'border-border bg-surface-elevated text-text-secondary hover:text-text-primary hover:border-accent/50'
+                          : 'border-border/50 bg-surface-elevated/50 text-text-muted'
                     )}
                   >
-                    <Icon className="w-4 h-4" />
-                    {variant.label}
+                    <Icon className="w-3.5 h-3.5" />
+                    {tab.label}
                   </button>
                 )
               })}
             </div>
 
-            {/* Active Variant Content */}
-            <div className="flex-1 overflow-y-auto space-y-4">
-              {(() => {
-                const variant = result.variants[activeVariant]
-                if (!variant) return null
-                const vid = `v${activeVariant}`
+            {/* Section Content */}
+            <div className="flex-1 overflow-y-auto space-y-3">
+              {currentSection ? (
+                <>
+                  {/* 4 Creative Control fields */}
+                  {(['productDetails', 'salesAngle', 'targetAvatar', 'additionalInstructions'] as const).map((fieldKey) => {
+                    const meta = FIELD_LABELS[fieldKey]
+                    const value = currentSection[fieldKey] || ''
+                    const fid = `${activeSection}-${fieldKey}`
 
-                return (
-                  <>
-                    {/* Headline */}
-                    <div className="p-4 bg-surface-elevated rounded-xl border border-border">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-medium text-text-muted uppercase tracking-wider">Headline</span>
-                        <CopyButton text={variant.headline} fieldId={`${vid}-headline`} />
-                      </div>
-                      <p className="text-lg font-bold text-text-primary">{variant.headline}</p>
-                    </div>
-
-                    {/* Sub-headline */}
-                    <div className="p-4 bg-surface-elevated rounded-xl border border-border">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-medium text-text-muted uppercase tracking-wider">Sub-headline</span>
-                        <CopyButton text={variant.sub_headline} fieldId={`${vid}-sub`} />
-                      </div>
-                      <p className="text-sm text-text-secondary">{variant.sub_headline}</p>
-                    </div>
-
-                    {/* Description */}
-                    {variant.description && (
-                      <div className="p-4 bg-surface-elevated rounded-xl border border-border">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs font-medium text-text-muted uppercase tracking-wider">Descripcion</span>
-                          <CopyButton text={variant.description} fieldId={`${vid}-desc`} />
+                    return (
+                      <div key={fieldKey} className="p-4 bg-surface-elevated rounded-xl border border-border">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <div className="flex items-center gap-2">
+                            <span className={cn('text-xs font-semibold uppercase tracking-wider', meta.color)}>
+                              {meta.label}
+                            </span>
+                            <span className="text-[10px] text-text-muted">
+                              {value.length}/{meta.maxChars}
+                            </span>
+                          </div>
+                          <CopyButton text={value} fieldId={fid} />
                         </div>
-                        <p className="text-sm text-text-secondary leading-relaxed">{variant.description}</p>
+                        <p className={cn(
+                          'text-sm leading-relaxed',
+                          fieldKey === 'salesAngle' ? 'text-text-primary font-semibold' : 'text-text-secondary'
+                        )}>
+                          {value}
+                        </p>
                       </div>
+                    )
+                  })}
+
+                  {/* Copy All */}
+                  <button
+                    onClick={() => copyAllSection(currentSection)}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-accent/30 text-accent hover:bg-accent/10 font-medium text-sm transition-colors"
+                  >
+                    {copiedField === 'all' ? (
+                      <>
+                        <Check className="w-4 h-4" />
+                        Copiado
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-4 h-4" />
+                        Copiar los 4 campos
+                      </>
                     )}
-
-                    {/* Bullets */}
-                    <div className="p-4 bg-surface-elevated rounded-xl border border-border">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-medium text-text-muted uppercase tracking-wider">Beneficios</span>
-                        <CopyButton text={variant.bullets.join('\n')} fieldId={`${vid}-bullets`} />
-                      </div>
-                      <ul className="space-y-1.5">
-                        {variant.bullets.map((b, i) => (
-                          <li key={i} className="text-sm text-text-primary flex items-start gap-2">
-                            <span className="text-accent mt-0.5">•</span>
-                            {b}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-
-                    {/* Objections */}
-                    {variant.objections && variant.objections.length > 0 && (
-                      <div className="p-4 bg-surface-elevated rounded-xl border border-border">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs font-medium text-text-muted uppercase tracking-wider">Objeciones resueltas</span>
-                          <CopyButton text={variant.objections.join('\n')} fieldId={`${vid}-objections`} />
-                        </div>
-                        <ul className="space-y-1.5">
-                          {variant.objections.map((o, i) => (
-                            <li key={i} className="text-sm text-text-secondary flex items-start gap-2">
-                              <Shield className="w-3.5 h-3.5 text-blue-400 mt-0.5 flex-shrink-0" />
-                              {o}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-
-                    {/* Guarantee */}
-                    {variant.guarantee && (
-                      <div className="p-4 bg-surface-elevated rounded-xl border border-border">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs font-medium text-text-muted uppercase tracking-wider">Garantia</span>
-                          <CopyButton text={variant.guarantee} fieldId={`${vid}-guarantee`} />
-                        </div>
-                        <p className="text-sm text-green-400 font-medium">{variant.guarantee}</p>
-                      </div>
-                    )}
-
-                    {/* CTAs */}
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="p-4 bg-surface-elevated rounded-xl border border-border">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs font-medium text-text-muted uppercase tracking-wider">CTA Principal</span>
-                          <CopyButton text={variant.cta_primary} fieldId={`${vid}-cta`} />
-                        </div>
-                        <p className="text-sm font-semibold text-accent">{variant.cta_primary}</p>
-                      </div>
-                      <div className="p-4 bg-surface-elevated rounded-xl border border-border">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs font-medium text-text-muted uppercase tracking-wider">CTA WhatsApp</span>
-                          <CopyButton text={variant.cta_whatsapp} fieldId={`${vid}-wa`} />
-                        </div>
-                        <p className="text-sm font-semibold text-green-400">{variant.cta_whatsapp}</p>
-                      </div>
-                    </div>
-
-                    {/* Ad Copy */}
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="p-4 bg-surface-elevated rounded-xl border border-border">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs font-medium text-text-muted uppercase tracking-wider">Ad Copy (125 chars)</span>
-                          <CopyButton text={variant.short_ad_copy} fieldId={`${vid}-ad`} />
-                        </div>
-                        <p className="text-sm text-text-secondary">{variant.short_ad_copy}</p>
-                        <p className="text-[10px] text-text-muted mt-1">{variant.short_ad_copy?.length || 0}/125</p>
-                      </div>
-                      <div className="p-4 bg-surface-elevated rounded-xl border border-border">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs font-medium text-text-muted uppercase tracking-wider">Ad Headline (40 chars)</span>
-                          <CopyButton text={variant.ad_headline} fieldId={`${vid}-adh`} />
-                        </div>
-                        <p className="text-sm font-semibold text-text-primary">{variant.ad_headline}</p>
-                        <p className="text-[10px] text-text-muted mt-1">{variant.ad_headline?.length || 0}/40</p>
-                      </div>
-                    </div>
-
-                    {/* Copy All */}
-                    <button
-                      onClick={() => copyAllVariant(variant)}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-accent/30 text-accent hover:bg-accent/10 font-medium text-sm transition-colors"
-                    >
-                      {copiedField === 'all' ? (
-                        <>
-                          <Check className="w-4 h-4" />
-                          Copiado
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-4 h-4" />
-                          Copiar toda la variante
-                        </>
-                      )}
-                    </button>
-                  </>
-                )
-              })()}
+                  </button>
+                </>
+              ) : (
+                <div className="flex items-center justify-center h-32">
+                  <p className="text-sm text-text-muted">No hay datos para esta seccion</p>
+                </div>
+              )}
 
               {/* Analysis */}
               {result.analysis && (
@@ -630,7 +645,7 @@ export function CopyOptimizer() {
                     onClick={() => setShowAnalysis(!showAnalysis)}
                     className="w-full flex items-center justify-between p-4 hover:bg-surface-elevated/50 transition-colors"
                   >
-                    <span className="text-sm font-medium text-text-secondary">Analisis</span>
+                    <span className="text-sm font-medium text-text-secondary">Analisis del Producto</span>
                     {showAnalysis ? (
                       <ChevronUp className="w-4 h-4 text-text-muted" />
                     ) : (
