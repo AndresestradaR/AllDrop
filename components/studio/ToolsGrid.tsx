@@ -22,10 +22,12 @@ import {
   Hash,
   Video,
   MessageSquare,
+  UserCircle,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { PromptGenerator } from './PromptGenerator'
 import { PromptBotGenerator } from './PromptBotGenerator'
+import { PersonDescriptor } from './PersonDescriptor'
 
 // Lip Sync Models
 type LipSyncModel = 'kling' | 'infinitalk'
@@ -114,6 +116,13 @@ const TOOLS: Tool[] = [
     description: 'Genera system prompts para bots de ventas',
     icon: MessageSquare,
     color: 'from-green-500 to-emerald-500',
+  },
+  {
+    id: 'person-descriptor',
+    name: 'Descriptor de Persona',
+    description: 'Descripcion 4K para videos IA (2 tecnicas)',
+    icon: UserCircle,
+    color: 'from-amber-500 to-orange-500',
   },
 ]
 
@@ -327,6 +336,10 @@ export function ToolsGrid() {
 
   if (activeTool === 'prompt-bot') {
     return <PromptBotGenerator onBack={() => { setActiveTool(null); resetTool() }} />
+  }
+
+  if (activeTool === 'person-descriptor') {
+    return <PersonDescriptor onBack={() => { setActiveTool(null); resetTool() }} />
   }
 
   // Tool interface view
