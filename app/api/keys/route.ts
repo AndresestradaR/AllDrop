@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
-import { encrypt, mask } from '@/lib/services/encryption'
+import { encrypt, decrypt, mask } from '@/lib/services/encryption'
 
 export async function GET() {
   try {
@@ -13,7 +13,7 @@ export async function GET() {
 
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('google_api_key, openai_api_key, kie_api_key, bfl_api_key, elevenlabs_api_key, apify_api_key, browserless_api_key')
+      .select('google_api_key, openai_api_key, kie_api_key, bfl_api_key, elevenlabs_api_key, apify_api_key, browserless_api_key, cf_account_id, cf_access_key_id, cf_secret_access_key, cf_bucket_name, cf_public_url')
       .eq('id', user.id)
       .single()
 
@@ -27,7 +27,24 @@ export async function GET() {
         hasElevenlabsApiKey: false,
         hasApifyApiKey: false,
         hasBrowserlessApiKey: false,
+        hasR2: false,
+        r2AccountId: '',
+        r2BucketName: '',
+        r2PublicUrl: '',
+        maskedR2AccessKeyId: '',
+        hasR2AccessKeyId: false,
+        maskedR2SecretAccessKey: '',
+        hasR2SecretAccessKey: false,
       })
+    }
+
+    // Safely decrypt non-secret fields
+    const safeDecrypt = (key: string | null) => {
+      try {
+        return key ? decrypt(key) : ''
+      } catch {
+        return ''
+      }
     }
 
     // Safely mask keys (catch any decryption errors)
@@ -62,6 +79,15 @@ export async function GET() {
       // Browserless
       maskedBrowserlessApiKey: safeMask(profile.browserless_api_key),
       hasBrowserlessApiKey: !!profile.browserless_api_key,
+      // Cloudflare R2
+      hasR2: !!profile.cf_account_id,
+      r2AccountId: safeDecrypt(profile.cf_account_id),
+      r2BucketName: safeDecrypt(profile.cf_bucket_name),
+      r2PublicUrl: safeDecrypt(profile.cf_public_url),
+      maskedR2AccessKeyId: safeMask(profile.cf_access_key_id),
+      hasR2AccessKeyId: !!profile.cf_access_key_id,
+      maskedR2SecretAccessKey: safeMask(profile.cf_secret_access_key),
+      hasR2SecretAccessKey: !!profile.cf_secret_access_key,
     })
   } catch (error: any) {
     console.error('GET /api/keys error:', error)
@@ -79,7 +105,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { googleApiKey, openaiApiKey, kieApiKey, bflApiKey, elevenlabsApiKey, apifyApiKey, browserlessApiKey } = body
+    const { googleApiKey, openaiApiKey, kieApiKey, bflApiKey, elevenlabsApiKey, apifyApiKey, browserlessApiKey, cfAccountId, cfAccessKeyId, cfSecretAccessKey, cfBucketName, cfPublicUrl } = body
 
     // Build update object with only provided keys
     const updateData: Record<string, string> = {}
@@ -105,6 +131,22 @@ export async function POST(request: Request) {
       }
       if (browserlessApiKey) {
         updateData.browserless_api_key = encrypt(browserlessApiKey)
+      }
+      // Cloudflare R2
+      if (cfAccountId) {
+        updateData.cf_account_id = encrypt(cfAccountId)
+      }
+      if (cfAccessKeyId) {
+        updateData.cf_access_key_id = encrypt(cfAccessKeyId)
+      }
+      if (cfSecretAccessKey) {
+        updateData.cf_secret_access_key = encrypt(cfSecretAccessKey)
+      }
+      if (cfBucketName) {
+        updateData.cf_bucket_name = encrypt(cfBucketName)
+      }
+      if (cfPublicUrl) {
+        updateData.cf_public_url = encrypt(cfPublicUrl)
       }
     } catch (encryptError: any) {
       console.error('Encryption error:', encryptError)

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Button, Input, Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui'
-import { Key, ExternalLink, Check, Loader2, Sparkles, Zap, Image as ImageIcon, Cpu, PlayCircle, X, Globe, Mic } from 'lucide-react'
+import { Key, ExternalLink, Check, Loader2, Sparkles, Zap, Image as ImageIcon, Cpu, PlayCircle, X, Globe, Mic, Cloud } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export const dynamic = 'force-dynamic'
@@ -25,6 +25,16 @@ export default function SettingsPage() {
   const [elevenlabsKey, setElevenlabsKey] = useState<ApiKeyState>({ value: '', hasKey: false, isSaving: false })
   const [apifyKey, setApifyKey] = useState<ApiKeyState>({ value: '', hasKey: false, isSaving: false })
   const [browserlessKey, setBrowserlessKey] = useState<ApiKeyState>({ value: '', hasKey: false, isSaving: false })
+
+  // Cloudflare R2 state
+  const [r2AccountId, setR2AccountId] = useState('')
+  const [r2AccessKeyId, setR2AccessKeyId] = useState('')
+  const [r2SecretAccessKey, setR2SecretAccessKey] = useState('')
+  const [r2BucketName, setR2BucketName] = useState('')
+  const [r2PublicUrl, setR2PublicUrl] = useState('')
+  const [hasR2, setHasR2] = useState(false)
+  const [isSavingR2, setIsSavingR2] = useState(false)
+  const [isTestingR2, setIsTestingR2] = useState(false)
 
   useEffect(() => {
     fetchKeys()
@@ -55,6 +65,19 @@ export default function SettingsPage() {
       }
       if (data.hasBrowserlessApiKey) {
         setBrowserlessKey(prev => ({ ...prev, hasKey: true, value: data.maskedBrowserlessApiKey || '' }))
+      }
+      // Cloudflare R2
+      if (data.hasR2) {
+        setHasR2(true)
+        setR2AccountId(data.r2AccountId || '')
+        setR2BucketName(data.r2BucketName || '')
+        setR2PublicUrl(data.r2PublicUrl || '')
+      }
+      if (data.hasR2AccessKeyId) {
+        setR2AccessKeyId(data.maskedR2AccessKeyId || '')
+      }
+      if (data.hasR2SecretAccessKey) {
+        setR2SecretAccessKey(data.maskedR2SecretAccessKey || '')
       }
     } catch (error) {
       console.error('Error fetching keys:', error)
@@ -103,6 +126,58 @@ export default function SettingsPage() {
       toast.error(error.message || 'Error al guardar')
     } finally {
       setter(prev => ({ ...prev, isSaving: false }))
+    }
+  }
+
+  const handleSaveR2 = async () => {
+    // Validate required fields (skip if masked)
+    if (!r2AccountId || !r2AccessKeyId || !r2SecretAccessKey || !r2BucketName) {
+      toast.error('Completa al menos Account ID, Access Key ID, Secret Access Key y Bucket Name')
+      return
+    }
+    // Don't save if all look masked
+    const hasMaskedOnly = [r2AccessKeyId, r2SecretAccessKey].every(v => v.includes('•'))
+    if (hasMaskedOnly && hasR2) {
+      toast.error('Ingresa nuevas credenciales para actualizar')
+      return
+    }
+
+    setIsSavingR2(true)
+    try {
+      const payload: Record<string, string> = {}
+      if (!r2AccountId.includes('•')) payload.cfAccountId = r2AccountId
+      if (!r2AccessKeyId.includes('•')) payload.cfAccessKeyId = r2AccessKeyId
+      if (!r2SecretAccessKey.includes('•')) payload.cfSecretAccessKey = r2SecretAccessKey
+      if (!r2BucketName.includes('•')) payload.cfBucketName = r2BucketName
+      if (r2PublicUrl && !r2PublicUrl.includes('•')) payload.cfPublicUrl = r2PublicUrl
+
+      const response = await fetch('/api/keys', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Error al guardar')
+      toast.success('Credenciales R2 guardadas correctamente')
+      fetchKeys()
+    } catch (error: any) {
+      toast.error(error.message || 'Error al guardar')
+    } finally {
+      setIsSavingR2(false)
+    }
+  }
+
+  const handleTestR2 = async () => {
+    setIsTestingR2(true)
+    try {
+      const response = await fetch('/api/studio/r2/test', { method: 'POST' })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Error al conectar')
+      toast.success(`Conexion exitosa — ${data.objectCount} objetos encontrados`)
+    } catch (error: any) {
+      toast.error(error.message || 'Error al conectar con R2')
+    } finally {
+      setIsTestingR2(false)
     }
   }
 
@@ -519,6 +594,105 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
+      {/* Section: Almacenamiento en la Nube */}
+      <div className="mt-8 mb-6">
+        <h2 className="text-lg font-semibold text-text-primary mb-4 flex items-center gap-2">
+          <Cloud className="w-5 h-5 text-accent" />
+          Almacenamiento en la Nube
+        </h2>
+      </div>
+
+      {/* Cloudflare R2 */}
+      <Card className="mb-4">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <div className="p-2 rounded-lg bg-gradient-to-br from-orange-500 to-amber-500 text-white">
+              <Cloud className="w-4 h-4" />
+            </div>
+            Cloudflare R2 (Storage)
+            {hasR2 && (
+              <span className="flex items-center gap-1 text-xs text-success ml-auto">
+                <Check className="w-3 h-3" />
+                Configurado
+              </span>
+            )}
+          </CardTitle>
+          <CardDescription>
+            Almacena imagenes y videos generados en tu propio bucket R2
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div>
+            <label className="text-xs text-text-secondary mb-1 block">Account ID</label>
+            <Input
+              placeholder="Tu Cloudflare Account ID"
+              value={r2AccountId}
+              onChange={(e) => setR2AccountId(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="text-xs text-text-secondary mb-1 block">Access Key ID</label>
+            <Input
+              type="password"
+              placeholder="R2 Access Key ID"
+              value={r2AccessKeyId}
+              onChange={(e) => setR2AccessKeyId(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="text-xs text-text-secondary mb-1 block">Secret Access Key</label>
+            <Input
+              type="password"
+              placeholder="R2 Secret Access Key"
+              value={r2SecretAccessKey}
+              onChange={(e) => setR2SecretAccessKey(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="text-xs text-text-secondary mb-1 block">Bucket Name</label>
+            <Input
+              placeholder="mi-bucket"
+              value={r2BucketName}
+              onChange={(e) => setR2BucketName(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="text-xs text-text-secondary mb-1 block">Public URL (opcional)</label>
+            <Input
+              placeholder="https://cdn.midominio.com"
+              value={r2PublicUrl}
+              onChange={(e) => setR2PublicUrl(e.target.value)}
+            />
+          </div>
+          <div className="flex gap-2 pt-1">
+            <Button
+              onClick={handleSaveR2}
+              isLoading={isSavingR2}
+              className="flex-1"
+            >
+              Guardar Credenciales
+            </Button>
+            {hasR2 && (
+              <Button
+                onClick={handleTestR2}
+                isLoading={isTestingR2}
+                variant="secondary"
+              >
+                Probar Conexion
+              </Button>
+            )}
+          </div>
+          <a
+            href="https://dash.cloudflare.com/?to=/:account/r2/api-tokens"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-xs text-accent hover:text-accent-hover transition-colors"
+          >
+            Crear API Token en Cloudflare <ExternalLink className="w-3 h-3" />
+          </a>
+        </CardContent>
+      </Card>
+
       {/* Info Card */}
       <Card className="mt-6" variant="glass">
         <CardContent className="pt-6">
@@ -554,6 +728,10 @@ export default function SettingsPage() {
             <li className="flex items-start gap-2">
               <span className="text-emerald-500">•</span>
               <span><strong>Browserless</strong> - Extrae precios de landing pages</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-orange-500">•</span>
+              <span><strong>Cloudflare R2</strong> - Almacena imagenes y videos en tu propio bucket</span>
             </li>
           </ul>
         </CardContent>
