@@ -82,12 +82,29 @@ export async function POST(request: Request) {
     }
 
     // Extract media ID from result
-    // The result structure varies, try common patterns
+    // Publer job results can have various structures depending on the endpoint
     const result = jobResult.result
     let mediaId: string | null = null
     let mediaType: string | null = null
 
-    if (result?.payload?.media) {
+    console.log('[Publer/Upload] Raw job result:', JSON.stringify(result ?? null).slice(0, 1000))
+
+    if (typeof result === 'string') {
+      // Sometimes the result IS the media URL directly
+      mediaId = result
+      mediaType = finalMediaUrl.includes('.mp4') || mediaContentType?.includes('video') ? 'video' : 'image'
+    } else if (Array.isArray(result)) {
+      // Sometimes result is an array of media URLs or objects
+      const first = result[0]
+      if (typeof first === 'string') {
+        mediaId = first
+      } else if (first?.id || first?._id) {
+        mediaId = first.id || first._id
+        mediaType = first.type
+      } else if (first?.url) {
+        mediaId = first.url
+      }
+    } else if (result?.payload?.media) {
       // Array of uploaded media
       const media = Array.isArray(result.payload.media) ? result.payload.media[0] : result.payload.media
       mediaId = media?.id || media?._id
@@ -99,14 +116,25 @@ export async function POST(request: Request) {
     } else if (result?.id) {
       mediaId = result.id
       mediaType = result.type
+    } else if (result?.url) {
+      // Result might just have a URL
+      mediaId = result.url
     }
 
     if (!mediaId) {
-      console.error('[Publer/Upload] Could not extract media ID from result:', JSON.stringify(result).substring(0, 500))
+      console.error('[Publer/Upload] Could not extract media ID from result:', JSON.stringify(result ?? null).slice(0, 500))
       return NextResponse.json({
         error: 'Media uploaded but could not extract ID',
-        rawResult: result,
+        rawResult: result ?? null,
       }, { status: 500 })
+    }
+
+    // Determine media type from URL/content if not set
+    if (!mediaType) {
+      const isVideo = finalMediaUrl.includes('.mp4') || 
+                      finalMediaUrl.includes('.mov') || 
+                      mediaContentType?.includes('video')
+      mediaType = isVideo ? 'video' : 'image'
     }
 
     console.log(`[Publer/Upload] ✓ Media uploaded: ${mediaId} (${mediaType})`)
