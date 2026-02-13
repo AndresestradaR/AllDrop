@@ -1,0 +1,246 @@
+import { NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+import { decrypt } from '@/lib/services/encryption'
+
+export const maxDuration = 60
+
+const ANALYSIS_SYSTEM = `Act as a professional visual analyst specialized in hyperrealistic human description, with expertise in breaking down human appearance into precise, observable parameters for artistic, generative AI, or technical reproduction purposes.
+
+You will be provided with reference images of a person. Your task is to analyze the images strictly from a visual standpoint, without making assumptions about the person's identity, background, or personal information.
+
+Extract and describe, with EXTREME level of detail, ALL visible parameters that define the person in the images. The description should be exhaustive and precise, as if it were intended for a 3D artist, character designer, or AI image generation system to recreate the person with perfect accuracy.
+
+Mandatory Analysis Areas (do not omit any):
+
+1. FACE
+- Overall face shape
+- Facial proportions
+- Visible bone structure
+- Skin (tone, undertone, texture, imperfections, lighting interaction)
+- Eyes (shape, size, color as perceived, spacing, gaze direction, expression)
+- Eyebrows (density, shape, thickness, color, angle)
+- Nose (bridge, width, length, tip shape)
+- Mouth and lips (shape, volume, symmetry, expression)
+- Jawline and chin
+- Distinctive visible features (moles, freckles, wrinkles, scars)
+
+2. HAIR
+- Color
+- Length
+- Texture (straight, wavy, curly, coiled)
+- Volume and density
+- Hairstyle
+- Hairline shape
+- Grooming and overall condition
+
+3. EXPRESSION AND BODY LANGUAGE
+- Dominant facial expression
+- Head position and tilt
+- Shoulder and torso posture
+- Body orientation
+- Emotion or attitude conveyed (based only on visible cues)
+
+4. CLOTHING
+- Upper garments (type, cut, fit, color, fabric)
+- Lower garments
+- Outer layers
+- How the clothing fits the body
+- Overall style classification
+
+5. ACCESSORIES
+- Jewelry
+- Glasses or sunglasses
+- Watches
+- Any small but relevant visual details
+
+6. IMMEDIATE VISUAL CONTEXT
+- Background description
+- Lighting type and direction
+- Camera angle and framing
+- Image quality
+
+Level of Detail: MAXIMUM. Describe every observable detail with clarity and technical precision. Avoid vague language.
+
+Constraints:
+- Do NOT identify the person
+- Do NOT speculate about personal details
+- Base all descriptions strictly on what is visible
+
+Output Format:
+- Clearly structured text with section headings
+- Professional, descriptive, and precise language
+- No emojis
+- No unnecessary conclusions or summaries
+
+ADDITIONALLY, at the end, provide a "PROMPT DESCRIPTOR" section: a single, dense paragraph (200-300 words) that describes the person in a way optimized for AI image generation prompts. This paragraph should be self-contained and usable directly as a character description in any image generation prompt.`
+
+export async function POST(request: Request) {
+  try {
+    const supabase = await createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
+    const body = await request.json()
+    const { influencerId } = body as { influencerId: string }
+
+    if (!influencerId) {
+      return NextResponse.json({ error: 'influencerId es requerido' }, { status: 400 })
+    }
+
+    // Get influencer data
+    const { data: inf } = await supabase
+      .from('influencers')
+      .select('realistic_image_url, angles_grid_url')
+      .eq('id', influencerId)
+      .eq('user_id', user.id)
+      .single()
+
+    if (!inf?.realistic_image_url) {
+      return NextResponse.json({ error: 'No se encontro imagen realista' }, { status: 400 })
+    }
+
+    // Get Google API key (Gemini only for analysis)
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('google_api_key')
+      .eq('id', user.id)
+      .single()
+
+    if (!profile?.google_api_key) {
+      return NextResponse.json({ error: 'Configura tu API key de Google en Settings' }, { status: 400 })
+    }
+
+    const apiKey = decrypt(profile.google_api_key)
+
+    console.log(`[Influencer/VisualAnalysis] User: ${user.id.substring(0, 8)}..., Influencer: ${influencerId.substring(0, 8)}...`)
+
+    // Download images and convert to base64
+    const imageParts: any[] = []
+
+    // Realistic image
+    const realisticRes = await fetch(inf.realistic_image_url)
+    if (realisticRes.ok) {
+      const buffer = await realisticRes.arrayBuffer()
+      const base64 = Buffer.from(buffer).toString('base64')
+      const mimeType = realisticRes.headers.get('content-type') || 'image/jpeg'
+      imageParts.push({
+        inline_data: { mime_type: mimeType, data: base64 },
+      })
+    }
+
+    // Angles grid image (if available)
+    if (inf.angles_grid_url) {
+      const anglesRes = await fetch(inf.angles_grid_url)
+      if (anglesRes.ok) {
+        const buffer = await anglesRes.arrayBuffer()
+        const base64 = Buffer.from(buffer).toString('base64')
+        const mimeType = anglesRes.headers.get('content-type') || 'image/jpeg'
+        imageParts.push({
+          inline_data: { mime_type: mimeType, data: base64 },
+        })
+      }
+    }
+
+    if (imageParts.length === 0) {
+      return NextResponse.json({ error: 'No se pudieron descargar las imagenes' }, { status: 500 })
+    }
+
+    // Call Gemini for visual analysis
+    const parts = [
+      ...imageParts,
+      { text: 'Analyze these reference images of the same person and generate an exhaustive visual analysis following the format specified in your instructions.' },
+    ]
+
+    // Try Gemini 2.5 Pro first, then 2.0 Flash
+    const models = ['gemini-2.5-pro-preview-06-05', 'gemini-2.0-flash']
+    let lastError = ''
+
+    for (const model of models) {
+      try {
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
+
+        const response = await fetch(`${endpoint}?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: ANALYSIS_SYSTEM }] },
+            contents: [{ parts }],
+            generationConfig: {
+              temperature: 0.3,
+              maxOutputTokens: 8192,
+            },
+          }),
+        })
+
+        if (!response.ok) {
+          const errBody = await response.text()
+          console.error(`[Influencer/VisualAnalysis] ${model} failed (${response.status}):`, errBody.substring(0, 300))
+          lastError = `${model}: ${response.status}`
+          continue
+        }
+
+        const data = await response.json()
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+
+        if (!text) {
+          lastError = `${model}: empty response`
+          continue
+        }
+
+        // Extract PROMPT DESCRIPTOR section
+        let promptDescriptor = ''
+        const descriptorMatch = text.match(/PROMPT DESCRIPTOR[:\s]*\n+([\s\S]*?)(?:\n\n---|\n\n#|$)/i)
+        if (descriptorMatch) {
+          promptDescriptor = descriptorMatch[1].trim()
+        }
+
+        // Parse sections into structured character_profile
+        const characterProfile: Record<string, string> = {}
+        const sections = ['FACE', 'HAIR', 'EXPRESSION AND BODY LANGUAGE', 'CLOTHING', 'ACCESSORIES', 'IMMEDIATE VISUAL CONTEXT']
+        for (const section of sections) {
+          const regex = new RegExp(`(?:^|\\n)(?:#+\\s*)?(?:\\d+\\.\\s*)?${section}[:\\s]*\\n([\\s\\S]*?)(?=\\n(?:#+\\s*)?(?:\\d+\\.\\s*)?(?:${sections.join('|')}|PROMPT DESCRIPTOR)|$)`, 'i')
+          const match = text.match(regex)
+          if (match) {
+            characterProfile[section.toLowerCase().replace(/ /g, '_')] = match[1].trim()
+          }
+        }
+
+        // Update influencer with analysis results
+        await supabase
+          .from('influencers')
+          .update({
+            visual_dna: text,
+            prompt_descriptor: promptDescriptor,
+            character_profile: characterProfile,
+            current_step: 5,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', influencerId)
+          .eq('user_id', user.id)
+
+        console.log(`[Influencer/VisualAnalysis] Done with ${model}, visual_dna length: ${text.length}`)
+
+        return NextResponse.json({
+          success: true,
+          visual_dna: text,
+          prompt_descriptor: promptDescriptor,
+          character_profile: characterProfile,
+        })
+
+      } catch (modelError: any) {
+        console.error(`[Influencer/VisualAnalysis] ${model} error:`, modelError.message)
+        lastError = modelError.message
+        continue
+      }
+    }
+
+    return NextResponse.json({ error: `Error al analizar: ${lastError}` }, { status: 500 })
+
+  } catch (error: any) {
+    console.error('[Influencer/VisualAnalysis] Error:', error.message)
+    return NextResponse.json({ error: error.message || 'Error al analizar' }, { status: 500 })
+  }
+}
