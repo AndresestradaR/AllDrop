@@ -84,12 +84,13 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { influencerId, optimizeVideoPrompt, videoModelId, userIdea, promptDescriptor: pdOverride, realisticImageUrl: fallbackRealisticUrl, anglesGridUrl: fallbackAnglesUrl, bodyGridUrl: fallbackBodyUrl } = body as {
+    const { influencerId, optimizeVideoPrompt, videoModelId, userIdea, promptDescriptor: pdOverride, presetId, realisticImageUrl: fallbackRealisticUrl, anglesGridUrl: fallbackAnglesUrl, bodyGridUrl: fallbackBodyUrl } = body as {
       influencerId: string
       optimizeVideoPrompt?: boolean
       videoModelId?: string
       userIdea?: string
       promptDescriptor?: string
+      presetId?: 'producto' | 'rapido' | 'premium'
       realisticImageUrl?: string
       anglesGridUrl?: string
       bodyGridUrl?: string
@@ -130,13 +131,66 @@ RULES:
 - If the user's idea is in Spanish, understand it but write the technical prompt in English with the Spanish speech instruction
 - Do NOT include any headers, explanations, or formatting`
 
+        const UGC_OPTIMIZER_SYSTEM = `You are an expert UGC (User-Generated Content) video prompt creator for AI video generation, specialized in e-commerce and dropshipping content for Latin American markets.
+
+STYLE REQUIREMENTS:
+- UGC aesthetic: natural, candid, unpolished, authentic
+- Camera: Amateur iPhone quality, slightly imperfect framing, handheld feel
+- Realism: Visible imperfections, real-world environments, casual clothing
+- Voice: MANDATORY "The character speaks naturally in Spanish with a Colombian paisa accent, warm and close tone"
+- Duration: Include "15 seconds" or appropriate duration in every prompt
+
+DIALOGUE STRUCTURE (mandatory):
+- Hook (first 3 seconds): Grab attention with a relatable problem or shocking statement
+- Solution (next 8 seconds): Present the product as the answer
+- CTA (final 4 seconds): Clear call to action
+- MAX 130 characters or 25 words for total dialogue
+
+CHARACTER GUIDELINES:
+- Age range: 21-38 years old
+- Diverse appearances (varied ethnicity, gender, body types)
+- Natural imperfections (blemishes, messy hair, uneven skin)
+- Real-world settings (bedroom, kitchen, bathroom, office, gym, park)
+
+CAMERA KEYWORDS TO INCLUDE:
+"unremarkable amateur iPhone video, slightly shaky handheld, natural lighting, casual framing"
+
+OUTPUT FORMAT:
+- Write the prompt in English for technical quality
+- ALWAYS include the Spanish speech instruction
+- Include specific camera movements and angles
+- Describe the character's emotion and body language
+- Include environmental details and lighting
+
+RULES:
+- Output ONLY the optimized prompt, nothing else
+- No headers, explanations, or formatting
+- Keep prompts under 800 characters for best results`
+
+        // Select system prompt based on preset
+        const isUGCPreset = presetId && ['producto', 'rapido', 'premium'].includes(presetId)
+        const systemPrompt = isUGCPreset ? UGC_OPTIMIZER_SYSTEM : optimizerSystem
+
+        // Build user message
+        let userMessage = `Character description: ${pdOverride || ''}\n\nUser's video idea: ${userIdea}\n\nTarget model: ${videoModelId || 'kling-3.0'}`
+
+        if (presetId === 'producto') {
+          userMessage += `\n\nIMPORTANT: This is a PRODUCT-ONLY video. The character will be generated from the text description only (Sora model). Focus the prompt on the character naturally showcasing/using the product. Include the full character description in the prompt.`
+        } else if (presetId === 'rapido') {
+          userMessage += `\n\nIMPORTANT: This video uses the character's PHOTO as the starting frame (Veo model). The prompt should describe what the character DOES in the video, not how they look. Focus on action, camera movement, and dialogue. Duration: 8 seconds.`
+        } else if (presetId === 'premium') {
+          userMessage += `\n\nIMPORTANT: This is a PREMIUM video with Kling 3.0 (supports audio natively). The character's photo is used as reference. Focus on cinematic quality while maintaining UGC authenticity. Include detailed camera movements, lighting changes, and emotional progression. Duration: 10-15 seconds.`
+        }
+
+        userMessage += `\n\nGenerate the optimized video prompt:`
+
         const endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent'
         const response = await fetch(`${endpoint}?key=${apiKey}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            systemInstruction: { parts: [{ text: optimizerSystem }] },
-            contents: [{ parts: [{ text: `Character description: ${pdOverride || ''}\n\nUser's video idea: ${userIdea}\n\nTarget model: ${videoModelId || 'kling-3.0-standard'}\n\nGenerate the optimized video prompt:` }] }],
+            systemInstruction: { parts: [{ text: systemPrompt }] },
+            contents: [{ parts: [{ text: userMessage }] }],
             generationConfig: { temperature: 0.7, maxOutputTokens: 1024 },
           }),
         })
