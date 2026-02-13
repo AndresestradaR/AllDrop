@@ -19,7 +19,7 @@ import {
 import toast from 'react-hot-toast'
 
 // Provider icons (simple text-based for now)
-const PROVIDER_CONFIG: Record<string, { label: string; color: string; emoji: string }> = {
+const PROVIDER_CONFIG: Record&lt;string, { label: string; color: string; emoji: string }&gt; = {
   facebook: { label: 'Facebook', color: 'bg-blue-600', emoji: '📘' },
   instagram: { label: 'Instagram', color: 'bg-gradient-to-br from-purple-600 to-pink-500', emoji: '📸' },
   twitter: { label: 'X / Twitter', color: 'bg-black', emoji: '𝕏' },
@@ -63,7 +63,7 @@ interface PublisherModalProps {
   previewUrl?: string
 }
 
-type PublishStep = 'select' | 'uploading' | 'publishing' | 'done' | 'error'
+type PublishStep = 'select' | 'publishing' | 'done' | 'error'
 
 export function PublisherModal({
   isOpen,
@@ -75,14 +75,14 @@ export function PublisherModal({
   defaultCaption = '',
   previewUrl,
 }: PublisherModalProps) {
-  const [accounts, setAccounts] = useState<PublerAccount[]>([])
-  const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([])
+  const [accounts, setAccounts] = useState&lt;PublerAccount[]&gt;([])
+  const [selectedAccountIds, setSelectedAccountIds] = useState&lt;string[]&gt;([])
   const [caption, setCaption] = useState(defaultCaption)
   const [isScheduled, setIsScheduled] = useState(false)
   const [scheduledDate, setScheduledDate] = useState('')
   const [scheduledTime, setScheduledTime] = useState('')
   const [isLoadingAccounts, setIsLoadingAccounts] = useState(false)
-  const [step, setStep] = useState<PublishStep>('select')
+  const [step, setStep] = useState&lt;PublishStep&gt;('select')
   const [errorMessage, setErrorMessage] = useState('')
   const [accountsError, setAccountsError] = useState('')
 
@@ -152,41 +152,6 @@ export function PublisherModal({
     }
 
     try {
-      // Step 1: Upload media (if not status-only post)
-      let publerMediaId: string | null = null
-      let publerMediaType: string | null = null
-
-      if (contentType !== 'status') {
-        setStep('uploading')
-
-        const uploadBody: Record<string, any> = {
-          name: `estrategas-${Date.now()}`,
-        }
-
-        if (mediaUrl) {
-          uploadBody.mediaUrl = mediaUrl
-        } else if (mediaBase64) {
-          uploadBody.mediaBase64 = mediaBase64
-          uploadBody.mediaContentType = mediaContentType || 'image/png'
-        }
-
-        const uploadResponse = await fetch('/api/publer/upload-media', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(uploadBody),
-        })
-
-        const uploadData = await uploadResponse.json()
-
-        if (!uploadResponse.ok || !uploadData.success) {
-          throw new Error(uploadData.error || 'Error subiendo media a Publer')
-        }
-
-        publerMediaId = uploadData.mediaId
-        publerMediaType = uploadData.mediaType
-      }
-
-      // Step 2: Publish post
       setStep('publishing')
 
       // Build scheduled datetime
@@ -195,15 +160,18 @@ export function PublisherModal({
         scheduledAt = new Date(`${scheduledDate}T${scheduledTime}`).toISOString()
       }
 
-      const publishBody: Record<string, any> = {
+      // Send everything to publish route - it handles media URL/base64 directly
+      const publishBody: Record&lt;string, any&gt; = {
         accountIds: selectedAccountIds,
         text: caption,
-        contentType: publerMediaId ? contentType : 'status',
+        contentType,
       }
 
-      if (publerMediaId) {
-        publishBody.mediaIds = [publerMediaId]
-        publishBody.mediaType = publerMediaType === 'video' ? 'video' : 'image'
+      if (mediaUrl) {
+        publishBody.mediaUrl = mediaUrl
+      } else if (mediaBase64) {
+        publishBody.mediaBase64 = mediaBase64
+        publishBody.mediaContentType = mediaContentType || 'image/png'
       }
 
       if (scheduledAt) {
@@ -243,121 +211,121 @@ export function PublisherModal({
   const ContentIcon = contentType === 'video' ? Video : contentType === 'status' ? Send : ImageIcon
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    &lt;div className="fixed inset-0 z-50 flex items-center justify-center"&gt;
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      &lt;div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} /&gt;
 
       {/* Modal */}
-      <div className="relative w-full max-w-lg mx-4 bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden">
+      &lt;div className="relative w-full max-w-lg mx-4 bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden"&gt;
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-gradient-to-br from-indigo-500 to-blue-500 text-white">
-              <Share2 className="w-4 h-4" />
-            </div>
-            <h3 className="text-lg font-semibold text-text-primary">Publicar en Redes</h3>
-          </div>
-          <button
+        &lt;div className="flex items-center justify-between px-6 py-4 border-b border-border"&gt;
+          &lt;div className="flex items-center gap-3"&gt;
+            &lt;div className="p-2 rounded-lg bg-gradient-to-br from-indigo-500 to-blue-500 text-white"&gt;
+              &lt;Share2 className="w-4 h-4" /&gt;
+            &lt;/div&gt;
+            &lt;h3 className="text-lg font-semibold text-text-primary"&gt;Publicar en Redes&lt;/h3&gt;
+          &lt;/div&gt;
+          &lt;button
             onClick={onClose}
             className="p-2 hover:bg-border/50 rounded-lg transition-colors"
-          >
-            <X className="w-5 h-5 text-text-secondary" />
-          </button>
-        </div>
+          &gt;
+            &lt;X className="w-5 h-5 text-text-secondary" /&gt;
+          &lt;/button&gt;
+        &lt;/div&gt;
 
-        <div className="px-6 py-4 max-h-[70vh] overflow-y-auto">
+        &lt;div className="px-6 py-4 max-h-[70vh] overflow-y-auto"&gt;
           {/* Step: Select accounts */}
           {step === 'select' && (
-            <div className="space-y-4">
+            &lt;div className="space-y-4"&gt;
               {/* Media Preview */}
               {previewUrl && (
-                <div className="flex items-center gap-3 p-3 bg-surface-elevated rounded-xl">
+                &lt;div className="flex items-center gap-3 p-3 bg-surface-elevated rounded-xl"&gt;
                   {contentType === 'video' ? (
-                    <div className="w-16 h-16 rounded-lg bg-border flex items-center justify-center">
-                      <Video className="w-6 h-6 text-text-secondary" />
-                    </div>
+                    &lt;div className="w-16 h-16 rounded-lg bg-border flex items-center justify-center"&gt;
+                      &lt;Video className="w-6 h-6 text-text-secondary" /&gt;
+                    &lt;/div&gt;
                   ) : (
-                    <img
+                    &lt;img
                       src={previewUrl}
                       alt="Preview"
                       className="w-16 h-16 object-cover rounded-lg"
-                    />
+                    /&gt;
                   )}
-                  <div>
-                    <p className="text-sm font-medium text-text-primary flex items-center gap-1">
-                      <ContentIcon className="w-4 h-4" />
+                  &lt;div&gt;
+                    &lt;p className="text-sm font-medium text-text-primary flex items-center gap-1"&gt;
+                      &lt;ContentIcon className="w-4 h-4" /&gt;
                       {contentType === 'video' ? 'Video' : contentType === 'status' ? 'Texto' : 'Imagen'}
-                    </p>
-                    <p className="text-xs text-text-secondary">Listo para publicar</p>
-                  </div>
-                </div>
+                    &lt;/p&gt;
+                    &lt;p className="text-xs text-text-secondary"&gt;Listo para publicar&lt;/p&gt;
+                  &lt;/div&gt;
+                &lt;/div&gt;
               )}
 
               {/* Caption */}
-              <div>
-                <label className="block text-sm font-medium text-text-secondary mb-1.5">
+              &lt;div&gt;
+                &lt;label className="block text-sm font-medium text-text-secondary mb-1.5"&gt;
                   Caption / Texto
-                </label>
-                <textarea
+                &lt;/label&gt;
+                &lt;textarea
                   value={caption}
                   onChange={(e) => setCaption(e.target.value)}
                   placeholder="Escribe el texto de tu publicación..."
                   rows={3}
                   className="w-full px-4 py-3 bg-surface-elevated border border-border rounded-xl text-text-primary placeholder:text-text-muted resize-none focus:outline-none focus:ring-2 focus:ring-accent/50"
-                />
-              </div>
+                /&gt;
+              &lt;/div&gt;
 
               {/* Accounts */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-sm font-medium text-text-secondary">
+              &lt;div&gt;
+                &lt;div className="flex items-center justify-between mb-2"&gt;
+                  &lt;label className="text-sm font-medium text-text-secondary"&gt;
                     Cuentas destino
-                  </label>
+                  &lt;/label&gt;
                   {accounts.length > 0 && (
-                    <button
+                    &lt;button
                       onClick={selectAll}
                       className="text-xs text-accent hover:text-accent-hover transition-colors"
-                    >
+                    &gt;
                       {selectedAccountIds.length === accounts.length
                         ? 'Deseleccionar todo'
                         : 'Seleccionar todo'}
-                    </button>
+                    &lt;/button&gt;
                   )}
-                </div>
+                &lt;/div&gt;
 
                 {isLoadingAccounts ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="w-6 h-6 animate-spin text-accent" />
-                    <span className="ml-2 text-sm text-text-secondary">Cargando cuentas...</span>
-                  </div>
+                  &lt;div className="flex items-center justify-center py-8"&gt;
+                    &lt;Loader2 className="w-6 h-6 animate-spin text-accent" /&gt;
+                    &lt;span className="ml-2 text-sm text-text-secondary"&gt;Cargando cuentas...&lt;/span&gt;
+                  &lt;/div&gt;
                 ) : accountsError ? (
-                  <div className="text-center py-6">
-                    <AlertCircle className="w-8 h-8 text-error mx-auto mb-2" />
-                    <p className="text-sm text-error mb-2">{accountsError}</p>
-                    <a
+                  &lt;div className="text-center py-6"&gt;
+                    &lt;AlertCircle className="w-8 h-8 text-error mx-auto mb-2" /&gt;
+                    &lt;p className="text-sm text-error mb-2"&gt;{accountsError}&lt;/p&gt;
+                    &lt;a
                       href="/dashboard/settings"
                       className="inline-flex items-center gap-1 text-xs text-accent hover:text-accent-hover"
-                    >
-                      <Settings className="w-3 h-3" />
+                    &gt;
+                      &lt;Settings className="w-3 h-3" /&gt;
                       Configurar Publer en Settings
-                    </a>
-                  </div>
+                    &lt;/a&gt;
+                  &lt;/div&gt;
                 ) : accounts.length === 0 ? (
-                  <div className="text-center py-6">
-                    <p className="text-sm text-text-secondary mb-2">
+                  &lt;div className="text-center py-6"&gt;
+                    &lt;p className="text-sm text-text-secondary mb-2"&gt;
                       No hay cuentas sociales conectadas
-                    </p>
-                    <a
+                    &lt;/p&gt;
+                    &lt;a
                       href="https://app.publer.com/settings"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-xs text-accent hover:text-accent-hover"
-                    >
-                      Conectar cuentas en Publer -&gt;
-                    </a>
-                  </div>
+                    &gt;
+                      Conectar cuentas en Publer -&amp;gt;
+                    &lt;/a&gt;
+                  &lt;/div&gt;
                 ) : (
-                  <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                  &lt;div className="space-y-1.5 max-h-48 overflow-y-auto"&gt;
                     {accounts.map((account) => {
                       const config = PROVIDER_CONFIG[account.provider] || {
                         label: account.provider,
@@ -367,7 +335,7 @@ export function PublisherModal({
                       const isSelected = selectedAccountIds.includes(account.id)
 
                       return (
-                        <button
+                        &lt;button
                           key={account.id}
                           onClick={() => toggleAccount(account.id)}
                           className={cn(
@@ -376,51 +344,51 @@ export function PublisherModal({
                               ? 'bg-accent/10 border border-accent/30'
                               : 'bg-surface-elevated border border-transparent hover:border-border'
                           )}
-                        >
+                        &gt;
                           {/* Provider icon */}
-                          <div
+                          &lt;div
                             className={cn(
                               'w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm',
                               config.color
                             )}
-                          >
+                          &gt;
                             {account.picture ? (
-                              <img
+                              &lt;img
                                 src={account.picture}
                                 alt=""
                                 className="w-8 h-8 rounded-lg object-cover"
-                              />
+                              /&gt;
                             ) : (
-                              <span>{config.emoji}</span>
+                              &lt;span&gt;{config.emoji}&lt;/span&gt;
                             )}
-                          </div>
+                          &lt;/div&gt;
 
-                          <div className="flex-1 text-left">
-                            <p className="text-sm font-medium text-text-primary">{account.name}</p>
-                            <p className="text-xs text-text-secondary">{config.label}</p>
-                          </div>
+                          &lt;div className="flex-1 text-left"&gt;
+                            &lt;p className="text-sm font-medium text-text-primary"&gt;{account.name}&lt;/p&gt;
+                            &lt;p className="text-xs text-text-secondary"&gt;{config.label}&lt;/p&gt;
+                          &lt;/div&gt;
 
                           {/* Checkbox */}
-                          <div
+                          &lt;div
                             className={cn(
                               'w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors',
                               isSelected
                                 ? 'bg-accent border-accent'
                                 : 'border-border'
                             )}
-                          >
-                            {isSelected && <Check className="w-3 h-3 text-white" />}
-                          </div>
-                        </button>
+                          &gt;
+                            {isSelected && &lt;Check className="w-3 h-3 text-white" /&gt;}
+                          &lt;/div&gt;
+                        &lt;/button&gt;
                       )
                     })}
-                  </div>
+                  &lt;/div&gt;
                 )}
-              </div>
+              &lt;/div&gt;
 
               {/* Schedule toggle */}
-              <div>
-                <button
+              &lt;div&gt;
+                &lt;button
                   onClick={() => setIsScheduled(!isScheduled)}
                   className={cn(
                     'flex items-center gap-2 px-3 py-2 rounded-lg transition-colors text-sm',
@@ -428,97 +396,88 @@ export function PublisherModal({
                       ? 'bg-accent/10 text-accent'
                       : 'text-text-secondary hover:text-text-primary hover:bg-surface-elevated'
                   )}
-                >
-                  <Calendar className="w-4 h-4" />
+                &gt;
+                  &lt;Calendar className="w-4 h-4" /&gt;
                   {isScheduled ? 'Publicación agendada' : 'Agendar para después'}
-                </button>
+                &lt;/button&gt;
 
                 {isScheduled && (
-                  <div className="flex gap-2 mt-2">
-                    <input
+                  &lt;div className="flex gap-2 mt-2"&gt;
+                    &lt;input
                       type="date"
                       value={scheduledDate}
                       onChange={(e) => setScheduledDate(e.target.value)}
                       min={new Date().toISOString().split('T')[0]}
                       className="flex-1 px-3 py-2 bg-surface-elevated border border-border rounded-lg text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50"
-                    />
-                    <input
+                    /&gt;
+                    &lt;input
                       type="time"
                       value={scheduledTime}
                       onChange={(e) => setScheduledTime(e.target.value)}
                       className="px-3 py-2 bg-surface-elevated border border-border rounded-lg text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50"
-                    />
-                  </div>
+                    /&gt;
+                  &lt;/div&gt;
                 )}
-              </div>
-            </div>
-          )}
-
-          {/* Step: Uploading */}
-          {step === 'uploading' && (
-            <div className="flex flex-col items-center justify-center py-12">
-              <Loader2 className="w-10 h-10 animate-spin text-accent mb-4" />
-              <p className="text-text-primary font-medium">Subiendo media a Publer...</p>
-              <p className="text-sm text-text-secondary mt-1">Esto puede tomar unos segundos</p>
-            </div>
+              &lt;/div&gt;
+            &lt;/div&gt;
           )}
 
           {/* Step: Publishing */}
           {step === 'publishing' && (
-            <div className="flex flex-col items-center justify-center py-12">
-              <Loader2 className="w-10 h-10 animate-spin text-accent mb-4" />
-              <p className="text-text-primary font-medium">
+            &lt;div className="flex flex-col items-center justify-center py-12"&gt;
+              &lt;Loader2 className="w-10 h-10 animate-spin text-accent mb-4" /&gt;
+              &lt;p className="text-text-primary font-medium"&gt;
                 {isScheduled ? 'Agendando publicación...' : 'Publicando...'}
-              </p>
-              <p className="text-sm text-text-secondary mt-1">
-                Enviando a {selectedAccountIds.length} cuenta{selectedAccountIds.length > 1 ? 's' : ''}
-              </p>
-            </div>
+              &lt;/p&gt;
+              &lt;p className="text-sm text-text-secondary mt-1"&gt;
+                Subiendo media y enviando a {selectedAccountIds.length} cuenta{selectedAccountIds.length > 1 ? 's' : ''}
+              &lt;/p&gt;
+            &lt;/div&gt;
           )}
 
           {/* Step: Done */}
           {step === 'done' && (
-            <div className="flex flex-col items-center justify-center py-12">
-              <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center mb-4">
-                <Check className="w-8 h-8 text-green-500" />
-              </div>
-              <p className="text-text-primary font-medium">
+            &lt;div className="flex flex-col items-center justify-center py-12"&gt;
+              &lt;div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center mb-4"&gt;
+                &lt;Check className="w-8 h-8 text-green-500" /&gt;
+              &lt;/div&gt;
+              &lt;p className="text-text-primary font-medium"&gt;
                 {isScheduled ? '¡Publicación agendada!' : '¡Publicado exitosamente!'}
-              </p>
-              <p className="text-sm text-text-secondary mt-1">
+              &lt;/p&gt;
+              &lt;p className="text-sm text-text-secondary mt-1"&gt;
                 {selectedAccountIds.length} cuenta{selectedAccountIds.length > 1 ? 's' : ''}
-              </p>
-            </div>
+              &lt;/p&gt;
+            &lt;/div&gt;
           )}
 
           {/* Step: Error */}
           {step === 'error' && (
-            <div className="flex flex-col items-center justify-center py-12">
-              <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center mb-4">
-                <AlertCircle className="w-8 h-8 text-red-500" />
-              </div>
-              <p className="text-text-primary font-medium">Error al publicar</p>
-              <p className="text-sm text-error mt-1">{errorMessage}</p>
-              <button
+            &lt;div className="flex flex-col items-center justify-center py-12"&gt;
+              &lt;div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center mb-4"&gt;
+                &lt;AlertCircle className="w-8 h-8 text-red-500" /&gt;
+              &lt;/div&gt;
+              &lt;p className="text-text-primary font-medium"&gt;Error al publicar&lt;/p&gt;
+              &lt;p className="text-sm text-error mt-1"&gt;{errorMessage}&lt;/p&gt;
+              &lt;button
                 onClick={() => setStep('select')}
                 className="mt-4 px-4 py-2 text-sm bg-surface-elevated border border-border rounded-lg hover:bg-border/50 transition-colors text-text-primary"
-              >
+              &gt;
                 Reintentar
-              </button>
-            </div>
+              &lt;/button&gt;
+            &lt;/div&gt;
           )}
-        </div>
+        &lt;/div&gt;
 
         {/* Footer - only show on select step */}
         {step === 'select' && (
-          <div className="px-6 py-4 border-t border-border flex gap-3">
-            <button
+          &lt;div className="px-6 py-4 border-t border-border flex gap-3"&gt;
+            &lt;button
               onClick={onClose}
               className="flex-1 px-4 py-2.5 border border-border rounded-xl text-sm font-medium text-text-secondary hover:bg-surface-elevated transition-colors"
-            >
+            &gt;
               Cancelar
-            </button>
-            <button
+            &lt;/button&gt;
+            &lt;button
               onClick={handlePublish}
               disabled={selectedAccountIds.length === 0}
               className={cn(
@@ -527,13 +486,13 @@ export function PublisherModal({
                   ? 'bg-border text-text-secondary cursor-not-allowed'
                   : 'bg-accent hover:bg-accent-hover text-background shadow-lg shadow-accent/25'
               )}
-            >
-              <Send className="w-4 h-4" />
+            &gt;
+              &lt;Send className="w-4 h-4" /&gt;
               {isScheduled ? 'Agendar' : 'Publicar ahora'}
-            </button>
-          </div>
+            &lt;/button&gt;
+          &lt;/div&gt;
         )}
-      </div>
-    </div>
+      &lt;/div&gt;
+    &lt;/div&gt;
   )
 }
