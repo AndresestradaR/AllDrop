@@ -3,9 +3,14 @@ import { generateSpeech as generateElevenLabs } from '@/lib/audio-providers/elev
 import { generateSpeech as generateGeminiTTS } from '@/lib/audio-providers/google-tts'
 import { createClient } from '@/lib/supabase/server'
 import { type AudioModelId } from '@/lib/audio-providers/types'
+import { tryUploadToR2 } from '@/lib/services/r2-upload'
 
 export async function POST(req: NextRequest) {
   try {
+    // Auth check (needed for R2 upload)
+    const supabaseAuth = await createClient()
+    const { data: { user } } = await supabaseAuth.auth.getUser()
+
     const body = await req.json()
     const {
       text,
@@ -128,10 +133,21 @@ export async function POST(req: NextRequest) {
 
     if (uploadError) {
       console.error('[API/generate-audio] Upload error:', uploadError)
-      // Return base64 if upload fails
+      // Try R2 even if Supabase failed
+      let r2Url: string | null = null
+      if (user) {
+        r2Url = await tryUploadToR2(
+          user.id,
+          audioBuffer,
+          `audio/${fileName}`,
+          result.contentType || 'audio/mpeg'
+        )
+      }
+
       return NextResponse.json({
         success: true,
         audioBase64: result.audioBase64,
+        r2Url,
         contentType: result.contentType,
         charactersUsed: result.charactersUsed,
         provider: result.provider,
@@ -149,9 +165,22 @@ export async function POST(req: NextRequest) {
       provider: result.provider,
     })
 
+    // Try R2 upload (optional, non-blocking)
+    let r2Url: string | null = null
+    if (user) {
+      r2Url = await tryUploadToR2(
+        user.id,
+        audioBuffer,
+        `audio/${fileName}`,
+        result.contentType || 'audio/mpeg'
+      )
+      if (r2Url) console.log(`[API/generate-audio] ✓ Audio saved to R2: ${r2Url}`)
+    }
+
     return NextResponse.json({
       success: true,
       audioUrl: urlData.publicUrl,
+      r2Url,
       contentType: result.contentType,
       charactersUsed: result.charactersUsed,
       provider: result.provider,

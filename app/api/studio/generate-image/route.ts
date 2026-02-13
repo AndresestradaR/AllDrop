@@ -10,6 +10,7 @@ import {
   modelIdToProviderType,
   type ImageModelId,
 } from '@/lib/image-providers'
+import { tryUploadToR2 } from '@/lib/services/r2-upload'
 
 // Mark this route as requiring extended timeout (Vercel Pro)
 export const maxDuration = 120 // 2 minutes max
@@ -234,11 +235,23 @@ export async function POST(request: Request) {
 
     console.log(`[Studio] ✓ Image generated successfully in ${totalTime}s with ${selectedProvider}`)
 
+    // Try R2 upload (optional, non-blocking)
+    const resultMime = result.mimeType || 'image/png'
+    const ext = resultMime.includes('png') ? 'png' : resultMime.includes('webp') ? 'webp' : 'jpg'
+    const r2Url = await tryUploadToR2(
+      user.id,
+      Buffer.from(result.imageBase64, 'base64'),
+      `images/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${ext}`,
+      resultMime
+    )
+    if (r2Url) console.log(`[Studio] ✓ Image saved to R2: ${r2Url}`)
+
     return NextResponse.json({
       success: true,
       imageBase64: result.imageBase64,
-      mimeType: result.mimeType || 'image/png',
+      mimeType: resultMime,
       provider: selectedProvider,
+      r2Url,
     })
 
   } catch (error: any) {

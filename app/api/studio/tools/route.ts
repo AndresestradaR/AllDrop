@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { decrypt } from '@/lib/services/encryption'
+import { tryUploadToR2, tryUploadUrlToR2 } from '@/lib/services/r2-upload'
 
 type ToolType = 'variations' | 'upscale' | 'remove-bg' | 'camera-angle' | 'mockup' | 'lip-sync' | 'deep-face'
 
@@ -672,10 +673,20 @@ export async function POST(request: Request) {
         const result = await generateWithGemini(imageBase64, mimeType, tool, apiKey)
 
         if (result.success && result.imageBase64) {
+          // Try R2 upload
+          const r2Url = await tryUploadToR2(
+            user.id,
+            Buffer.from(result.imageBase64, 'base64'),
+            `tools/${tool}/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.png`,
+            'image/png'
+          )
+          if (r2Url) console.log(`[Tools] ✓ ${tool} saved to R2: ${r2Url}`)
+
           return NextResponse.json({
             success: true,
             imageBase64: result.imageBase64,
             mimeType: 'image/png',
+            r2Url,
           })
         }
 
@@ -700,10 +711,20 @@ export async function POST(request: Request) {
         const result = await removeBackground(imageBase64, apiKey)
 
         if (result.success && result.imageBase64) {
+          // Try R2 upload
+          const r2Url = await tryUploadToR2(
+            user.id,
+            Buffer.from(result.imageBase64, 'base64'),
+            `tools/remove-bg/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.png`,
+            'image/png'
+          )
+          if (r2Url) console.log(`[Tools] ✓ remove-bg saved to R2: ${r2Url}`)
+
           return NextResponse.json({
             success: true,
             imageBase64: result.imageBase64,
             mimeType: 'image/png',
+            r2Url,
           })
         }
 
@@ -881,6 +902,18 @@ export async function GET(request: Request) {
     const result = type === 'deep-face'
       ? await checkDeepFaceStatus(taskId, apiKey)
       : await checkLipSyncStatus(taskId, apiKey)
+
+    // If completed with video URL, try R2 upload
+    if (result.status === 'completed' && result.videoUrl) {
+      const r2Url = await tryUploadUrlToR2(
+        user.id,
+        result.videoUrl,
+        `tools/${type}/${Date.now()}-${taskId.substring(0, 8)}.mp4`,
+        'video/mp4'
+      )
+      if (r2Url) console.log(`[Tools/${type}] ✓ Video saved to R2: ${r2Url}`)
+      return NextResponse.json({ ...result, r2Url })
+    }
 
     return NextResponse.json(result)
 

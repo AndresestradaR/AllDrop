@@ -107,3 +107,65 @@ export async function testR2Connection(userId: string): Promise<{ success: boole
     objectCount: result.KeyCount || 0,
   }
 }
+
+/**
+ * Try to upload a buffer to R2. Returns null silently if R2 not configured or fails.
+ * Use this in generation APIs where R2 is optional.
+ */
+export async function tryUploadToR2(
+  userId: string,
+  buffer: Buffer,
+  key: string,
+  contentType: string
+): Promise<string | null> {
+  try {
+    const creds = await getR2Credentials(userId)
+    if (!creds) return null
+
+    const client = createR2Client(creds)
+    const fullKey = `${userId.substring(0, 8)}/${key}`
+
+    await client.send(new PutObjectCommand({
+      Bucket: creds.bucketName,
+      Key: fullKey,
+      Body: buffer,
+      ContentType: contentType,
+    }))
+
+    if (creds.publicUrl) {
+      const base = creds.publicUrl.endsWith('/') ? creds.publicUrl.slice(0, -1) : creds.publicUrl
+      return `${base}/${fullKey}`
+    }
+    return `https://${creds.bucketName}.${creds.accountId}.r2.cloudflarestorage.com/${fullKey}`
+  } catch (err: any) {
+    console.warn('[R2] Optional upload failed, continuing:', err.message)
+    return null
+  }
+}
+
+/**
+ * Try to download from URL and upload to R2. Returns null silently if R2 not configured or fails.
+ */
+export async function tryUploadUrlToR2(
+  userId: string,
+  sourceUrl: string,
+  key: string,
+  contentType?: string
+): Promise<string | null> {
+  try {
+    const creds = await getR2Credentials(userId)
+    if (!creds) return null
+
+    const response = await fetch(sourceUrl)
+    if (!response.ok) return null
+
+    const arrayBuffer = await response.arrayBuffer()
+    const buffer = Buffer.from(arrayBuffer)
+    const ct = contentType || response.headers.get('content-type') || 'application/octet-stream'
+
+    return tryUploadToR2(userId, buffer, key, ct)
+  } catch (err: any) {
+    console.warn('[R2] Optional URL upload failed, continuing:', err.message)
+    return null
+  }
+}

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { decrypt } from '@/lib/services/encryption'
+import { tryUploadUrlToR2 } from '@/lib/services/r2-upload'
 
 const KIE_API_BASE = 'https://api.kie.ai/api/v1'
 
@@ -146,10 +147,20 @@ export async function GET(request: Request) {
     }
 
     if (result.status === 'completed' && result.videoUrl) {
+      // Try R2 upload (optional, non-blocking)
+      const r2Url = await tryUploadUrlToR2(
+        user.id,
+        result.videoUrl,
+        `videos/${Date.now()}-${taskId.substring(0, 8)}.mp4`,
+        'video/mp4'
+      )
+      if (r2Url) console.log(`[VideoStatus] ✓ Video saved to R2: ${r2Url}`)
+
       return NextResponse.json({
         success: true,
         status: 'completed',
         videoUrl: result.videoUrl,
+        r2Url,
         taskId,
       })
     }
