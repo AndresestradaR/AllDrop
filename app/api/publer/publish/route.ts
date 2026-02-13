@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { getPublerCredentials, getAccounts, uploadMediaFromUrl, pollJobUntilComplete } from '@/lib/services/publer'
+import { getPublerCredentials, getAccounts, uploadMediaFromUrl, pollJobUntilComplete, PublerAccount } from '@/lib/services/publer'
 
 export const maxDuration = 60
 
@@ -124,15 +124,14 @@ export async function POST(request: Request) {
     // ========================================
     // Step 3: Determine provider for each account
     // ========================================
-    let accounts
+    let allAccounts: PublerAccount[] = []
     try {
-      accounts = await getAccounts(creds)
+      allAccounts = await getAccounts(creds)
     } catch {
-      accounts = []
+      allAccounts = []
     }
 
     // Map provider names for each selected account
-    // Publer provider types -> network keys
     const PROVIDER_TO_NETWORK: Record<string, string> = {
       facebook: 'facebook',
       ig_business: 'instagram',
@@ -151,7 +150,7 @@ export async function POST(request: Request) {
     }
 
     // Build networks object with provider-specific entries
-    const selectedAccounts = accounts.filter((a: any) => accountIds.includes(a.id))
+    const selectedAccounts = allAccounts.filter((a) => accountIds.includes(a.id))
     const providerSet = new Set<string>()
 
     for (const acc of selectedAccounts) {
@@ -252,7 +251,7 @@ export async function POST(request: Request) {
     console.log('[Publer/Publish] Job result:', JSON.stringify(publishResult).slice(0, 500))
 
     // Check for failures in the result
-    const failures = publishResult.result?.payload?.failures || []
+    const failures = publishResult.result?.payload?.failures || publishResult.result?.failures || []
     if (Array.isArray(failures) && failures.length > 0) {
       const failMsg = failures.map((f: any) => f.message || f.error || JSON.stringify(f)).join('; ')
       console.error('[Publer/Publish] Publish failures:', failMsg)
