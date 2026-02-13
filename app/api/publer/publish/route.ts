@@ -149,24 +149,28 @@ export async function POST(request: Request) {
       bluesky: 'bluesky',
     }
 
-    // Build networks object with provider-specific entries
+    // Build unique provider list from selected accounts
     const selectedAccounts = allAccounts.filter((a) => accountIds.includes(a.id))
-    const providerSet = new Set<string>()
+    const providerList: string[] = []
 
-    for (const acc of selectedAccounts) {
+    for (let i = 0; i < selectedAccounts.length; i++) {
+      const acc = selectedAccounts[i]
       const provider = acc.type || acc.provider || 'instagram'
       const networkKey = PROVIDER_TO_NETWORK[provider] || provider
-      providerSet.add(networkKey)
+      if (!providerList.includes(networkKey)) {
+        providerList.push(networkKey)
+      }
     }
 
     // If we couldn't determine providers, fallback to instagram
-    if (providerSet.size === 0) {
-      providerSet.add('instagram')
+    if (providerList.length === 0) {
+      providerList.push('instagram')
     }
 
     // Build the network content for each provider
     const networks: Record<string, any> = {}
-    for (const networkKey of providerSet) {
+    for (let i = 0; i < providerList.length; i++) {
+      const networkKey = providerList[i]
       const networkContent: Record<string, any> = {
         type: contentType === 'status' ? 'status' : contentType,
         text: text || '',
@@ -239,7 +243,6 @@ export async function POST(request: Request) {
 
     const jobId = data.id || data.job_id
     if (!jobId) {
-      // Some endpoints return result directly
       return NextResponse.json({ success: true, result: data })
     }
 
