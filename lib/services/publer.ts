@@ -119,13 +119,98 @@ export async function getWorkspaces(apiKey: string): Promise<PublerWorkspace[]> 
 // MEDIA UPLOAD
 // ============================================
 
+export interface PublerMediaObject {
+  id: string
+  path: string
+  thumbnail?: string
+  type: string
+  name?: string
+  validity?: Record<string, any>
+  width?: number
+  height?: number
+}
+
+/**
+ * Upload media DIRECTLY via multipart/form-data.
+ * This returns the media object IMMEDIATELY (no polling needed).
+ * 
+ * Use this instead of uploadMediaFromUrl to avoid async job timeouts.
+ */
+export async function uploadMediaDirect(
+  creds: PublerCredentials,
+  fileBuffer: Buffer,
+  filename: string,
+  contentType: string
+): Promise<PublerMediaObject> {
+  // Build multipart form data manually using Web API FormData + Blob
+  const formData = new FormData()
+  const blob = new Blob([fileBuffer], { type: contentType })
+  formData.append('file', blob, filename)
+  formData.append('direct_upload', 'false')
+  formData.append('in_library', 'false')
+
+  const response = await fetch(`${PUBLER_API_BASE}/media`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer-API ${creds.apiKey}`,
+      'Publer-Workspace-Id': creds.workspaceId,
+      'Accept': '*/*',
+      // Do NOT set Content-Type - fetch sets it automatically with boundary for FormData
+    },
+    body: formData,
+  })
+
+  if (!response.ok) {
+    const error = await response.text()
+    throw new Error(`Direct media upload error: ${response.status} - ${error}`)
+  }
+
+  const data = await response.json()
+
+  console.log('[Publer/MediaDirect] Response:', JSON.stringify(data).slice(0, 500))
+
+  if (!data.id || !data.path) {
+    throw new Error(`Direct upload did not return media object: ${JSON.stringify(data).slice(0, 300)}`)
+  }
+
+  return {
+    id: data.id,
+    path: data.path,
+    thumbnail: data.thumbnail,
+    type: data.type || 'photo',
+    name: data.name,
+    validity: data.validity,
+    width: data.width,
+    height: data.height,
+  }
+}
+
+/**
+ * Download a file from a URL and return it as a Buffer.
+ */
+export async function downloadFileAsBuffer(url: string): Promise<{ buffer: Buffer; contentType: string }> {
+  const response = await fetch(url)
+
+  if (!response.ok) {
+    throw new Error(`Failed to download file: ${response.status} from ${url}`)
+  }
+
+  const contentType = response.headers.get('content-type') || 'application/octet-stream'
+  const arrayBuffer = await response.arrayBuffer()
+  const buffer = Buffer.from(arrayBuffer)
+
+  console.log(`[Publer/Download] Downloaded ${buffer.length} bytes, type=${contentType}`)
+
+  return { buffer, contentType }
+}
+
 export interface MediaUploadResult {
   jobId: string
 }
 
 /**
- * Upload media from a public URL to Publer.
- * Returns a job ID that must be polled for the media ID.
+ * Upload media from a public URL to Publer (ASYNC - requires polling).
+ * DEPRECATED: Use uploadMediaDirect instead to avoid timeout issues.
  */
 export async function uploadMediaFromUrl(
   creds: PublerCredentials,
@@ -166,21 +251,13 @@ export async function uploadMediaFromUrl(
 
 export interface JobStatusResult {
   status: 'working' | 'complete' | 'error'
-  /** The raw response from Publer job_status endpoint */
   raw?: any
-  /** Extracted result (media object, post result, etc.) */
   result?: any
   error?: string
 }
 
 /**
  * Check the status of an async Publer job.
- * 
- * Publer job_status can return different formats:
- * 1. { status: "complete", payload: { ... } }
- * 2. { data: { status: "complete", result: { ... } } }
- * 3. Direct media object: { id: "...", path: "...", type: "photo" }
- * 4. { status: "working" } while processing
  */
 export async function checkJobStatus(
   creds: PublerCredentials,
@@ -197,16 +274,14 @@ export async function checkJobStatus(
 
   console.log('[Publer/Job] Raw response:', JSON.stringify(data).slice(0, 800))
 
-  // Case: explicit error
   if (data.success === false) {
     return { status: 'error', error: data.error || 'Unknown error', raw: data }
   }
 
-  // Case: wrapped in data object
   if (data.data) {
     const inner = data.data
     const status = inner.status || 'working'
-    if (status === 'complete' || status === 'done') {
+    if (status === 'complete' || status === 'done' || status === 'completed') {
       return { status: 'complete', result: inner.result || inner, raw: data }
     }
     if (status === 'error' || status === 'failed') {
@@ -215,9 +290,8 @@ export async function checkJobStatus(
     return { status: 'working', raw: data }
   }
 
-  // Case: direct status field
   const status = data.status
-  if (status === 'complete' || status === 'done') {
+  if (status === 'complete' || status === 'done' || status === 'completed') {
     return { status: 'complete', result: data.payload || data.result || data, raw: data }
   }
   if (status === 'error' || status === 'failed') {
@@ -227,17 +301,14 @@ export async function checkJobStatus(
     return { status: 'working', raw: data }
   }
 
-  // Case: direct media object (has id + path, no status field)
   if (data.id && data.path) {
     return { status: 'complete', result: data, raw: data }
   }
 
-  // Case: array of results
   if (Array.isArray(data) && data.length > 0) {
     return { status: 'complete', result: data, raw: data }
   }
 
-  // Default: still working
   return { status: 'working', raw: data }
 }
 
@@ -262,87 +333,4 @@ export async function pollJobUntilComplete(
   }
 
   return { status: 'error', error: 'Timeout waiting for job to complete' }
-}
-
-// ============================================
-// PUBLISH POST (legacy - kept for reference)
-// ============================================
-
-export interface PublishPostOptions {
-  accountIds: string[]
-  text: string
-  contentType: 'photo' | 'video' | 'status'
-  mediaIds?: string[]
-  mediaType?: 'image' | 'video'
-  scheduledAt?: string
-  networkOverrides?: Record<string, { type: string; text: string; media?: any[] }>
-}
-
-export interface PublishResult {
-  jobId: string
-}
-
-export async function publishPost(
-  creds: PublerCredentials,
-  options: PublishPostOptions
-): Promise<PublishResult> {
-  const { accountIds, text, contentType, mediaIds, mediaType, scheduledAt, networkOverrides } = options
-
-  let networks: Record<string, any>
-  if (networkOverrides && Object.keys(networkOverrides).length > 0) {
-    networks = networkOverrides
-  } else {
-    const defaultNetwork: Record<string, any> = {
-      type: contentType,
-      text,
-    }
-    if (mediaIds && mediaIds.length > 0) {
-      defaultNetwork.media = mediaIds.map(id => ({
-        id,
-        type: mediaType || (contentType === 'video' ? 'video' : 'image'),
-      }))
-    }
-    networks = { default: defaultNetwork }
-  }
-
-  const accounts = accountIds.map(id => {
-    const account: Record<string, any> = { id }
-    if (scheduledAt) {
-      account.scheduled_at = scheduledAt
-    }
-    return account
-  })
-
-  const payload = {
-    bulk: {
-      state: 'scheduled',
-      posts: [{
-        networks,
-        accounts,
-      }],
-    },
-  }
-
-  const endpoint = scheduledAt ? '/posts/schedule' : '/posts/schedule/publish'
-
-  console.log(`[Publer] Publishing to ${endpoint} for ${accountIds.length} accounts`)
-
-  const response = await publerFetch(creds, endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  })
-
-  if (!response.ok) {
-    const error = await response.text()
-    throw new Error(`Publish error: ${response.status} - ${error}`)
-  }
-
-  const data = await response.json()
-  const jobId = data.id || data.job_id
-  if (!jobId) {
-    throw new Error('No job ID returned from publish')
-  }
-
-  return { jobId }
 }
