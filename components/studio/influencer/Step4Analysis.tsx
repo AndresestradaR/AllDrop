@@ -67,7 +67,12 @@ export function Step4Analysis({
       const res = await fetch('/api/studio/influencer/visual-analysis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ influencerId }),
+        body: JSON.stringify({
+          influencerId,
+          realisticImageUrl,
+          anglesGridUrl,
+          bodyGridUrl,
+        }),
       })
 
       const data = await res.json()

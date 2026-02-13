@@ -84,12 +84,15 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { influencerId, optimizeVideoPrompt, videoModelId, userIdea, promptDescriptor: pdOverride } = body as {
+    const { influencerId, optimizeVideoPrompt, videoModelId, userIdea, promptDescriptor: pdOverride, realisticImageUrl: fallbackRealisticUrl, anglesGridUrl: fallbackAnglesUrl, bodyGridUrl: fallbackBodyUrl } = body as {
       influencerId: string
       optimizeVideoPrompt?: boolean
       videoModelId?: string
       userIdea?: string
       promptDescriptor?: string
+      realisticImageUrl?: string
+      anglesGridUrl?: string
+      bodyGridUrl?: string
     }
 
     if (!influencerId) {
@@ -155,7 +158,12 @@ RULES:
       .eq('user_id', user.id)
       .single()
 
-    if (!inf?.realistic_image_url) {
+    // Use DB values first, then fallback to values sent from frontend
+    const realisticUrl = inf?.realistic_image_url || fallbackRealisticUrl
+    const anglesUrl = inf?.angles_grid_url || fallbackAnglesUrl
+    const bodyUrl = inf?.body_grid_url || fallbackBodyUrl
+
+    if (!realisticUrl) {
       return NextResponse.json({ error: 'No se encontro imagen realista' }, { status: 400 })
     }
 
@@ -165,7 +173,7 @@ RULES:
     const imageParts: any[] = []
 
     // Realistic image
-    const realisticRes = await fetch(inf.realistic_image_url)
+    const realisticRes = await fetch(realisticUrl)
     if (realisticRes.ok) {
       const buffer = await realisticRes.arrayBuffer()
       const base64 = Buffer.from(buffer).toString('base64')
@@ -176,8 +184,8 @@ RULES:
     }
 
     // Angles grid image (if available)
-    if (inf.angles_grid_url) {
-      const anglesRes = await fetch(inf.angles_grid_url)
+    if (anglesUrl) {
+      const anglesRes = await fetch(anglesUrl)
       if (anglesRes.ok) {
         const buffer = await anglesRes.arrayBuffer()
         const base64 = Buffer.from(buffer).toString('base64')
@@ -189,8 +197,8 @@ RULES:
     }
 
     // Body grid image (if available)
-    if (inf.body_grid_url) {
-      const bodyRes = await fetch(inf.body_grid_url)
+    if (bodyUrl) {
+      const bodyRes = await fetch(bodyUrl)
       if (bodyRes.ok) {
         const buffer = await bodyRes.arrayBuffer()
         const base64 = Buffer.from(buffer).toString('base64')
