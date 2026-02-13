@@ -1161,6 +1161,8 @@ interface CloneInfluencer {
   id: string
   name: string
   image_url?: string
+  realistic_image_url?: string
+  prompt_descriptor?: string
   character_profile: any
 }
 
@@ -1360,14 +1362,20 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
 
     try {
       // Step 1: Generate voice
+      // Detectar género: character_profile.gender, o inferir del prompt_descriptor
+      const isMale = influencer.character_profile?.gender === 'male' ||
+        influencer.prompt_descriptor?.toLowerCase()?.includes('hombre') ||
+        influencer.prompt_descriptor?.toLowerCase()?.includes('male') ||
+        influencer.prompt_descriptor?.toLowerCase()?.includes('man ')
+
       const voiceRes = await fetch('/api/studio/clone-viral/generate-voice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           text: translatedScript,
-          voice_id: influencer.character_profile?.gender === 'male'
-            ? 'pNInz6obpgDQGcFmaJgB'  // Adam (male)
-            : 'EXAVITQu4vr4xnSDxMaL',  // Bella (female)
+          voice_id: isMale
+            ? 'pNInz6obpgDQGcFmaJgB'  // Adam (male) - ElevenLabs
+            : 'EXAVITQu4vr4xnSDxMaL',  // Bella (female) - ElevenLabs
         }),
       })
 
@@ -1381,16 +1389,17 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
       }
 
       // Step 2: Generate motion-controlled video
-      if (influencer.image_url) {
+      const influencerImageUrl = influencer.realistic_image_url || influencer.image_url
+      if (influencerImageUrl) {
         setGenerationStatus('Generando video con motion control...')
 
         const motionRes = await fetch('/api/studio/clone-viral/motion-control', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            pose_image_url: influencer.image_url,
+            pose_image_url: influencerImageUrl,
             motion_video_url: viralVideoUrl,
-            prompt: influencer.character_profile?.prompt_descriptor || undefined,
+            prompt: influencer.prompt_descriptor || influencer.character_profile?.prompt_descriptor || undefined,
           }),
         })
 
@@ -1639,8 +1648,8 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
                               : 'border-border bg-surface-elevated hover:border-accent/50'
                           )}
                         >
-                          {inf.image_url ? (
-                            <img src={inf.image_url} alt={inf.name} className="w-16 h-16 mx-auto rounded-lg object-cover mb-2" />
+                          {(inf.realistic_image_url || inf.image_url) ? (
+                            <img src={inf.realistic_image_url || inf.image_url} alt={inf.name} className="w-16 h-16 mx-auto rounded-lg object-cover mb-2" />
                           ) : (
                             <div className="w-16 h-16 mx-auto rounded-lg bg-border/50 flex items-center justify-center mb-2">
                               <UserCircle className="w-8 h-8 text-text-muted" />

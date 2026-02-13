@@ -17,7 +17,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { text, voice_id = 'pNInz6obpgDQGcFmaJgB' } = body as {
+    const { text, voice_id = 'EXAVITQu4vr4xnSDxMaL' } = body as {
       text: string
       voice_id?: string
     }
@@ -38,11 +38,13 @@ export async function POST(request: Request) {
 
     const kieApiKey = decrypt(profile.kie_api_key)
 
-    const taskResponse = await fetch('https://api.kie.ai/api/v1/createTask', {
+    // CORREGIDO: endpoint /jobs/createTask y header Authorization Bearer
+    // (antes usaba /createTask con header api-key que ya no funciona)
+    const taskResponse = await fetch('https://api.kie.ai/api/v1/jobs/createTask', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'api-key': kieApiKey,
+        Authorization: `Bearer ${kieApiKey}`,
       },
       body: JSON.stringify({
         model: 'elevenlabs/text-to-speech',
@@ -54,18 +56,31 @@ export async function POST(request: Request) {
       }),
     })
 
-    const taskData = await taskResponse.json()
+    const responseText = await taskResponse.text()
+    console.log('[CloneViral/Voice] KIE Response:', taskResponse.status, responseText.substring(0, 500))
 
-    if (!taskData.data?.taskId) {
-      console.error('[CloneViral/Voice] Task creation failed:', taskData)
-      return NextResponse.json({ error: 'Error al crear tarea de voz' }, { status: 500 })
+    let taskData: any
+    try {
+      taskData = JSON.parse(responseText)
+    } catch (e) {
+      console.error('[CloneViral/Voice] Invalid JSON response:', responseText.substring(0, 200))
+      return NextResponse.json({ error: 'Respuesta inválida de KIE' }, { status: 500 })
     }
 
-    console.log(`[CloneViral/Voice] User: ${user.id.substring(0, 8)}..., TaskId: ${taskData.data.taskId}`)
+    // KIE puede devolver taskId en data.taskId o directamente en taskId
+    const taskId = taskData.data?.taskId || taskData.taskId
+    if (!taskId) {
+      console.error('[CloneViral/Voice] No taskId in response:', JSON.stringify(taskData))
+      return NextResponse.json({
+        error: taskData.msg || taskData.message || 'Error al crear tarea de voz'
+      }, { status: 500 })
+    }
+
+    console.log(`[CloneViral/Voice] User: ${user.id.substring(0, 8)}..., TaskId: ${taskId}`)
 
     return NextResponse.json({
       success: true,
-      taskId: taskData.data.taskId,
+      taskId,
       status: 'processing',
     })
 
