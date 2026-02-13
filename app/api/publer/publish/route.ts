@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { getPublerCredentials, pollJobUntilComplete } from '@/lib/services/publer'
+import { getPublerCredentials, getAccounts, uploadMediaFromUrl, pollJobUntilComplete } from '@/lib/services/publer'
 
 export const maxDuration = 60
 
@@ -18,8 +18,6 @@ export async function POST(request: Request) {
       accountIds,
       text,
       contentType = 'photo',
-      mediaIds,
-      mediaType,
       mediaUrl,
       mediaBase64,
       mediaContentType,
@@ -28,8 +26,6 @@ export async function POST(request: Request) {
       accountIds: string[]
       text: string
       contentType?: 'photo' | 'video' | 'status'
-      mediaIds?: string[]
-      mediaType?: 'image' | 'video'
       mediaUrl?: string
       mediaBase64?: string
       mediaContentType?: string
@@ -40,7 +36,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Selecciona al menos una cuenta' }, { status: 400 })
     }
 
-    if (!text && !mediaIds?.length && !mediaUrl && !mediaBase64) {
+    if (!text && !mediaUrl && !mediaBase64) {
       return NextResponse.json({ error: 'Agrega texto o media al post' }, { status: 400 })
     }
 
@@ -49,7 +45,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Configura Publer en Settings' }, { status: 400 })
     }
 
-    // Resolve media URL (if base64, upload to Supabase first)
+    // ========================================
+    // Step 1: Resolve media URL
+    // ========================================
     let finalMediaUrl = mediaUrl || ''
     if (!finalMediaUrl && mediaBase64) {
       console.log('[Publer/Publish] Converting base64 to Supabase URL...')
@@ -78,32 +76,123 @@ export async function POST(request: Request) {
       finalMediaUrl = urlData.publicUrl
     }
 
-    console.log(`[Publer/Publish] Publishing to ${accountIds.length} accounts, type: ${contentType}`)
+    // ========================================
+    // Step 2: Upload media to Publer (if applicable)
+    // ========================================
+    let publerMedia: { id: string; path: string; type: string } | null = null
 
-    // Build the Publer post payload
-    // Use media URL directly instead of requiring a media ID upload
-    const resolvedMediaType = mediaType || 
-      (contentType === 'video' ? 'video' : 'image')
+    if (finalMediaUrl && contentType !== 'status') {
+      console.log(`[Publer/Publish] Uploading media to Publer: ${finalMediaUrl}`)
 
-    const defaultNetwork: Record<string, any> = {
-      type: (finalMediaUrl || mediaIds?.length) ? contentType : 'status',
-      text: text || '',
+      const { jobId } = await uploadMediaFromUrl(creds, finalMediaUrl)
+      console.log(`[Publer/Publish] Media upload job: ${jobId}`)
+
+      const jobResult = await pollJobUntilComplete(creds, jobId, 30, 2000)
+
+      console.log('[Publer/Publish] Media job result:', JSON.stringify(jobResult).slice(0, 1000))
+
+      if (jobResult.status !== 'complete') {
+        return NextResponse.json({
+          error: jobResult.error || 'Error subiendo media a Publer',
+        }, { status: 500 })
+      }
+
+      // Extract media info from job result
+      // Publer returns: { id, path, thumbnail, type, name, ... }
+      const result = jobResult.result
+      if (result?.id && result?.path) {
+        publerMedia = { id: result.id, path: result.path, type: result.type || 'video' }
+      } else if (result?.payload?.media) {
+        const m = Array.isArray(result.payload.media) ? result.payload.media[0] : result.payload.media
+        if (m?.id && m?.path) {
+          publerMedia = { id: m.id, path: m.path, type: m.type || 'video' }
+        }
+      } else if (Array.isArray(result) && result[0]?.id) {
+        publerMedia = { id: result[0].id, path: result[0].path, type: result[0].type || 'video' }
+      }
+
+      if (!publerMedia) {
+        console.error('[Publer/Publish] Could not extract media from result:', JSON.stringify(result ?? null).slice(0, 500))
+        return NextResponse.json({
+          error: 'Media subida pero no se pudo extraer ID. Raw: ' + JSON.stringify(result ?? null).slice(0, 200),
+        }, { status: 500 })
+      }
+
+      console.log(`[Publer/Publish] Media ready: id=${publerMedia.id}, type=${publerMedia.type}`)
     }
 
-    // Add media - prefer URL-based if available, fallback to media IDs
-    if (finalMediaUrl) {
-      defaultNetwork.media = [{
-        url: finalMediaUrl,
-        type: resolvedMediaType,
-      }]
-    } else if (mediaIds && mediaIds.length > 0) {
-      defaultNetwork.media = mediaIds.map(id => ({
-        id,
-        type: resolvedMediaType,
-      }))
+    // ========================================
+    // Step 3: Determine provider for each account
+    // ========================================
+    let accounts
+    try {
+      accounts = await getAccounts(creds)
+    } catch {
+      accounts = []
     }
 
-    const accounts = accountIds.map(id => {
+    // Map provider names for each selected account
+    // Publer provider types -> network keys
+    const PROVIDER_TO_NETWORK: Record<string, string> = {
+      facebook: 'facebook',
+      ig_business: 'instagram',
+      ig_personal: 'instagram',
+      instagram: 'instagram',
+      twitter: 'twitter',
+      linkedin: 'linkedin',
+      tiktok: 'tiktok',
+      youtube: 'youtube',
+      pinterest: 'pinterest',
+      threads: 'threads',
+      telegram: 'telegram',
+      google: 'google',
+      mastodon: 'mastodon',
+      bluesky: 'bluesky',
+    }
+
+    // Build networks object with provider-specific entries
+    const selectedAccounts = accounts.filter((a: any) => accountIds.includes(a.id))
+    const providerSet = new Set<string>()
+
+    for (const acc of selectedAccounts) {
+      const provider = acc.type || acc.provider || 'instagram'
+      const networkKey = PROVIDER_TO_NETWORK[provider] || provider
+      providerSet.add(networkKey)
+    }
+
+    // If we couldn't determine providers, fallback to instagram
+    if (providerSet.size === 0) {
+      providerSet.add('instagram')
+    }
+
+    // Build the network content for each provider
+    const networks: Record<string, any> = {}
+    for (const networkKey of providerSet) {
+      const networkContent: Record<string, any> = {
+        type: contentType === 'status' ? 'status' : contentType,
+        text: text || '',
+      }
+
+      if (publerMedia) {
+        networkContent.media = [{
+          id: publerMedia.id,
+          path: publerMedia.path,
+          type: publerMedia.type,
+        }]
+
+        // For Instagram videos, publish as reel
+        if (networkKey === 'instagram' && contentType === 'video') {
+          networkContent.details = { type: 'reel' }
+        }
+      }
+
+      networks[networkKey] = networkContent
+    }
+
+    // ========================================
+    // Step 4: Create the post
+    // ========================================
+    const postAccounts = accountIds.map(id => {
       const account: Record<string, any> = { id }
       if (scheduledAt) {
         account.scheduled_at = scheduledAt
@@ -115,17 +204,16 @@ export async function POST(request: Request) {
       bulk: {
         state: 'scheduled',
         posts: [{
-          networks: { default: defaultNetwork },
-          accounts,
+          networks,
+          accounts: postAccounts,
         }],
       },
     }
 
-    // Use /publish for immediate, /schedule for scheduled
     const endpoint = scheduledAt ? '/posts/schedule' : '/posts/schedule/publish'
     const PUBLER_API_BASE = 'https://app.publer.com/api/v1'
 
-    console.log(`[Publer/Publish] Sending to ${endpoint}`, JSON.stringify(payload).slice(0, 500))
+    console.log(`[Publer/Publish] Sending to ${endpoint}:`, JSON.stringify(payload).slice(0, 800))
 
     const response = await fetch(`${PUBLER_API_BASE}${endpoint}`, {
       method: 'POST',
@@ -148,35 +236,45 @@ export async function POST(request: Request) {
     }
 
     const data = await response.json()
-    const jobId = data.id || data.job_id
+    console.log('[Publer/Publish] Response:', JSON.stringify(data).slice(0, 500))
 
+    const jobId = data.id || data.job_id
     if (!jobId) {
-      console.log('[Publer/Publish] No job ID, response:', JSON.stringify(data).slice(0, 500))
-      // Some endpoints return the result directly
-      return NextResponse.json({
-        success: true,
-        result: data,
-      })
+      // Some endpoints return result directly
+      return NextResponse.json({ success: true, result: data })
     }
 
-    console.log(`[Publer/Publish] Job created: ${jobId}`)
+    // ========================================
+    // Step 5: Poll for publish completion
+    // ========================================
+    const publishResult = await pollJobUntilComplete(creds, jobId, 15, 2000)
 
-    // Poll for completion
-    const jobResult = await pollJobUntilComplete(creds, jobId, 15, 2000)
+    console.log('[Publer/Publish] Job result:', JSON.stringify(publishResult).slice(0, 500))
 
-    if (jobResult.status === 'error') {
+    // Check for failures in the result
+    const failures = publishResult.result?.payload?.failures || []
+    if (Array.isArray(failures) && failures.length > 0) {
+      const failMsg = failures.map((f: any) => f.message || f.error || JSON.stringify(f)).join('; ')
+      console.error('[Publer/Publish] Publish failures:', failMsg)
       return NextResponse.json({
         success: false,
-        error: jobResult.error || 'Error al publicar',
+        error: `Error de Publer: ${failMsg}`,
       }, { status: 200 })
     }
 
-    console.log(`[Publer/Publish] ✓ Post published successfully`)
+    if (publishResult.status === 'error') {
+      return NextResponse.json({
+        success: false,
+        error: publishResult.error || 'Error al publicar',
+      }, { status: 200 })
+    }
+
+    console.log('[Publer/Publish] Post published successfully!')
 
     return NextResponse.json({
       success: true,
-      status: jobResult.status,
-      result: jobResult.result,
+      status: publishResult.status,
+      result: publishResult.result,
     })
   } catch (error: any) {
     console.error('[Publer/Publish] Error:', error.message)
