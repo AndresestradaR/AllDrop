@@ -58,6 +58,8 @@ export async function POST(request: Request) {
       productPosition,
       productImageBase64,
       productImageMimeType,
+      promptDescriptor: fallbackDescriptor,
+      realisticImageUrl: fallbackRealisticUrl,
     } = body as {
       influencerId: string
       modelId: ImageModelId
@@ -67,6 +69,8 @@ export async function POST(request: Request) {
       productPosition?: string
       productImageBase64?: string
       productImageMimeType?: string
+      promptDescriptor?: string
+      realisticImageUrl?: string
     }
 
     if (!influencerId || !modelId || !situation) {
@@ -78,7 +82,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Modelo no encontrado' }, { status: 400 })
     }
 
-    // Get influencer data
+    // Get influencer data (use DB values first, fallback to frontend-provided)
     const { data: inf } = await supabase
       .from('influencers')
       .select('prompt_descriptor, realistic_image_url')
@@ -86,7 +90,10 @@ export async function POST(request: Request) {
       .eq('user_id', user.id)
       .single()
 
-    if (!inf?.prompt_descriptor) {
+    const descriptor = inf?.prompt_descriptor || fallbackDescriptor
+    const realisticUrl = inf?.realistic_image_url || fallbackRealisticUrl
+
+    if (!descriptor) {
       return NextResponse.json({ error: 'El influencer no tiene prompt descriptor. Completa el analisis primero.' }, { status: 400 })
     }
 
@@ -120,7 +127,7 @@ export async function POST(request: Request) {
 
     // Build prompt
     const prompt = buildContentPrompt(
-      inf.prompt_descriptor,
+      descriptor,
       situation,
       mode,
       mode === 'with_product' && productName
@@ -134,8 +141,8 @@ export async function POST(request: Request) {
     let refImages: { data: string; mimeType: string }[] = []
     let productImageUrls: string[] | undefined
 
-    if (inf.realistic_image_url) {
-      const imgRes = await fetch(inf.realistic_image_url)
+    if (realisticUrl) {
+      const imgRes = await fetch(realisticUrl)
       if (imgRes.ok) {
         const imgBuffer = await imgRes.arrayBuffer()
         const base64 = Buffer.from(imgBuffer).toString('base64')
@@ -233,7 +240,7 @@ export async function POST(request: Request) {
       .getPublicUrl(storagePath)
 
     // Save to gallery
-    await supabase
+    const { data: galleryRow } = await supabase
       .from('influencer_gallery')
       .insert({
         influencer_id: influencerId,
@@ -245,6 +252,8 @@ export async function POST(request: Request) {
         prompt_used: prompt,
         situation,
       })
+      .select('id')
+      .single()
 
     const totalTime = ((Date.now() - startTime) / 1000).toFixed(1)
     console.log(`[Influencer/GenerateContent] Done in ${totalTime}s`)
@@ -254,6 +263,7 @@ export async function POST(request: Request) {
       imageUrl: publicUrl,
       imageBase64: result.imageBase64,
       mimeType: result.mimeType,
+      galleryId: galleryRow?.id || null,
     })
 
   } catch (error: any) {

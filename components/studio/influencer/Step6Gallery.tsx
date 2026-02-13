@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { cn } from '@/lib/utils/cn'
 import { Sparkles, Loader2, RefreshCw, Upload, Shuffle, Heart, Download, X } from 'lucide-react'
 import { IMAGE_MODELS, STUDIO_COMPANY_GROUPS, type ImageModelId } from '@/lib/image-providers/types'
@@ -17,26 +17,31 @@ interface Step6GalleryProps {
 }
 
 const RANDOM_SITUATIONS = [
-  'Walking through a cozy coffee shop with warm lighting, carrying a latte',
-  'Sitting on a park bench reading a book on a sunny afternoon',
-  'Standing on a rooftop terrace at golden hour with a city skyline behind',
-  'Browsing vinyl records at a vintage music store',
-  'Laughing while walking down a colorful street market',
-  'Sitting at a beach bonfire at sunset, relaxed pose',
-  'Working on a laptop at a minimalist co-working space',
-  'Trying on sunglasses at a trendy boutique',
-  'Taking a selfie in front of a mural on a city wall',
-  'Enjoying street food at a night market with neon lights',
-  'Riding a bicycle through a tree-lined avenue in autumn',
-  'Standing under an umbrella on a rainy cobblestone street',
-  'Relaxing in a hammock at a tropical resort',
-  'Window shopping on a busy commercial avenue',
-  'Posing casually against a vintage car on a quiet street',
-  'Doing yoga in a serene outdoor garden at sunrise',
-  'Walking along the beach at sunset, barefoot in the sand',
-  'Sitting at a European cafe terrace with an espresso',
-  'Exploring a colorful flower market, holding a bouquet',
-  'Standing at a viewpoint overlooking mountains at dawn',
+  'Caminando por una cafeteria acogedora con luz calida, llevando un latte',
+  'Sentada en una banca del parque leyendo un libro en una tarde soleada',
+  'De pie en una terraza con vista a la ciudad al atardecer',
+  'Revisando discos de vinilo en una tienda de musica vintage',
+  'Riendo mientras camina por un mercado callejero colorido',
+  'Sentada junto a una fogata en la playa al atardecer, pose relajada',
+  'Trabajando en un laptop en un coworking minimalista',
+  'Probandose gafas de sol en una boutique de moda',
+  'Tomandose una selfie frente a un mural urbano',
+  'Disfrutando comida callejera en un mercado nocturno con luces neon',
+  'Montando bicicleta por una avenida arbolada en otono',
+  'De pie bajo un paraguas en una calle adoquinada bajo la lluvia',
+  'Relajandose en una hamaca en un resort tropical',
+  'Mirando vitrinas en una avenida comercial concurrida',
+  'Posando casualmente contra un auto vintage en una calle tranquila',
+  'Haciendo yoga en un jardin al aire libre al amanecer',
+  'Caminando por la playa al atardecer, descalza en la arena',
+  'Sentada en la terraza de un cafe europeo con un espresso',
+  'Explorando un mercado de flores colorido, sosteniendo un ramo',
+  'De pie en un mirador contemplando las montanas al amanecer',
+  'Cocinando en una cocina moderna con vapor saliendo de la sarten',
+  'En un gimnasio haciendo ejercicio con pesas, expresion concentrada',
+  'Grabando contenido en un estudio con aro de luz, setup de influencer',
+  'En la habitacion de un hotel de lujo, luz de manana por las cortinas',
+  'En un festival de musica, multitud de fondo, vibra energetica',
 ]
 
 const PRODUCT_POSITIONS = [
@@ -54,6 +59,7 @@ interface GalleryItem {
   situation: string
   type: string
   product_name?: string
+  is_favorite?: boolean
 }
 
 export function Step6Gallery({
@@ -71,6 +77,8 @@ export function Step6Gallery({
   const [error, setError] = useState<string | null>(null)
   const [gallery, setGallery] = useState<GalleryItem[]>([])
   const [selectedImage, setSelectedImage] = useState<GalleryItem | null>(null)
+  const [isLoadingGallery, setIsLoadingGallery] = useState(true)
+  const [galleryFilter, setGalleryFilter] = useState<'all' | 'favorites' | 'solo' | 'with_product'>('all')
 
   // Product mode state
   const [productName, setProductName] = useState('')
@@ -81,6 +89,40 @@ export function Step6Gallery({
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const availableModels = STUDIO_COMPANY_GROUPS.flatMap(g => g.models)
+
+  // Cargar galería existente al montar
+  useEffect(() => {
+    const loadGallery = async () => {
+      setIsLoadingGallery(true)
+      try {
+        const res = await fetch(`/api/studio/influencer/gallery?influencerId=${influencerId}`)
+        const data = await res.json()
+        if (data.items) {
+          setGallery(data.items.map((item: any) => ({
+            id: item.id,
+            image_url: item.image_url,
+            situation: item.situation || '',
+            type: item.type || 'solo',
+            product_name: item.product_name,
+            is_favorite: item.is_favorite,
+          })))
+        }
+      } catch (err) {
+        console.error('Error loading gallery:', err)
+      } finally {
+        setIsLoadingGallery(false)
+      }
+    }
+    loadGallery()
+  }, [influencerId])
+
+  const filteredGallery = gallery.filter(item => {
+    if (galleryFilter === 'all') return true
+    if (galleryFilter === 'favorites') return item.is_favorite
+    if (galleryFilter === 'solo') return item.type === 'solo'
+    if (galleryFilter === 'with_product') return item.type === 'with_product'
+    return true
+  })
 
   const handleRandomSituation = () => {
     const random = RANDOM_SITUATIONS[Math.floor(Math.random() * RANDOM_SITUATIONS.length)]
@@ -121,6 +163,8 @@ export function Step6Gallery({
           modelId,
           mode,
           situation: situation.trim(),
+          promptDescriptor,
+          realisticImageUrl,
           productName: mode === 'with_product' ? productName : undefined,
           productPosition: mode === 'with_product' ? productPosition : undefined,
           productImageBase64: mode === 'with_product' ? productBase64 : undefined,
@@ -135,12 +179,14 @@ export function Step6Gallery({
       }
 
       const newItem: GalleryItem = {
+        id: data.galleryId,
         image_url: data.imageUrl,
         imageBase64: data.imageBase64,
         mimeType: data.mimeType,
         situation: situation.trim(),
         type: mode,
         product_name: mode === 'with_product' ? productName : undefined,
+        is_favorite: false,
       }
 
       setGallery(prev => [newItem, ...prev])
@@ -167,11 +213,46 @@ export function Step6Gallery({
     }
   }
 
+  const handleToggleFavorite = async (item: GalleryItem) => {
+    if (!item.id) return
+    const newVal = !item.is_favorite
+    try {
+      await fetch('/api/studio/influencer/gallery', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: item.id, is_favorite: newVal }),
+      })
+      setGallery(prev => prev.map(g =>
+        g.id === item.id ? { ...g, is_favorite: newVal } : g
+      ))
+    } catch (err) {
+      console.error('Error toggling favorite:', err)
+    }
+  }
+
+  const handleDeleteImage = async (item: GalleryItem) => {
+    if (!item.id) return
+    try {
+      await fetch(`/api/studio/influencer/gallery?id=${item.id}`, { method: 'DELETE' })
+      setGallery(prev => prev.filter(g => g.id !== item.id))
+      toast.success('Imagen eliminada')
+    } catch {
+      toast.error('Error al eliminar')
+    }
+  }
+
   return (
     <div className="max-w-3xl mx-auto">
       <p className="text-sm text-text-secondary mb-5">
         Genera contenido con tu influencer. Elige una situacion y crea imagenes unicas.
       </p>
+
+      {/* Warning if no prompt descriptor */}
+      {!promptDescriptor && (
+        <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl mb-4">
+          <p className="text-sm text-amber-400">Sin prompt descriptor. Las imagenes pueden no mantener consistencia.</p>
+        </div>
+      )}
 
       {/* Mode selector */}
       <div className="flex gap-2 mb-5">
@@ -318,16 +399,45 @@ export function Step6Gallery({
         )}
       </button>
 
-      {/* Gallery grid */}
-      {gallery.length > 0 && (
-        <div>
-          <h4 className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-3">
-            Galeria ({gallery.length})
+      {/* Gallery section */}
+      <div className="mt-6">
+        <div className="flex items-center justify-between mb-3">
+          <h4 className="text-xs font-semibold text-text-muted uppercase tracking-wide">
+            Galeria de {influencerName} ({gallery.length})
           </h4>
+          <div className="flex gap-1">
+            {(['all', 'favorites', 'solo', 'with_product'] as const).map(f => (
+              <button
+                key={f}
+                onClick={() => setGalleryFilter(f)}
+                className={cn(
+                  'px-2.5 py-1 rounded-lg text-[10px] font-medium transition-all',
+                  galleryFilter === f
+                    ? 'bg-accent/15 text-accent'
+                    : 'text-text-muted hover:text-text-secondary'
+                )}
+              >
+                {f === 'all' ? 'Todas' : f === 'favorites' ? 'Favoritas' : f === 'solo' ? 'Solo' : 'Producto'}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {isLoadingGallery ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-6 h-6 text-accent animate-spin" />
+          </div>
+        ) : filteredGallery.length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-sm text-text-muted">
+              {galleryFilter === 'all' ? 'No hay imagenes aun. Genera tu primer contenido!' : 'No hay imagenes en esta categoria'}
+            </p>
+          </div>
+        ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {gallery.map((item, idx) => (
+            {filteredGallery.map((item, idx) => (
               <div
-                key={idx}
+                key={item.id || idx}
                 className="group relative rounded-xl overflow-hidden bg-surface-elevated border border-border cursor-pointer"
                 onClick={() => setSelectedImage(item)}
               >
@@ -336,22 +446,52 @@ export function Step6Gallery({
                   alt={item.situation}
                   className="w-full aspect-[9/16] object-cover"
                 />
+                {/* Overlay con info */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
                   <div className="absolute bottom-2 left-2 right-2">
-                    <p className="text-[10px] text-white/80 line-clamp-2">{item.situation}</p>
+                    <p className="text-[10px] text-white/80 line-clamp-2 mb-1.5">{item.situation}</p>
+                    {item.product_name && (
+                      <span className="text-[9px] px-1.5 py-0.5 bg-accent/30 text-accent rounded-full">
+                        {item.product_name}
+                      </span>
+                    )}
                   </div>
                 </div>
-                <button
-                  onClick={(e) => { e.stopPropagation(); handleDownload(item) }}
-                  className="absolute top-2 right-2 p-1.5 bg-black/40 rounded-lg text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                </button>
+                {/* Botones superiores */}
+                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleToggleFavorite(item) }}
+                    className={cn(
+                      'p-1.5 rounded-lg transition-colors',
+                      item.is_favorite ? 'bg-amber-500/80 text-white' : 'bg-black/40 text-white hover:bg-black/60'
+                    )}
+                  >
+                    <Heart className={cn('w-3.5 h-3.5', item.is_favorite && 'fill-current')} />
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleDownload(item) }}
+                    className="p-1.5 bg-black/40 rounded-lg text-white hover:bg-black/60 transition-colors"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleDeleteImage(item) }}
+                    className="p-1.5 bg-error/60 rounded-lg text-white hover:bg-error/80 transition-colors"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                {/* Favorite indicator (always visible) */}
+                {item.is_favorite && (
+                  <div className="absolute top-2 left-2">
+                    <Heart className="w-3.5 h-3.5 text-amber-400 fill-current" />
+                  </div>
+                )}
               </div>
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Image preview modal */}
       {selectedImage && (

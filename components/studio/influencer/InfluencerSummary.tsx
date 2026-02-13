@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { Copy, Check, Palette, Video, Pencil } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Copy, Check, Palette, Video, Pencil, Loader2, Heart } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 interface InfluencerSummaryProps {
@@ -22,6 +22,19 @@ export function InfluencerSummary({
   const [isEditingName, setIsEditingName] = useState(false)
   const [name, setName] = useState(influencer.name || 'Mi Influencer')
   const [copiedField, setCopiedField] = useState<string | null>(null)
+  const [recentContent, setRecentContent] = useState<any[]>([])
+  const [loadingContent, setLoadingContent] = useState(false)
+
+  // Load recent gallery content
+  useEffect(() => {
+    if (!influencer.id) return
+    setLoadingContent(true)
+    fetch(`/api/studio/influencer/gallery?influencerId=${influencer.id}`)
+      .then(res => res.json())
+      .then(data => setRecentContent((data.items || []).slice(0, 6)))
+      .catch(() => {})
+      .finally(() => setLoadingContent(false))
+  }, [influencer.id])
 
   const handleCopy = async (text: string, field: string) => {
     try {
@@ -135,6 +148,38 @@ export function InfluencerSummary({
           {copiedField === 'dna' ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
           Copiar ADN Visual completo
         </button>
+      )}
+
+      {/* Recent content */}
+      {loadingContent && (
+        <div className="flex items-center justify-center gap-2 py-4 mb-4">
+          <Loader2 className="w-4 h-4 animate-spin text-text-muted" />
+          <p className="text-xs text-text-muted">Cargando contenido...</p>
+        </div>
+      )}
+      {!loadingContent && recentContent.length > 0 && (
+        <div className="mb-4">
+          <p className="text-xs text-text-muted uppercase tracking-wide mb-2">Contenido Reciente</p>
+          <div className="grid grid-cols-3 gap-2">
+            {recentContent.map((item: any) => (
+              <div key={item.id} className="relative rounded-xl overflow-hidden bg-surface-elevated border border-border group">
+                <img
+                  src={item.image_url}
+                  alt={item.situation || 'Content'}
+                  className="w-full aspect-[9/16] object-cover"
+                />
+                {item.is_favorite && (
+                  <div className="absolute top-1.5 right-1.5">
+                    <Heart className="w-3.5 h-3.5 text-red-400 fill-red-400" />
+                  </div>
+                )}
+                <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/70 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <p className="text-[10px] text-white/80 truncate">{item.situation}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* Action buttons */}
