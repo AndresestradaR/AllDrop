@@ -13,6 +13,7 @@ import { Step4Analysis } from './Step4Analysis'
 import { Step6Gallery } from './Step6Gallery'
 import { Step7Video } from './Step7Video'
 import { InfluencerSummary } from './InfluencerSummary'
+import { InfluencerBoard } from './InfluencerBoard'
 import type { ImageModelId } from '@/lib/image-providers/types'
 
 interface Influencer {
@@ -44,7 +45,7 @@ interface Influencer {
   created_at: string
 }
 
-type WizardView = 'list' | 'wizard' | 'summary'
+type WizardView = 'list' | 'wizard' | 'summary' | 'board'
 
 export function InfluencerWizard({ onBack }: { onBack: () => void }) {
   const [view, setView] = useState<WizardView>('list')
@@ -377,12 +378,25 @@ export function InfluencerWizard({ onBack }: { onBack: () => void }) {
               influencer={activeInfluencer}
               onCreateContent={handleGoToGallery}
               onCreateVideo={handleGoToVideo}
+              onViewBoard={() => setView('board')}
               onEditName={handleEditName}
               onBack={() => { setView('list'); fetchInfluencers() }}
             />
           </div>
         </div>
       </div>
+    )
+  }
+
+  // ============ BOARD VIEW ============
+  if (view === 'board' && activeInfluencer) {
+    return (
+      <InfluencerBoard
+        influencer={activeInfluencer}
+        onBack={() => setView('summary')}
+        onCreateContent={handleGoToGallery}
+        onCreateVideo={handleGoToVideo}
+      />
     )
   }
 

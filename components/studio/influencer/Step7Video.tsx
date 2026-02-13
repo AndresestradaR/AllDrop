@@ -232,29 +232,27 @@ export function Step7Video({
 
       if (data.optimized_prompt) {
         if (isSora) {
-          const soraPrompt = `The character speaks naturally in Spanish with a Latin American accent.\n\n${resolvedDescriptor}\n\n${data.optimized_prompt}`
-          setPrompt(soraPrompt)
+          setPrompt(`${resolvedDescriptor}\n\n${data.optimized_prompt}`)
         } else {
-          setPrompt(`The character speaks naturally in Spanish with a Latin American accent. ${data.optimized_prompt}`)
+          setPrompt(data.optimized_prompt)
         }
         toast.success('Prompt optimizado')
       } else {
-        const desc = resolvedDescriptor || `a person called ${influencerName}`
         if (isSora) {
-          setPrompt(`The character speaks naturally in Spanish with a Latin American accent.\n\n${desc}\n\nScene: ${userIdea.trim()}. Hyperrealistic, shot on iPhone 14 Pro, cinematic, natural lighting.`)
+          const desc = resolvedDescriptor || `a person called ${influencerName}`
+          setPrompt(`${desc}\n\n${userIdea.trim()}. Habla en español con acento latino.`)
         } else {
-          setPrompt(`The character speaks naturally in Spanish with a Latin American accent. A hyperrealistic video of ${desc}. ${userIdea.trim()}. Shot on iPhone 14 Pro, cinematic, natural lighting.`)
+          setPrompt(`${userIdea.trim()}. Habla en español con acento latino.`)
         }
         toast.success('Prompt generado')
       }
     } catch (err: any) {
       console.error('[Step7Video] Optimize error:', err)
-      // Fallback robusto que siempre funciona
-      const desc = resolvedDescriptor || `a person called ${influencerName}`
       if (isSora) {
-        setPrompt(`The character speaks naturally in Spanish with a Latin American accent.\n\n${desc}\n\nScene: ${userIdea.trim()}. Hyperrealistic, cinematic, natural lighting.`)
+        const desc = resolvedDescriptor || `a person called ${influencerName}`
+        setPrompt(`${desc}\n\n${userIdea.trim()}. Habla en español con acento latino.`)
       } else {
-        setPrompt(`The character speaks naturally in Spanish with a Latin American accent. A hyperrealistic video of ${desc}. ${userIdea.trim()}. Cinematic, natural lighting.`)
+        setPrompt(`${userIdea.trim()}. Habla en español con acento latino.`)
       }
       toast.success('Prompt generado (modo fallback)')
     } finally {
@@ -315,11 +313,11 @@ export function Step7Video({
     let finalPrompt = prompt.trim()
     if (!finalPrompt && userIdea.trim()) {
       if (isSora) {
-        finalPrompt = `The character speaks naturally in Spanish with a Latin American accent.\n\n${resolvedDescriptor || 'A person'}. Scene: ${userIdea.trim()}. Hyperrealistic, cinematic, natural lighting, shot on iPhone 14 Pro.`
+        finalPrompt = `${resolvedDescriptor || 'A person'}.\n\n${userIdea.trim()}. Habla en español con acento latino.`
       } else {
-        finalPrompt = `The character speaks naturally in Spanish with a Latin American accent. A hyperrealistic video of ${resolvedDescriptor || 'a person'}. ${userIdea.trim()}. Cinematic, natural lighting, shot on iPhone 14 Pro.`
+        finalPrompt = userIdea.trim()
       }
-      setPrompt(finalPrompt) // Guardar para que el usuario lo vea
+      setPrompt(finalPrompt)
     }
 
     if (!finalPrompt) {
@@ -367,13 +365,13 @@ export function Step7Video({
           const endB64 = await getBase64FromUrl(endImageUrl)
           if (startB64 && endB64) veoImages = [startB64, endB64]
           else if (startB64) {
-            veoGenerationType = 'REFERENCE_2_VIDEO'
+            veoGenerationType = 'FIRST_AND_LAST_FRAMES_2_VIDEO'
             veoImages = [startB64]
           } else {
             veoGenerationType = 'TEXT_2_VIDEO'
           }
         } else if (videoMode === 'image' && startImageUrl) {
-          veoGenerationType = 'REFERENCE_2_VIDEO'
+          veoGenerationType = 'FIRST_AND_LAST_FRAMES_2_VIDEO'
           const startB64 = await getBase64FromUrl(startImageUrl)
           if (startB64) veoImages = [startB64]
           else {
@@ -433,6 +431,7 @@ export function Step7Video({
           imageBase64End,
           veoGenerationType,
           veoImages,
+          ...(isVeo ? { resolution: '720p', veoSeed: Math.floor(Math.random() * 1000000) } : {}),
         }),
       })
 

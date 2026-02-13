@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Copy, Check, Pencil, Loader2, Heart, Download, Image as ImageIcon, Video } from 'lucide-react'
+import { Copy, Check, Pencil, Loader2, Heart, Download, Image as ImageIcon, Video, LayoutGrid } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
 import toast from 'react-hot-toast'
 
@@ -9,6 +9,7 @@ interface InfluencerSummaryProps {
   influencer: any
   onCreateContent: () => void
   onCreateVideo: () => void
+  onViewBoard: () => void
   onEditName: (name: string) => void
   onBack: () => void
 }
@@ -17,6 +18,7 @@ export function InfluencerSummary({
   influencer,
   onCreateContent,
   onCreateVideo,
+  onViewBoard,
   onEditName,
   onBack,
 }: InfluencerSummaryProps) {
@@ -326,6 +328,15 @@ export function InfluencerSummary({
           </>
         )}
       </div>
+
+      {/* Ver pizarra completa */}
+      <button
+        onClick={onViewBoard}
+        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-accent/10 border border-accent/30 text-accent hover:bg-accent/20 transition-all mb-4"
+      >
+        <LayoutGrid className="w-4 h-4" />
+        Ver Pizarra de Contenido
+      </button>
 
       {/* Acciones principales */}
       <div className="flex gap-3">
