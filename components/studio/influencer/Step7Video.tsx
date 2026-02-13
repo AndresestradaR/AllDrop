@@ -21,6 +21,37 @@ export function Step7Video({
   realisticImageUrl,
   onBack,
 }: Step7VideoProps) {
+  console.log('[Step7Video] Props received:', { promptDescriptor: promptDescriptor?.substring(0, 30), influencerId, realisticImageUrl: !!realisticImageUrl })
+
+  // Resolved descriptor (loads from DB if prop is empty)
+  const [resolvedDescriptor, setResolvedDescriptor] = useState(promptDescriptor)
+
+  useEffect(() => {
+    // Si el prop llega vacío, intentar cargarlo de la BD
+    if (!promptDescriptor && influencerId) {
+      const loadDescriptor = async () => {
+        try {
+          const res = await fetch(`/api/studio/influencer`)
+          const data = await res.json()
+          const inf = data.influencers?.find((i: any) => i.id === influencerId)
+          if (inf?.prompt_descriptor) {
+            setResolvedDescriptor(inf.prompt_descriptor)
+            console.log('[Step7Video] Loaded descriptor from DB:', inf.prompt_descriptor.substring(0, 50))
+          } else {
+            console.warn('[Step7Video] No descriptor in DB either. Using fallback.')
+            setResolvedDescriptor(`a person called ${influencerName}`)
+          }
+        } catch (err) {
+          console.error('[Step7Video] Error loading descriptor:', err)
+          setResolvedDescriptor(`a person called ${influencerName}`)
+        }
+      }
+      loadDescriptor()
+    } else if (promptDescriptor) {
+      setResolvedDescriptor(promptDescriptor)
+    }
+  }, [promptDescriptor, influencerId, influencerName])
+
   // Model & config
   const [videoModelId, setVideoModelId] = useState<VideoModelId>('kling-3.0')
   const selectedModel = VIDEO_MODELS[videoModelId]
@@ -84,7 +115,67 @@ export function Step7Video({
     }
   }, [videoModelId])
 
+  // Polling for video status
+  useEffect(() => {
+    if (!taskId || videoUrl) return // No poll si no hay task o ya tenemos video
+
+    let cancelled = false
+    let pollCount = 0
+    const MAX_POLLS = 60 // 5 minutos máximo (60 * 5s)
+
+    const poll = async () => {
+      if (cancelled || pollCount >= MAX_POLLS) {
+        if (pollCount >= MAX_POLLS) {
+          setError('El video está tardando demasiado. Puedes verificar en el tab de Video principal.')
+          setIsGenerating(false)
+        }
+        return
+      }
+
+      pollCount++
+      console.log(`[Step7Video] Polling status #${pollCount} for task: ${taskId}`)
+
+      try {
+        const res = await fetch(`/api/studio/video-status?taskId=${taskId}`)
+        const data = await res.json()
+
+        if (cancelled) return
+
+        if (data.status === 'completed' && data.videoUrl) {
+          console.log('[Step7Video] Video completed:', data.videoUrl)
+          setVideoUrl(data.videoUrl)
+          setIsGenerating(false)
+          toast.success('¡Video generado!')
+          return // Stop polling
+        }
+
+        if (data.status === 'failed') {
+          console.error('[Step7Video] Video failed:', data.error)
+          setError(data.error || 'Error al generar el video')
+          setIsGenerating(false)
+          return // Stop polling
+        }
+
+        // Still processing — poll again in 5 seconds
+        setTimeout(poll, 5000)
+      } catch (err) {
+        console.error('[Step7Video] Polling error:', err)
+        // Don't stop on network error, retry
+        setTimeout(poll, 8000)
+      }
+    }
+
+    // Start polling after 3 seconds (give KIE time to register the task)
+    const initialDelay = setTimeout(poll, 3000)
+
+    return () => {
+      cancelled = true
+      clearTimeout(initialDelay)
+    }
+  }, [taskId, videoUrl])
+
   const handleOptimizePrompt = async () => {
+    console.log('[Step7Video] handleOptimizePrompt called, resolvedDescriptor:', resolvedDescriptor?.substring(0, 50))
     if (!userIdea.trim()) {
       toast.error('Escribe una idea para el video')
       return
@@ -102,7 +193,7 @@ export function Step7Video({
           optimizeVideoPrompt: true,
           videoModelId,
           userIdea: userIdea.trim(),
-          promptDescriptor,
+          promptDescriptor: resolvedDescriptor,
         }),
       })
 
@@ -116,14 +207,14 @@ export function Step7Video({
 
       if (data.optimized_prompt) {
         if (isSora) {
-          const soraPrompt = `${promptDescriptor}\n\n${data.optimized_prompt}`
+          const soraPrompt = `${resolvedDescriptor}\n\n${data.optimized_prompt}`
           setPrompt(soraPrompt)
         } else {
           setPrompt(data.optimized_prompt)
         }
         toast.success('Prompt optimizado')
       } else {
-        const desc = promptDescriptor || `a person called ${influencerName}`
+        const desc = resolvedDescriptor || `a person called ${influencerName}`
         if (isSora) {
           setPrompt(`${desc}\n\nScene: ${userIdea.trim()}. Hyperrealistic, shot on iPhone 14 Pro, cinematic, natural lighting.`)
         } else {
@@ -134,7 +225,7 @@ export function Step7Video({
     } catch (err: any) {
       console.error('[Step7Video] Optimize error:', err)
       // Fallback robusto que siempre funciona
-      const desc = promptDescriptor || `a person called ${influencerName}`
+      const desc = resolvedDescriptor || `a person called ${influencerName}`
       if (isSora) {
         setPrompt(`${desc}\n\nScene: ${userIdea.trim()}. Hyperrealistic, cinematic, natural lighting.`)
       } else {
@@ -194,13 +285,14 @@ export function Step7Video({
   }
 
   const handleGenerate = async () => {
+    console.log('[Step7Video] handleGenerate called, resolvedDescriptor:', resolvedDescriptor?.substring(0, 50))
     // Si no hay prompt optimizado, construir uno automático desde userIdea
     let finalPrompt = prompt.trim()
     if (!finalPrompt && userIdea.trim()) {
       if (isSora) {
-        finalPrompt = `${promptDescriptor || 'A person'}. Scene: ${userIdea.trim()}. Hyperrealistic, cinematic, natural lighting, shot on iPhone 14 Pro.`
+        finalPrompt = `${resolvedDescriptor || 'A person'}. Scene: ${userIdea.trim()}. Hyperrealistic, cinematic, natural lighting, shot on iPhone 14 Pro.`
       } else {
-        finalPrompt = `A hyperrealistic video of ${promptDescriptor || 'a person'}. ${userIdea.trim()}. Cinematic, natural lighting, shot on iPhone 14 Pro.`
+        finalPrompt = `A hyperrealistic video of ${resolvedDescriptor || 'a person'}. ${userIdea.trim()}. Cinematic, natural lighting, shot on iPhone 14 Pro.`
       }
       setPrompt(finalPrompt) // Guardar para que el usuario lo vea
     }
@@ -209,6 +301,8 @@ export function Step7Video({
       toast.error('Escribe una idea o un prompt para el video')
       return
     }
+
+    console.log('[Step7Video] handleGenerate called, finalPrompt:', finalPrompt?.substring(0, 50))
 
     const model = VIDEO_MODELS[videoModelId]
 
@@ -353,7 +447,7 @@ export function Step7Video({
         />
         <div>
           <p className="text-sm font-medium text-text-primary">{influencerName}</p>
-          <p className="text-xs text-text-secondary line-clamp-1">{promptDescriptor?.substring(0, 80)}...</p>
+          <p className="text-xs text-text-secondary line-clamp-1">{resolvedDescriptor?.substring(0, 80)}...</p>
         </div>
       </div>
 
@@ -682,9 +776,12 @@ export function Step7Video({
 
       {taskId && !videoUrl && (
         <div className="mb-4 p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl">
-          <p className="text-sm text-amber-400 font-medium">Video en proceso</p>
+          <div className="flex items-center gap-2 mb-1">
+            <Loader2 className="w-4 h-4 text-amber-400 animate-spin" />
+            <p className="text-sm text-amber-400 font-medium">Video en proceso...</p>
+          </div>
           <p className="text-xs text-text-secondary mt-1">
-            El video se esta generando. Puedes ver el progreso en el tab de Video principal.
+            Verificando estado automaticamente. Esto puede tardar 1-3 minutos.
           </p>
           <p className="text-[10px] text-text-muted mt-1 font-mono">Task ID: {taskId}</p>
         </div>

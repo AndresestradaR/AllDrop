@@ -274,7 +274,7 @@ RULES:
         }
 
         // Update influencer with analysis results
-        await supabase
+        const { error: updateError } = await supabase
           .from('influencers')
           .update({
             visual_dna: text,
@@ -285,6 +285,12 @@ RULES:
           })
           .eq('id', influencerId)
           .eq('user_id', user.id)
+
+        if (updateError) {
+          console.error('[Influencer/VisualAnalysis] DB update FAILED:', updateError.message)
+        } else {
+          console.log(`[Influencer/VisualAnalysis] DB update OK, descriptor length: ${promptDescriptor.length}`)
+        }
 
         console.log(`[Influencer/VisualAnalysis] Done with ${model}, visual_dna length: ${text.length}`)
 
