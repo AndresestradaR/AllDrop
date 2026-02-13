@@ -1,216 +1,202 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
-const DEFAULT_SYSTEM_PROMPT = `Eres un experto en crear contenido UGC para dropshipping en Colombia y LATAM.
-Tu trabajo es generar un prompt de video corto (5-10 segundos) para un influencer virtual que promociona un producto.
-
-REGLAS:
-- El video debe verse natural, como un reel de Instagram/TikTok real
-- El influencer debe hablar en español con acento {voice_style}
-- Cada video debe tener un escenario/situación DIFERENTE y creativo
-- Incluye emociones genuinas y lenguaje coloquial colombiano
-- El producto debe aparecer de forma natural, no forzada
-- El prompt debe ser específico y visual (describe poses, gestos, mirada, entorno)
-
-PRODUCTO: {product_name}
-INFLUENCER: {influencer_name}
-DESCRIPCIÓN INFLUENCER: {influencer_descriptor}
-
-{scenarios_instruction}
-
-Genera UN escenario aleatorio creativo y el prompt de video optimizado.
-Responde SOLO en JSON válido:
-{
-  "scenario": "descripción breve del escenario",
-  "video_prompt": "prompt completo optimizado para el modelo de video",
-  "caption": "texto para publicar en redes sociales con emojis y hashtags"
-}`
-
-const DEFAULT_SCENARIOS = [
-  'Mostrando el producto recién llegado, abriendo el paquete emocionada',
-  'Grabándose frente al espejo usando el producto por primera vez',
-  'Haciendo un story time de cómo descubrió el producto',
-  'Recomendando el producto a una amiga por videollamada',
-  'Antes y después de usar el producto, reacción genuina',
-  'Usando el producto en su rutina diaria, de forma casual',
-  'Respondiendo a un comentario hater sobre el producto',
-  'Mostrando el producto en su mesa de noche, aesthetic',
-  'Haciendo un Get Ready With Me incluyendo el producto',
-  'Review honesta después de 2 semanas usando el producto',
-]
-
-// GET: List all automations for the user
-export async function GET(req: NextRequest) {
+// GET — List user's automation flows (with influencer name)
+export async function GET() {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
 
-    const { searchParams } = new URL(req.url)
-    const includeRuns = searchParams.get('includeRuns') === 'true'
-
-    const { data: automations, error } = await supabase
-      .from('automations')
-      .select('*')
+    const { data: flows, error } = await supabase
+      .from('automation_flows')
+      .select(`
+        *,
+        influencer:influencers(id, name, image_url, realistic_image_url, prompt_descriptor)
+      `)
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
 
-    if (error) throw error
-
-    // Optionally include last 5 runs for each
-    if (includeRuns && automations) {
-      for (const auto of automations) {
-        const { data: runs } = await supabase
-          .from('automation_runs')
-          .select('*')
-          .eq('automation_id', auto.id)
-          .order('created_at', { ascending: false })
-          .limit(5)
-        ;(auto as any).recent_runs = runs || []
-      }
+    if (error) {
+      console.error('[Automations/List] Error:', error.message)
+      return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json({ automations: automations || [] })
-  } catch (err: any) {
-    console.error('[Automations] GET error:', err)
-    return NextResponse.json({ error: err.message }, { status: 500 })
+    return NextResponse.json({ flows: flows || [] })
+  } catch (error: any) {
+    console.error('[Automations/List] Error:', error.message)
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
 
-// POST: Create a new automation
-export async function POST(req: NextRequest) {
+// POST — Create new automation flow
+export async function POST(request: Request) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
 
-    const body = await req.json()
+    const body = await request.json()
     const {
       name,
       influencer_id,
-      preset = 'rapido',
+      video_preset,
       product_name,
       product_image_url,
+      product_benefits,
       system_prompt,
       scenarios,
-      voice_style = 'latina',
-      publer_account_ids = [],
-      caption_prompt,
-      hashtags,
-      frequency_hours = 12,
-      mode = 'auto',
-      aspect_ratio = '9:16',
-      duration = 10,
+      voice_style,
+      voice_custom_instruction,
+      frequency_hours,
+      account_ids,
+      mode,
     } = body
 
-    if (!name || !influencer_id || !product_name) {
+    if (!influencer_id || !product_name?.trim()) {
       return NextResponse.json(
-        { error: 'name, influencer_id y product_name son requeridos' },
+        { error: 'Influencer y nombre de producto son requeridos' },
         { status: 400 }
       )
     }
 
-    const now = new Date()
-    const nextRun = new Date(now.getTime() + frequency_hours * 60 * 60 * 1000)
+    // Verify influencer belongs to user
+    const { data: influencer } = await supabase
+      .from('influencers')
+      .select('id')
+      .eq('id', influencer_id)
+      .eq('user_id', user.id)
+      .single()
 
-    const { data, error } = await supabase
-      .from('automations')
+    if (!influencer) {
+      return NextResponse.json({ error: 'Influencer no encontrado' }, { status: 404 })
+    }
+
+    const { data: flow, error } = await supabase
+      .from('automation_flows')
       .insert({
         user_id: user.id,
-        name,
+        name: name?.trim() || `Auto - ${product_name}`,
         influencer_id,
-        preset,
-        product_name,
+        video_preset: video_preset || 'rapido',
+        product_name: product_name.trim(),
         product_image_url: product_image_url || null,
-        system_prompt: system_prompt || DEFAULT_SYSTEM_PROMPT,
-        scenarios: scenarios && scenarios.length > 0 ? scenarios : DEFAULT_SCENARIOS,
-        voice_style,
-        publer_account_ids,
-        caption_prompt: caption_prompt || null,
-        hashtags: hashtags || null,
-        frequency_hours,
-        mode,
-        aspect_ratio,
-        duration,
-        status: 'paused',
-        next_run_at: nextRun.toISOString(),
+        product_benefits: product_benefits?.trim() || '',
+        system_prompt: system_prompt?.trim() || undefined,
+        scenarios: scenarios || undefined,
+        voice_style: voice_style || 'paisa',
+        voice_custom_instruction: voice_custom_instruction?.trim() || '',
+        frequency_hours: frequency_hours || 12,
+        account_ids: account_ids || [],
+        mode: mode || 'semi',
+        is_active: false,
+        next_run_at: new Date().toISOString(),
       })
       .select()
       .single()
 
-    if (error) throw error
+    if (error) {
+      console.error('[Automations/Create] Error:', error.message)
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
 
-    return NextResponse.json({ success: true, automation: data })
-  } catch (err: any) {
-    console.error('[Automations] POST error:', err)
-    return NextResponse.json({ error: err.message }, { status: 500 })
+    return NextResponse.json({ flow })
+  } catch (error: any) {
+    console.error('[Automations/Create] Error:', error.message)
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
 
-// PUT: Update an automation
-export async function PUT(req: NextRequest) {
+// PATCH — Update automation flow
+export async function PATCH(request: Request) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
 
-    const body = await req.json()
+    const body = await request.json()
     const { id, ...updates } = body
 
     if (!id) {
-      return NextResponse.json({ error: 'id es requerido' }, { status: 400 })
+      return NextResponse.json({ error: 'Se requiere el ID' }, { status: 400 })
     }
 
-    // Recalculate next_run if frequency changed
-    if (updates.frequency_hours) {
-      const now = new Date()
-      updates.next_run_at = new Date(now.getTime() + updates.frequency_hours * 60 * 60 * 1000).toISOString()
+    const allowedFields = [
+      'name', 'influencer_id', 'video_preset',
+      'product_name', 'product_image_url', 'product_benefits',
+      'system_prompt', 'scenarios',
+      'voice_style', 'voice_custom_instruction',
+      'frequency_hours', 'account_ids', 'mode', 'is_active',
+    ]
+
+    const safeUpdates: Record<string, any> = { updated_at: new Date().toISOString() }
+    for (const key of allowedFields) {
+      if (key in updates) {
+        safeUpdates[key] = updates[key]
+      }
     }
 
-    updates.updated_at = new Date().toISOString()
+    // Si se activa, calcular next_run_at
+    if (safeUpdates.is_active === true) {
+      safeUpdates.next_run_at = new Date().toISOString()
+    }
 
-    const { data, error } = await supabase
-      .from('automations')
-      .update(updates)
+    const { data: flow, error } = await supabase
+      .from('automation_flows')
+      .update(safeUpdates)
       .eq('id', id)
       .eq('user_id', user.id)
       .select()
       .single()
 
-    if (error) throw error
+    if (error) {
+      console.error('[Automations/Update] Error:', error.message)
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
 
-    return NextResponse.json({ success: true, automation: data })
-  } catch (err: any) {
-    console.error('[Automations] PUT error:', err)
-    return NextResponse.json({ error: err.message }, { status: 500 })
+    return NextResponse.json({ flow })
+  } catch (error: any) {
+    console.error('[Automations/Update] Error:', error.message)
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
 
-// DELETE: Remove an automation
-export async function DELETE(req: NextRequest) {
+// DELETE — Delete automation flow
+export async function DELETE(request: Request) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
 
-    const { searchParams } = new URL(req.url)
+    const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
 
     if (!id) {
-      return NextResponse.json({ error: 'id es requerido' }, { status: 400 })
+      return NextResponse.json({ error: 'Se requiere el ID' }, { status: 400 })
     }
 
     const { error } = await supabase
-      .from('automations')
+      .from('automation_flows')
       .delete()
       .eq('id', id)
       .eq('user_id', user.id)
 
-    if (error) throw error
+    if (error) {
+      console.error('[Automations/Delete] Error:', error.message)
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
 
     return NextResponse.json({ success: true })
-  } catch (err: any) {
-    console.error('[Automations] DELETE error:', err)
-    return NextResponse.json({ error: err.message }, { status: 500 })
+  } catch (error: any) {
+    console.error('[Automations/Delete] Error:', error.message)
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }

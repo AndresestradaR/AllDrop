@@ -15,9 +15,11 @@ import {
   Loader2,
   Download,
   AlertCircle,
+  Zap,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { InfluencerWizard } from './influencer/InfluencerWizard'
+import { AutoPublisherTool } from './AutoPublisherTool'
 
 interface DropshippingTool {
   id: string
@@ -69,6 +71,14 @@ const DROPSHIPPING_TOOLS: DropshippingTool[] = [
     icon: UserCircle,
     color: 'from-green-500 to-emerald-500',
     emoji: '👤',
+  },
+  {
+    id: 'auto-publicar',
+    name: 'Auto Publicar',
+    description: 'Automatiza generacion y publicacion de videos',
+    icon: Zap,
+    color: 'from-orange-500 to-red-500',
+    emoji: '🚀',
   },
 ]
 
@@ -2035,6 +2045,10 @@ export function DropshippingGrid() {
 
   if (activeTool === 'mi-influencer') {
     return <InfluencerWizard onBack={handleBack} />
+  }
+
+  if (activeTool === 'auto-publicar') {
+    return <AutoPublisherTool onBack={handleBack} />
   }
 
   if (activeTool) {
