@@ -42,7 +42,8 @@ interface PublerAccount {
   provider: string
   type: string
   picture: string
-  status: string
+  locked?: boolean
+  permissions?: { can_access?: boolean }
 }
 
 interface PublisherModalProps {
@@ -98,8 +99,11 @@ export function PublisherModal({
         return
       }
 
-      const activeAccounts = (data.accounts || []).filter(
-        (a: PublerAccount) => a.status === 'active'
+      // Publer API returns accounts without a "status" field.
+      // Filter by: not locked AND has access permission.
+      const rawAccounts: PublerAccount[] = data.accounts || []
+      const activeAccounts = rawAccounts.filter(
+        (a) => !a.locked && a.permissions?.can_access !== false
       )
       setAccounts(activeAccounts)
     } catch (err: any) {
