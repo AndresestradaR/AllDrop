@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ArrowLeft, Heart, Download, Image as ImageIcon, Video, X, Grid3X3, LayoutGrid, Loader2 } from 'lucide-react'
+import { ArrowLeft, Heart, Download, Image as ImageIcon, Video, X, Grid3X3, LayoutGrid, Loader2, Share2 } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
 import toast from 'react-hot-toast'
+import { PublisherModal } from '../PublisherModal'
 
 interface InfluencerBoardProps {
   influencer: any
@@ -23,6 +24,7 @@ export function InfluencerBoard({
   const [filter, setFilter] = useState<'all' | 'images' | 'videos' | 'favorites'>('all')
   const [gridCols, setGridCols] = useState<3 | 4>(3)
   const [lightboxItem, setLightboxItem] = useState<any | null>(null)
+  const [publishItem, setPublishItem] = useState<any | null>(null)
 
   useEffect(() => {
     const load = async () => {
@@ -252,6 +254,13 @@ export function InfluencerBoard({
                   {/* Hover buttons */}
                   <div className="absolute top-1.5 right-1.5 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
+                      onClick={(e) => { e.stopPropagation(); setPublishItem(item) }}
+                      className="p-1 bg-indigo-500/80 rounded-md text-white hover:bg-indigo-500 transition-colors"
+                      title="Publicar en redes"
+                    >
+                      <Share2 className="w-3 h-3" />
+                    </button>
+                    <button
                       onClick={(e) => { e.stopPropagation(); handleToggleFavorite(item) }}
                       className={cn(
                         'p-1 rounded-md transition-colors',
@@ -323,6 +332,13 @@ export function InfluencerBoard({
               </div>
               <div className="flex gap-2 ml-3">
                 <button
+                  onClick={() => { setPublishItem(lightboxItem); setLightboxItem(null) }}
+                  className="p-2 bg-indigo-500/30 rounded-lg text-indigo-400 hover:bg-indigo-500/50 transition-colors"
+                  title="Publicar en redes"
+                >
+                  <Share2 className="w-4 h-4" />
+                </button>
+                <button
                   onClick={() => handleToggleFavorite(lightboxItem)}
                   className={cn(
                     'p-2 rounded-lg transition-colors',
@@ -348,6 +364,16 @@ export function InfluencerBoard({
           </div>
         </div>
       )}
+
+      {/* Publisher Modal */}
+      <PublisherModal
+        isOpen={!!publishItem}
+        onClose={() => setPublishItem(null)}
+        mediaUrl={publishItem?.content_type === 'video' ? publishItem?.video_url : publishItem?.image_url}
+        contentType={publishItem?.content_type === 'video' ? 'video' : 'photo'}
+        defaultCaption={publishItem?.situation || `${influencer.name} - Contenido generado con IA`}
+        previewUrl={publishItem?.content_type === 'video' ? publishItem?.video_url : publishItem?.image_url}
+      />
     </div>
   )
 }
