@@ -1,6 +1,14 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { getPublerCredentials, getAccounts, uploadMediaFromUrl, pollJobUntilComplete, PublerAccount } from '@/lib/services/publer'
+import {
+  getPublerCredentials,
+  getAccounts,
+  uploadMediaDirect,
+  downloadFileAsBuffer,
+  pollJobUntilComplete,
+  PublerAccount,
+  PublerMediaObject,
+} from '@/lib/services/publer'
 
 export const maxDuration = 60
 
@@ -46,83 +54,57 @@ export async function POST(request: Request) {
     }
 
     // ========================================
-    // Step 1: Resolve media URL
+    // Step 1: Upload media DIRECTLY to Publer (no polling!)
+    // Uses POST /api/v1/media with multipart/form-data
+    // Returns media object immediately.
     // ========================================
-    let finalMediaUrl = mediaUrl || ''
-    if (!finalMediaUrl && mediaBase64) {
-      console.log('[Publer/Publish] Converting base64 to Supabase URL...')
-      const buffer = Buffer.from(mediaBase64, 'base64')
-      const ext = mediaContentType?.includes('png') ? 'png' :
-                  mediaContentType?.includes('webp') ? 'webp' :
-                  mediaContentType?.includes('mp4') ? 'mp4' : 'jpg'
-      const filename = `studio/publer/${user.id}/${Date.now()}.${ext}`
+    let publerMedia: PublerMediaObject | null = null
 
-      const { error: uploadError } = await supabase.storage
-        .from('landing-images')
-        .upload(filename, buffer, {
-          contentType: mediaContentType || 'image/png',
-          upsert: true,
-        })
+    if (contentType !== 'status' && (mediaBase64 || mediaUrl)) {
+      let fileBuffer: Buffer
+      let filename: string
+      let fileMimeType: string
 
-      if (uploadError) {
-        console.error('[Publer/Publish] Supabase upload error:', uploadError)
-        return NextResponse.json({ error: 'Error subiendo media a storage' }, { status: 500 })
+      if (mediaBase64) {
+        // Already have the file in memory
+        console.log('[Publer/Publish] Using base64 media directly')
+        fileBuffer = Buffer.from(mediaBase64, 'base64')
+        const ext = mediaContentType?.includes('mp4') ? 'mp4' :
+                    mediaContentType?.includes('webm') ? 'webm' :
+                    mediaContentType?.includes('mov') ? 'mov' :
+                    mediaContentType?.includes('png') ? 'png' :
+                    mediaContentType?.includes('webp') ? 'webp' : 'jpg'
+        filename = `estrategas-${Date.now()}.${ext}`
+        fileMimeType = mediaContentType || 'image/png'
+      } else {
+        // Download the file from URL first
+        console.log(`[Publer/Publish] Downloading media from: ${mediaUrl}`)
+        const downloaded = await downloadFileAsBuffer(mediaUrl!)
+        fileBuffer = downloaded.buffer
+        fileMimeType = downloaded.contentType
+
+        // Determine extension from content type or URL
+        let ext = 'bin'
+        if (fileMimeType.includes('mp4') || mediaUrl!.includes('.mp4')) ext = 'mp4'
+        else if (fileMimeType.includes('webm')) ext = 'webm'
+        else if (fileMimeType.includes('mov') || mediaUrl!.includes('.mov')) ext = 'mov'
+        else if (fileMimeType.includes('png')) ext = 'png'
+        else if (fileMimeType.includes('webp')) ext = 'webp'
+        else if (fileMimeType.includes('jpeg') || fileMimeType.includes('jpg')) ext = 'jpg'
+        else if (fileMimeType.includes('gif')) ext = 'gif'
+        filename = `estrategas-${Date.now()}.${ext}`
       }
 
-      const { data: urlData } = supabase.storage
-        .from('landing-images')
-        .getPublicUrl(filename)
+      console.log(`[Publer/Publish] Uploading ${fileBuffer.length} bytes as ${filename} (${fileMimeType})`)
 
-      finalMediaUrl = urlData.publicUrl
+      // Direct multipart upload - returns immediately!
+      publerMedia = await uploadMediaDirect(creds, fileBuffer, filename, fileMimeType)
+
+      console.log(`[Publer/Publish] Media ready: id=${publerMedia.id}, type=${publerMedia.type}, path=${publerMedia.path}`)
     }
 
     // ========================================
-    // Step 2: Upload media to Publer (if applicable)
-    // ========================================
-    let publerMedia: { id: string; path: string; type: string } | null = null
-
-    if (finalMediaUrl && contentType !== 'status') {
-      console.log(`[Publer/Publish] Uploading media to Publer: ${finalMediaUrl}`)
-
-      const { jobId } = await uploadMediaFromUrl(creds, finalMediaUrl)
-      console.log(`[Publer/Publish] Media upload job: ${jobId}`)
-
-      const jobResult = await pollJobUntilComplete(creds, jobId, 30, 2000)
-
-      console.log('[Publer/Publish] Media job result:', JSON.stringify(jobResult).slice(0, 1000))
-
-      if (jobResult.status !== 'complete') {
-        return NextResponse.json({
-          error: jobResult.error || 'Error subiendo media a Publer',
-        }, { status: 500 })
-      }
-
-      // Extract media info from job result
-      // Publer returns: { id, path, thumbnail, type, name, ... }
-      const result = jobResult.result
-      if (result?.id && result?.path) {
-        publerMedia = { id: result.id, path: result.path, type: result.type || 'video' }
-      } else if (result?.payload?.media) {
-        const m = Array.isArray(result.payload.media) ? result.payload.media[0] : result.payload.media
-        if (m?.id && m?.path) {
-          publerMedia = { id: m.id, path: m.path, type: m.type || 'video' }
-        }
-      } else if (Array.isArray(result) && result[0]?.id) {
-        publerMedia = { id: result[0].id, path: result[0].path, type: result[0].type || 'video' }
-      }
-
-      if (!publerMedia) {
-        console.error('[Publer/Publish] Could not extract media from result:', JSON.stringify(result ?? null).slice(0, 500))
-        return NextResponse.json({
-          error: 'Media subida pero no se pudo extraer ID. Raw: ' + JSON.stringify(result ?? null).slice(0, 200),
-        }, { status: 500 })
-      }
-
-      console.log(`[Publer/Publish] Media ready: id=${publerMedia.id}, type=${publerMedia.type}`)
-    }
-
-    // ========================================
-    // Step 3: Determine provider for each account
+    // Step 2: Determine provider for each account
     // ========================================
     let allAccounts: PublerAccount[] = []
     try {
@@ -131,7 +113,6 @@ export async function POST(request: Request) {
       allAccounts = []
     }
 
-    // Map provider names for each selected account
     const PROVIDER_TO_NETWORK: Record<string, string> = {
       facebook: 'facebook',
       ig_business: 'instagram',
@@ -149,7 +130,6 @@ export async function POST(request: Request) {
       bluesky: 'bluesky',
     }
 
-    // Build unique provider list from selected accounts
     const selectedAccounts = allAccounts.filter((a) => accountIds.includes(a.id))
     const providerList: string[] = []
 
@@ -162,12 +142,13 @@ export async function POST(request: Request) {
       }
     }
 
-    // If we couldn't determine providers, fallback to instagram
     if (providerList.length === 0) {
       providerList.push('instagram')
     }
 
-    // Build the network content for each provider
+    // ========================================
+    // Step 3: Build network content
+    // ========================================
     const networks: Record<string, any> = {}
     for (let i = 0; i < providerList.length; i++) {
       const networkKey = providerList[i]
@@ -183,7 +164,7 @@ export async function POST(request: Request) {
           type: publerMedia.type,
         }]
 
-        // For Instagram videos, publish as reel
+        // Instagram videos → Reels
         if (networkKey === 'instagram' && contentType === 'video') {
           networkContent.details = { type: 'reel' }
         }
@@ -243,17 +224,18 @@ export async function POST(request: Request) {
 
     const jobId = data.id || data.job_id
     if (!jobId) {
+      // Some endpoints return result directly
       return NextResponse.json({ success: true, result: data })
     }
 
     // ========================================
-    // Step 5: Poll for publish completion
+    // Step 5: Poll for publish completion (this is for the POST job, not media)
     // ========================================
     const publishResult = await pollJobUntilComplete(creds, jobId, 15, 2000)
 
     console.log('[Publer/Publish] Job result:', JSON.stringify(publishResult).slice(0, 500))
 
-    // Check for failures in the result
+    // Check for failures
     const failures = publishResult.result?.payload?.failures || publishResult.result?.failures || []
     if (Array.isArray(failures) && failures.length > 0) {
       const failMsg = failures.map((f: any) => f.message || f.error || JSON.stringify(f)).join('; ')
