@@ -63,7 +63,7 @@ export async function POST(request: Request) {
     const insertData: Record<string, any> = {
       influencer_id: body.influencerId,
       user_id: user.id,
-      image_url: body.image_url || null,
+      image_url: body.image_url || body.video_url || '', // Fallback para videos: usar video_url como image_url, nunca null
       type: body.type || 'solo',
       product_name: body.product_name || null,
       product_image_url: body.product_image_url || null,

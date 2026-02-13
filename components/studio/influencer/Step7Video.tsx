@@ -153,22 +153,29 @@ export function Step7Video({
 
           // Guardar video en la galería del influencer
           try {
-            await fetch('/api/studio/influencer/gallery', {
+            const saveBody = {
+              influencerId,
+              image_url: data.videoUrl, // CRITICAL: usar video URL como image_url para evitar NOT NULL constraint
+              video_url: data.videoUrl,
+              content_type: 'video',
+              type: 'solo',
+              situation: userIdea || prompt.substring(0, 200),
+              prompt_used: prompt,
+            }
+            console.log('[Step7Video] Saving video to gallery:', { influencerId, videoUrl: data.videoUrl?.substring(0, 60) })
+            const saveRes = await fetch('/api/studio/influencer/gallery', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                influencerId,
-                video_url: data.videoUrl,
-                content_type: 'video',
-                type: 'solo',
-                situation: userIdea || prompt.substring(0, 200),
-                prompt_used: prompt,
-              }),
+              body: JSON.stringify(saveBody),
             })
-            console.log('[Step7Video] Video saved to gallery')
+            const saveData = await saveRes.json()
+            if (saveRes.ok && saveData.success) {
+              console.log('[Step7Video] Video saved to gallery successfully, id:', saveData.id)
+            } else {
+              console.error('[Step7Video] Gallery save failed:', saveData.error)
+            }
           } catch (saveErr) {
             console.error('[Step7Video] Error saving video to gallery:', saveErr)
-            // No bloquear al usuario, el video ya se mostró
           }
 
           return // Stop polling
@@ -232,9 +239,15 @@ export function Step7Video({
 
       if (data.optimized_prompt) {
         if (isSora) {
-          setPrompt(`${resolvedDescriptor}\n\n${data.optimized_prompt}`)
+          const soraFinal = `${resolvedDescriptor}\n\n${data.optimized_prompt}`
+          console.log('[Step7Video] SORA PROMPT - descriptor included:', resolvedDescriptor?.length > 20 ? 'YES' : 'NO/SHORT')
+          console.log('[Step7Video] SORA PROMPT - total length:', soraFinal.length)
+          setPrompt(soraFinal)
         } else {
-          setPrompt(data.optimized_prompt)
+          // Asegurar que incluya instrucción de español
+          const optimized = data.optimized_prompt
+          const hasSpanish = optimized.toLowerCase().includes('español') || optimized.toLowerCase().includes('spanish') || optimized.toLowerCase().includes('latino')
+          setPrompt(hasSpanish ? optimized : `${optimized}, habla en español con acento latino`)
         }
         toast.success('Prompt optimizado')
       } else {
@@ -315,7 +328,8 @@ export function Step7Video({
       if (isSora) {
         finalPrompt = `${resolvedDescriptor || 'A person'}.\n\n${userIdea.trim()}. Habla en español con acento latino.`
       } else {
-        finalPrompt = userIdea.trim()
+        // Agregar instrucción de español para TODOS los modelos
+        finalPrompt = `${userIdea.trim()}, habla en español con acento latino`
       }
       setPrompt(finalPrompt)
     }
@@ -326,6 +340,13 @@ export function Step7Video({
     }
 
     console.log('[Step7Video] handleGenerate called, finalPrompt:', finalPrompt?.substring(0, 50))
+
+    // Log para debug Sora descriptor
+    if (isSora) {
+      console.log('[Step7Video] SORA DEBUG - resolvedDescriptor length:', resolvedDescriptor?.length || 0)
+      console.log('[Step7Video] SORA DEBUG - first 100 chars:', resolvedDescriptor?.substring(0, 100))
+      console.log('[Step7Video] SORA DEBUG - finalPrompt first 200 chars:', finalPrompt?.substring(0, 200))
+    }
 
     const model = VIDEO_MODELS[videoModelId]
 
