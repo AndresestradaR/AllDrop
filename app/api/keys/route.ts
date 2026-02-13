@@ -13,7 +13,7 @@ export async function GET() {
 
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('google_api_key, openai_api_key, kie_api_key, bfl_api_key, elevenlabs_api_key, apify_api_key, browserless_api_key, cf_account_id, cf_access_key_id, cf_secret_access_key, cf_bucket_name, cf_public_url')
+      .select('google_api_key, openai_api_key, kie_api_key, bfl_api_key, elevenlabs_api_key, apify_api_key, browserless_api_key, cf_account_id, cf_access_key_id, cf_secret_access_key, cf_bucket_name, cf_public_url, publer_api_key, publer_workspace_id')
       .eq('id', user.id)
       .single()
 
@@ -35,6 +35,7 @@ export async function GET() {
         hasR2AccessKeyId: false,
         maskedR2SecretAccessKey: '',
         hasR2SecretAccessKey: false,
+        hasPubler: false,
       })
     }
 
@@ -88,6 +89,10 @@ export async function GET() {
       hasR2AccessKeyId: !!profile.cf_access_key_id,
       maskedR2SecretAccessKey: safeMask(profile.cf_secret_access_key),
       hasR2SecretAccessKey: !!profile.cf_secret_access_key,
+      // Publer
+      maskedPublerApiKey: safeMask(profile.publer_api_key),
+      publerWorkspaceId: safeDecrypt(profile.publer_workspace_id),
+      hasPubler: !!(profile.publer_api_key && profile.publer_workspace_id),
     })
   } catch (error: any) {
     console.error('GET /api/keys error:', error)
@@ -105,10 +110,10 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { googleApiKey, openaiApiKey, kieApiKey, bflApiKey, elevenlabsApiKey, apifyApiKey, browserlessApiKey, cfAccountId, cfAccessKeyId, cfSecretAccessKey, cfBucketName, cfPublicUrl } = body
+    const { googleApiKey, openaiApiKey, kieApiKey, bflApiKey, elevenlabsApiKey, apifyApiKey, browserlessApiKey, cfAccountId, cfAccessKeyId, cfSecretAccessKey, cfBucketName, cfPublicUrl, publerApiKey, publerWorkspaceId } = body
 
     // Build update object with only provided keys
-    const updateData: Record<string, string> = {}
+    const updateData: Record<string, string | null> = {}
 
     try {
       if (googleApiKey) {
@@ -147,6 +152,13 @@ export async function POST(request: Request) {
       }
       if (cfPublicUrl) {
         updateData.cf_public_url = encrypt(cfPublicUrl)
+      }
+      // Publer
+      if (publerApiKey) {
+        updateData.publer_api_key = encrypt(publerApiKey)
+      }
+      if (publerWorkspaceId !== undefined) {
+        updateData.publer_workspace_id = publerWorkspaceId ? encrypt(publerWorkspaceId) : null
       }
     } catch (encryptError: any) {
       console.error('Encryption error:', encryptError)

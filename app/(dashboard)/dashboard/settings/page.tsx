@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Button, Input, Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui'
-import { Key, ExternalLink, Check, Loader2, Sparkles, Zap, Image as ImageIcon, Cpu, PlayCircle, X, Globe, Mic, Cloud } from 'lucide-react'
+import { Key, ExternalLink, Check, Loader2, Sparkles, Zap, Image as ImageIcon, Cpu, PlayCircle, X, Globe, Mic, Cloud, Share2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export const dynamic = 'force-dynamic'
@@ -35,6 +35,13 @@ export default function SettingsPage() {
   const [hasR2, setHasR2] = useState(false)
   const [isSavingR2, setIsSavingR2] = useState(false)
   const [isTestingR2, setIsTestingR2] = useState(false)
+
+  // Publer state
+  const [publerApiKey, setPublerApiKey] = useState<ApiKeyState>({ value: '', hasKey: false, isSaving: false })
+  const [publerWorkspaceId, setPublerWorkspaceId] = useState('')
+  const [isSavingPubler, setIsSavingPubler] = useState(false)
+  const [isTestingPubler, setIsTestingPubler] = useState(false)
+  const [hasPubler, setHasPubler] = useState(false)
 
   useEffect(() => {
     fetchKeys()
@@ -78,6 +85,12 @@ export default function SettingsPage() {
       }
       if (data.hasR2SecretAccessKey) {
         setR2SecretAccessKey(data.maskedR2SecretAccessKey || '')
+      }
+      // Publer
+      if (data.hasPubler) {
+        setHasPubler(true)
+        setPublerApiKey(prev => ({ ...prev, hasKey: true, value: data.maskedPublerApiKey || '' }))
+        setPublerWorkspaceId(data.publerWorkspaceId || '')
       }
     } catch (error) {
       console.error('Error fetching keys:', error)
@@ -164,6 +177,53 @@ export default function SettingsPage() {
       toast.error(error.message || 'Error al guardar')
     } finally {
       setIsSavingR2(false)
+    }
+  }
+
+  const handleSavePubler = async () => {
+    const hasNewKey = publerApiKey.value && !publerApiKey.value.includes('•')
+    const hasNewWorkspace = publerWorkspaceId && !publerWorkspaceId.includes('•')
+
+    if (!hasPubler && (!hasNewKey || !hasNewWorkspace)) {
+      toast.error('Completa la API Key y el Workspace ID de Publer')
+      return
+    }
+
+    setIsSavingPubler(true)
+    try {
+      const body: Record<string, string> = {}
+      if (hasNewKey) body.publerApiKey = publerApiKey.value
+      body.publerWorkspaceId = publerWorkspaceId
+
+      const response = await fetch('/api/keys', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Error al guardar')
+
+      toast.success('Credenciales de Publer guardadas')
+      fetchKeys()
+    } catch (error: any) {
+      toast.error(error.message || 'Error al guardar')
+    } finally {
+      setIsSavingPubler(false)
+    }
+  }
+
+  const handleTestPubler = async () => {
+    setIsTestingPubler(true)
+    try {
+      const response = await fetch('/api/publer/accounts')
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Error al conectar')
+      const count = data.accounts?.length || 0
+      toast.success(`Publer conectado. ${count} cuenta${count !== 1 ? 's' : ''} encontrada${count !== 1 ? 's' : ''}`)
+    } catch (error: any) {
+      toast.error(error.message || 'Error al conectar con Publer')
+    } finally {
+      setIsTestingPubler(false)
     }
   }
 
@@ -693,6 +753,81 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
+      {/* Section: Publicación en Redes Sociales */}
+      <div className="mt-8 mb-6">
+        <h2 className="text-lg font-semibold text-text-primary mb-4 flex items-center gap-2">
+          <Share2 className="w-5 h-5 text-accent" />
+          Publicación en Redes Sociales
+        </h2>
+      </div>
+
+      {/* Publer */}
+      <Card className="mb-4">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <div className="p-2 rounded-lg bg-gradient-to-br from-indigo-500 to-blue-500 text-white">
+              <Share2 className="w-4 h-4" />
+            </div>
+            Publer (Social Media)
+            {hasPubler && (
+              <span className="flex items-center gap-1 text-xs text-success ml-auto">
+                <Check className="w-3 h-3" />
+                Configurado
+              </span>
+            )}
+          </CardTitle>
+          <CardDescription>
+            Publica imágenes y videos directamente a Facebook, Instagram, TikTok, YouTube y más
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* API Key */}
+          <div>
+            <label className="block text-xs font-medium text-text-secondary mb-1">API Key *</label>
+            <Input
+              type="password"
+              placeholder="Tu Publer API Key"
+              value={publerApiKey.value}
+              onChange={(e) => setPublerApiKey(prev => ({ ...prev, value: e.target.value }))}
+            />
+          </div>
+          {/* Workspace ID */}
+          <div>
+            <label className="block text-xs font-medium text-text-secondary mb-1">Workspace ID *</label>
+            <Input
+              type="text"
+              placeholder="5f8d7a62c9e77e001f36e3a1"
+              value={publerWorkspaceId}
+              onChange={(e) => setPublerWorkspaceId(e.target.value)}
+            />
+            <p className="text-xs text-text-muted mt-1">
+              Encuéntralo en Publer → Settings → Access & Login → API Keys
+            </p>
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-2 pt-2">
+            <Button onClick={handleSavePubler} isLoading={isSavingPubler} className="flex-1">
+              Guardar Publer
+            </Button>
+            {hasPubler && (
+              <Button onClick={handleTestPubler} isLoading={isTestingPubler} variant="secondary">
+                Probar Conexión
+              </Button>
+            )}
+          </div>
+
+          <a
+            href="https://app.publer.com/settings"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-xs text-accent hover:text-accent-hover transition-colors"
+          >
+            Configurar Publer API Key <ExternalLink className="w-3 h-3" />
+          </a>
+        </CardContent>
+      </Card>
+
       {/* Info Card */}
       <Card className="mt-6" variant="glass">
         <CardContent className="pt-6">
@@ -732,6 +867,10 @@ export default function SettingsPage() {
             <li className="flex items-start gap-2">
               <span className="text-orange-500">•</span>
               <span><strong>Cloudflare R2</strong> - Almacena imagenes y videos en tu propio bucket</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-indigo-500">•</span>
+              <span><strong>Publer</strong> - Publica en 13 redes sociales directamente</span>
             </li>
           </ul>
         </CardContent>
