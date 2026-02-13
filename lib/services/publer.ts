@@ -66,7 +66,8 @@ export interface PublerAccount {
   provider: string
   type: string
   picture: string
-  status: string
+  locked?: boolean
+  permissions?: { can_access?: boolean }
 }
 
 /**
@@ -165,12 +166,21 @@ export async function uploadMediaFromUrl(
 
 export interface JobStatusResult {
   status: 'working' | 'complete' | 'error'
+  /** The raw response from Publer job_status endpoint */
+  raw?: any
+  /** Extracted result (media object, post result, etc.) */
   result?: any
   error?: string
 }
 
 /**
  * Check the status of an async Publer job.
+ * 
+ * Publer job_status can return different formats:
+ * 1. { status: "complete", payload: { ... } }
+ * 2. { data: { status: "complete", result: { ... } } }
+ * 3. Direct media object: { id: "...", path: "...", type: "photo" }
+ * 4. { status: "working" } while processing
  */
 export async function checkJobStatus(
   creds: PublerCredentials,
@@ -185,16 +195,50 @@ export async function checkJobStatus(
 
   const data = await response.json()
 
+  console.log('[Publer/Job] Raw response:', JSON.stringify(data).slice(0, 800))
+
+  // Case: explicit error
   if (data.success === false) {
-    return { status: 'error', error: data.error || 'Unknown error' }
+    return { status: 'error', error: data.error || 'Unknown error', raw: data }
   }
 
-  const status = data.data?.status || data.status || 'working'
-  return {
-    status: status === 'complete' ? 'complete' : status === 'error' ? 'error' : 'working',
-    result: data.data?.result || data.result,
-    error: data.data?.error || data.error,
+  // Case: wrapped in data object
+  if (data.data) {
+    const inner = data.data
+    const status = inner.status || 'working'
+    if (status === 'complete' || status === 'done') {
+      return { status: 'complete', result: inner.result || inner, raw: data }
+    }
+    if (status === 'error' || status === 'failed') {
+      return { status: 'error', error: inner.error || 'Job failed', raw: data }
+    }
+    return { status: 'working', raw: data }
   }
+
+  // Case: direct status field
+  const status = data.status
+  if (status === 'complete' || status === 'done') {
+    return { status: 'complete', result: data.payload || data.result || data, raw: data }
+  }
+  if (status === 'error' || status === 'failed') {
+    return { status: 'error', error: data.error || data.payload?.error || 'Job failed', raw: data }
+  }
+  if (status === 'working' || status === 'pending' || status === 'queued') {
+    return { status: 'working', raw: data }
+  }
+
+  // Case: direct media object (has id + path, no status field)
+  if (data.id && data.path) {
+    return { status: 'complete', result: data, raw: data }
+  }
+
+  // Case: array of results
+  if (Array.isArray(data) && data.length > 0) {
+    return { status: 'complete', result: data, raw: data }
+  }
+
+  // Default: still working
+  return { status: 'working', raw: data }
 }
 
 /**
@@ -209,6 +253,8 @@ export async function pollJobUntilComplete(
   for (let i = 0; i < maxAttempts; i++) {
     const result = await checkJobStatus(creds, jobId)
 
+    console.log(`[Publer/Job] Poll ${i + 1}/${maxAttempts}: status=${result.status}`)
+
     if (result.status === 'complete') return result
     if (result.status === 'error') return result
 
@@ -219,23 +265,16 @@ export async function pollJobUntilComplete(
 }
 
 // ============================================
-// PUBLISH POST
+// PUBLISH POST (legacy - kept for reference)
 // ============================================
 
 export interface PublishPostOptions {
-  /** Array of account IDs to publish to */
   accountIds: string[]
-  /** Post text/caption */
   text: string
-  /** Content type: photo, video, status */
   contentType: 'photo' | 'video' | 'status'
-  /** Media IDs (from upload) */
   mediaIds?: string[]
-  /** Media type for each media ID */
   mediaType?: 'image' | 'video'
-  /** ISO 8601 scheduled time. Omit for immediate publishing. */
   scheduledAt?: string
-  /** Network-specific overrides. If not provided, uses "default" for all. */
   networkOverrides?: Record<string, { type: string; text: string; media?: any[] }>
 }
 
@@ -243,17 +282,12 @@ export interface PublishResult {
   jobId: string
 }
 
-/**
- * Schedule or publish a post to Publer.
- * Use /posts/schedule/publish for immediate, /posts/schedule for scheduled.
- */
 export async function publishPost(
   creds: PublerCredentials,
   options: PublishPostOptions
 ): Promise<PublishResult> {
   const { accountIds, text, contentType, mediaIds, mediaType, scheduledAt, networkOverrides } = options
 
-  // Build networks object
   let networks: Record<string, any>
   if (networkOverrides && Object.keys(networkOverrides).length > 0) {
     networks = networkOverrides
@@ -271,7 +305,6 @@ export async function publishPost(
     networks = { default: defaultNetwork }
   }
 
-  // Build accounts array
   const accounts = accountIds.map(id => {
     const account: Record<string, any> = { id }
     if (scheduledAt) {
@@ -290,7 +323,6 @@ export async function publishPost(
     },
   }
 
-  // Use /publish for immediate, /schedule for scheduled
   const endpoint = scheduledAt ? '/posts/schedule' : '/posts/schedule/publish'
 
   console.log(`[Publer] Publishing to ${endpoint} for ${accountIds.length} accounts`)
