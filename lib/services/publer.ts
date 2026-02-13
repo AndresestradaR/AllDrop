@@ -142,9 +142,11 @@ export async function uploadMediaDirect(
   filename: string,
   contentType: string
 ): Promise<PublerMediaObject> {
-  // Build multipart form data manually using Web API FormData + Blob
+  // Convert Buffer to Uint8Array to satisfy Blob type requirements
+  const uint8 = new Uint8Array(fileBuffer.buffer, fileBuffer.byteOffset, fileBuffer.byteLength)
+
   const formData = new FormData()
-  const blob = new Blob([fileBuffer], { type: contentType })
+  const blob = new Blob([uint8], { type: contentType })
   formData.append('file', blob, filename)
   formData.append('direct_upload', 'false')
   formData.append('in_library', 'false')
