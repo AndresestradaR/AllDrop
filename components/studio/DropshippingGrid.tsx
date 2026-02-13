@@ -1373,9 +1373,8 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           text: translatedScript,
-          voice_id: isMale
-            ? 'pNInz6obpgDQGcFmaJgB'  // Adam (male) - ElevenLabs
-            : 'EXAVITQu4vr4xnSDxMaL',  // Bella (female) - ElevenLabs
+          gender: isMale ? 'male' : 'female',
+          language_code: 'es',
         }),
       })
 
