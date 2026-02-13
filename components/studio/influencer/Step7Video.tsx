@@ -107,6 +107,12 @@ export function Step7Video({
       })
 
       const data = await res.json()
+      console.log('[Step7Video] Optimize response:', { status: res.status, hasPrompt: !!data.optimized_prompt, error: data.error })
+
+      if (!res.ok) {
+        console.warn('[Step7Video] API returned error:', data.error)
+        // No throw, caer al else para usar fallback
+      }
 
       if (data.optimized_prompt) {
         if (isSora) {
@@ -117,23 +123,24 @@ export function Step7Video({
         }
         toast.success('Prompt optimizado')
       } else {
+        const desc = promptDescriptor || `a person called ${influencerName}`
         if (isSora) {
-          const basic = `${promptDescriptor}\n\nScene: ${userIdea.trim()}. Hyperrealistic, shot on iPhone 14 Pro, cinematic, natural lighting.`
-          setPrompt(basic)
+          setPrompt(`${desc}\n\nScene: ${userIdea.trim()}. Hyperrealistic, shot on iPhone 14 Pro, cinematic, natural lighting.`)
         } else {
-          const basic = `A hyperrealistic video of ${promptDescriptor}. ${userIdea.trim()}. Shot on iPhone 14 Pro, cinematic, natural lighting.`
-          setPrompt(basic)
+          setPrompt(`A hyperrealistic video of ${desc}. ${userIdea.trim()}. Shot on iPhone 14 Pro, cinematic, natural lighting.`)
         }
         toast.success('Prompt generado')
       }
     } catch (err: any) {
+      console.error('[Step7Video] Optimize error:', err)
+      // Fallback robusto que siempre funciona
+      const desc = promptDescriptor || `a person called ${influencerName}`
       if (isSora) {
-        const basic = `${promptDescriptor}\n\nScene: ${userIdea.trim()}. Hyperrealistic, cinematic.`
-        setPrompt(basic)
+        setPrompt(`${desc}\n\nScene: ${userIdea.trim()}. Hyperrealistic, cinematic, natural lighting.`)
       } else {
-        const basic = `A hyperrealistic video of ${promptDescriptor}. ${userIdea.trim()}.`
-        setPrompt(basic)
+        setPrompt(`A hyperrealistic video of ${desc}. ${userIdea.trim()}. Cinematic, natural lighting.`)
       }
+      toast.success('Prompt generado (modo fallback)')
     } finally {
       setIsOptimizing(false)
     }
@@ -148,16 +155,32 @@ export function Step7Video({
   }
 
   const getBase64FromUrl = async (url: string): Promise<string | undefined> => {
+    if (!url) {
+      console.warn('[Step7Video] getBase64FromUrl: no URL provided')
+      return undefined
+    }
     try {
+      console.log('[Step7Video] Fetching image:', url.substring(0, 80) + '...')
       const res = await fetch(url)
-      if (!res.ok) return undefined
+      if (!res.ok) {
+        console.error('[Step7Video] Image fetch failed:', res.status, res.statusText)
+        toast.error(`Error al cargar imagen: ${res.status}`)
+        return undefined
+      }
       const blob = await res.blob()
-      return new Promise<string>((resolve) => {
+      console.log('[Step7Video] Image loaded, size:', blob.size, 'type:', blob.type)
+      return new Promise<string>((resolve, reject) => {
         const reader = new FileReader()
         reader.onload = () => resolve(reader.result as string)
+        reader.onerror = () => {
+          console.error('[Step7Video] FileReader error')
+          reject(new Error('FileReader error'))
+        }
         reader.readAsDataURL(blob)
       })
-    } catch {
+    } catch (err) {
+      console.error('[Step7Video] getBase64FromUrl error:', err)
+      toast.error('No se pudo cargar la imagen de referencia')
       return undefined
     }
   }
@@ -171,8 +194,19 @@ export function Step7Video({
   }
 
   const handleGenerate = async () => {
-    if (!prompt.trim()) {
-      toast.error('Genera o escribe un prompt primero')
+    // Si no hay prompt optimizado, construir uno automático desde userIdea
+    let finalPrompt = prompt.trim()
+    if (!finalPrompt && userIdea.trim()) {
+      if (isSora) {
+        finalPrompt = `${promptDescriptor || 'A person'}. Scene: ${userIdea.trim()}. Hyperrealistic, cinematic, natural lighting, shot on iPhone 14 Pro.`
+      } else {
+        finalPrompt = `A hyperrealistic video of ${promptDescriptor || 'a person'}. ${userIdea.trim()}. Cinematic, natural lighting, shot on iPhone 14 Pro.`
+      }
+      setPrompt(finalPrompt) // Guardar para que el usuario lo vea
+    }
+
+    if (!finalPrompt) {
+      toast.error('Escribe una idea o un prompt para el video')
       return
     }
 
@@ -223,7 +257,10 @@ export function Step7Video({
           veoGenerationType = 'REFERENCE_2_VIDEO'
           const startB64 = await getBase64FromUrl(startImageUrl)
           if (startB64) veoImages = [startB64]
-          else veoGenerationType = 'TEXT_2_VIDEO'
+          else {
+            veoGenerationType = 'TEXT_2_VIDEO'
+            toast('Imagen no disponible, generando desde texto', { icon: '⚠️' })
+          }
         } else {
           veoGenerationType = 'TEXT_2_VIDEO'
         }
@@ -231,18 +268,45 @@ export function Step7Video({
         // =============== OTROS MODELOS (Kling, Hailuo, Seedance, Wan) ===============
         if ((videoMode === 'image' || videoMode === 'start_end') && startImageUrl) {
           imageBase64 = await getBase64FromUrl(startImageUrl)
+          if (!imageBase64) {
+            console.warn('[Step7Video] Start image failed to load, falling back to text-to-video')
+            if (model?.requiresImage) {
+              setError('Este modelo requiere imagen pero no se pudo cargar. Intenta con otro modelo.')
+              setIsGenerating(false)
+              return
+            }
+            toast('Imagen no disponible, generando desde texto', { icon: '⚠️' })
+          }
         }
         if (videoMode === 'start_end' && endImageUrl) {
           imageBase64End = await getBase64FromUrl(endImageUrl)
+          if (!imageBase64End) {
+            console.warn('[Step7Video] End image failed to load')
+            toast('Imagen final no disponible', { icon: '⚠️' })
+          }
         }
       }
+
+      // Debug: mostrar exactamente qué se envía
+      console.log('[Step7Video] Generating video:', {
+        modelId: videoModelId,
+        promptLength: finalPrompt.length,
+        duration,
+        aspectRatio,
+        hasStartImage: !!imageBase64,
+        hasEndImage: !!imageBase64End,
+        veoGenerationType,
+        hasVeoImages: veoImages?.length || 0,
+        isSora,
+        hasProductImage: isSora && !!imageBase64,
+      })
 
       const res = await fetch('/api/studio/generate-video', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           modelId: videoModelId,
-          prompt: prompt.trim(),
+          prompt: finalPrompt,
           duration,
           aspectRatio,
           enableAudio: model?.supportsAudio ? true : false,
@@ -254,6 +318,7 @@ export function Step7Video({
       })
 
       const data = await res.json()
+      console.log('[Step7Video] Generate response:', { status: res.status, success: data.success, taskId: data.taskId, error: data.error })
 
       if (!res.ok || (!data.success && !data.taskId)) {
         throw new Error(data.error || 'Error al generar video')
@@ -628,10 +693,10 @@ export function Step7Video({
       {/* ============ BOTON GENERAR ============ */}
       <button
         onClick={handleGenerate}
-        disabled={isGenerating || !prompt.trim()}
+        disabled={isGenerating || (!prompt.trim() && !userIdea.trim())}
         className={cn(
           'w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-semibold transition-all',
-          isGenerating || !prompt.trim()
+          isGenerating || (!prompt.trim() && !userIdea.trim())
             ? 'bg-border text-text-secondary cursor-not-allowed'
             : 'bg-accent hover:bg-accent-hover text-background shadow-lg shadow-accent/25'
         )}
