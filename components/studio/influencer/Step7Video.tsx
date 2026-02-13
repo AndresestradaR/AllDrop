@@ -27,28 +27,32 @@ export function Step7Video({
   const [resolvedDescriptor, setResolvedDescriptor] = useState(promptDescriptor)
 
   useEffect(() => {
-    // Si el prop llega vacío, intentar cargarlo de la BD
-    if (!promptDescriptor && influencerId) {
+    if (promptDescriptor && promptDescriptor.length > 20) {
+      setResolvedDescriptor(promptDescriptor)
+      console.log('[Step7Video] Using prop descriptor, length:', promptDescriptor.length)
+      return
+    }
+
+    // Prop vacía o muy corta — cargar de la BD
+    if (influencerId) {
       const loadDescriptor = async () => {
         try {
           const res = await fetch(`/api/studio/influencer`)
           const data = await res.json()
           const inf = data.influencers?.find((i: any) => i.id === influencerId)
-          if (inf?.prompt_descriptor) {
+          if (inf?.prompt_descriptor && inf.prompt_descriptor.length > 20) {
             setResolvedDescriptor(inf.prompt_descriptor)
-            console.log('[Step7Video] Loaded descriptor from DB:', inf.prompt_descriptor.substring(0, 50))
+            console.log('[Step7Video] Loaded descriptor from DB, length:', inf.prompt_descriptor.length)
           } else {
-            console.warn('[Step7Video] No descriptor in DB either. Using fallback.')
-            setResolvedDescriptor(`a person called ${influencerName}`)
+            console.warn('[Step7Video] No descriptor in DB. Sora will use basic name only.')
+            setResolvedDescriptor(`a young woman called ${influencerName}, natural appearance, casual style`)
           }
         } catch (err) {
           console.error('[Step7Video] Error loading descriptor:', err)
-          setResolvedDescriptor(`a person called ${influencerName}`)
+          setResolvedDescriptor(`a young woman called ${influencerName}, natural appearance, casual style`)
         }
       }
       loadDescriptor()
-    } else if (promptDescriptor) {
-      setResolvedDescriptor(promptDescriptor)
     }
   }, [promptDescriptor, influencerId, influencerName])
 
@@ -146,6 +150,27 @@ export function Step7Video({
           setVideoUrl(data.videoUrl)
           setIsGenerating(false)
           toast.success('¡Video generado!')
+
+          // Guardar video en la galería del influencer
+          try {
+            await fetch('/api/studio/influencer/gallery', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                influencerId,
+                video_url: data.videoUrl,
+                content_type: 'video',
+                type: 'solo',
+                situation: userIdea || prompt.substring(0, 200),
+                prompt_used: prompt,
+              }),
+            })
+            console.log('[Step7Video] Video saved to gallery')
+          } catch (saveErr) {
+            console.error('[Step7Video] Error saving video to gallery:', saveErr)
+            // No bloquear al usuario, el video ya se mostró
+          }
+
           return // Stop polling
         }
 
@@ -207,18 +232,18 @@ export function Step7Video({
 
       if (data.optimized_prompt) {
         if (isSora) {
-          const soraPrompt = `${resolvedDescriptor}\n\n${data.optimized_prompt}`
+          const soraPrompt = `The character speaks naturally in Spanish with a Latin American accent.\n\n${resolvedDescriptor}\n\n${data.optimized_prompt}`
           setPrompt(soraPrompt)
         } else {
-          setPrompt(data.optimized_prompt)
+          setPrompt(`The character speaks naturally in Spanish with a Latin American accent. ${data.optimized_prompt}`)
         }
         toast.success('Prompt optimizado')
       } else {
         const desc = resolvedDescriptor || `a person called ${influencerName}`
         if (isSora) {
-          setPrompt(`${desc}\n\nScene: ${userIdea.trim()}. Hyperrealistic, shot on iPhone 14 Pro, cinematic, natural lighting.`)
+          setPrompt(`The character speaks naturally in Spanish with a Latin American accent.\n\n${desc}\n\nScene: ${userIdea.trim()}. Hyperrealistic, shot on iPhone 14 Pro, cinematic, natural lighting.`)
         } else {
-          setPrompt(`A hyperrealistic video of ${desc}. ${userIdea.trim()}. Shot on iPhone 14 Pro, cinematic, natural lighting.`)
+          setPrompt(`The character speaks naturally in Spanish with a Latin American accent. A hyperrealistic video of ${desc}. ${userIdea.trim()}. Shot on iPhone 14 Pro, cinematic, natural lighting.`)
         }
         toast.success('Prompt generado')
       }
@@ -227,9 +252,9 @@ export function Step7Video({
       // Fallback robusto que siempre funciona
       const desc = resolvedDescriptor || `a person called ${influencerName}`
       if (isSora) {
-        setPrompt(`${desc}\n\nScene: ${userIdea.trim()}. Hyperrealistic, cinematic, natural lighting.`)
+        setPrompt(`The character speaks naturally in Spanish with a Latin American accent.\n\n${desc}\n\nScene: ${userIdea.trim()}. Hyperrealistic, cinematic, natural lighting.`)
       } else {
-        setPrompt(`A hyperrealistic video of ${desc}. ${userIdea.trim()}. Cinematic, natural lighting.`)
+        setPrompt(`The character speaks naturally in Spanish with a Latin American accent. A hyperrealistic video of ${desc}. ${userIdea.trim()}. Cinematic, natural lighting.`)
       }
       toast.success('Prompt generado (modo fallback)')
     } finally {
@@ -290,9 +315,9 @@ export function Step7Video({
     let finalPrompt = prompt.trim()
     if (!finalPrompt && userIdea.trim()) {
       if (isSora) {
-        finalPrompt = `${resolvedDescriptor || 'A person'}. Scene: ${userIdea.trim()}. Hyperrealistic, cinematic, natural lighting, shot on iPhone 14 Pro.`
+        finalPrompt = `The character speaks naturally in Spanish with a Latin American accent.\n\n${resolvedDescriptor || 'A person'}. Scene: ${userIdea.trim()}. Hyperrealistic, cinematic, natural lighting, shot on iPhone 14 Pro.`
       } else {
-        finalPrompt = `A hyperrealistic video of ${resolvedDescriptor || 'a person'}. ${userIdea.trim()}. Cinematic, natural lighting, shot on iPhone 14 Pro.`
+        finalPrompt = `The character speaks naturally in Spanish with a Latin American accent. A hyperrealistic video of ${resolvedDescriptor || 'a person'}. ${userIdea.trim()}. Cinematic, natural lighting, shot on iPhone 14 Pro.`
       }
       setPrompt(finalPrompt) // Guardar para que el usuario lo vea
     }

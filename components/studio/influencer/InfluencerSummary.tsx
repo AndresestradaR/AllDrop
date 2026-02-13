@@ -25,7 +25,7 @@ export function InfluencerSummary({
   const [copiedField, setCopiedField] = useState<string | null>(null)
   const [recentContent, setRecentContent] = useState<any[]>([])
   const [loadingContent, setLoadingContent] = useState(true)
-  const [contentFilter, setContentFilter] = useState<'all' | 'favorites' | 'solo' | 'with_product'>('all')
+  const [contentFilter, setContentFilter] = useState<'all' | 'favorites' | 'images' | 'videos'>('all')
   const [showAllContent, setShowAllContent] = useState(false)
 
   // Load gallery content
@@ -81,14 +81,17 @@ export function InfluencerSummary({
 
   const handleDownloadItem = async (item: any) => {
     try {
-      const response = await fetch(item.image_url)
+      const url = item.content_type === 'video' ? item.video_url : item.image_url
+      if (!url) return
+      const response = await fetch(url)
       const blob = await response.blob()
-      const url = URL.createObjectURL(blob)
+      const blobUrl = URL.createObjectURL(blob)
       const a = document.createElement('a')
-      a.href = url
-      a.download = `${influencer.name}_${Date.now()}.jpg`
+      a.href = blobUrl
+      const ext = item.content_type === 'video' ? 'mp4' : 'jpg'
+      a.download = `${influencer.name}_${Date.now()}.${ext}`
       a.click()
-      URL.revokeObjectURL(url)
+      URL.revokeObjectURL(blobUrl)
     } catch {
       // silently fail
     }
@@ -97,7 +100,9 @@ export function InfluencerSummary({
   const filteredContent = recentContent.filter(item => {
     if (contentFilter === 'all') return true
     if (contentFilter === 'favorites') return item.is_favorite
-    return item.type === contentFilter
+    if (contentFilter === 'images') return item.content_type !== 'video'
+    if (contentFilter === 'videos') return item.content_type === 'video'
+    return true
   })
 
   const displayContent = showAllContent ? filteredContent : filteredContent.slice(0, 6)
@@ -206,14 +211,14 @@ export function InfluencerSummary({
           <div className="flex items-center gap-2">
             <ImageIcon className="w-4 h-4 text-accent" />
             <h4 className="text-sm font-semibold text-text-primary">
-              Contenido Generado
+              Pizarra de Contenido
             </h4>
             <span className="text-xs text-text-muted">
               ({recentContent.length})
             </span>
           </div>
           <div className="flex gap-1">
-            {(['all', 'favorites', 'solo', 'with_product'] as const).map(f => (
+            {(['all', 'favorites', 'images', 'videos'] as const).map(f => (
               <button
                 key={f}
                 onClick={() => setContentFilter(f)}
@@ -224,7 +229,7 @@ export function InfluencerSummary({
                     : 'text-text-muted hover:text-text-secondary'
                 )}
               >
-                {f === 'all' ? 'Todas' : f === 'favorites' ? 'Favoritas' : f === 'solo' ? 'Solo' : 'Producto'}
+                {f === 'all' ? 'Todo' : f === 'favorites' ? '⭐' : f === 'images' ? '📷 Fotos' : '🎬 Videos'}
               </button>
             ))}
           </div>
@@ -248,11 +253,29 @@ export function InfluencerSummary({
                   key={item.id}
                   className="group relative rounded-xl overflow-hidden bg-surface-elevated border border-border aspect-[9/16]"
                 >
-                  <img
-                    src={item.image_url}
-                    alt={item.situation || 'Contenido'}
-                    className="w-full h-full object-cover"
-                  />
+                  {item.content_type === 'video' && item.video_url ? (
+                    <div className="relative w-full h-full">
+                      <video
+                        src={item.video_url}
+                        className="w-full h-full object-cover"
+                        muted
+                        loop
+                        playsInline
+                        onMouseEnter={(e) => (e.target as HTMLVideoElement).play()}
+                        onMouseLeave={(e) => { const v = e.target as HTMLVideoElement; v.pause(); v.currentTime = 0 }}
+                      />
+                      {/* Badge de video */}
+                      <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 bg-black/60 rounded-md">
+                        <Video className="w-3 h-3 text-white" />
+                      </div>
+                    </div>
+                  ) : (
+                    <img
+                      src={item.image_url}
+                      alt={item.situation || 'Contenido'}
+                      className="w-full h-full object-cover"
+                    />
+                  )}
                   {/* Overlay */}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
                     <div className="absolute bottom-2 left-2 right-2">

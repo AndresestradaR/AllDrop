@@ -125,7 +125,9 @@ For Sora (sora-*): Be specific about physics, camera angles, environmental detai
 RULES:
 - Output ONLY the optimized prompt, nothing else
 - Always maintain the character's appearance consistency
-- Write in English for best results
+- The character ALWAYS speaks in Spanish with a natural Latin American accent. This is mandatory and must be included in EVERY prompt.
+- Write the prompt in English for technical quality, BUT include this mandatory instruction at the START of every prompt: "The character speaks naturally in Spanish with a Latin American accent."
+- If the user's idea is in Spanish, understand it but write the technical prompt in English with the Spanish speech instruction
 - Do NOT include any headers, explanations, or formatting`
 
         const endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent'
@@ -257,9 +259,33 @@ RULES:
 
         // Extract PROMPT DESCRIPTOR section
         let promptDescriptor = ''
-        const descriptorMatch = text.match(/PROMPT DESCRIPTOR[:\s]*\n+([\s\S]*?)(?:\n\n---|\n\n#|$)/i)
-        if (descriptorMatch) {
-          promptDescriptor = descriptorMatch[1].trim()
+        // Intentar múltiples patrones para extraer el descriptor
+        const patterns = [
+          /PROMPT DESCRIPTOR[:\s]*\n+([\s\S]*?)(?:\n\n---|$)/i,
+          /PROMPT DESCRIPTOR[:\s]*\n+([\s\S]*?)$/i,
+          /prompt.descriptor[:\s]*\n+([\s\S]{100,})/i,
+        ]
+
+        for (const pattern of patterns) {
+          const match = text.match(pattern)
+          if (match && match[1].trim().length > 50) {
+            promptDescriptor = match[1].trim()
+            console.log('[VisualAnalysis] Descriptor extracted, length:', promptDescriptor.length)
+            break
+          }
+        }
+
+        // Si no se encontró con regex, intentar extraer el último párrafo largo (>100 chars)
+        if (!promptDescriptor) {
+          const paragraphs = text.split('\n\n').filter((p: string) => p.trim().length > 100)
+          if (paragraphs.length > 0) {
+            promptDescriptor = paragraphs[paragraphs.length - 1].trim()
+            console.log('[VisualAnalysis] Descriptor from last paragraph, length:', promptDescriptor.length)
+          }
+        }
+
+        if (!promptDescriptor) {
+          console.warn('[VisualAnalysis] WARNING: Could not extract prompt descriptor from analysis')
         }
 
         // Parse sections into structured character_profile
