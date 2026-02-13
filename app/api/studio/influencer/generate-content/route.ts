@@ -90,12 +90,8 @@ export async function POST(request: Request) {
       .eq('user_id', user.id)
       .single()
 
-    const descriptor = inf?.prompt_descriptor || fallbackDescriptor
+    const descriptor = inf?.prompt_descriptor || fallbackDescriptor || 'a person'
     const realisticUrl = inf?.realistic_image_url || fallbackRealisticUrl
-
-    if (!descriptor) {
-      return NextResponse.json({ error: 'El influencer no tiene prompt descriptor. Completa el analisis primero.' }, { status: 400 })
-    }
 
     // Get API keys
     const { data: profile } = await supabase
@@ -239,21 +235,27 @@ export async function POST(request: Request) {
       .from('landing-images')
       .getPublicUrl(storagePath)
 
-    // Save to gallery
-    const { data: galleryRow } = await supabase
-      .from('influencer_gallery')
-      .insert({
-        influencer_id: influencerId,
-        user_id: user.id,
-        image_url: publicUrl,
-        type: mode,
-        product_name: mode === 'with_product' ? productName : null,
-        product_image_url: null,
-        prompt_used: prompt,
-        situation,
-      })
-      .select('id')
-      .single()
+    // Save to gallery (graceful — table may not exist yet)
+    let galleryId: string | null = null
+    try {
+      const { data: galleryRow } = await supabase
+        .from('influencer_gallery')
+        .insert({
+          influencer_id: influencerId,
+          user_id: user.id,
+          image_url: publicUrl,
+          type: mode,
+          product_name: mode === 'with_product' ? productName : null,
+          product_image_url: null,
+          prompt_used: prompt,
+          situation,
+        })
+        .select('id')
+        .single()
+      galleryId = galleryRow?.id || null
+    } catch (e) {
+      console.warn('[Influencer/GenerateContent] Gallery insert skipped:', e)
+    }
 
     const totalTime = ((Date.now() - startTime) / 1000).toFixed(1)
     console.log(`[Influencer/GenerateContent] Done in ${totalTime}s`)
@@ -263,7 +265,7 @@ export async function POST(request: Request) {
       imageUrl: publicUrl,
       imageBase64: result.imageBase64,
       mimeType: result.mimeType,
-      galleryId: galleryRow?.id || null,
+      galleryId,
     })
 
   } catch (error: any) {

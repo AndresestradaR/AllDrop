@@ -27,14 +27,15 @@ export async function GET(request: Request) {
 
     if (error) {
       console.error('[Gallery/List] Error:', error.message)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      // Return empty array gracefully (table may not exist yet)
+      return NextResponse.json({ items: [] })
     }
 
     return NextResponse.json({ items: items || [] })
 
   } catch (error: any) {
     console.error('[Gallery/List] Error:', error.message)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ items: [] })
   }
 }
 
