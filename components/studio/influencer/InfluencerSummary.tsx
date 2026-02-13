@@ -46,8 +46,8 @@ export function InfluencerSummary({
         <p className="text-sm text-text-secondary">Tu influencer virtual esta completo y listo para crear contenido</p>
       </div>
 
-      {/* Main image */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+      {/* Main images */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         {influencer.realistic_image_url && (
           <div>
             <p className="text-xs text-text-muted uppercase tracking-wide mb-2">Foto Realista</p>
@@ -67,6 +67,18 @@ export function InfluencerSummary({
               <img
                 src={influencer.angles_grid_url}
                 alt="Angles grid"
+                className="w-full aspect-square object-cover"
+              />
+            </div>
+          </div>
+        )}
+        {influencer.body_grid_url && (
+          <div>
+            <p className="text-xs text-text-muted uppercase tracking-wide mb-2">Grid de Cuerpo</p>
+            <div className="rounded-xl overflow-hidden bg-surface-elevated border border-border">
+              <img
+                src={influencer.body_grid_url}
+                alt="Body grid"
                 className="w-full aspect-square object-cover"
               />
             </div>

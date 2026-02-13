@@ -9,6 +9,7 @@ interface Step4AnalysisProps {
   influencerId: string
   realisticImageUrl: string
   anglesGridUrl: string
+  bodyGridUrl: string
   onComplete: (visualDna: string, promptDescriptor: string) => void
   onBack: () => void
 }
@@ -33,6 +34,7 @@ export function Step4Analysis({
   influencerId,
   realisticImageUrl,
   anglesGridUrl,
+  bodyGridUrl,
   onComplete,
   onBack,
 }: Step4AnalysisProps) {
@@ -129,6 +131,12 @@ export function Step4Analysis({
           <img src={anglesGridUrl} alt="Angles" className="w-12 h-12 rounded-lg object-cover flex-shrink-0" />
           <p className="text-xs text-text-secondary">Grid de angulos</p>
         </div>
+        {bodyGridUrl && (
+          <div className="flex items-center gap-2 p-2 bg-surface-elevated rounded-xl border border-border flex-1">
+            <img src={bodyGridUrl} alt="Body" className="w-12 h-12 rounded-lg object-cover flex-shrink-0" />
+            <p className="text-xs text-text-secondary">Grid de cuerpo</p>
+          </div>
+        )}
       </div>
 
       {/* Loading state */}

@@ -84,22 +84,16 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { influencerId } = body as { influencerId: string }
+    const { influencerId, optimizeVideoPrompt, videoModelId, userIdea, promptDescriptor: pdOverride } = body as {
+      influencerId: string
+      optimizeVideoPrompt?: boolean
+      videoModelId?: string
+      userIdea?: string
+      promptDescriptor?: string
+    }
 
     if (!influencerId) {
       return NextResponse.json({ error: 'influencerId es requerido' }, { status: 400 })
-    }
-
-    // Get influencer data
-    const { data: inf } = await supabase
-      .from('influencers')
-      .select('realistic_image_url, angles_grid_url')
-      .eq('id', influencerId)
-      .eq('user_id', user.id)
-      .single()
-
-    if (!inf?.realistic_image_url) {
-      return NextResponse.json({ error: 'No se encontro imagen realista' }, { status: 400 })
     }
 
     // Get Google API key (Gemini only for analysis)
@@ -114,6 +108,56 @@ export async function POST(request: Request) {
     }
 
     const apiKey = decrypt(profile.google_api_key)
+
+    // Video prompt optimization mode
+    if (optimizeVideoPrompt && userIdea) {
+      try {
+        const optimizerSystem = `You are an expert video prompt optimizer for AI video generation models. Your job is to take a character description and a user's video idea, and produce a highly detailed, model-optimized prompt.
+
+MODEL-SPECIFIC GUIDES:
+For Kling models (kling-*): Focus on camera movement, step-by-step actions, lighting, clothing movement. Keep under 500 chars.
+For Veo models (veo-*): Use cinematic language, describe audio atmosphere, emotional tone, film styles. Keep under 1000 chars.
+For Sora (sora-*): Be specific about physics, camera angles, environmental details, temporal progression. Keep under 1000 chars.
+
+RULES:
+- Output ONLY the optimized prompt, nothing else
+- Always maintain the character's appearance consistency
+- Write in English for best results
+- Do NOT include any headers, explanations, or formatting`
+
+        const endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent'
+        const response = await fetch(`${endpoint}?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: optimizerSystem }] },
+            contents: [{ parts: [{ text: `Character description: ${pdOverride || ''}\n\nUser's video idea: ${userIdea}\n\nTarget model: ${videoModelId || 'kling-3.0-standard'}\n\nGenerate the optimized video prompt:` }] }],
+            generationConfig: { temperature: 0.7, maxOutputTokens: 1024 },
+          }),
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+          return NextResponse.json({ success: true, optimized_prompt: text.trim() })
+        }
+      } catch (err: any) {
+        console.error('[Influencer/VideoPromptOptimizer] Error:', err.message)
+      }
+      return NextResponse.json({ success: false, optimized_prompt: '' })
+    }
+
+    // Get influencer data
+    const { data: inf } = await supabase
+      .from('influencers')
+      .select('realistic_image_url, angles_grid_url, body_grid_url')
+      .eq('id', influencerId)
+      .eq('user_id', user.id)
+      .single()
+
+    if (!inf?.realistic_image_url) {
+      return NextResponse.json({ error: 'No se encontro imagen realista' }, { status: 400 })
+    }
 
     console.log(`[Influencer/VisualAnalysis] User: ${user.id.substring(0, 8)}..., Influencer: ${influencerId.substring(0, 8)}...`)
 
@@ -138,6 +182,19 @@ export async function POST(request: Request) {
         const buffer = await anglesRes.arrayBuffer()
         const base64 = Buffer.from(buffer).toString('base64')
         const mimeType = anglesRes.headers.get('content-type') || 'image/jpeg'
+        imageParts.push({
+          inline_data: { mime_type: mimeType, data: base64 },
+        })
+      }
+    }
+
+    // Body grid image (if available)
+    if (inf.body_grid_url) {
+      const bodyRes = await fetch(inf.body_grid_url)
+      if (bodyRes.ok) {
+        const buffer = await bodyRes.arrayBuffer()
+        const base64 = Buffer.from(buffer).toString('base64')
+        const mimeType = bodyRes.headers.get('content-type') || 'image/jpeg'
         imageParts.push({
           inline_data: { mime_type: mimeType, data: base64 },
         })
@@ -215,7 +272,7 @@ export async function POST(request: Request) {
             visual_dna: text,
             prompt_descriptor: promptDescriptor,
             character_profile: characterProfile,
-            current_step: 5,
+            current_step: 6,
             updated_at: new Date().toISOString(),
           })
           .eq('id', influencerId)

@@ -108,7 +108,7 @@ export async function PATCH(request: Request) {
       'name', 'description', 'image_url', 'character_profile',
       'gender', 'age_range', 'skin_tone', 'hair_color', 'hair_style',
       'eye_color', 'build', 'style_vibe', 'accessories', 'custom_details',
-      'base_image_url', 'base_prompt', 'realistic_image_url', 'angles_grid_url',
+      'base_image_url', 'base_prompt', 'realistic_image_url', 'angles_grid_url', 'body_grid_url',
       'visual_dna', 'prompt_descriptor', 'current_step',
       'voice_id', 'voice_name',
     ]

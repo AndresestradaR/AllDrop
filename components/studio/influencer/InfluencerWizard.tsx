@@ -2,13 +2,16 @@
 
 import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils/cn'
-import { ArrowLeft, Sparkles, Loader2, UserCircle, Trash2, ChevronRight, Lock } from 'lucide-react'
+import { ArrowLeft, Sparkles, Loader2, UserCircle, Trash2, ChevronRight } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { StepperHeader } from './StepperHeader'
 import { Step1Design } from './Step1Design'
 import { Step2Realism } from './Step2Realism'
 import { Step3Angles } from './Step3Angles'
+import { Step4Body } from './Step4Body'
 import { Step4Analysis } from './Step4Analysis'
+import { Step6Gallery } from './Step6Gallery'
+import { Step7Video } from './Step7Video'
 import { InfluencerSummary } from './InfluencerSummary'
 import type { ImageModelId } from '@/lib/image-providers/types'
 
@@ -32,6 +35,7 @@ interface Influencer {
   base_prompt?: string
   realistic_image_url?: string
   angles_grid_url?: string
+  body_grid_url?: string
   visual_dna?: string
   prompt_descriptor?: string
   current_step?: number
@@ -105,8 +109,8 @@ export function InfluencerWizard({ onBack }: { onBack: () => void }) {
     const step = inf.current_step || 1
     setCompletedSteps(Math.max(0, step - 1))
 
-    if (step >= 5) {
-      // Already completed step 4 — show summary
+    if (step >= 6) {
+      // Completed analysis — show summary
       setView('summary')
     } else {
       setCurrentStep(step)
@@ -115,7 +119,7 @@ export function InfluencerWizard({ onBack }: { onBack: () => void }) {
   }
 
   const handleStepClick = (step: number) => {
-    if (step <= completedSteps + 1 && step <= 4) {
+    if (step <= completedSteps + 1 && step <= 7) {
       setCurrentStep(step)
     }
   }
@@ -146,22 +150,29 @@ export function InfluencerWizard({ onBack }: { onBack: () => void }) {
     setCurrentStep(3)
   }
 
-  // Step 3 complete
+  // Step 3 complete (Face angles grid)
   const handleStep3Complete = (anglesGridUrl: string) => {
     setActiveInfluencer(prev => prev ? { ...prev, angles_grid_url: anglesGridUrl } : null)
     setCompletedSteps(3)
     setCurrentStep(4)
   }
 
-  // Step 4 complete
-  const handleStep4Complete = (visualDna: string, promptDescriptor: string) => {
+  // Step 4 complete (Body grid)
+  const handleStep4BodyComplete = (bodyGridUrl: string) => {
+    setActiveInfluencer(prev => prev ? { ...prev, body_grid_url: bodyGridUrl } : null)
+    setCompletedSteps(4)
+    setCurrentStep(5)
+  }
+
+  // Step 5 complete (Analysis)
+  const handleStep5AnalysisComplete = (visualDna: string, promptDescriptor: string) => {
     setActiveInfluencer(prev => prev ? {
       ...prev,
       visual_dna: visualDna,
       prompt_descriptor: promptDescriptor,
-      current_step: 5,
+      current_step: 6,
     } : null)
-    setCompletedSteps(4)
+    setCompletedSteps(5)
     setView('summary')
     fetchInfluencers() // refresh list
   }
@@ -183,8 +194,18 @@ export function InfluencerWizard({ onBack }: { onBack: () => void }) {
     }
   }
 
-  const handleComingSoon = () => {
-    toast('Proximamente', { icon: '🔒' })
+  const handleGoToGallery = () => {
+    if (!activeInfluencer) return
+    setCompletedSteps(Math.max(completedSteps, 5))
+    setCurrentStep(6)
+    setView('wizard')
+  }
+
+  const handleGoToVideo = () => {
+    if (!activeInfluencer) return
+    setCompletedSteps(Math.max(completedSteps, 6))
+    setCurrentStep(7)
+    setView('wizard')
   }
 
   // HEADER for wizard view
@@ -192,8 +213,11 @@ export function InfluencerWizard({ onBack }: { onBack: () => void }) {
     switch (currentStep) {
       case 1: return 'Diseña tu Influencer'
       case 2: return 'Mejorar Realismo'
-      case 3: return 'Grid de Angulos'
-      case 4: return 'Analisis Visual'
+      case 3: return 'Grid de Rostro'
+      case 4: return 'Grid de Cuerpo'
+      case 5: return 'Analisis Visual'
+      case 6: return 'Galeria de Contenido'
+      case 7: return 'Crear Video'
       default: return 'Mi Influencer'
     }
   }
@@ -258,7 +282,7 @@ export function InfluencerWizard({ onBack }: { onBack: () => void }) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {influencers.map((inf) => {
                   const step = inf.current_step || 1
-                  const isComplete = step >= 5
+                  const isComplete = step >= 6
                   const displayImage = inf.realistic_image_url || inf.base_image_url || inf.image_url
 
                   return (
@@ -292,7 +316,7 @@ export function InfluencerWizard({ onBack }: { onBack: () => void }) {
                               </span>
                             ) : (
                               <span className="text-[10px] px-2 py-0.5 bg-amber-500/15 text-amber-400 rounded-full font-medium">
-                                Paso {step}/4
+                                Paso {step}/5
                               </span>
                             )}
                           </div>
@@ -308,15 +332,6 @@ export function InfluencerWizard({ onBack }: { onBack: () => void }) {
                           <ChevronRight className="w-3.5 h-3.5" />
                           {isComplete ? 'Ver resumen' : 'Continuar'}
                         </button>
-                        {isComplete && (
-                          <button
-                            onClick={handleComingSoon}
-                            className="flex items-center gap-1.5 px-3 py-2 bg-surface border border-border rounded-lg text-xs text-text-secondary hover:text-text-primary transition-all"
-                          >
-                            <Lock className="w-3 h-3" />
-                            Contenido
-                          </button>
-                        )}
                       </div>
 
                       {/* Delete */}
@@ -359,8 +374,8 @@ export function InfluencerWizard({ onBack }: { onBack: () => void }) {
           <div className="flex-1 p-6 overflow-y-auto">
             <InfluencerSummary
               influencer={activeInfluencer}
-              onCreateContent={handleComingSoon}
-              onCreateVideo={handleComingSoon}
+              onCreateContent={handleGoToGallery}
+              onCreateVideo={handleGoToVideo}
               onEditName={handleEditName}
               onBack={() => { setView('list'); fetchInfluencers() }}
             />
@@ -378,7 +393,10 @@ export function InfluencerWizard({ onBack }: { onBack: () => void }) {
         <div className="flex items-center gap-4 px-6 py-4 border-b border-border">
           <button
             onClick={() => {
-              if (currentStep > 1) {
+              if (currentStep === 6 || currentStep === 7) {
+                // Go back to summary from gallery/video
+                setView('summary')
+              } else if (currentStep > 1) {
                 setCurrentStep(prev => prev - 1)
               } else {
                 setView('list')
@@ -391,7 +409,7 @@ export function InfluencerWizard({ onBack }: { onBack: () => void }) {
           </button>
           <div>
             <h2 className="text-lg font-semibold text-text-primary">{getStepTitle()}</h2>
-            <p className="text-sm text-text-secondary">Paso {currentStep} de 6</p>
+            <p className="text-sm text-text-secondary">Paso {currentStep} de 7</p>
           </div>
         </div>
 
@@ -456,12 +474,48 @@ export function InfluencerWizard({ onBack }: { onBack: () => void }) {
           )}
 
           {currentStep === 4 && activeInfluencer && (
+            <Step4Body
+              influencerId={activeInfluencer.id}
+              realisticImageUrl={activeInfluencer.realistic_image_url || ''}
+              realisticImageBase64={realisticImageBase64}
+              realisticImageMimeType={realisticImageMime}
+              modelId={modelId}
+              onModelChange={setModelId}
+              onComplete={handleStep4BodyComplete}
+              onBack={() => setCurrentStep(3)}
+            />
+          )}
+
+          {currentStep === 5 && activeInfluencer && (
             <Step4Analysis
               influencerId={activeInfluencer.id}
               realisticImageUrl={activeInfluencer.realistic_image_url || ''}
               anglesGridUrl={activeInfluencer.angles_grid_url || ''}
-              onComplete={handleStep4Complete}
-              onBack={() => setCurrentStep(3)}
+              bodyGridUrl={activeInfluencer.body_grid_url || ''}
+              onComplete={handleStep5AnalysisComplete}
+              onBack={() => setCurrentStep(4)}
+            />
+          )}
+
+          {currentStep === 6 && activeInfluencer && (
+            <Step6Gallery
+              influencerId={activeInfluencer.id}
+              influencerName={activeInfluencer.name}
+              promptDescriptor={activeInfluencer.prompt_descriptor || ''}
+              realisticImageUrl={activeInfluencer.realistic_image_url || ''}
+              modelId={modelId}
+              onModelChange={setModelId}
+              onBack={() => setView('summary')}
+            />
+          )}
+
+          {currentStep === 7 && activeInfluencer && (
+            <Step7Video
+              influencerId={activeInfluencer.id}
+              influencerName={activeInfluencer.name}
+              promptDescriptor={activeInfluencer.prompt_descriptor || ''}
+              realisticImageUrl={activeInfluencer.realistic_image_url || ''}
+              onBack={() => setView('summary')}
             />
           )}
         </div>

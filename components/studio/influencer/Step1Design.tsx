@@ -366,8 +366,16 @@ export function Step1Design({
                 className="w-full px-3 py-2 bg-surface-elevated border border-border rounded-xl text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50"
               >
                 <option value="">Seleccionar...</option>
-                {['fair', 'light', 'olive', 'medium', 'tan', 'dark', 'deep'].map(t => (
-                  <option key={t} value={t}>{t}</option>
+                {[
+                  { v: 'fair', l: 'Clara' },
+                  { v: 'light', l: 'Ligera' },
+                  { v: 'olive', l: 'Oliva' },
+                  { v: 'medium', l: 'Media' },
+                  { v: 'tan', l: 'Bronceada' },
+                  { v: 'dark', l: 'Oscura' },
+                  { v: 'deep', l: 'Muy Oscura' },
+                ].map(t => (
+                  <option key={t.v} value={t.v}>{t.l}</option>
                 ))}
               </select>
             </div>

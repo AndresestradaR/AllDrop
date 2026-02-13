@@ -12,10 +12,11 @@ interface Step {
 const STEPS: Step[] = [
   { number: 1, label: 'Diseña' },
   { number: 2, label: 'Realismo' },
-  { number: 3, label: 'Angulos' },
-  { number: 4, label: 'Analisis' },
-  { number: 5, label: 'Galeria', comingSoon: true },
-  { number: 6, label: 'Videos', comingSoon: true },
+  { number: 3, label: 'Rostro' },
+  { number: 4, label: 'Cuerpo' },
+  { number: 5, label: 'Analisis' },
+  { number: 6, label: 'Galeria' },
+  { number: 7, label: 'Videos' },
 ]
 
 interface StepperHeaderProps {
