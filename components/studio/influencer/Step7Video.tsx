@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { cn } from '@/lib/utils/cn'
-
-import { Video, Loader2, Sparkles, RefreshCw, Copy, Check, Wand2 } from 'lucide-react'
+import { VIDEO_MODELS, VIDEO_COMPANY_GROUPS, type VideoModelId } from '@/lib/video-providers/types'
+import { Video, Loader2, Copy, Check, Wand2, Image as ImageIcon, Heart, X, Package, Info } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 interface Step7VideoProps {
@@ -14,44 +14,6 @@ interface Step7VideoProps {
   onBack: () => void
 }
 
-const VIDEO_MODELS = [
-  { id: 'kling-2.1-master', name: 'Kling 2.1 Master', description: 'Alta calidad, lento' },
-  { id: 'kling-3.0-standard', name: 'Kling 3.0 Standard', description: 'Rapido, buena calidad' },
-  { id: 'kling-3.0-pro', name: 'Kling 3.0 Pro', description: 'Mejor calidad Kling' },
-  { id: 'veo-3.0-generate', name: 'Veo 3.0', description: 'Google, con audio' },
-  { id: 'veo-3.1-generate', name: 'Veo 3.1', description: 'Ultima version Google' },
-  { id: 'sora-2', name: 'Sora 2', description: 'OpenAI' },
-]
-
-const PROMPT_OPTIMIZER_SYSTEM = `You are an expert video prompt optimizer for AI video generation models. Your job is to take a character description and a user's video idea, and produce a highly detailed, model-optimized prompt.
-
-MODEL-SPECIFIC GUIDES:
-
-For Kling models (kling-*):
-- Focus on camera movement descriptions: "slow dolly in", "tracking shot", "panning left to right"
-- Describe actions step by step in temporal order
-- Include lighting: "soft golden hour light", "dramatic rim lighting"
-- Mention clothing movement: "hair flowing in the wind", "fabric swaying gently"
-
-For Veo models (veo-*):
-- Use cinematic language: "establishing shot", "close-up", "medium shot"
-- Describe the audio atmosphere: "ambient cafe sounds", "birds chirping", "soft music playing"
-- Include emotional tone: "warm and inviting", "mysterious and moody"
-- Reference film styles: "documentary style", "Instagram reel aesthetic"
-
-For Sora (sora-*):
-- Be very specific about physics and movement
-- Describe camera angles precisely: "low angle looking up", "bird's eye view"
-- Include environmental details: "dust particles in the light", "steam rising"
-- Mention temporal progression: "starting with..., then transitioning to..."
-
-RULES:
-- Output ONLY the optimized prompt, nothing else
-- Keep it under 500 characters for Kling, 1000 for Veo/Sora
-- Always maintain the character's appearance consistency
-- Write in English for best results
-- Do NOT include any headers, explanations, or formatting — just the prompt text`
-
 export function Step7Video({
   influencerId,
   influencerName,
@@ -59,10 +21,32 @@ export function Step7Video({
   realisticImageUrl,
   onBack,
 }: Step7VideoProps) {
-  const [videoModelId, setVideoModelId] = useState('kling-3.0-standard')
+  // Model & config
+  const [videoModelId, setVideoModelId] = useState<VideoModelId>('kling-3.0')
+  const selectedModel = VIDEO_MODELS[videoModelId]
+  const isSora = videoModelId === 'sora-2'
+
+  // Mode: text (solo prompt), image (1 imagen inicio), start_end (inicio + final)
+  const [videoMode, setVideoMode] = useState<'text' | 'image' | 'start_end'>('image')
+
+  // Images
+  const [galleryImages, setGalleryImages] = useState<any[]>([])
+  const [isLoadingGallery, setIsLoadingGallery] = useState(true)
+  const [startImageUrl, setStartImageUrl] = useState<string | null>(realisticImageUrl || null)
+  const [endImageUrl, setEndImageUrl] = useState<string | null>(null)
+  const [showImagePicker, setShowImagePicker] = useState<'start' | 'end' | 'product' | null>(null)
+
+  // Sora product mode
+  const [productImageUrl, setProductImageUrl] = useState<string | null>(null)
+  const [productImageFile, setProductImageFile] = useState<File | null>(null)
+  const productInputRef = useRef<HTMLInputElement>(null)
+
+  // Prompt
   const [prompt, setPrompt] = useState('')
   const [userIdea, setUserIdea] = useState('')
   const [isOptimizing, setIsOptimizing] = useState(false)
+
+  // Generation
   const [isGenerating, setIsGenerating] = useState(false)
   const [taskId, setTaskId] = useState<string | null>(null)
   const [videoUrl, setVideoUrl] = useState<string | null>(null)
@@ -70,6 +54,35 @@ export function Step7Video({
   const [copiedPrompt, setCopiedPrompt] = useState(false)
   const [duration, setDuration] = useState(5)
   const [aspectRatio, setAspectRatio] = useState<'16:9' | '9:16' | '1:1'>('9:16')
+
+  // Cargar galería
+  useEffect(() => {
+    const loadGallery = async () => {
+      setIsLoadingGallery(true)
+      try {
+        const res = await fetch(`/api/studio/influencer/gallery?influencerId=${influencerId}`)
+        const data = await res.json()
+        if (data.items) setGalleryImages(data.items)
+      } catch (err) {
+        console.error('Error loading gallery:', err)
+      } finally {
+        setIsLoadingGallery(false)
+      }
+    }
+    loadGallery()
+  }, [influencerId])
+
+  // Ajustar modo cuando cambia el modelo
+  useEffect(() => {
+    const model = VIDEO_MODELS[videoModelId]
+    if (model?.requiresImage && videoMode === 'text') {
+      setVideoMode('image')
+    }
+    // Sora: forzar modo texto (no acepta imágenes de personas)
+    if (videoModelId === 'sora-2') {
+      setVideoMode('text')
+    }
+  }, [videoModelId])
 
   const handleOptimizePrompt = async () => {
     if (!userIdea.trim()) {
@@ -81,7 +94,6 @@ export function Step7Video({
     setError(null)
 
     try {
-      // Use Gemini to optimize the prompt
       const res = await fetch('/api/studio/influencer/visual-analysis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -97,21 +109,65 @@ export function Step7Video({
       const data = await res.json()
 
       if (data.optimized_prompt) {
-        setPrompt(data.optimized_prompt)
+        if (isSora) {
+          const soraPrompt = `${promptDescriptor}\n\n${data.optimized_prompt}`
+          setPrompt(soraPrompt)
+        } else {
+          setPrompt(data.optimized_prompt)
+        }
         toast.success('Prompt optimizado')
       } else {
-        // Fallback: build a basic prompt
-        const basic = `A hyperrealistic video of ${promptDescriptor}. ${userIdea.trim()}. Shot on iPhone 14 Pro, cinematic, natural lighting.`
-        setPrompt(basic)
+        if (isSora) {
+          const basic = `${promptDescriptor}\n\nScene: ${userIdea.trim()}. Hyperrealistic, shot on iPhone 14 Pro, cinematic, natural lighting.`
+          setPrompt(basic)
+        } else {
+          const basic = `A hyperrealistic video of ${promptDescriptor}. ${userIdea.trim()}. Shot on iPhone 14 Pro, cinematic, natural lighting.`
+          setPrompt(basic)
+        }
         toast.success('Prompt generado')
       }
     } catch (err: any) {
-      // Fallback prompt
-      const basic = `A hyperrealistic video of ${promptDescriptor}. ${userIdea.trim()}. Shot on iPhone 14 Pro, cinematic, natural lighting.`
-      setPrompt(basic)
+      if (isSora) {
+        const basic = `${promptDescriptor}\n\nScene: ${userIdea.trim()}. Hyperrealistic, cinematic.`
+        setPrompt(basic)
+      } else {
+        const basic = `A hyperrealistic video of ${promptDescriptor}. ${userIdea.trim()}.`
+        setPrompt(basic)
+      }
     } finally {
       setIsOptimizing(false)
     }
+  }
+
+  const handleProductImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setProductImageFile(file)
+    const url = URL.createObjectURL(file)
+    setProductImageUrl(url)
+  }
+
+  const getBase64FromUrl = async (url: string): Promise<string | undefined> => {
+    try {
+      const res = await fetch(url)
+      if (!res.ok) return undefined
+      const blob = await res.blob()
+      return new Promise<string>((resolve) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result as string)
+        reader.readAsDataURL(blob)
+      })
+    } catch {
+      return undefined
+    }
+  }
+
+  const getBase64FromFile = async (file: File): Promise<string> => {
+    return new Promise<string>((resolve) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.readAsDataURL(file)
+    })
   }
 
   const handleGenerate = async () => {
@@ -120,26 +176,65 @@ export function Step7Video({
       return
     }
 
+    const model = VIDEO_MODELS[videoModelId]
+
+    if (model?.requiresImage && !startImageUrl) {
+      toast.error('Este modelo requiere una imagen de inicio')
+      return
+    }
+
     setIsGenerating(true)
     setError(null)
     setVideoUrl(null)
+    setTaskId(null)
 
     try {
-      // Convert realistic image to base64 for image-to-video
       let imageBase64: string | undefined
-      try {
-        const imgRes = await fetch(realisticImageUrl)
-        if (imgRes.ok) {
-          const blob = await imgRes.blob()
-          const reader = new FileReader()
-          const dataUrl = await new Promise<string>((resolve) => {
-            reader.onload = () => resolve(reader.result as string)
-            reader.readAsDataURL(blob)
-          })
-          imageBase64 = dataUrl
+      let imageBase64End: string | undefined
+      let veoGenerationType: string | undefined
+      let veoImages: string[] | undefined
+
+      const isVeo = videoModelId.startsWith('veo')
+
+      if (isSora) {
+        // =============== MODO SORA ===============
+        // NO enviar imagen de la persona (Sora la rechaza)
+        // El prompt ya contiene el promptDescriptor
+        // Solo enviar imagen del producto si existe
+        if (productImageFile) {
+          imageBase64 = await getBase64FromFile(productImageFile)
+        } else if (productImageUrl && !productImageUrl.startsWith('blob:')) {
+          imageBase64 = await getBase64FromUrl(productImageUrl)
         }
-      } catch {
-        // Continue without image
+      } else if (isVeo) {
+        // =============== MODO VEO ===============
+        if (videoMode === 'start_end' && startImageUrl && endImageUrl) {
+          veoGenerationType = 'FIRST_AND_LAST_FRAMES_2_VIDEO'
+          const startB64 = await getBase64FromUrl(startImageUrl)
+          const endB64 = await getBase64FromUrl(endImageUrl)
+          if (startB64 && endB64) veoImages = [startB64, endB64]
+          else if (startB64) {
+            veoGenerationType = 'REFERENCE_2_VIDEO'
+            veoImages = [startB64]
+          } else {
+            veoGenerationType = 'TEXT_2_VIDEO'
+          }
+        } else if (videoMode === 'image' && startImageUrl) {
+          veoGenerationType = 'REFERENCE_2_VIDEO'
+          const startB64 = await getBase64FromUrl(startImageUrl)
+          if (startB64) veoImages = [startB64]
+          else veoGenerationType = 'TEXT_2_VIDEO'
+        } else {
+          veoGenerationType = 'TEXT_2_VIDEO'
+        }
+      } else {
+        // =============== OTROS MODELOS (Kling, Hailuo, Seedance, Wan) ===============
+        if ((videoMode === 'image' || videoMode === 'start_end') && startImageUrl) {
+          imageBase64 = await getBase64FromUrl(startImageUrl)
+        }
+        if (videoMode === 'start_end' && endImageUrl) {
+          imageBase64End = await getBase64FromUrl(endImageUrl)
+        }
       }
 
       const res = await fetch('/api/studio/generate-video', {
@@ -150,8 +245,11 @@ export function Step7Video({
           prompt: prompt.trim(),
           duration,
           aspectRatio,
-          enableAudio: true,
+          enableAudio: model?.supportsAudio ? true : false,
           imageBase64,
+          imageBase64End,
+          veoGenerationType,
+          veoImages,
         }),
       })
 
@@ -163,26 +261,15 @@ export function Step7Video({
 
       if (data.videoUrl) {
         setVideoUrl(data.videoUrl)
-        toast.success('Video generado')
+        toast.success('Video generado!')
       } else if (data.taskId) {
         setTaskId(data.taskId)
-        toast.success('Video en proceso. Revisa el tab de Video principal para ver el resultado.')
+        toast.success('Video en proceso. Revisa el tab de Video para ver el resultado.')
       }
     } catch (err: any) {
       setError(err.message)
     } finally {
       setIsGenerating(false)
-    }
-  }
-
-  const handleCopyPrompt = async () => {
-    try {
-      await navigator.clipboard.writeText(prompt)
-      setCopiedPrompt(true)
-      toast.success('Prompt copiado')
-      setTimeout(() => setCopiedPrompt(false), 2000)
-    } catch {
-      toast.error('Error al copiar')
     }
   }
 
@@ -205,23 +292,216 @@ export function Step7Video({
         </div>
       </div>
 
-      {/* Video model selector */}
+      {/* ============ MODELO DE VIDEO ============ */}
       <div className="mb-4">
         <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">Modelo de Video</label>
         <select
           value={videoModelId}
-          onChange={(e) => setVideoModelId(e.target.value)}
+          onChange={(e) => setVideoModelId(e.target.value as VideoModelId)}
           className="w-full px-3 py-2 bg-surface-elevated border border-border rounded-xl text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50"
         >
-          {VIDEO_MODELS.map(m => (
-            <option key={m.id} value={m.id}>
-              {m.name} — {m.description}
-            </option>
+          {VIDEO_COMPANY_GROUPS.map(group => (
+            <optgroup key={group.id} label={group.name}>
+              {group.models.map(m => (
+                <option key={m.id} value={m.id}>
+                  {m.name} — {m.description} {m.tags?.includes('AUDIO') ? '🔊' : ''} {m.requiresImage ? '📷' : ''}
+                </option>
+              ))}
+            </optgroup>
           ))}
         </select>
+
+        {/* Model capabilities badges */}
+        {selectedModel && (
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            {selectedModel.supportsAudio && (
+              <span className="text-[9px] px-2 py-0.5 bg-blue-500/15 text-blue-400 rounded-full">🔊 Audio</span>
+            )}
+            {selectedModel.supportsStartEndFrames && (
+              <span className="text-[9px] px-2 py-0.5 bg-purple-500/15 text-purple-400 rounded-full">🖼️ Start/End</span>
+            )}
+            {selectedModel.requiresImage && (
+              <span className="text-[9px] px-2 py-0.5 bg-amber-500/15 text-amber-400 rounded-full">📷 Requiere imagen</span>
+            )}
+            {selectedModel.supportsMultiShots && (
+              <span className="text-[9px] px-2 py-0.5 bg-green-500/15 text-green-400 rounded-full">🎬 Multi-shot</span>
+            )}
+            <span className="text-[9px] px-2 py-0.5 bg-text-muted/10 text-text-muted rounded-full">
+              {selectedModel.durationRange} | {selectedModel.priceRange}
+            </span>
+          </div>
+        )}
       </div>
 
-      {/* Duration and aspect ratio */}
+      {/* ============ ALERTA SORA ============ */}
+      {isSora && (
+        <div className="mb-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl">
+          <div className="flex gap-2">
+            <Info className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-xs font-semibold text-blue-400 mb-1">Modo Sora — Texto + Producto</p>
+              <p className="text-[11px] text-blue-300/80">
+                Sora no permite crear videos a partir de imagenes de personas. En su lugar, usamos la descripcion
+                detallada de tu influencer ({influencerName}) como prompt para que Sora genere al personaje.
+                Opcionalmente puedes subir la imagen de un <strong>producto</strong> para que aparezca en el video.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============ MODO DE GENERACION (NO para Sora) ============ */}
+      {!isSora && (
+        <div className="mb-4">
+          <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">
+            Modo de generacion
+          </label>
+          <div className="flex gap-2">
+            {selectedModel?.apiModelIdText && !selectedModel?.requiresImage && (
+              <button
+                onClick={() => { setVideoMode('text'); setStartImageUrl(null); setEndImageUrl(null) }}
+                className={cn(
+                  'flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all border',
+                  videoMode === 'text'
+                    ? 'bg-accent/15 border-accent text-accent'
+                    : 'bg-surface-elevated border-border text-text-secondary hover:border-text-muted'
+                )}
+              >
+                Solo Texto
+              </button>
+            )}
+            <button
+              onClick={() => { setVideoMode('image'); setEndImageUrl(null); if (!startImageUrl) setStartImageUrl(realisticImageUrl) }}
+              className={cn(
+                'flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all border',
+                videoMode === 'image'
+                  ? 'bg-accent/15 border-accent text-accent'
+                  : 'bg-surface-elevated border-border text-text-secondary hover:border-text-muted'
+              )}
+            >
+              Imagen Inicial
+            </button>
+            {selectedModel?.supportsStartEndFrames && (
+              <button
+                onClick={() => { setVideoMode('start_end'); if (!startImageUrl) setStartImageUrl(realisticImageUrl) }}
+                className={cn(
+                  'flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all border',
+                  videoMode === 'start_end'
+                    ? 'bg-accent/15 border-accent text-accent'
+                    : 'bg-surface-elevated border-border text-text-secondary hover:border-text-muted'
+                )}
+              >
+                Inicio + Final
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ============ SELECTOR DE IMAGENES (NO Sora) ============ */}
+      {!isSora && (videoMode === 'image' || videoMode === 'start_end') && (
+        <>
+          {/* Imagen de inicio */}
+          <div className="mb-4">
+            <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">
+              {videoMode === 'start_end' ? 'Frame inicial' : 'Imagen de referencia'}
+            </label>
+            <div
+              onClick={() => setShowImagePicker('start')}
+              className="flex items-center gap-3 p-3 bg-surface-elevated rounded-xl border border-border cursor-pointer hover:border-accent/30 transition-colors"
+            >
+              {startImageUrl ? (
+                <>
+                  <img src={startImageUrl} alt="Start" className="w-14 h-14 rounded-lg object-cover flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-sm text-text-primary font-medium">Imagen seleccionada</p>
+                    <p className="text-[10px] text-accent">Click para cambiar</p>
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center gap-2 py-3">
+                  <ImageIcon className="w-5 h-5 text-text-muted" />
+                  <p className="text-sm text-text-secondary">Seleccionar de la galeria</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Imagen final (solo start_end) */}
+          {videoMode === 'start_end' && (
+            <div className="mb-4">
+              <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">
+                Frame final
+              </label>
+              <div
+                onClick={() => setShowImagePicker('end')}
+                className="flex items-center gap-3 p-3 bg-surface-elevated rounded-xl border border-border cursor-pointer hover:border-accent/30 transition-colors"
+              >
+                {endImageUrl ? (
+                  <>
+                    <img src={endImageUrl} alt="End" className="w-14 h-14 rounded-lg object-cover flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-sm text-text-primary font-medium">Imagen final seleccionada</p>
+                      <p className="text-[10px] text-accent">Click para cambiar</p>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex items-center gap-2 py-3">
+                    <ImageIcon className="w-5 h-5 text-text-muted" />
+                    <p className="text-sm text-text-secondary">Seleccionar imagen final (opcional)</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ============ PRODUCTO PARA SORA ============ */}
+      {isSora && (
+        <div className="mb-4">
+          <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">
+            Imagen del producto (opcional)
+          </label>
+          <input
+            ref={productInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleProductImageUpload}
+            className="hidden"
+          />
+          <div
+            onClick={() => productInputRef.current?.click()}
+            className="flex items-center gap-3 p-3 bg-surface-elevated rounded-xl border border-dashed border-border cursor-pointer hover:border-accent/30 transition-colors"
+          >
+            {productImageUrl ? (
+              <>
+                <img src={productImageUrl} alt="Producto" className="w-14 h-14 rounded-lg object-cover flex-shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm text-text-primary font-medium">Producto seleccionado</p>
+                  <p className="text-[10px] text-accent">Click para cambiar</p>
+                </div>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setProductImageUrl(null); setProductImageFile(null) }}
+                  className="p-1.5 hover:bg-border/50 rounded-lg"
+                >
+                  <X className="w-4 h-4 text-text-muted" />
+                </button>
+              </>
+            ) : (
+              <div className="flex items-center gap-2 py-3 w-full justify-center">
+                <Package className="w-5 h-5 text-text-muted" />
+                <p className="text-sm text-text-secondary">Subir imagen del producto</p>
+              </div>
+            )}
+          </div>
+          <p className="text-[10px] text-text-muted mt-1">
+            Sora creara al personaje ({influencerName}) desde su descripcion y mostrara este producto en el video
+          </p>
+        </div>
+      )}
+
+      {/* ============ DURACION Y ASPECTO ============ */}
       <div className="grid grid-cols-2 gap-3 mb-4">
         <div>
           <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">Duracion</label>
@@ -263,13 +543,16 @@ export function Step7Video({
         </div>
       </div>
 
-      {/* User idea input */}
+      {/* ============ IDEA + OPTIMIZADOR ============ */}
       <div className="mb-4">
         <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">Tu idea para el video</label>
         <textarea
           value={userIdea}
           onChange={(e) => setUserIdea(e.target.value)}
-          placeholder="Ej: El influencer caminando por la playa al atardecer, mirando a camara y sonriendo..."
+          placeholder={isSora
+            ? `Ej: ${influencerName} sosteniendo el producto en la mano, caminando por la playa al atardecer, mirando a camara y sonriendo...`
+            : `Ej: ${influencerName} caminando por la playa al atardecer, mirando a camara y sonriendo...`
+          }
           rows={3}
           className="w-full px-3 py-2 bg-surface-elevated border border-border rounded-xl text-sm text-text-primary placeholder:text-text-muted resize-none focus:outline-none focus:ring-2 focus:ring-accent/50"
         />
@@ -284,17 +567,22 @@ export function Step7Video({
           )}
         >
           {isOptimizing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />}
-          Optimizar prompt con IA
+          {isSora ? 'Optimizar prompt (incluye descripcion del personaje)' : 'Optimizar prompt con IA'}
         </button>
       </div>
 
-      {/* Optimized prompt */}
+      {/* ============ PROMPT OPTIMIZADO ============ */}
       {prompt && (
         <div className="mb-4 p-4 bg-accent/5 border border-accent/30 rounded-xl">
           <div className="flex items-center justify-between mb-2">
             <h4 className="text-xs font-bold text-accent uppercase tracking-wide">Prompt optimizado</h4>
             <button
-              onClick={handleCopyPrompt}
+              onClick={async () => {
+                await navigator.clipboard.writeText(prompt)
+                setCopiedPrompt(true)
+                toast.success('Copiado')
+                setTimeout(() => setCopiedPrompt(false), 2000)
+              }}
               className="p-1.5 rounded-lg hover:bg-accent/10 text-accent transition-colors"
             >
               {copiedPrompt ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
@@ -303,28 +591,27 @@ export function Step7Video({
           <textarea
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            rows={4}
+            rows={5}
             className="w-full px-3 py-2 bg-background border border-accent/20 rounded-lg text-sm text-text-primary resize-none focus:outline-none focus:ring-2 focus:ring-accent/50"
           />
+          {isSora && (
+            <p className="text-[10px] text-accent/60 mt-1">
+              Este prompt incluye la descripcion detallada de {influencerName} para que Sora recree al personaje
+            </p>
+          )}
         </div>
       )}
 
+      {/* ============ ERRORES Y RESULTADOS ============ */}
       {error && (
         <div className="p-3 bg-error/10 border border-error/20 rounded-xl mb-4">
           <p className="text-sm text-error">{error}</p>
         </div>
       )}
 
-      {/* Video result */}
       {videoUrl && (
         <div className="mb-4 rounded-xl overflow-hidden bg-surface-elevated border border-border">
-          <video
-            src={videoUrl}
-            controls
-            className="w-full"
-            autoPlay
-            loop
-          />
+          <video src={videoUrl} controls className="w-full" autoPlay loop />
         </div>
       )}
 
@@ -338,7 +625,7 @@ export function Step7Video({
         </div>
       )}
 
-      {/* Generate video button */}
+      {/* ============ BOTON GENERAR ============ */}
       <button
         onClick={handleGenerate}
         disabled={isGenerating || !prompt.trim()}
@@ -350,17 +637,105 @@ export function Step7Video({
         )}
       >
         {isGenerating ? (
-          <>
-            <Loader2 className="w-5 h-5 animate-spin" />
-            Generando video...
-          </>
+          <><Loader2 className="w-5 h-5 animate-spin" /> Generando video...</>
         ) : (
-          <>
-            <Video className="w-5 h-5" />
-            Generar Video
-          </>
+          <><Video className="w-5 h-5" /> Generar Video</>
         )}
       </button>
+
+      {/* ============ IMAGE PICKER MODAL ============ */}
+      {showImagePicker && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setShowImagePicker(null)}
+        >
+          <div
+            className="bg-surface rounded-2xl border border-border max-w-2xl w-full max-h-[80vh] overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+              <h3 className="text-sm font-semibold text-text-primary">
+                Seleccionar {showImagePicker === 'start' ? 'imagen de inicio' : 'imagen final'}
+              </h3>
+              <button
+                onClick={() => setShowImagePicker(null)}
+                className="p-1.5 hover:bg-border/50 rounded-lg transition-colors"
+              >
+                <X className="w-4 h-4 text-text-secondary" />
+              </button>
+            </div>
+            <div className="p-4 overflow-y-auto max-h-[60vh]">
+              {/* Foto principal del influencer */}
+              <p className="text-[10px] font-semibold text-text-muted uppercase tracking-wide mb-2">Foto principal</p>
+              <div className="grid grid-cols-4 gap-2 mb-4">
+                <div
+                  onClick={() => {
+                    if (showImagePicker === 'start') setStartImageUrl(realisticImageUrl)
+                    else setEndImageUrl(realisticImageUrl)
+                    setShowImagePicker(null)
+                  }}
+                  className={cn(
+                    'relative rounded-lg overflow-hidden cursor-pointer border-2 transition-all aspect-[9/16]',
+                    (showImagePicker === 'start' ? startImageUrl : endImageUrl) === realisticImageUrl
+                      ? 'border-accent shadow-lg shadow-accent/25'
+                      : 'border-transparent hover:border-accent/30'
+                  )}
+                >
+                  <img src={realisticImageUrl} alt="Realista" className="w-full h-full object-cover" />
+                  <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-1 py-0.5">
+                    <p className="text-[8px] text-white text-center">Foto realista</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Galería */}
+              {galleryImages.length > 0 && (
+                <>
+                  <p className="text-[10px] font-semibold text-text-muted uppercase tracking-wide mb-2">
+                    Galeria ({galleryImages.length})
+                  </p>
+                  <div className="grid grid-cols-4 gap-2">
+                    {galleryImages.map((item: any) => (
+                      <div
+                        key={item.id}
+                        onClick={() => {
+                          if (showImagePicker === 'start') setStartImageUrl(item.image_url)
+                          else setEndImageUrl(item.image_url)
+                          setShowImagePicker(null)
+                        }}
+                        className={cn(
+                          'relative rounded-lg overflow-hidden cursor-pointer border-2 transition-all aspect-[9/16]',
+                          (showImagePicker === 'start' ? startImageUrl : endImageUrl) === item.image_url
+                            ? 'border-accent shadow-lg shadow-accent/25'
+                            : 'border-transparent hover:border-accent/30'
+                        )}
+                      >
+                        <img src={item.image_url} alt={item.situation || ''} className="w-full h-full object-cover" />
+                        {item.is_favorite && (
+                          <div className="absolute top-1 right-1">
+                            <Heart className="w-2.5 h-2.5 text-amber-400 fill-current" />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {isLoadingGallery && (
+                <div className="flex items-center justify-center py-6">
+                  <Loader2 className="w-5 h-5 text-accent animate-spin" />
+                </div>
+              )}
+              {!isLoadingGallery && galleryImages.length === 0 && (
+                <p className="text-xs text-text-muted text-center py-4">
+                  No hay imagenes en la galeria. Genera contenido primero en el paso 6.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
