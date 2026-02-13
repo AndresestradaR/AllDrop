@@ -107,12 +107,13 @@ export function InfluencerWizard({ onBack }: { onBack: () => void }) {
   const handleContinue = (inf: Influencer) => {
     setActiveInfluencer(inf)
     const step = inf.current_step || 1
-    setCompletedSteps(Math.max(0, step - 1))
 
     if (step >= 6) {
-      // Completed analysis — show summary
+      // Analysis complete — all steps accessible
+      setCompletedSteps(7)
       setView('summary')
     } else {
+      setCompletedSteps(Math.max(0, step - 1))
       setCurrentStep(step)
       setView('wizard')
     }
@@ -172,9 +173,9 @@ export function InfluencerWizard({ onBack }: { onBack: () => void }) {
       prompt_descriptor: promptDescriptor,
       current_step: 6,
     } : null)
-    setCompletedSteps(5)
+    setCompletedSteps(7) // Pasos 6 y 7 son libres, desbloquear ambos
     setView('summary')
-    fetchInfluencers() // refresh list
+    fetchInfluencers()
   }
 
   // Summary actions
@@ -196,14 +197,14 @@ export function InfluencerWizard({ onBack }: { onBack: () => void }) {
 
   const handleGoToGallery = () => {
     if (!activeInfluencer) return
-    setCompletedSteps(Math.max(completedSteps, 5))
+    setCompletedSteps(7)
     setCurrentStep(6)
     setView('wizard')
   }
 
   const handleGoToVideo = () => {
     if (!activeInfluencer) return
-    setCompletedSteps(Math.max(completedSteps, 6))
+    setCompletedSteps(7)
     setCurrentStep(7)
     setView('wizard')
   }

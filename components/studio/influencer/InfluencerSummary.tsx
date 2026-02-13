@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Copy, Check, Palette, Video, Pencil, Loader2, Heart } from 'lucide-react'
+import { Copy, Check, Pencil, Loader2, Heart, Download, Image as ImageIcon, Video } from 'lucide-react'
+import { cn } from '@/lib/utils/cn'
 import toast from 'react-hot-toast'
 
 interface InfluencerSummaryProps {
@@ -23,17 +24,27 @@ export function InfluencerSummary({
   const [name, setName] = useState(influencer.name || 'Mi Influencer')
   const [copiedField, setCopiedField] = useState<string | null>(null)
   const [recentContent, setRecentContent] = useState<any[]>([])
-  const [loadingContent, setLoadingContent] = useState(false)
+  const [loadingContent, setLoadingContent] = useState(true)
+  const [contentFilter, setContentFilter] = useState<'all' | 'favorites' | 'solo' | 'with_product'>('all')
+  const [showAllContent, setShowAllContent] = useState(false)
 
-  // Load recent gallery content
+  // Load gallery content
   useEffect(() => {
-    if (!influencer.id) return
-    setLoadingContent(true)
-    fetch(`/api/studio/influencer/gallery?influencerId=${influencer.id}`)
-      .then(res => res.json())
-      .then(data => setRecentContent((data.items || []).slice(0, 6)))
-      .catch(() => {})
-      .finally(() => setLoadingContent(false))
+    const loadContent = async () => {
+      setLoadingContent(true)
+      try {
+        const res = await fetch(`/api/studio/influencer/gallery?influencerId=${influencer.id}`)
+        const data = await res.json()
+        if (data.items) {
+          setRecentContent(data.items)
+        }
+      } catch (err) {
+        console.error('Error loading content:', err)
+      } finally {
+        setLoadingContent(false)
+      }
+    }
+    loadContent()
   }, [influencer.id])
 
   const handleCopy = async (text: string, field: string) => {
@@ -51,6 +62,45 @@ export function InfluencerSummary({
     setIsEditingName(false)
     onEditName(name)
   }
+
+  const handleToggleFavorite = async (item: any) => {
+    const newVal = !item.is_favorite
+    try {
+      await fetch('/api/studio/influencer/gallery', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: item.id, is_favorite: newVal }),
+      })
+      setRecentContent(prev => prev.map(g =>
+        g.id === item.id ? { ...g, is_favorite: newVal } : g
+      ))
+    } catch (err) {
+      console.error('Error toggling favorite:', err)
+    }
+  }
+
+  const handleDownloadItem = async (item: any) => {
+    try {
+      const response = await fetch(item.image_url)
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${influencer.name}_${Date.now()}.jpg`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      // silently fail
+    }
+  }
+
+  const filteredContent = recentContent.filter(item => {
+    if (contentFilter === 'all') return true
+    if (contentFilter === 'favorites') return item.is_favorite
+    return item.type === contentFilter
+  })
+
+  const displayContent = showAllContent ? filteredContent : filteredContent.slice(0, 6)
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -150,52 +200,124 @@ export function InfluencerSummary({
         </button>
       )}
 
-      {/* Recent content */}
-      {loadingContent && (
-        <div className="flex items-center justify-center gap-2 py-4 mb-4">
-          <Loader2 className="w-4 h-4 animate-spin text-text-muted" />
-          <p className="text-xs text-text-muted">Cargando contenido...</p>
-        </div>
-      )}
-      {!loadingContent && recentContent.length > 0 && (
-        <div className="mb-4">
-          <p className="text-xs text-text-muted uppercase tracking-wide mb-2">Contenido Reciente</p>
-          <div className="grid grid-cols-3 gap-2">
-            {recentContent.map((item: any) => (
-              <div key={item.id} className="relative rounded-xl overflow-hidden bg-surface-elevated border border-border group">
-                <img
-                  src={item.image_url}
-                  alt={item.situation || 'Content'}
-                  className="w-full aspect-[9/16] object-cover"
-                />
-                {item.is_favorite && (
-                  <div className="absolute top-1.5 right-1.5">
-                    <Heart className="w-3.5 h-3.5 text-red-400 fill-red-400" />
-                  </div>
+      {/* ============ PIZARRA: CONTENIDO DEL INFLUENCER ============ */}
+      <div className="mt-6 mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <ImageIcon className="w-4 h-4 text-accent" />
+            <h4 className="text-sm font-semibold text-text-primary">
+              Contenido Generado
+            </h4>
+            <span className="text-xs text-text-muted">
+              ({recentContent.length})
+            </span>
+          </div>
+          <div className="flex gap-1">
+            {(['all', 'favorites', 'solo', 'with_product'] as const).map(f => (
+              <button
+                key={f}
+                onClick={() => setContentFilter(f)}
+                className={cn(
+                  'px-2.5 py-1 rounded-lg text-[10px] font-medium transition-all',
+                  contentFilter === f
+                    ? 'bg-accent/15 text-accent'
+                    : 'text-text-muted hover:text-text-secondary'
                 )}
-                <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/70 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <p className="text-[10px] text-white/80 truncate">{item.situation}</p>
-                </div>
-              </div>
+              >
+                {f === 'all' ? 'Todas' : f === 'favorites' ? 'Favoritas' : f === 'solo' ? 'Solo' : 'Producto'}
+              </button>
             ))}
           </div>
         </div>
-      )}
 
-      {/* Action buttons */}
-      <div className="grid grid-cols-2 gap-3">
+        {loadingContent ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-5 h-5 text-accent animate-spin" />
+          </div>
+        ) : recentContent.length === 0 ? (
+          <div className="text-center py-8 bg-surface-elevated rounded-xl border border-border">
+            <ImageIcon className="w-8 h-8 text-text-muted mx-auto mb-2" />
+            <p className="text-xs text-text-muted">No hay contenido generado aun</p>
+            <p className="text-[10px] text-text-muted mt-1">Usa "Crear Contenido" para generar imagenes</p>
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-3 gap-2">
+              {displayContent.map((item: any) => (
+                <div
+                  key={item.id}
+                  className="group relative rounded-xl overflow-hidden bg-surface-elevated border border-border aspect-[9/16]"
+                >
+                  <img
+                    src={item.image_url}
+                    alt={item.situation || 'Contenido'}
+                    className="w-full h-full object-cover"
+                  />
+                  {/* Overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="absolute bottom-2 left-2 right-2">
+                      <p className="text-[9px] text-white/80 line-clamp-2">{item.situation}</p>
+                      {item.type === 'with_product' && item.product_name && (
+                        <span className="text-[8px] px-1.5 py-0.5 bg-accent/30 text-accent rounded-full mt-1 inline-block">
+                          {item.product_name}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {/* Favorito badge */}
+                  {item.is_favorite && (
+                    <div className="absolute top-1.5 left-1.5">
+                      <Heart className="w-3 h-3 text-amber-400 fill-current" />
+                    </div>
+                  )}
+                  {/* Botones hover */}
+                  <div className="absolute top-1.5 right-1.5 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={() => handleToggleFavorite(item)}
+                      className={cn(
+                        'p-1 rounded-md transition-colors',
+                        item.is_favorite ? 'bg-amber-500/80 text-white' : 'bg-black/40 text-white hover:bg-black/60'
+                      )}
+                    >
+                      <Heart className={cn('w-3 h-3', item.is_favorite && 'fill-current')} />
+                    </button>
+                    <button
+                      onClick={() => handleDownloadItem(item)}
+                      className="p-1 bg-black/40 rounded-md text-white hover:bg-black/60 transition-colors"
+                    >
+                      <Download className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {/* Ver mas / Ver menos */}
+            {filteredContent.length > 6 && (
+              <button
+                onClick={() => setShowAllContent(!showAllContent)}
+                className="w-full mt-3 py-2 text-xs text-accent hover:bg-accent/5 rounded-lg transition-colors font-medium"
+              >
+                {showAllContent ? 'Ver menos' : `Ver todas (${filteredContent.length})`}
+              </button>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Acciones principales */}
+      <div className="flex gap-3">
         <button
           onClick={onCreateContent}
-          className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold bg-accent/10 border border-accent/30 text-accent hover:bg-accent/20 transition-all"
+          className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-accent hover:bg-accent-hover text-background rounded-xl font-semibold transition-all shadow-lg shadow-accent/25"
         >
-          <Palette className="w-5 h-5" />
+          <ImageIcon className="w-4 h-4" />
           Crear Contenido
         </button>
         <button
           onClick={onCreateVideo}
-          className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold bg-accent/10 border border-accent/30 text-accent hover:bg-accent/20 transition-all"
+          className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-surface-elevated hover:bg-border/50 text-text-primary rounded-xl font-semibold transition-all border border-border"
         >
-          <Video className="w-5 h-5" />
+          <Video className="w-4 h-4" />
           Crear Video
         </button>
       </div>
