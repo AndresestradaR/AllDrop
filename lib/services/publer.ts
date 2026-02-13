@@ -133,8 +133,6 @@ export interface PublerMediaObject {
 /**
  * Upload media DIRECTLY via multipart/form-data.
  * This returns the media object IMMEDIATELY (no polling needed).
- * 
- * Use this instead of uploadMediaFromUrl to avoid async job timeouts.
  */
 export async function uploadMediaDirect(
   creds: PublerCredentials,
@@ -142,11 +140,14 @@ export async function uploadMediaDirect(
   filename: string,
   contentType: string
 ): Promise<PublerMediaObject> {
-  // Convert Buffer to Uint8Array to satisfy Blob type requirements
-  const uint8 = new Uint8Array(fileBuffer.buffer, fileBuffer.byteOffset, fileBuffer.byteLength)
+  // Convert Buffer to ArrayBuffer to satisfy strict TS Blob typing
+  const ab = fileBuffer.buffer.slice(
+    fileBuffer.byteOffset,
+    fileBuffer.byteOffset + fileBuffer.byteLength
+  ) as ArrayBuffer
 
   const formData = new FormData()
-  const blob = new Blob([uint8], { type: contentType })
+  const blob = new Blob([ab], { type: contentType })
   formData.append('file', blob, filename)
   formData.append('direct_upload', 'false')
   formData.append('in_library', 'false')
@@ -157,7 +158,6 @@ export async function uploadMediaDirect(
       'Authorization': `Bearer-API ${creds.apiKey}`,
       'Publer-Workspace-Id': creds.workspaceId,
       'Accept': '*/*',
-      // Do NOT set Content-Type - fetch sets it automatically with boundary for FormData
     },
     body: formData,
   })
