@@ -9,6 +9,7 @@ import {
   Sparkles,
   Loader2,
   Download,
+  Share2,
   X,
   Check,
   Clock,
@@ -26,6 +27,7 @@ import {
   Trash2,
   UserCircle,
 } from 'lucide-react'
+import { PublisherModal } from './PublisherModal'
 import {
   VIDEO_MODELS,
   VIDEO_COMPANY_GROUPS,
@@ -112,6 +114,7 @@ export function VideoGenerator() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [generatingStatus, setGeneratingStatus] = useState<string>('')
   const [generatedVideos, setGeneratedVideos] = useState<GeneratedVideo[]>([])
+  const [publishVideoUrl, setPublishVideoUrl] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   // Kling 3.0 multi-shot state
@@ -1119,23 +1122,41 @@ export function VideoGenerator() {
                       </p>
                     </div>
                   </div>
-                  <button
-                    onClick={() => {
-                      const a = document.createElement('a')
-                      a.href = video.url
-                      a.download = `video-${video.id}.mp4`
-                      a.click()
-                    }}
-                    className="absolute top-2 right-2 p-2 bg-black/50 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70"
-                  >
-                    <Download className="w-4 h-4 text-white" />
-                  </button>
+                  <div className="absolute top-2 right-2 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={() => setPublishVideoUrl(video.url)}
+                      className="p-2 bg-indigo-500/80 hover:bg-indigo-500 rounded-lg transition-colors"
+                      title="Publicar en redes"
+                    >
+                      <Share2 className="w-4 h-4 text-white" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        const a = document.createElement('a')
+                        a.href = video.url
+                        a.download = `video-${video.id}.mp4`
+                        a.click()
+                      }}
+                      className="p-2 bg-black/50 rounded-lg hover:bg-black/70 transition-colors"
+                    >
+                      <Download className="w-4 h-4 text-white" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
           </div>
         )}
       </div>
+
+      {/* Publisher Modal */}
+      <PublisherModal
+        isOpen={!!publishVideoUrl}
+        onClose={() => setPublishVideoUrl(null)}
+        mediaUrl={publishVideoUrl || undefined}
+        contentType="video"
+        previewUrl={publishVideoUrl || undefined}
+      />
     </div>
   )
 }

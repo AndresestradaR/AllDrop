@@ -19,6 +19,7 @@ import {
   Download,
   Heart,
   Copy,
+  Share2,
   Loader2,
   X,
   Check,
@@ -26,6 +27,7 @@ import {
   Image as ImageLucide,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { PublisherModal } from './PublisherModal'
 
 const COMPANY_ICONS: Record<string, React.ElementType> = {
   Sparkles,
@@ -83,6 +85,7 @@ export function ImageGenerator() {
   // State
   const [isGenerating, setIsGenerating] = useState(false)
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([])
+  const [publishImage, setPublishImage] = useState<GeneratedImage | null>(null)
 
   // Refs for file inputs
   const styleInputRef = useRef<HTMLInputElement>(null)
@@ -661,6 +664,13 @@ export function ImageGenerator() {
                       </p>
                       <div className="flex items-center gap-2">
                         <button
+                          onClick={() => setPublishImage(image)}
+                          className="p-2 bg-indigo-500/80 hover:bg-indigo-500 rounded-lg transition-colors"
+                          title="Publicar en redes"
+                        >
+                          <Share2 className="w-4 h-4 text-white" />
+                        </button>
+                        <button
                           onClick={() => handleDownload(image)}
                           className="p-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
                           title="Descargar"
@@ -697,6 +707,17 @@ export function ImageGenerator() {
           </div>
         )}
       </div>
+
+      {/* Publisher Modal */}
+      <PublisherModal
+        isOpen={!!publishImage}
+        onClose={() => setPublishImage(null)}
+        mediaBase64={publishImage?.url.split(',')[1]}
+        mediaContentType={publishImage?.url.split(';')[0]?.split(':')[1] || 'image/png'}
+        contentType="photo"
+        defaultCaption={publishImage?.prompt || ''}
+        previewUrl={publishImage?.url}
+      />
     </div>
   )
 }

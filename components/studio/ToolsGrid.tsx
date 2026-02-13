@@ -16,6 +16,7 @@ import {
   Loader2,
   Music,
   Download,
+  Share2,
   Play,
   Pause,
   Check,
@@ -25,6 +26,7 @@ import {
   UserCircle,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { PublisherModal } from './PublisherModal'
 import { PromptGenerator } from './PromptGenerator'
 import { PromptBotGenerator } from './PromptBotGenerator'
 import { PersonDescriptor } from './PersonDescriptor'
@@ -137,6 +139,12 @@ export function ToolsGrid() {
   const [resultVideo, setResultVideo] = useState<string | null>(null)
   const [processingStatus, setProcessingStatus] = useState<string>('')
   const [isPlaying, setIsPlaying] = useState(false)
+  const [publishResult, setPublishResult] = useState<{
+    base64?: string
+    mimeType?: string
+    url?: string
+    type: 'photo' | 'video'
+  } | null>(null)
   const audioPreviewRef = useRef<HTMLAudioElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const pollingRef = useRef<NodeJS.Timeout | null>(null)
@@ -663,13 +671,31 @@ export function ToolsGrid() {
             </button>
             <div className="flex items-center gap-3">
               {(resultImage || resultVideo) && (
-                <button
-                  onClick={handleDownload}
-                  className="flex items-center gap-2 px-4 py-2 bg-surface-elevated border border-border rounded-lg text-sm font-medium text-text-primary hover:bg-border/50 transition-colors"
-                >
-                  <Download className="w-4 h-4" />
-                  Descargar
-                </button>
+                <>
+                  <button
+                    onClick={() => {
+                      if (resultVideo) {
+                        setPublishResult({ url: resultVideo, type: 'video' })
+                      } else if (resultImage) {
+                        const base64Part = resultImage.split(',')[1]
+                        const mimeType = resultImage.split(';')[0]?.split(':')[1] || 'image/png'
+                        setPublishResult({ base64: base64Part, mimeType, type: 'photo' })
+                      }
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg text-sm font-medium transition-colors"
+                    title="Publicar en redes"
+                  >
+                    <Share2 className="w-4 h-4" />
+                    Publicar
+                  </button>
+                  <button
+                    onClick={handleDownload}
+                    className="flex items-center gap-2 px-4 py-2 bg-surface-elevated border border-border rounded-lg text-sm font-medium text-text-primary hover:bg-border/50 transition-colors"
+                  >
+                    <Download className="w-4 h-4" />
+                    Descargar
+                  </button>
+                </>
               )}
               <button
                 onClick={handleProcess}
@@ -696,6 +722,20 @@ export function ToolsGrid() {
             </div>
           </div>
         </div>
+
+        {/* Publisher Modal */}
+        <PublisherModal
+          isOpen={!!publishResult}
+          onClose={() => setPublishResult(null)}
+          mediaBase64={publishResult?.base64}
+          mediaUrl={publishResult?.url}
+          mediaContentType={publishResult?.mimeType}
+          contentType={publishResult?.type || 'photo'}
+          previewUrl={
+            publishResult?.url ||
+            (publishResult?.base64 ? `data:${publishResult.mimeType || 'image/png'};base64,${publishResult.base64}` : undefined)
+          }
+        />
       </div>
     )
   }

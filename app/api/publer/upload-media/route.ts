@@ -13,10 +13,52 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    const { mediaUrl, name } = await request.json()
+    const { mediaUrl, mediaBase64, mediaContentType, name } = await request.json() as {
+      mediaUrl?: string
+      mediaBase64?: string
+      mediaContentType?: string
+      name?: string
+    }
 
-    if (!mediaUrl) {
-      return NextResponse.json({ error: 'mediaUrl es requerido' }, { status: 400 })
+    if (!mediaUrl && !mediaBase64) {
+      return NextResponse.json({ error: 'mediaUrl o mediaBase64 es requerido' }, { status: 400 })
+    }
+
+    let finalMediaUrl = mediaUrl || ''
+
+    // If base64 provided, upload to Supabase first to get a public URL
+    if (!finalMediaUrl && mediaBase64) {
+      console.log('[Publer/Upload] Converting base64 to Supabase URL...')
+      const buffer = Buffer.from(mediaBase64, 'base64')
+      const ext = mediaContentType?.includes('png') ? 'png' :
+                  mediaContentType?.includes('webp') ? 'webp' :
+                  mediaContentType?.includes('mp4') ? 'mp4' :
+                  mediaContentType?.includes('mp3') ? 'mp3' :
+                  mediaContentType?.includes('wav') ? 'wav' : 'jpg'
+      const filename = `studio/publer/${user.id}/${Date.now()}.${ext}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('landing-images')
+        .upload(filename, buffer, {
+          contentType: mediaContentType || 'image/png',
+          upsert: true,
+        })
+
+      if (uploadError) {
+        console.error('[Publer/Upload] Supabase upload error:', uploadError)
+        return NextResponse.json({ error: 'Error subiendo media a storage' }, { status: 500 })
+      }
+
+      const { data: urlData } = supabase.storage
+        .from('landing-images')
+        .getPublicUrl(filename)
+
+      finalMediaUrl = urlData.publicUrl
+      console.log('[Publer/Upload] Supabase URL:', finalMediaUrl)
+    }
+
+    if (!finalMediaUrl) {
+      return NextResponse.json({ error: 'No se pudo obtener URL del media' }, { status: 400 })
     }
 
     const creds = await getPublerCredentials(user.id)
@@ -24,10 +66,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Configura Publer en Settings' }, { status: 400 })
     }
 
-    console.log(`[Publer/Upload] Starting media upload from: ${mediaUrl}`)
+    console.log(`[Publer/Upload] Starting media upload from: ${finalMediaUrl}`)
 
     // Upload media from URL
-    const { jobId } = await uploadMediaFromUrl(creds, mediaUrl, name)
+    const { jobId } = await uploadMediaFromUrl(creds, finalMediaUrl, name)
     console.log(`[Publer/Upload] Job created: ${jobId}`)
 
     // Poll until complete
