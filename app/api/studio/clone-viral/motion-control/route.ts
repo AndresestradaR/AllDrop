@@ -59,7 +59,7 @@ export async function POST(request: Request) {
           prompt: motionPrompt,
           input_urls: [pose_image_url],
           video_urls: [motion_video_url],
-          mode: '720p',
+          mode: '1080p',
           character_orientation: 'video',
         },
       }),
@@ -74,6 +74,14 @@ export async function POST(request: Request) {
     } catch (e) {
       console.error('[CloneViral/MotionControl] Invalid JSON:', responseText.substring(0, 200))
       return NextResponse.json({ error: 'Respuesta inválida de KIE' }, { status: 500 })
+    }
+
+    // Check for API error codes (same as working deep-face tool)
+    if (taskData.code !== 200 && taskData.code !== 0) {
+      console.error('[CloneViral/MotionControl] API error:', JSON.stringify(taskData))
+      return NextResponse.json({
+        error: taskData.msg || taskData.message || 'Error en KIE API'
+      }, { status: 500 })
     }
 
     const taskId = taskData.data?.taskId || taskData.taskId

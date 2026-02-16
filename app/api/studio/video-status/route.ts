@@ -20,76 +20,69 @@ async function checkStatus(taskId: string, apiKey: string) {
   if (jobsResponse.ok) {
     const data = await jobsResponse.json()
     const taskData = data.data || data
-    const state = taskData.state || ''
+    const state = (taskData.state || taskData.status || taskData.taskStatus || '').toLowerCase()
 
-    console.log('[VideoStatus] Jobs FULL response:', JSON.stringify(data).substring(0, 500))
-    console.log('[VideoStatus] Jobs state:', state || '(empty)')
+    console.log('[VideoStatus] Jobs response:', JSON.stringify(data).substring(0, 500))
 
-    // Also check alternative field names KIE might use
-    const effectiveState = state || taskData.status || taskData.taskStatus || ''
-
-    // If jobs endpoint returned a meaningful state, use it
-    if (effectiveState) {
-      // Processing states
-      if (['waiting', 'queuing', 'generating', 'processing', 'running', 'pending'].includes(effectiveState)) {
-        return { status: 'processing', taskState: effectiveState }
-      }
-
-      // Failed states
-      if (['fail', 'failed', 'error'].includes(effectiveState)) {
-        return {
-          status: 'failed',
-          error: taskData.failMsg || taskData.failCode || 'Video generation failed',
-        }
-      }
-
-      // Success - extract video/audio URL
-      if (effectiveState === 'success' || effectiveState === 'completed') {
-        let videoUrl: string | undefined
-        let audioUrl: string | undefined
-
-        if (taskData.resultJson) {
-          try {
-            const result = typeof taskData.resultJson === 'string'
-              ? JSON.parse(taskData.resultJson)
-              : taskData.resultJson
-
-            videoUrl = result.videoUrl ||
-                       result.video_url ||
-                       result.resultUrls?.[0] ||
-                       result.videos?.[0] ||
-                       result.url ||
-                       result.output?.url
-
-            // ElevenLabs and other audio models return audioUrl
-            audioUrl = result.audioUrl ||
-                       result.audio_url ||
-                       result.output?.audio_url
-          } catch (e) {
-            console.error('[VideoStatus] Failed to parse resultJson:', e)
-          }
-        }
-
-        if (!videoUrl) {
-          videoUrl = taskData.videoUrl || taskData.video_url || taskData.resultUrl
-        }
-        if (!audioUrl) {
-          audioUrl = taskData.audioUrl || taskData.audio_url
-        }
-
-        if (videoUrl || audioUrl) {
-          return { status: 'completed', videoUrl, audioUrl }
-        }
-
-        return { status: 'failed', error: 'Task completed but URL not found' }
-      }
-
-      // Unknown but non-empty state — return it so frontend can debug
-      return { status: 'processing', taskState: `unknown:${effectiveState}` }
+    // Processing states
+    if (!state || ['waiting', 'queuing', 'generating', 'processing', 'running', 'pending'].includes(state)) {
+      return { status: 'processing', taskState: state || 'initializing' }
     }
+
+    // Failed states
+    if (['fail', 'failed', 'error'].includes(state)) {
+      return {
+        status: 'failed',
+        error: taskData.failMsg || taskData.failCode || 'Video generation failed',
+      }
+    }
+
+    // Success - extract video/audio URL
+    if (state === 'success' || state === 'completed') {
+      let videoUrl: string | undefined
+      let audioUrl: string | undefined
+
+      if (taskData.resultJson) {
+        try {
+          const result = typeof taskData.resultJson === 'string'
+            ? JSON.parse(taskData.resultJson)
+            : taskData.resultJson
+
+          videoUrl = result.videoUrl ||
+                     result.video_url ||
+                     result.resultUrls?.[0] ||
+                     result.videos?.[0] ||
+                     result.url ||
+                     result.output?.url
+
+          audioUrl = result.audioUrl ||
+                     result.audio_url ||
+                     result.output?.audio_url
+        } catch (e) {
+          console.error('[VideoStatus] Failed to parse resultJson:', e)
+        }
+      }
+
+      if (!videoUrl) {
+        videoUrl = taskData.videoUrl || taskData.video_url || taskData.resultUrl
+      }
+      if (!audioUrl) {
+        audioUrl = taskData.audioUrl || taskData.audio_url
+      }
+
+      if (videoUrl || audioUrl) {
+        return { status: 'completed', videoUrl, audioUrl }
+      }
+
+      return { status: 'failed', error: 'Task completed but URL not found' }
+    }
+
+    // Any other state - keep polling
+    return { status: 'processing', taskState: state }
   }
 
-  // Fallback to Veo endpoint (for veo3_fast, veo3 models only)
+  // Jobs endpoint failed (HTTP error) — try Veo endpoint as fallback
+  console.log('[VideoStatus] Jobs endpoint failed, trying Veo...')
   const veoResponse = await fetch(`${KIE_API_BASE}/veo/record-info?taskId=${taskId}`, {
     method: 'GET',
     headers: { Authorization: `Bearer ${apiKey}` },
@@ -102,28 +95,18 @@ async function checkStatus(taskId: string, apiKey: string) {
     if (veoData.code === 200 && veoData.data) {
       const vData = veoData.data
 
-      // Check if completed
       if (vData.successFlag === 1 && vData.response?.resultUrls?.length > 0) {
-        return {
-          status: 'completed',
-          videoUrl: vData.response.resultUrls[0],
-        }
+        return { status: 'completed', videoUrl: vData.response.resultUrls[0] }
       }
 
-      // Check for error
       if (vData.errorCode || vData.errorMessage) {
-        return {
-          status: 'failed',
-          error: vData.errorMessage || vData.errorCode || 'Unknown error',
-        }
+        return { status: 'failed', error: vData.errorMessage || vData.errorCode || 'Unknown error' }
       }
 
-      // Still processing via Veo
       return { status: 'processing', taskState: 'veo-processing' }
     }
   }
 
-  // Neither endpoint returned useful data
   return { status: 'processing', taskState: 'unknown' }
 }
 
