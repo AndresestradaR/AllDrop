@@ -74,9 +74,10 @@ async function checkStatus(taskId: string, apiKey: string) {
     }
   }
 
-  // Success - extract video URL
+  // Success - extract video/audio URL
   if (state === 'success' || state === 'completed') {
     let videoUrl: string | undefined
+    let audioUrl: string | undefined
 
     if (taskData.resultJson) {
       try {
@@ -90,6 +91,11 @@ async function checkStatus(taskId: string, apiKey: string) {
                    result.videos?.[0] ||
                    result.url ||
                    result.output?.url
+
+        // ElevenLabs and other audio models return audioUrl
+        audioUrl = result.audioUrl ||
+                   result.audio_url ||
+                   result.output?.audio_url
       } catch (e) {
         console.error('[VideoStatus] Failed to parse resultJson:', e)
       }
@@ -98,12 +104,15 @@ async function checkStatus(taskId: string, apiKey: string) {
     if (!videoUrl) {
       videoUrl = taskData.videoUrl || taskData.video_url || taskData.resultUrl
     }
-
-    if (videoUrl) {
-      return { status: 'completed', videoUrl }
+    if (!audioUrl) {
+      audioUrl = taskData.audioUrl || taskData.audio_url
     }
 
-    return { status: 'failed', error: 'Video completed but URL not found' }
+    if (videoUrl || audioUrl) {
+      return { status: 'completed', videoUrl, audioUrl }
+    }
+
+    return { status: 'failed', error: 'Task completed but URL not found' }
   }
 
   return { status: 'failed', error: `Unknown status: ${state}` }
@@ -146,20 +155,25 @@ export async function GET(request: Request) {
       })
     }
 
-    if (result.status === 'completed' && result.videoUrl) {
-      // Try R2 upload (optional, non-blocking)
-      const r2Url = await tryUploadUrlToR2(
-        user.id,
-        result.videoUrl,
-        `videos/${Date.now()}-${taskId.substring(0, 8)}.mp4`,
-        'video/mp4'
-      )
-      if (r2Url) console.log(`[VideoStatus] ✓ Video saved to R2: ${r2Url}`)
+    if (result.status === 'completed' && (result.videoUrl || result.audioUrl)) {
+      let r2Url: string | null | undefined
+
+      // Try R2 upload for video (optional, non-blocking)
+      if (result.videoUrl) {
+        r2Url = await tryUploadUrlToR2(
+          user.id,
+          result.videoUrl,
+          `videos/${Date.now()}-${taskId.substring(0, 8)}.mp4`,
+          'video/mp4'
+        )
+        if (r2Url) console.log(`[VideoStatus] ✓ Video saved to R2: ${r2Url}`)
+      }
 
       return NextResponse.json({
         success: true,
         status: 'completed',
         videoUrl: result.videoUrl,
+        audioUrl: result.audioUrl,
         r2Url,
         taskId,
       })

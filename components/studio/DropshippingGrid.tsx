@@ -1194,6 +1194,7 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
   // Step 5: Result
   const [resultVideoUrl, setResultVideoUrl] = useState<string | null>(null)
   const [resultAudioUrl, setResultAudioUrl] = useState<string | null>(null)
+  const [resultLipSyncUrl, setResultLipSyncUrl] = useState<string | null>(null)
 
   const tool = DROPSHIPPING_TOOLS.find(t => t.id === 'clonar-viral')!
   const pollingRef = useRef<NodeJS.Timeout | null>(null)
@@ -1358,11 +1359,15 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
 
     setIsGenerating(true)
     setError(null)
-    setGenerationStatus('Generando voz...')
+    setResultAudioUrl(null)
+    setResultVideoUrl(null)
+    setResultLipSyncUrl(null)
+    setGenerationStatus('Generando voz con ElevenLabs...')
 
     try {
-      // Step 1: Generate voice
-      // Detectar género: character_profile.gender, o inferir del prompt_descriptor
+      const influencerImageUrl = influencer.realistic_image_url || influencer.image_url
+
+      // === Step 1: Generate voice (ElevenLabs TTS) ===
       const isMale = influencer.character_profile?.gender === 'male' ||
         influencer.prompt_descriptor?.toLowerCase()?.includes('hombre') ||
         influencer.prompt_descriptor?.toLowerCase()?.includes('male') ||
@@ -1381,14 +1386,14 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
       const voiceData = await voiceRes.json()
       if (!voiceRes.ok) throw new Error(voiceData.error || 'Error generando voz')
 
+      let audioUrl: string | null = null
       if (voiceData.taskId) {
-        setGenerationStatus('Procesando voz... (puede tardar 1-2 min)')
-        const audioUrl = await pollKieTask(voiceData.taskId)
+        setGenerationStatus('Procesando voz... (1-2 min)')
+        audioUrl = await pollKieTask(voiceData.taskId)
         if (audioUrl) setResultAudioUrl(audioUrl)
       }
 
-      // Step 2: Generate motion-controlled video
-      const influencerImageUrl = influencer.realistic_image_url || influencer.image_url
+      // === Step 2: Generate motion-controlled video (Kling motion control) ===
       if (influencerImageUrl) {
         setGenerationStatus('Generando video con motion control...')
 
@@ -1406,9 +1411,35 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
         if (!motionRes.ok) throw new Error(motionData.error || 'Error en motion control')
 
         if (motionData.taskId) {
-          setGenerationStatus('Procesando video... (puede tardar 3-5 min)')
+          setGenerationStatus('Procesando video motion control... (3-5 min)')
           const videoUrl = await pollKieTask(motionData.taskId)
           if (videoUrl) setResultVideoUrl(videoUrl)
+        }
+      }
+
+      // === Step 3: Generate lip-synced video (Kling Avatar) ===
+      if (audioUrl && influencerImageUrl) {
+        setGenerationStatus('Generando video con lip sync...')
+
+        const lipSyncRes = await fetch('/api/studio/clone-viral/lip-sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            image_url: influencerImageUrl,
+            audio_url: audioUrl,
+            prompt: influencer.prompt_descriptor
+              ? `${influencer.prompt_descriptor}, speaking naturally to camera`
+              : 'Person speaking naturally with expressive facial expressions, professional lighting',
+          }),
+        })
+
+        const lipSyncData = await lipSyncRes.json()
+        if (lipSyncRes.ok && lipSyncData.taskId) {
+          setGenerationStatus('Procesando lip sync... (2-4 min)')
+          const lipSyncUrl = await pollKieTask(lipSyncData.taskId)
+          if (lipSyncUrl) setResultLipSyncUrl(lipSyncUrl)
+        } else {
+          console.warn('[CloneViral] Lip sync failed:', lipSyncData.error)
         }
       }
 
@@ -1685,13 +1716,32 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
 
           {/* STEP 5: Result */}
           {step === 'result' && (
-            <div className="max-w-2xl mx-auto space-y-4">
-              <p className="text-sm text-text-secondary">Tu video clonado esta listo.</p>
+            <div className="max-w-3xl mx-auto space-y-4">
+              <p className="text-sm text-text-secondary">Tu video clonado esta listo. Tienes dos versiones:</p>
 
               <div className="grid grid-cols-2 gap-4">
-                {/* Video */}
+                {/* Lip Sync Video (primary) */}
                 <div>
-                  <label className="block text-sm font-medium text-text-secondary mb-2">Video generado</label>
+                  <label className="block text-sm font-medium text-text-secondary mb-2">
+                    Video con Lip Sync
+                    <span className="ml-1.5 text-[10px] bg-accent/20 text-accent px-1.5 py-0.5 rounded">RECOMENDADO</span>
+                  </label>
+                  <div className="bg-surface-elevated rounded-xl overflow-hidden aspect-[9/16] flex items-center justify-center">
+                    {resultLipSyncUrl ? (
+                      <video src={resultLipSyncUrl} controls className="w-full h-full object-contain" />
+                    ) : (
+                      <div className="text-center p-4">
+                        <Video className="w-8 h-8 text-text-muted mx-auto mb-2" />
+                        <p className="text-xs text-text-muted">Lip sync no disponible</p>
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-text-muted mt-1">Audio y labios sincronizados perfectamente</p>
+                </div>
+
+                {/* Motion Control Video */}
+                <div>
+                  <label className="block text-sm font-medium text-text-secondary mb-2">Video Motion Control</label>
                   <div className="bg-surface-elevated rounded-xl overflow-hidden aspect-[9/16] flex items-center justify-center">
                     {resultVideoUrl ? (
                       <video src={resultVideoUrl} controls className="w-full h-full object-contain" />
@@ -1702,43 +1752,52 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
                       </div>
                     )}
                   </div>
-                </div>
-
-                {/* Audio */}
-                <div>
-                  <label className="block text-sm font-medium text-text-secondary mb-2">Audio generado</label>
-                  <div className="bg-surface-elevated rounded-xl p-4">
-                    {resultAudioUrl ? (
-                      <audio src={resultAudioUrl} controls className="w-full" />
-                    ) : (
-                      <p className="text-xs text-text-muted">Audio no disponible</p>
-                    )}
-                  </div>
-
-                  <div className="mt-4 p-4 bg-surface-elevated rounded-xl">
-                    <label className="block text-xs font-medium text-text-muted uppercase mb-2">Guion usado</label>
-                    <p className="text-sm text-text-secondary">{translatedScript}</p>
-                  </div>
+                  <p className="text-[10px] text-text-muted mt-1">Mismos movimientos del video original (sin audio)</p>
                 </div>
               </div>
 
-              {(resultVideoUrl || resultAudioUrl) && (
-                <div className="flex gap-3">
+              {/* Audio player */}
+              {resultAudioUrl && (
+                <div className="bg-surface-elevated rounded-xl p-4">
+                  <label className="block text-xs font-medium text-text-muted uppercase mb-2">Audio generado (ElevenLabs)</label>
+                  <audio src={resultAudioUrl} controls className="w-full" />
+                </div>
+              )}
+
+              {/* Script */}
+              <div className="p-4 bg-surface-elevated rounded-xl">
+                <label className="block text-xs font-medium text-text-muted uppercase mb-2">Guion usado</label>
+                <p className="text-sm text-text-secondary">{translatedScript}</p>
+              </div>
+
+              {/* Download buttons */}
+              {(resultLipSyncUrl || resultVideoUrl || resultAudioUrl) && (
+                <div className="flex flex-wrap gap-3">
+                  {resultLipSyncUrl && (
+                    <a
+                      href={resultLipSyncUrl}
+                      download={`clone-viral-lipsync-${Date.now()}.mp4`}
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-accent/10 border border-accent/30 text-accent hover:bg-accent/20 font-medium text-sm transition-colors"
+                    >
+                      <Download className="w-4 h-4" />
+                      Descargar lip sync
+                    </a>
+                  )}
                   {resultVideoUrl && (
                     <a
                       href={resultVideoUrl}
-                      download={`clone-viral-${Date.now()}.mp4`}
-                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-accent/30 text-accent hover:bg-accent/10 font-medium text-sm transition-colors"
+                      download={`clone-viral-motion-${Date.now()}.mp4`}
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-border text-text-secondary hover:bg-border/30 font-medium text-sm transition-colors"
                     >
                       <Download className="w-4 h-4" />
-                      Descargar video
+                      Descargar motion
                     </a>
                   )}
                   {resultAudioUrl && (
                     <a
                       href={resultAudioUrl}
                       download={`clone-viral-audio-${Date.now()}.mp3`}
-                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-accent/30 text-accent hover:bg-accent/10 font-medium text-sm transition-colors"
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-border text-text-secondary hover:bg-border/30 font-medium text-sm transition-colors"
                     >
                       <Download className="w-4 h-4" />
                       Descargar audio

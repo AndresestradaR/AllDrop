@@ -45,11 +45,12 @@ export async function POST(request: Request) {
       ? `${prompt_descriptor}, same pose and angle as reference, professional photo`
       : 'Person in the same pose and angle as the reference image, professional photo'
 
-    const taskResponse = await fetch('https://api.kie.ai/api/v1/createTask', {
+    // CORREGIDO: endpoint /jobs/createTask + Authorization Bearer
+    const taskResponse = await fetch('https://api.kie.ai/api/v1/jobs/createTask', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'api-key': kieApiKey,
+        Authorization: `Bearer ${kieApiKey}`,
       },
       body: JSON.stringify({
         model: 'kling-2.6/image',
@@ -61,18 +62,30 @@ export async function POST(request: Request) {
       }),
     })
 
-    const taskData = await taskResponse.json()
+    const responseText = await taskResponse.text()
+    console.log('[CloneViral/GeneratePose] KIE Response:', taskResponse.status, responseText.substring(0, 500))
 
-    if (!taskData.data?.taskId) {
-      console.error('[CloneViral/GeneratePose] Task creation failed:', taskData)
-      return NextResponse.json({ error: 'Error al crear tarea de generacion' }, { status: 500 })
+    let taskData: any
+    try {
+      taskData = JSON.parse(responseText)
+    } catch (e) {
+      console.error('[CloneViral/GeneratePose] Invalid JSON:', responseText.substring(0, 200))
+      return NextResponse.json({ error: 'Respuesta inválida de KIE' }, { status: 500 })
     }
 
-    console.log(`[CloneViral/GeneratePose] User: ${user.id.substring(0, 8)}..., TaskId: ${taskData.data.taskId}`)
+    const taskId = taskData.data?.taskId || taskData.taskId
+    if (!taskId) {
+      console.error('[CloneViral/GeneratePose] No taskId:', JSON.stringify(taskData))
+      return NextResponse.json({
+        error: taskData.msg || taskData.message || 'Error al crear tarea de generacion'
+      }, { status: 500 })
+    }
+
+    console.log(`[CloneViral/GeneratePose] User: ${user.id.substring(0, 8)}..., TaskId: ${taskId}`)
 
     return NextResponse.json({
       success: true,
-      taskId: taskData.data.taskId,
+      taskId,
       status: 'processing',
     })
 

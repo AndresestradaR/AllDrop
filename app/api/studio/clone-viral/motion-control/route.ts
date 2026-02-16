@@ -43,8 +43,10 @@ export async function POST(request: Request) {
 
     const motionPrompt = prompt || 'Person speaking naturally with expressive gestures, professional lighting'
 
-    // CORREGIDO: endpoint /jobs/createTask y header Authorization Bearer
-    // (antes usaba /createTask con header api-key que ya no funciona)
+    // KIE.ai Kling 2.6 Motion Control
+    // Docs: https://docs.kie.ai/market/kling/motion-control
+    // mode: "720p" (standard) | "1080p" (pro)
+    // character_orientation: "image" (match photo, max 10s) | "video" (match video, max 30s)
     const taskResponse = await fetch('https://api.kie.ai/api/v1/jobs/createTask', {
       method: 'POST',
       headers: {
@@ -57,9 +59,8 @@ export async function POST(request: Request) {
           prompt: motionPrompt,
           input_urls: [pose_image_url],
           video_urls: [motion_video_url],
-          duration: String(duration),
-          aspect_ratio: '9:16',
-          mode: 'pro',
+          mode: '720p',
+          character_orientation: 'video',
         },
       }),
     })
