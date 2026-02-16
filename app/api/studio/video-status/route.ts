@@ -28,7 +28,7 @@ async function checkStatus(taskId: string, apiKey: string) {
     if (state) {
       // Processing states
       if (['waiting', 'queuing', 'generating', 'processing', 'running', 'pending'].includes(state)) {
-        return { status: 'processing' }
+        return { status: 'processing', taskState: state }
       }
 
       // Failed states
@@ -115,12 +115,12 @@ async function checkStatus(taskId: string, apiKey: string) {
       }
 
       // Still processing via Veo
-      return { status: 'processing' }
+      return { status: 'processing', taskState: 'veo-processing' }
     }
   }
 
   // Neither endpoint returned useful data
-  return { status: 'processing' }
+  return { status: 'processing', taskState: 'unknown' }
 }
 
 export async function GET(request: Request) {
@@ -157,6 +157,7 @@ export async function GET(request: Request) {
         success: true,
         status: 'processing',
         taskId,
+        taskState: result.taskState,
       })
     }
 

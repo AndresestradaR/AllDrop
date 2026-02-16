@@ -1317,35 +1317,47 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
     }
   }
 
-  const pollKieTask = async (taskId: string): Promise<string | null> => {
+  const pollKieTask = async (taskId: string, statusPrefix?: string): Promise<string | null> => {
     return new Promise((resolve, reject) => {
       let attempts = 0
-      const maxAttempts = 120
+      const maxAttempts = 180 // 15 minutes (5s * 180)
+      const startTime = Date.now()
 
       pollingRef.current = setInterval(async () => {
         attempts++
         if (attempts > maxAttempts) {
           clearInterval(pollingRef.current!)
           pollingRef.current = null
-          reject(new Error('Tiempo de espera agotado'))
+          reject(new Error('Tiempo de espera agotado (15 min)'))
           return
+        }
+
+        // Show elapsed time
+        const elapsed = Math.floor((Date.now() - startTime) / 1000)
+        const mins = Math.floor(elapsed / 60)
+        const secs = elapsed % 60
+        const timeStr = `${mins}:${String(secs).padStart(2, '0')}`
+        if (statusPrefix) {
+          setGenerationStatus(`${statusPrefix} (${timeStr})`)
         }
 
         try {
           const res = await fetch(`/api/studio/video-status?taskId=${taskId}`)
           const data = await res.json()
 
+          console.log(`[CloneViral] Poll #${attempts} taskState=${data.taskState || '-'} status=${data.status}`)
+
           if (data.status === 'completed') {
             clearInterval(pollingRef.current!)
             pollingRef.current = null
             resolve(data.videoUrl || data.audioUrl || data.imageUrl || null)
-          } else if (data.status === 'failed' || data.error) {
+          } else if (data.status === 'failed' || (data.success === false && data.error)) {
             clearInterval(pollingRef.current!)
             pollingRef.current = null
             reject(new Error(data.error || 'Tarea fallida'))
           }
         } catch (err) {
-          // Keep polling
+          // Keep polling on network errors
         }
       }, 5000)
     })
@@ -1388,14 +1400,13 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
 
       let audioUrl: string | null = null
       if (voiceData.taskId) {
-        setGenerationStatus('Procesando voz... (1-2 min)')
-        audioUrl = await pollKieTask(voiceData.taskId)
+        audioUrl = await pollKieTask(voiceData.taskId, 'Generando voz con ElevenLabs')
         if (audioUrl) setResultAudioUrl(audioUrl)
       }
 
       // === Step 2: Generate motion-controlled video (Kling motion control) ===
       if (influencerImageUrl) {
-        setGenerationStatus('Generando video con motion control...')
+        setGenerationStatus('Enviando a Kling motion control...')
 
         const motionRes = await fetch('/api/studio/clone-viral/motion-control', {
           method: 'POST',
@@ -1411,15 +1422,14 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
         if (!motionRes.ok) throw new Error(motionData.error || 'Error en motion control')
 
         if (motionData.taskId) {
-          setGenerationStatus('Procesando video motion control... (3-5 min)')
-          const videoUrl = await pollKieTask(motionData.taskId)
+          const videoUrl = await pollKieTask(motionData.taskId, 'Procesando motion control')
           if (videoUrl) setResultVideoUrl(videoUrl)
         }
       }
 
       // === Step 3: Generate lip-synced video (Kling Avatar) ===
       if (audioUrl && influencerImageUrl) {
-        setGenerationStatus('Generando video con lip sync...')
+        setGenerationStatus('Enviando a Kling lip sync...')
 
         const lipSyncRes = await fetch('/api/studio/clone-viral/lip-sync', {
           method: 'POST',
@@ -1435,8 +1445,7 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
 
         const lipSyncData = await lipSyncRes.json()
         if (lipSyncRes.ok && lipSyncData.taskId) {
-          setGenerationStatus('Procesando lip sync... (2-4 min)')
-          const lipSyncUrl = await pollKieTask(lipSyncData.taskId)
+          const lipSyncUrl = await pollKieTask(lipSyncData.taskId, 'Procesando lip sync')
           if (lipSyncUrl) setResultLipSyncUrl(lipSyncUrl)
         } else {
           console.warn('[CloneViral] Lip sync failed:', lipSyncData.error)
