@@ -1337,15 +1337,16 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
         const mins = Math.floor(elapsed / 60)
         const secs = elapsed % 60
         const timeStr = `${mins}:${String(secs).padStart(2, '0')}`
-        if (statusPrefix) {
-          setGenerationStatus(`${statusPrefix} (${timeStr})`)
-        }
-
         try {
           const res = await fetch(`/api/studio/video-status?taskId=${taskId}`)
           const data = await res.json()
 
-          console.log(`[CloneViral] Poll #${attempts} taskState=${data.taskState || '-'} status=${data.status}`)
+          const stateLabel = data.taskState || 'sin estado'
+          if (statusPrefix) {
+            setGenerationStatus(`${statusPrefix} (${timeStr}) [${stateLabel}]`)
+          }
+
+          console.log(`[CloneViral] Poll #${attempts} taskState=${data.taskState || '-'} status=${data.status} raw:`, data)
 
           if (data.status === 'completed') {
             clearInterval(pollingRef.current!)

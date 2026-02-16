@@ -22,17 +22,21 @@ async function checkStatus(taskId: string, apiKey: string) {
     const taskData = data.data || data
     const state = taskData.state || ''
 
-    console.log('[VideoStatus] Jobs response:', state, JSON.stringify(taskData).substring(0, 300))
+    console.log('[VideoStatus] Jobs FULL response:', JSON.stringify(data).substring(0, 500))
+    console.log('[VideoStatus] Jobs state:', state || '(empty)')
+
+    // Also check alternative field names KIE might use
+    const effectiveState = state || taskData.status || taskData.taskStatus || ''
 
     // If jobs endpoint returned a meaningful state, use it
-    if (state) {
+    if (effectiveState) {
       // Processing states
-      if (['waiting', 'queuing', 'generating', 'processing', 'running', 'pending'].includes(state)) {
-        return { status: 'processing', taskState: state }
+      if (['waiting', 'queuing', 'generating', 'processing', 'running', 'pending'].includes(effectiveState)) {
+        return { status: 'processing', taskState: effectiveState }
       }
 
       // Failed states
-      if (['fail', 'failed', 'error'].includes(state)) {
+      if (['fail', 'failed', 'error'].includes(effectiveState)) {
         return {
           status: 'failed',
           error: taskData.failMsg || taskData.failCode || 'Video generation failed',
@@ -40,7 +44,7 @@ async function checkStatus(taskId: string, apiKey: string) {
       }
 
       // Success - extract video/audio URL
-      if (state === 'success' || state === 'completed') {
+      if (effectiveState === 'success' || effectiveState === 'completed') {
         let videoUrl: string | undefined
         let audioUrl: string | undefined
 
@@ -80,8 +84,8 @@ async function checkStatus(taskId: string, apiKey: string) {
         return { status: 'failed', error: 'Task completed but URL not found' }
       }
 
-      // Unknown but non-empty state
-      return { status: 'failed', error: `Unknown status: ${state}` }
+      // Unknown but non-empty state — return it so frontend can debug
+      return { status: 'processing', taskState: `unknown:${effectiveState}` }
     }
   }
 
