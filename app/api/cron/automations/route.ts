@@ -64,13 +64,14 @@ export async function GET(request: Request) {
         results.push({ flowId: flow.id, name: flow.name, error: err.message })
       }
 
-      // Update next_run_at regardless of success
-      const nextRun = new Date(now.getTime() + flow.frequency_hours * 60 * 60 * 1000)
+      // Update next_run_at based on schedule_times
+      const scheduleTimes = flow.schedule_times || ['08:00', '20:00']
+      const nextRunAt = calculateNextRunAt(scheduleTimes)
       await supabase
         .from('automation_flows')
         .update({
           last_run_at: now.toISOString(),
-          next_run_at: nextRun.toISOString(),
+          next_run_at: nextRunAt,
         })
         .eq('id', flow.id)
     }
@@ -445,4 +446,47 @@ async function publishToSocial(appUrl: string, flow: any, videoUrl: string, capt
     throw new Error(data.error || 'Publish failed')
   }
   return data
+}
+
+// Calculate next run time based on schedule_times (Colombia UTC-5)
+function calculateNextRunAt(scheduleTimes: string[]): string {
+  if (!scheduleTimes || scheduleTimes.length === 0) {
+    // Default: 1 hour from now
+    return new Date(Date.now() + 60 * 60 * 1000).toISOString()
+  }
+
+  const now = new Date()
+  const colombiaOffset = -5 * 60
+  const utcMinutes = now.getUTCHours() * 60 + now.getUTCMinutes()
+  const colombiaMinutes = utcMinutes + colombiaOffset
+  const colombiaHour = Math.floor(((colombiaMinutes % 1440) + 1440) % 1440 / 60)
+  const colombiaMin = ((colombiaMinutes % 1440) + 1440) % 1440 % 60
+
+  const times = scheduleTimes
+    .map(t => {
+      const [h, m] = t.split(':').map(Number)
+      return { h, m, total: h * 60 + m }
+    })
+    .sort((a, b) => a.total - b.total)
+
+  const currentTotal = colombiaHour * 60 + colombiaMin
+
+  // Find next time AFTER current (with 30 min buffer to avoid re-triggering)
+  let nextTime = times.find(t => t.total > currentTotal + 30)
+  let daysToAdd = 0
+
+  if (!nextTime) {
+    nextTime = times[0]
+    daysToAdd = 1
+  }
+
+  const nextDate = new Date(now)
+  nextDate.setUTCDate(nextDate.getUTCDate() + daysToAdd)
+  const nextUtcHour = nextTime.h + 5
+  nextDate.setUTCHours(nextUtcHour % 24, nextTime.m, 0, 0)
+  if (nextUtcHour >= 24) {
+    nextDate.setUTCDate(nextDate.getUTCDate() + 1)
+  }
+
+  return nextDate.toISOString()
 }

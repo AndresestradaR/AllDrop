@@ -59,7 +59,7 @@ interface AutomationFlow {
   scenarios: string[]
   voice_style: 'paisa' | 'latina' | 'rola' | 'costena' | 'personalizada'
   voice_custom_instruction: string
-  frequency_hours: number
+  schedule_times: string[]
   account_ids: string[]
   mode: 'auto' | 'semi'
   is_active: boolean
@@ -476,7 +476,11 @@ function FlowCard({
             <span>·</span>
             <span className="flex items-center gap-1">
               <Clock className="w-3 h-3" />
-              cada {flow.frequency_hours}h
+              {(flow.schedule_times || []).map(t => {
+                const [h] = t.split(':')
+                const hour = parseInt(h)
+                return hour >= 12 ? `${hour === 12 ? 12 : hour - 12}pm` : `${hour === 0 ? 12 : hour}am`
+              }).join(', ')}
             </span>
             <span>·</span>
             <span>{voice?.short || flow.voice_style}</span>
@@ -748,7 +752,8 @@ function FlowEditor({
   const [newScenario, setNewScenario] = useState('')
   const [voiceStyle, setVoiceStyle] = useState(flow?.voice_style || 'paisa')
   const [voiceCustom, setVoiceCustom] = useState(flow?.voice_custom_instruction || '')
-  const [frequencyHours, setFrequencyHours] = useState(flow?.frequency_hours || 12)
+  const [scheduleTimes, setScheduleTimes] = useState<string[]>(flow?.schedule_times || ['08:00', '20:00'])
+  const [newTime, setNewTime] = useState('12:00')
   const [accountIds, setAccountIds] = useState<string[]>(flow?.account_ids || [])
   const [mode, setMode] = useState<'auto' | 'semi'>(flow?.mode || 'semi')
   const [isSaving, setIsSaving] = useState(false)
@@ -773,7 +778,7 @@ function FlowEditor({
         scenarios: scenarios.filter(s => s.trim()),
         voice_style: voiceStyle,
         voice_custom_instruction: voiceCustom.trim(),
-        frequency_hours: frequencyHours,
+        schedule_times: scheduleTimes,
         account_ids: accountIds,
         mode,
       }
@@ -1019,57 +1024,87 @@ function FlowEditor({
               </div>
             </div>
 
-            {/* Frecuencia + Modo */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">
-                  Frecuencia
-                </label>
-                <div className="flex flex-wrap gap-1.5">
-                  {[6, 12, 24, 48].map(h => (
-                    <button
-                      key={h}
-                      onClick={() => setFrequencyHours(h)}
-                      className={cn(
-                        'px-3 py-1.5 rounded-lg text-xs font-medium border transition-all',
-                        frequencyHours === h
-                          ? 'bg-accent/15 border-accent text-accent'
-                          : 'bg-surface-elevated border-border text-text-secondary'
-                      )}
-                    >
-                      {h}h
-                    </button>
-                  ))}
-                </div>
+            {/* Horarios de publicacion */}
+            <div>
+              <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">
+                Horarios de publicacion (hora Colombia)
+              </label>
+              <p className="text-[10px] text-text-muted mb-2">
+                Se publica automaticamente a las horas seleccionadas
+              </p>
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {scheduleTimes
+                  .sort((a, b) => a.localeCompare(b))
+                  .map(time => {
+                    const [h, m] = time.split(':')
+                    const hour = parseInt(h)
+                    const label = `${hour > 12 ? hour - 12 : hour === 0 ? 12 : hour}:${m} ${hour >= 12 ? 'PM' : 'AM'}`
+                    return (
+                      <span
+                        key={time}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-accent/15 border border-accent text-accent"
+                      >
+                        <Clock className="w-3 h-3" />
+                        {label}
+                        <button
+                          onClick={() => setScheduleTimes(prev => prev.filter(t => t !== time))}
+                          className="hover:text-red-400 transition-colors"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    )
+                  })}
               </div>
-              <div>
-                <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">
-                  Modo
-                </label>
-                <div className="flex gap-1.5">
-                  <button
-                    onClick={() => setMode('semi')}
-                    className={cn(
-                      'flex-1 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all',
-                      mode === 'semi'
-                        ? 'bg-accent/15 border-accent text-accent'
-                        : 'bg-surface-elevated border-border text-text-secondary'
-                    )}
-                  >
-                    👀 Semi-auto
-                  </button>
-                  <button
-                    onClick={() => setMode('auto')}
-                    className={cn(
-                      'flex-1 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all',
-                      mode === 'auto'
-                        ? 'bg-accent/15 border-accent text-accent'
-                        : 'bg-surface-elevated border-border text-text-secondary'
-                    )}
-                  >
-                    🤖 Automatico
-                  </button>
-                </div>
+              <div className="flex gap-2">
+                <input
+                  type="time"
+                  value={newTime}
+                  onChange={(e) => setNewTime(e.target.value)}
+                  className="px-3 py-2 bg-surface-elevated border border-border rounded-lg text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50"
+                />
+                <button
+                  onClick={() => {
+                    if (newTime && !scheduleTimes.includes(newTime)) {
+                      setScheduleTimes(prev => [...prev, newTime])
+                    }
+                  }}
+                  disabled={!newTime || scheduleTimes.includes(newTime)}
+                  className="px-3 py-2 bg-accent/10 text-accent rounded-lg text-sm font-medium hover:bg-accent/20 disabled:opacity-50 transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modo */}
+            <div>
+              <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">
+                Modo
+              </label>
+              <div className="flex gap-1.5">
+                <button
+                  onClick={() => setMode('semi')}
+                  className={cn(
+                    'flex-1 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all',
+                    mode === 'semi'
+                      ? 'bg-accent/15 border-accent text-accent'
+                      : 'bg-surface-elevated border-border text-text-secondary'
+                  )}
+                >
+                  👀 Semi-auto
+                </button>
+                <button
+                  onClick={() => setMode('auto')}
+                  className={cn(
+                    'flex-1 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all',
+                    mode === 'auto'
+                      ? 'bg-accent/15 border-accent text-accent'
+                      : 'bg-surface-elevated border-border text-text-secondary'
+                  )}
+                >
+                  🤖 Automatico
+                </button>
               </div>
             </div>
 

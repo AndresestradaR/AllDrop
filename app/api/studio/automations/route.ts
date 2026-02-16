@@ -52,7 +52,7 @@ export async function POST(request: Request) {
       scenarios,
       voice_style,
       voice_custom_instruction,
-      frequency_hours,
+      schedule_times,
       account_ids,
       mode,
     } = body
@@ -90,7 +90,7 @@ export async function POST(request: Request) {
         scenarios: scenarios || undefined,
         voice_style: voice_style || 'paisa',
         voice_custom_instruction: voice_custom_instruction?.trim() || '',
-        frequency_hours: frequency_hours || 12,
+        schedule_times: schedule_times || ['08:00', '20:00'],
         account_ids: account_ids || [],
         mode: mode || 'semi',
         is_active: false,
@@ -132,7 +132,7 @@ export async function PATCH(request: Request) {
       'product_name', 'product_image_url', 'product_benefits',
       'system_prompt', 'scenarios',
       'voice_style', 'voice_custom_instruction',
-      'frequency_hours', 'account_ids', 'mode', 'is_active',
+      'schedule_times', 'account_ids', 'mode', 'is_active',
     ]
 
     const safeUpdates: Record<string, any> = { updated_at: new Date().toISOString() }
@@ -142,9 +142,16 @@ export async function PATCH(request: Request) {
       }
     }
 
-    // Si se activa, calcular next_run_at
+    // Si se activa, calcular next_run_at basado en schedule_times
     if (safeUpdates.is_active === true) {
-      safeUpdates.next_run_at = new Date().toISOString()
+      // Fetch current flow to get schedule_times
+      const { data: currentFlow } = await supabase
+        .from('automation_flows')
+        .select('schedule_times')
+        .eq('id', id)
+        .single()
+      const times = safeUpdates.schedule_times || currentFlow?.schedule_times || ['08:00', '20:00']
+      safeUpdates.next_run_at = calculateNextRunAt(times)
     }
 
     const { data: flow, error } = await supabase
@@ -199,4 +206,51 @@ export async function DELETE(request: Request) {
     console.error('[Automations/Delete] Error:', error.message)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
+}
+
+// Calculate next run time based on schedule_times (Colombia UTC-5)
+function calculateNextRunAt(scheduleTimes: string[]): string {
+  if (!scheduleTimes || scheduleTimes.length === 0) {
+    return new Date().toISOString()
+  }
+
+  // Colombia timezone offset (UTC-5)
+  const now = new Date()
+  const colombiaOffset = -5 * 60 // minutes
+  const utcMinutes = now.getUTCHours() * 60 + now.getUTCMinutes()
+  const colombiaMinutes = utcMinutes + colombiaOffset
+  const colombiaHour = Math.floor(((colombiaMinutes % 1440) + 1440) % 1440 / 60)
+  const colombiaMin = ((colombiaMinutes % 1440) + 1440) % 1440 % 60
+
+  // Parse and sort schedule times
+  const times = scheduleTimes
+    .map(t => {
+      const [h, m] = t.split(':').map(Number)
+      return { h, m, total: h * 60 + m }
+    })
+    .sort((a, b) => a.total - b.total)
+
+  const currentTotal = colombiaHour * 60 + colombiaMin
+
+  // Find next time after now
+  let nextTime = times.find(t => t.total > currentTotal)
+  let daysToAdd = 0
+
+  if (!nextTime) {
+    // No more times today, use first time tomorrow
+    nextTime = times[0]
+    daysToAdd = 1
+  }
+
+  // Build UTC date for the next run
+  const nextDate = new Date(now)
+  nextDate.setUTCDate(nextDate.getUTCDate() + daysToAdd)
+  // Convert Colombia time back to UTC
+  const nextUtcHour = nextTime.h + 5 // Colombia is UTC-5
+  nextDate.setUTCHours(nextUtcHour % 24, nextTime.m, 0, 0)
+  if (nextUtcHour >= 24) {
+    nextDate.setUTCDate(nextDate.getUTCDate() + 1)
+  }
+
+  return nextDate.toISOString()
 }
