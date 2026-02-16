@@ -56,63 +56,33 @@ export function Step7Video({
     }
   }, [promptDescriptor, influencerId, influencerName])
 
-  // Presets
-  type VideoPreset = 'producto' | 'rapido' | 'premium'
+  // Influencer selector
+  const [allInfluencers, setAllInfluencers] = useState<any[]>([])
+  const [selectedInfluencerId, setSelectedInfluencerId] = useState(influencerId)
+  const [selectedInfluencerName, setSelectedInfluencerName] = useState(influencerName)
+  const [selectedInfluencerImage, setSelectedInfluencerImage] = useState(realisticImageUrl)
 
-  interface PresetConfig {
-    id: VideoPreset
-    label: string
-    emoji: string
-    description: string
-    modelId: VideoModelId
-    duration: number
-    aspectRatio: '9:16' | '16:9' | '1:1'
-    videoMode: 'text' | 'image'
-    badge: string
-    color: string
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await fetch('/api/studio/influencer')
+        const data = await res.json()
+        if (data.influencers) setAllInfluencers(data.influencers)
+      } catch {}
+    }
+    load()
+  }, [])
+
+  const handleInfluencerChange = (inf: any) => {
+    setSelectedInfluencerId(inf.id)
+    setSelectedInfluencerName(inf.name)
+    setSelectedInfluencerImage(inf.realistic_image_url || inf.base_image_url || '')
+    setStartImageUrl(inf.realistic_image_url || inf.base_image_url || null)
+    if (inf.prompt_descriptor) setResolvedDescriptor(inf.prompt_descriptor)
+    setPrompt('')
+    setVideoUrl(null)
+    setError(null)
   }
-
-  const VIDEO_PRESETS: PresetConfig[] = [
-    {
-      id: 'producto',
-      label: 'Producto',
-      emoji: '🎯',
-      description: 'Solo con imagen del producto. Sora genera al personaje desde su descripción.',
-      modelId: 'sora-2',
-      duration: 10,
-      aspectRatio: '9:16',
-      videoMode: 'text',
-      badge: '~$0.45',
-      color: 'from-emerald-500/15 to-emerald-600/15 border-emerald-500/30',
-    },
-    {
-      id: 'rapido',
-      label: 'Rápido',
-      emoji: '⚡',
-      description: 'Usa foto del influencer como frame. Rápido y con audio.',
-      modelId: 'veo-3-fast',
-      duration: 8,
-      aspectRatio: '9:16',
-      videoMode: 'image',
-      badge: '~$0.40',
-      color: 'from-blue-500/15 to-blue-600/15 border-blue-500/30',
-    },
-    {
-      id: 'premium',
-      label: 'Premium',
-      emoji: '💎',
-      description: 'Videos largos con Kling 3.0. Mejor calidad y consistencia.',
-      modelId: 'kling-3.0',
-      duration: 10,
-      aspectRatio: '9:16',
-      videoMode: 'image',
-      badge: '~$0.42',
-      color: 'from-purple-500/15 to-purple-600/15 border-purple-500/30',
-    },
-  ]
-
-  const [selectedPreset, setSelectedPreset] = useState<VideoPreset | null>(null)
-  const [isCustomMode, setIsCustomMode] = useState(false)
 
   // Model & config
   const [videoModelId, setVideoModelId] = useState<VideoModelId>('kling-3.0')
@@ -150,10 +120,11 @@ export function Step7Video({
 
   // Cargar galería
   useEffect(() => {
+    if (!selectedInfluencerId) return
     const loadGallery = async () => {
       setIsLoadingGallery(true)
       try {
-        const res = await fetch(`/api/studio/influencer/gallery?influencerId=${influencerId}`)
+        const res = await fetch(`/api/studio/influencer/gallery?influencerId=${selectedInfluencerId}`)
         const data = await res.json()
         if (data.items) setGalleryImages(data.items)
       } catch (err) {
@@ -163,7 +134,7 @@ export function Step7Video({
       }
     }
     loadGallery()
-  }, [influencerId])
+  }, [selectedInfluencerId])
 
   // Ajustar modo cuando cambia el modelo
   useEffect(() => {
@@ -212,7 +183,7 @@ export function Step7Video({
           // Guardar video en la galería del influencer
           try {
             const saveBody = {
-              influencerId,
+              influencerId: selectedInfluencerId,
               image_url: data.videoUrl, // CRITICAL: usar video URL como image_url para evitar NOT NULL constraint
               video_url: data.videoUrl,
               content_type: 'video',
@@ -279,12 +250,11 @@ export function Step7Video({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          influencerId,
+          influencerId: selectedInfluencerId,
           optimizeVideoPrompt: true,
           videoModelId,
           userIdea: userIdea.trim(),
           promptDescriptor: resolvedDescriptor,
-          presetId: selectedPreset || undefined,
         }),
       })
 
@@ -332,21 +302,7 @@ export function Step7Video({
     }
   }
 
-  const handlePresetSelect = (preset: PresetConfig) => {
-    setSelectedPreset(preset.id)
-    setVideoModelId(preset.modelId)
-    setDuration(preset.duration)
-    setAspectRatio(preset.aspectRatio)
-    setVideoMode(preset.videoMode)
-    setIsCustomMode(false)
-    setPrompt('')
-    setError(null)
-
-    // Si es image mode y no hay imagen seleccionada, usar la realista
-    if (preset.videoMode === 'image' && !startImageUrl) {
-      setStartImageUrl(realisticImageUrl)
-    }
-  }
+  // (presets removed — direct model selection)
 
   const handleProductImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -558,106 +514,81 @@ export function Step7Video({
         Genera videos con tu influencer. Describe tu idea y optimizaremos el prompt para el modelo elegido.
       </p>
 
-      {/* Reference */}
-      <div className="flex items-center gap-3 mb-4 p-3 bg-surface-elevated rounded-xl border border-border">
-        <img
-          src={realisticImageUrl}
-          alt={influencerName}
-          className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
-        />
-        <div>
-          <p className="text-sm font-medium text-text-primary">{influencerName}</p>
-          <p className="text-xs text-text-secondary line-clamp-1">{resolvedDescriptor?.substring(0, 80)}...</p>
+      {/* ============ INFLUENCER SELECTOR ============ */}
+      <div className="mb-5">
+        <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-2">Influencer</label>
+        <div className="flex gap-2 overflow-x-auto pb-2">
+          {allInfluencers.map((inf: any) => (
+            <button
+              key={inf.id}
+              onClick={() => handleInfluencerChange(inf)}
+              className={cn(
+                'flex-shrink-0 flex items-center gap-2 px-3 py-2 rounded-xl border transition-all',
+                selectedInfluencerId === inf.id
+                  ? 'bg-accent/15 border-accent shadow-md'
+                  : 'bg-surface-elevated border-border hover:border-text-muted'
+              )}
+            >
+              <img
+                src={inf.realistic_image_url || inf.base_image_url || ''}
+                alt={inf.name}
+                className="w-9 h-9 rounded-lg object-cover flex-shrink-0"
+              />
+              <div className="text-left">
+                <p className={cn('text-xs font-semibold', selectedInfluencerId === inf.id ? 'text-accent' : 'text-text-primary')}>
+                  {inf.name}
+                </p>
+              </div>
+            </button>
+          ))}
+          {allInfluencers.length === 0 && (
+            <div className="flex items-center gap-2 px-3 py-2 bg-surface-elevated rounded-xl border border-border">
+              <img src={realisticImageUrl} alt={influencerName} className="w-9 h-9 rounded-lg object-cover" />
+              <p className="text-xs font-semibold text-text-primary">{influencerName}</p>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* ============ PRESETS ============ */}
-      <div className="mb-5">
-        <div className="flex items-center justify-between mb-2">
-          <label className="block text-xs font-medium text-text-muted uppercase tracking-wide">
-            Tipo de video
-          </label>
-          <button
-            onClick={() => { setIsCustomMode(!isCustomMode); setSelectedPreset(null) }}
-            className="text-[10px] text-accent hover:underline"
-          >
-            {isCustomMode ? 'Usar presets' : 'Configuración manual'}
-          </button>
-        </div>
-
-        {!isCustomMode && (
-          <div className="grid grid-cols-3 gap-2">
-            {VIDEO_PRESETS.map(preset => (
-              <button
-                key={preset.id}
-                onClick={() => handlePresetSelect(preset)}
-                className={cn(
-                  'relative p-3 rounded-xl border text-left transition-all',
-                  selectedPreset === preset.id
-                    ? `bg-gradient-to-br ${preset.color} border-2 shadow-lg`
-                    : 'bg-surface-elevated border-border hover:border-text-muted'
-                )}
-              >
-                <div className="text-lg mb-1">{preset.emoji}</div>
-                <p className="text-xs font-semibold text-text-primary">{preset.label}</p>
-                <p className="text-[10px] text-text-secondary mt-0.5 line-clamp-2">{preset.description}</p>
-                <div className="flex items-center gap-1.5 mt-2">
-                  <span className="text-[9px] px-1.5 py-0.5 bg-black/20 rounded-full text-text-muted">
-                    {VIDEO_MODELS[preset.modelId].name}
-                  </span>
-                  <span className="text-[9px] px-1.5 py-0.5 bg-black/20 rounded-full text-text-muted">
-                    {preset.badge}
-                  </span>
-                </div>
-              </button>
-            ))}
+      {/* ============ MODELO DE VIDEO ============ */}
+      <div className="mb-4">
+        <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">Modelo de IA</label>
+        <select
+          value={videoModelId}
+          onChange={(e) => setVideoModelId(e.target.value as VideoModelId)}
+          className="w-full px-3 py-2 bg-surface-elevated border border-border rounded-xl text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50"
+        >
+          {VIDEO_COMPANY_GROUPS.map(group => (
+            <optgroup key={group.id} label={group.name}>
+              {group.models.map(m => (
+                <option key={m.id} value={m.id}>
+                  {m.name} — {m.description} {m.tags?.includes('AUDIO') ? '🔊' : ''} {m.requiresImage ? '📷' : ''}
+                </option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
+        {/* Model capabilities badges */}
+        {selectedModel && (
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            {selectedModel.supportsAudio && (
+              <span className="text-[9px] px-2 py-0.5 bg-blue-500/15 text-blue-400 rounded-full">🔊 Audio</span>
+            )}
+            {selectedModel.supportsStartEndFrames && (
+              <span className="text-[9px] px-2 py-0.5 bg-purple-500/15 text-purple-400 rounded-full">🖼️ Start/End</span>
+            )}
+            {selectedModel.requiresImage && (
+              <span className="text-[9px] px-2 py-0.5 bg-amber-500/15 text-amber-400 rounded-full">📷 Requiere imagen</span>
+            )}
+            {selectedModel.supportsMultiShots && (
+              <span className="text-[9px] px-2 py-0.5 bg-green-500/15 text-green-400 rounded-full">🎬 Multi-shot</span>
+            )}
+            <span className="text-[9px] px-2 py-0.5 bg-text-muted/10 text-text-muted rounded-full">
+              {selectedModel.durationRange} | {selectedModel.priceRange}
+            </span>
           </div>
         )}
       </div>
-
-      {/* ============ CONTROLES MANUALES (solo si modo custom) ============ */}
-      {isCustomMode && (
-        <>
-          {/* ============ MODELO DE VIDEO ============ */}
-          <div className="mb-4">
-            <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">Modelo de Video</label>
-            <select
-              value={videoModelId}
-              onChange={(e) => setVideoModelId(e.target.value as VideoModelId)}
-              className="w-full px-3 py-2 bg-surface-elevated border border-border rounded-xl text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50"
-            >
-              {VIDEO_COMPANY_GROUPS.map(group => (
-                <optgroup key={group.id} label={group.name}>
-                  {group.models.map(m => (
-                    <option key={m.id} value={m.id}>
-                      {m.name} — {m.description} {m.tags?.includes('AUDIO') ? '🔊' : ''} {m.requiresImage ? '📷' : ''}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-
-            {/* Model capabilities badges */}
-            {selectedModel && (
-              <div className="flex flex-wrap gap-1.5 mt-2">
-                {selectedModel.supportsAudio && (
-                  <span className="text-[9px] px-2 py-0.5 bg-blue-500/15 text-blue-400 rounded-full">🔊 Audio</span>
-                )}
-                {selectedModel.supportsStartEndFrames && (
-                  <span className="text-[9px] px-2 py-0.5 bg-purple-500/15 text-purple-400 rounded-full">🖼️ Start/End</span>
-                )}
-                {selectedModel.requiresImage && (
-                  <span className="text-[9px] px-2 py-0.5 bg-amber-500/15 text-amber-400 rounded-full">📷 Requiere imagen</span>
-                )}
-                {selectedModel.supportsMultiShots && (
-                  <span className="text-[9px] px-2 py-0.5 bg-green-500/15 text-green-400 rounded-full">🎬 Multi-shot</span>
-                )}
-                <span className="text-[9px] px-2 py-0.5 bg-text-muted/10 text-text-muted rounded-full">
-                  {selectedModel.durationRange} | {selectedModel.priceRange}
-                </span>
-              </div>
-            )}
-          </div>
 
           {/* ============ ALERTA SORA ============ */}
           {isSora && (
@@ -668,7 +599,7 @@ export function Step7Video({
                   <p className="text-xs font-semibold text-blue-400 mb-1">Modo Sora — Texto + Producto</p>
                   <p className="text-[11px] text-blue-300/80">
                     Sora no permite crear videos a partir de imagenes de personas. En su lugar, usamos la descripcion
-                    detallada de tu influencer ({influencerName}) como prompt para que Sora genere al personaje.
+                    detallada de tu influencer ({selectedInfluencerName}) como prompt para que Sora genere al personaje.
                     Opcionalmente puedes subir la imagen de un <strong>producto</strong> para que aparezca en el video.
                   </p>
                 </div>
@@ -697,7 +628,7 @@ export function Step7Video({
                   </button>
                 )}
                 <button
-                  onClick={() => { setVideoMode('image'); setEndImageUrl(null); if (!startImageUrl) setStartImageUrl(realisticImageUrl) }}
+                  onClick={() => { setVideoMode('image'); setEndImageUrl(null); if (!startImageUrl) setStartImageUrl(selectedInfluencerImage) }}
                   className={cn(
                     'flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all border',
                     videoMode === 'image'
@@ -709,7 +640,7 @@ export function Step7Video({
                 </button>
                 {selectedModel?.supportsStartEndFrames && (
                   <button
-                    onClick={() => { setVideoMode('start_end'); if (!startImageUrl) setStartImageUrl(realisticImageUrl) }}
+                    onClick={() => { setVideoMode('start_end'); if (!startImageUrl) setStartImageUrl(selectedInfluencerImage) }}
                     className={cn(
                       'flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all border',
                       videoMode === 'start_end'
@@ -822,7 +753,7 @@ export function Step7Video({
                 )}
               </div>
               <p className="text-[10px] text-text-muted mt-1">
-                Sora creara al personaje ({influencerName}) desde su descripcion y mostrara este producto en el video
+                Sora creara al personaje ({selectedInfluencerName}) desde su descripcion y mostrara este producto en el video
               </p>
             </div>
           )}
@@ -868,85 +799,6 @@ export function Step7Video({
               </div>
             </div>
           </div>
-        </>
-      )}
-
-      {/* ============ CONTROLES DE PRESET (solo si no es custom y hay preset seleccionado) ============ */}
-      {!isCustomMode && selectedPreset && (
-        <>
-          {/* Preset 'producto' → mostrar upload producto (como Sora) */}
-          {selectedPreset === 'producto' && (
-            <div className="mb-4">
-              <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">
-                Imagen del producto (opcional)
-              </label>
-              <input
-                ref={productInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleProductImageUpload}
-                className="hidden"
-              />
-              <div
-                onClick={() => productInputRef.current?.click()}
-                className="flex items-center gap-3 p-3 bg-surface-elevated rounded-xl border border-dashed border-border cursor-pointer hover:border-accent/30 transition-colors"
-              >
-                {productImageUrl ? (
-                  <>
-                    <img src={productImageUrl} alt="Producto" className="w-14 h-14 rounded-lg object-cover flex-shrink-0" />
-                    <div className="flex-1">
-                      <p className="text-sm text-text-primary font-medium">Producto seleccionado</p>
-                      <p className="text-[10px] text-accent">Click para cambiar</p>
-                    </div>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setProductImageUrl(null); setProductImageFile(null) }}
-                      className="p-1.5 hover:bg-border/50 rounded-lg"
-                    >
-                      <X className="w-4 h-4 text-text-muted" />
-                    </button>
-                  </>
-                ) : (
-                  <div className="flex items-center gap-2 py-3 w-full justify-center">
-                    <Package className="w-5 h-5 text-text-muted" />
-                    <p className="text-sm text-text-secondary">Subir imagen del producto</p>
-                  </div>
-                )}
-              </div>
-              <p className="text-[10px] text-text-muted mt-1">
-                Sora creará al personaje ({influencerName}) desde su descripción y mostrará este producto en el video
-              </p>
-            </div>
-          )}
-
-          {/* Preset 'rapido' o 'premium' → mostrar imagen de referencia */}
-          {(selectedPreset === 'rapido' || selectedPreset === 'premium') && (
-            <div className="mb-4">
-              <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">
-                Imagen de referencia
-              </label>
-              <div
-                onClick={() => setShowImagePicker('start')}
-                className="flex items-center gap-3 p-3 bg-surface-elevated rounded-xl border border-border cursor-pointer hover:border-accent/30 transition-colors"
-              >
-                {startImageUrl ? (
-                  <>
-                    <img src={startImageUrl} alt="Start" className="w-14 h-14 rounded-lg object-cover flex-shrink-0" />
-                    <div className="flex-1">
-                      <p className="text-sm text-text-primary font-medium">Imagen seleccionada</p>
-                      <p className="text-[10px] text-accent">Click para cambiar</p>
-                    </div>
-                  </>
-                ) : (
-                  <div className="flex items-center gap-2 py-3">
-                    <ImageIcon className="w-5 h-5 text-text-muted" />
-                    <p className="text-sm text-text-secondary">Seleccionar de la galería</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        </>
-      )}
 
       {/* ============ IDEA + OPTIMIZADOR ============ */}
       <div className="mb-4">
@@ -955,8 +807,8 @@ export function Step7Video({
           value={userIdea}
           onChange={(e) => setUserIdea(e.target.value)}
           placeholder={isSora
-            ? `Ej: ${influencerName} sosteniendo el producto en la mano, caminando por la playa al atardecer, mirando a camara y sonriendo...`
-            : `Ej: ${influencerName} caminando por la playa al atardecer, mirando a camara y sonriendo...`
+            ? `Ej: ${selectedInfluencerName} sosteniendo el producto en la mano, caminando por la playa al atardecer, mirando a camara y sonriendo...`
+            : `Ej: ${selectedInfluencerName} caminando por la playa al atardecer, mirando a camara y sonriendo...`
           }
           rows={3}
           className="w-full px-3 py-2 bg-surface-elevated border border-border rounded-xl text-sm text-text-primary placeholder:text-text-muted resize-none focus:outline-none focus:ring-2 focus:ring-accent/50"
@@ -1001,7 +853,7 @@ export function Step7Video({
           />
           {isSora && (
             <p className="text-[10px] text-accent/60 mt-1">
-              Este prompt incluye la descripcion detallada de {influencerName} para que Sora recree al personaje
+              Este prompt incluye la descripcion detallada de {selectedInfluencerName} para que Sora recree al personaje
             </p>
           )}
         </div>
@@ -1078,18 +930,18 @@ export function Step7Video({
               <div className="grid grid-cols-4 gap-2 mb-4">
                 <div
                   onClick={() => {
-                    if (showImagePicker === 'start') setStartImageUrl(realisticImageUrl)
-                    else setEndImageUrl(realisticImageUrl)
+                    if (showImagePicker === 'start') setStartImageUrl(selectedInfluencerImage)
+                    else setEndImageUrl(selectedInfluencerImage)
                     setShowImagePicker(null)
                   }}
                   className={cn(
                     'relative rounded-lg overflow-hidden cursor-pointer border-2 transition-all aspect-[9/16]',
-                    (showImagePicker === 'start' ? startImageUrl : endImageUrl) === realisticImageUrl
+                    (showImagePicker === 'start' ? startImageUrl : endImageUrl) === selectedInfluencerImage
                       ? 'border-accent shadow-lg shadow-accent/25'
                       : 'border-transparent hover:border-accent/30'
                   )}
                 >
-                  <img src={realisticImageUrl} alt="Realista" className="w-full h-full object-cover" />
+                  <img src={selectedInfluencerImage} alt="Realista" className="w-full h-full object-cover" />
                   <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-1 py-0.5">
                     <p className="text-[8px] text-white text-center">Foto realista</p>
                   </div>
