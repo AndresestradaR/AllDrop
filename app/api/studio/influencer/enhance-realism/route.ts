@@ -27,7 +27,7 @@ Minimal makeup only, light base that does not hide pores, visible skin grain thr
 
 Ultra-detailed skin textures, visible pores, fine skin grain, micro-hair, natural blemishes, realistic specular highlights, organic surface variation.
 
-Hyperrealistic detail, ultra sharp optics, natural grain, photometric accuracy, subsurface scattering, tactile skin texture, editorial realism, smartphone photography authenticity, imperfect beauty, human realism.`
+Hyperrealistic detail, ultra sharp optics, natural grain, photometric accuracy, subsurface scattering, tactile skin texture, editorial realism, smartphone photography authenticity, imperfect beauty, human realism, soft diffusion, tonal richness, realistic highlights, depth realism, color discipline, natural variance, unretouched look.`
 
 export async function POST(request: Request) {
   const startTime = Date.now()

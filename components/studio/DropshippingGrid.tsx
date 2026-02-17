@@ -1185,16 +1185,21 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
   const [isTranslating, setIsTranslating] = useState(false)
   const [translatedScript, setTranslatedScript] = useState('')
 
-  // Step 4: Generate (influencer selection + generation)
+  // Step 4: Prompt generation (Kling 3.0 multi-shot)
   const [influencers, setInfluencers] = useState<CloneInfluencer[]>([])
   const [selectedInfluencer, setSelectedInfluencer] = useState<string>('')
-  const [isGenerating, setIsGenerating] = useState(false)
-  const [generationStatus, setGenerationStatus] = useState('')
+  const [targetDuration, setTargetDuration] = useState<14 | 28 | 42>(14)
+  const [isGeneratingPrompts, setIsGeneratingPrompts] = useState(false)
+  const [generatedSections, setGeneratedSections] = useState<Array<{
+    title: string
+    startImagePrompt: string
+    scenes: Array<{ prompt: string; duration: number }>
+  }>>([])
 
-  // Step 5: Result
-  const [resultVideoUrl, setResultVideoUrl] = useState<string | null>(null)
-  const [resultAudioUrl, setResultAudioUrl] = useState<string | null>(null)
-  const [resultLipSyncUrl, setResultLipSyncUrl] = useState<string | null>(null)
+  // Step 5: Video generation per section
+  const [generatingVideoIdx, setGeneratingVideoIdx] = useState<number | null>(null)
+  const [sectionVideos, setSectionVideos] = useState<(string | null)[]>([])
+  const [generationStatus, setGenerationStatus] = useState('')
 
   const tool = DROPSHIPPING_TOOLS.find(t => t.id === 'clonar-viral')!
   const pollingRef = useRef<NodeJS.Timeout | null>(null)
@@ -1364,102 +1369,93 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
     })
   }
 
-  const handleGenerate = async () => {
-    if (!selectedInfluencer || !viralVideoUrl || !translatedScript) return
-
+  const handleGeneratePrompts = async () => {
     const influencer = influencers.find(i => i.id === selectedInfluencer)
-    if (!influencer) return
+    if (!influencer || !translatedScript) return
 
-    setIsGenerating(true)
+    setIsGeneratingPrompts(true)
     setError(null)
-    setResultAudioUrl(null)
-    setResultVideoUrl(null)
-    setResultLipSyncUrl(null)
-    setGenerationStatus('Generando voz con ElevenLabs...')
+    setGeneratedSections([])
+    setSectionVideos([])
+
+    const sectionCount = targetDuration === 14 ? 1 : targetDuration === 28 ? 2 : 3
 
     try {
-      const influencerImageUrl = influencer.realistic_image_url || influencer.image_url
-
-      // === Step 1: Generate voice (ElevenLabs TTS) ===
-      const isMale = influencer.character_profile?.gender === 'male' ||
-        influencer.prompt_descriptor?.toLowerCase()?.includes('hombre') ||
-        influencer.prompt_descriptor?.toLowerCase()?.includes('male') ||
-        influencer.prompt_descriptor?.toLowerCase()?.includes('man ')
-
-      const voiceRes = await fetch('/api/studio/clone-viral/generate-voice', {
+      const res = await fetch('/api/studio/clone-viral/generate-prompts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          text: translatedScript,
-          gender: isMale ? 'male' : 'female',
-          language_code: 'es',
+          transcript: translatedScript,
+          productName,
+          sectionCount,
+          promptDescriptor: influencer.prompt_descriptor || influencer.character_profile?.prompt_descriptor,
+          influencerName: influencer.name,
         }),
       })
 
-      const voiceData = await voiceRes.json()
-      if (!voiceRes.ok) throw new Error(voiceData.error || 'Error generando voz')
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Error al generar prompts')
 
-      let audioUrl: string | null = null
-      if (voiceData.taskId) {
-        audioUrl = await pollKieTask(voiceData.taskId, 'Generando voz con ElevenLabs')
-        if (audioUrl) setResultAudioUrl(audioUrl)
+      if (data.sections && data.sections.length > 0) {
+        setGeneratedSections(data.sections)
+        setSectionVideos(new Array(data.sections.length).fill(null))
+        toast.success(`${data.sections.length} seccion(es) generada(s)`)
+      } else {
+        throw new Error('No se generaron secciones')
       }
-
-      // === Step 2: Generate motion-controlled video (Kling motion control) ===
-      if (influencerImageUrl) {
-        setGenerationStatus('Enviando a Kling motion control...')
-
-        const motionRes = await fetch('/api/studio/clone-viral/motion-control', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            pose_image_url: influencerImageUrl,
-            motion_video_url: viralVideoUrl,
-            prompt: influencer.prompt_descriptor || influencer.character_profile?.prompt_descriptor || undefined,
-          }),
-        })
-
-        const motionData = await motionRes.json()
-        if (!motionRes.ok) throw new Error(motionData.error || 'Error en motion control')
-
-        if (motionData.taskId) {
-          const videoUrl = await pollKieTask(motionData.taskId, 'Procesando motion control')
-          if (videoUrl) setResultVideoUrl(videoUrl)
-        }
-      }
-
-      // === Step 3: Generate lip-synced video (Kling Avatar) ===
-      if (audioUrl && influencerImageUrl) {
-        setGenerationStatus('Enviando a Kling lip sync...')
-
-        const lipSyncRes = await fetch('/api/studio/clone-viral/lip-sync', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            image_url: influencerImageUrl,
-            audio_url: audioUrl,
-            prompt: influencer.prompt_descriptor
-              ? `${influencer.prompt_descriptor}, speaking naturally to camera`
-              : 'Person speaking naturally with expressive facial expressions, professional lighting',
-          }),
-        })
-
-        const lipSyncData = await lipSyncRes.json()
-        if (lipSyncRes.ok && lipSyncData.taskId) {
-          const lipSyncUrl = await pollKieTask(lipSyncData.taskId, 'Procesando lip sync')
-          if (lipSyncUrl) setResultLipSyncUrl(lipSyncUrl)
-        } else {
-          console.warn('[CloneViral] Lip sync failed:', lipSyncData.error)
-        }
-      }
-
-      setStep('result')
-      toast.success('Video clonado generado')
-
     } catch (err: any) {
       setError(err.message)
     } finally {
-      setIsGenerating(false)
+      setIsGeneratingPrompts(false)
+    }
+  }
+
+  const handleGenerateVideo = async (sectionIdx: number) => {
+    const section = generatedSections[sectionIdx]
+    const influencer = influencers.find(i => i.id === selectedInfluencer)
+    if (!section || !influencer) return
+
+    setGeneratingVideoIdx(sectionIdx)
+    setGenerationStatus('')
+    setError(null)
+
+    try {
+      const imageUrl = influencer.realistic_image_url || influencer.image_url
+      const totalDuration = section.scenes.reduce((s, sc) => s + sc.duration, 0)
+
+      const res = await fetch('/api/studio/generate-video', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          modelId: 'kling-3.0',
+          prompt: section.scenes[0].prompt,
+          duration: totalDuration,
+          aspectRatio: '9:16',
+          enableAudio: true,
+          imageUrl,
+          multiShots: true,
+          multiPrompt: section.scenes,
+        }),
+      })
+
+      const data = await res.json()
+      if (!res.ok || !data.success) throw new Error(data.error || 'Error al iniciar generacion')
+
+      if (data.taskId) {
+        const videoUrl = await pollKieTask(data.taskId, `Seccion ${sectionIdx + 1} — Kling 3.0`)
+        if (videoUrl) {
+          setSectionVideos(prev => {
+            const next = [...prev]
+            next[sectionIdx] = videoUrl
+            return next
+          })
+          toast.success(`Video seccion ${sectionIdx + 1} listo`)
+        }
+      }
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setGeneratingVideoIdx(null)
       setGenerationStatus('')
     }
   }
@@ -1659,10 +1655,10 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
             </div>
           )}
 
-          {/* STEP 4: Generate */}
+          {/* STEP 4: Generate prompts + videos */}
           {step === 'generate' && (
-            <div className="max-w-lg mx-auto space-y-4">
-              <p className="text-sm text-text-secondary">Selecciona tu influencer virtual y genera el video clonado.</p>
+            <div className="max-w-2xl mx-auto space-y-4">
+              <p className="text-sm text-text-secondary">Selecciona influencer, duracion y genera prompts multi-shot para Kling 3.0.</p>
 
               {influencers.length === 0 ? (
                 <div className="text-center py-8">
@@ -1674,6 +1670,7 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
                 </div>
               ) : (
                 <>
+                  {/* Influencer grid */}
                   <div>
                     <label className="block text-sm font-medium text-text-secondary mb-2">Selecciona influencer</label>
                     <div className="grid grid-cols-3 gap-3">
@@ -1703,22 +1700,159 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
                     </div>
                   </div>
 
+                  {/* Duration selector */}
+                  <div>
+                    <label className="block text-sm font-medium text-text-secondary mb-2">Duracion del clon</label>
+                    <div className="flex gap-3">
+                      {([14, 28, 42] as const).map((d) => (
+                        <button
+                          key={d}
+                          onClick={() => setTargetDuration(d)}
+                          className={cn(
+                            'flex-1 px-4 py-2.5 rounded-xl border text-sm font-medium transition-all',
+                            targetDuration === d
+                              ? 'border-accent bg-accent/10 text-accent'
+                              : 'border-border bg-surface-elevated text-text-secondary hover:border-accent/50'
+                          )}
+                        >
+                          ~{d}s ({d === 14 ? '1 seccion' : d === 28 ? '2 secciones' : '3 secciones'})
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Generate prompts button */}
                   <button
-                    onClick={handleGenerate}
-                    disabled={!selectedInfluencer || isGenerating}
+                    onClick={handleGeneratePrompts}
+                    disabled={!selectedInfluencer || isGeneratingPrompts}
                     className={cn(
                       'w-full flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold transition-all',
-                      !selectedInfluencer || isGenerating
+                      !selectedInfluencer || isGeneratingPrompts
                         ? 'bg-border text-text-secondary cursor-not-allowed'
                         : 'bg-accent hover:bg-accent-hover text-background shadow-lg shadow-accent/25'
                     )}
                   >
-                    {isGenerating ? (
-                      <><Loader2 className="w-5 h-5 animate-spin" /> {generationStatus || 'Generando...'}</>
+                    {isGeneratingPrompts ? (
+                      <><Loader2 className="w-5 h-5 animate-spin" /> Generando prompts con IA...</>
                     ) : (
-                      <><Sparkles className="w-5 h-5" /> Generar video clonado</>
+                      <><Sparkles className="w-5 h-5" /> Generar prompts con IA</>
                     )}
                   </button>
+
+                  {/* Generated sections */}
+                  {generatedSections.length > 0 && (
+                    <div className="space-y-6 pt-4 border-t border-border">
+                      {generatedSections.map((section, sIdx) => {
+                        const totalSec = section.scenes.reduce((s, sc) => s + sc.duration, 0)
+                        return (
+                          <div key={sIdx} className="border border-border rounded-xl overflow-hidden">
+                            {/* Section header */}
+                            <div className="px-4 py-3 bg-surface-elevated border-b border-border">
+                              <h4 className="text-sm font-semibold text-text-primary">
+                                Seccion {sIdx + 1}: {section.title}
+                              </h4>
+                              <p className="text-xs text-text-muted mt-0.5">Total: {totalSec}s</p>
+                            </div>
+
+                            <div className="p-4 space-y-3">
+                              {/* Start image prompt */}
+                              <div>
+                                <label className="block text-xs font-medium text-text-muted uppercase mb-1">Prompt imagen inicial</label>
+                                <textarea
+                                  value={section.startImagePrompt}
+                                  onChange={(e) => {
+                                    setGeneratedSections(prev => {
+                                      const next = [...prev]
+                                      next[sIdx] = { ...next[sIdx], startImagePrompt: e.target.value }
+                                      return next
+                                    })
+                                  }}
+                                  rows={2}
+                                  className="w-full px-3 py-2 bg-surface-elevated border border-border rounded-lg text-text-primary resize-none focus:outline-none focus:ring-2 focus:ring-accent/50 text-xs"
+                                />
+                              </div>
+
+                              {/* Scenes */}
+                              <div>
+                                <label className="block text-xs font-medium text-text-muted uppercase mb-1">Escenas multi-shot</label>
+                                <div className="space-y-2">
+                                  {section.scenes.map((scene, scIdx) => (
+                                    <div key={scIdx} className="flex gap-2">
+                                      <textarea
+                                        value={scene.prompt}
+                                        onChange={(e) => {
+                                          setGeneratedSections(prev => {
+                                            const next = [...prev]
+                                            const scenes = [...next[sIdx].scenes]
+                                            scenes[scIdx] = { ...scenes[scIdx], prompt: e.target.value }
+                                            next[sIdx] = { ...next[sIdx], scenes }
+                                            return next
+                                          })
+                                        }}
+                                        rows={2}
+                                        className="flex-1 px-3 py-2 bg-surface-elevated border border-border rounded-lg text-text-primary resize-none focus:outline-none focus:ring-2 focus:ring-accent/50 text-xs"
+                                      />
+                                      <div className="flex flex-col items-center justify-center min-w-[50px]">
+                                        <input
+                                          type="number"
+                                          min={2}
+                                          max={5}
+                                          value={scene.duration}
+                                          onChange={(e) => {
+                                            setGeneratedSections(prev => {
+                                              const next = [...prev]
+                                              const scenes = [...next[sIdx].scenes]
+                                              scenes[scIdx] = { ...scenes[scIdx], duration: Math.max(2, Math.min(5, Number(e.target.value) || 2)) }
+                                              next[sIdx] = { ...next[sIdx], scenes }
+                                              return next
+                                            })
+                                          }}
+                                          className="w-12 px-1 py-1 bg-surface-elevated border border-border rounded-lg text-text-primary text-center text-xs focus:outline-none focus:ring-2 focus:ring-accent/50"
+                                        />
+                                        <span className="text-[10px] text-text-muted">seg</span>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+
+                              {/* Generate video button / player */}
+                              {sectionVideos[sIdx] ? (
+                                <div className="space-y-2">
+                                  <video src={sectionVideos[sIdx]!} controls className="w-full rounded-lg aspect-[9/16] object-contain bg-black" />
+                                  <a
+                                    href={sectionVideos[sIdx]!}
+                                    download={`clone-viral-s${sIdx + 1}-${Date.now()}.mp4`}
+                                    className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-accent/10 border border-accent/30 text-accent hover:bg-accent/20 font-medium text-xs transition-colors"
+                                  >
+                                    <Download className="w-3.5 h-3.5" />
+                                    Descargar video
+                                  </a>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => handleGenerateVideo(sIdx)}
+                                  disabled={generatingVideoIdx !== null}
+                                  className={cn(
+                                    'w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-semibold text-sm transition-all',
+                                    generatingVideoIdx !== null
+                                      ? 'bg-border text-text-secondary cursor-not-allowed'
+                                      : 'bg-accent hover:bg-accent-hover text-background shadow-lg shadow-accent/25'
+                                  )}
+                                >
+                                  {generatingVideoIdx === sIdx ? (
+                                    <><Loader2 className="w-4 h-4 animate-spin" /> {generationStatus || 'Generando video...'}</>
+                                  ) : (
+                                    <>Generar video Kling 3.0</>
+                                  )}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
                 </>
               )}
             </div>
@@ -1727,52 +1861,37 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
           {/* STEP 5: Result */}
           {step === 'result' && (
             <div className="max-w-3xl mx-auto space-y-4">
-              <p className="text-sm text-text-secondary">Tu video clonado esta listo. Tienes dos versiones:</p>
+              <p className="text-sm text-text-secondary">Videos generados con Kling 3.0 multi-shot.</p>
 
-              <div className="grid grid-cols-2 gap-4">
-                {/* Lip Sync Video (primary) */}
-                <div>
-                  <label className="block text-sm font-medium text-text-secondary mb-2">
-                    Video con Lip Sync
-                    <span className="ml-1.5 text-[10px] bg-accent/20 text-accent px-1.5 py-0.5 rounded">RECOMENDADO</span>
-                  </label>
-                  <div className="bg-surface-elevated rounded-xl overflow-hidden aspect-[9/16] flex items-center justify-center">
-                    {resultLipSyncUrl ? (
-                      <video src={resultLipSyncUrl} controls className="w-full h-full object-contain" />
-                    ) : (
-                      <div className="text-center p-4">
-                        <Video className="w-8 h-8 text-text-muted mx-auto mb-2" />
-                        <p className="text-xs text-text-muted">Lip sync no disponible</p>
-                      </div>
+              <div className={cn('grid gap-4', generatedSections.length === 1 ? 'grid-cols-1 max-w-md mx-auto' : generatedSections.length === 2 ? 'grid-cols-2' : 'grid-cols-3')}>
+                {generatedSections.map((section, sIdx) => (
+                  <div key={sIdx} className="space-y-2">
+                    <label className="block text-sm font-medium text-text-secondary">
+                      Seccion {sIdx + 1}: {section.title}
+                    </label>
+                    <div className="bg-surface-elevated rounded-xl overflow-hidden aspect-[9/16] flex items-center justify-center">
+                      {sectionVideos[sIdx] ? (
+                        <video src={sectionVideos[sIdx]!} controls className="w-full h-full object-contain" />
+                      ) : (
+                        <div className="text-center p-4">
+                          <Video className="w-8 h-8 text-text-muted mx-auto mb-2" />
+                          <p className="text-xs text-text-muted">Pendiente</p>
+                        </div>
+                      )}
+                    </div>
+                    {sectionVideos[sIdx] && (
+                      <a
+                        href={sectionVideos[sIdx]!}
+                        download={`clone-viral-s${sIdx + 1}-${Date.now()}.mp4`}
+                        className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-accent/10 border border-accent/30 text-accent hover:bg-accent/20 font-medium text-sm transition-colors"
+                      >
+                        <Download className="w-4 h-4" />
+                        Descargar
+                      </a>
                     )}
                   </div>
-                  <p className="text-[10px] text-text-muted mt-1">Audio y labios sincronizados perfectamente</p>
-                </div>
-
-                {/* Motion Control Video */}
-                <div>
-                  <label className="block text-sm font-medium text-text-secondary mb-2">Video Motion Control</label>
-                  <div className="bg-surface-elevated rounded-xl overflow-hidden aspect-[9/16] flex items-center justify-center">
-                    {resultVideoUrl ? (
-                      <video src={resultVideoUrl} controls className="w-full h-full object-contain" />
-                    ) : (
-                      <div className="text-center p-4">
-                        <Video className="w-8 h-8 text-text-muted mx-auto mb-2" />
-                        <p className="text-xs text-text-muted">Video no disponible</p>
-                      </div>
-                    )}
-                  </div>
-                  <p className="text-[10px] text-text-muted mt-1">Mismos movimientos del video original (sin audio)</p>
-                </div>
+                ))}
               </div>
-
-              {/* Audio player */}
-              {resultAudioUrl && (
-                <div className="bg-surface-elevated rounded-xl p-4">
-                  <label className="block text-xs font-medium text-text-muted uppercase mb-2">Audio generado (ElevenLabs)</label>
-                  <audio src={resultAudioUrl} controls className="w-full" />
-                </div>
-              )}
 
               {/* Script */}
               <div className="p-4 bg-surface-elevated rounded-xl">
@@ -1780,41 +1899,13 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
                 <p className="text-sm text-text-secondary">{translatedScript}</p>
               </div>
 
-              {/* Download buttons */}
-              {(resultLipSyncUrl || resultVideoUrl || resultAudioUrl) && (
-                <div className="flex flex-wrap gap-3">
-                  {resultLipSyncUrl && (
-                    <a
-                      href={resultLipSyncUrl}
-                      download={`clone-viral-lipsync-${Date.now()}.mp4`}
-                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-accent/10 border border-accent/30 text-accent hover:bg-accent/20 font-medium text-sm transition-colors"
-                    >
-                      <Download className="w-4 h-4" />
-                      Descargar lip sync
-                    </a>
-                  )}
-                  {resultVideoUrl && (
-                    <a
-                      href={resultVideoUrl}
-                      download={`clone-viral-motion-${Date.now()}.mp4`}
-                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-border text-text-secondary hover:bg-border/30 font-medium text-sm transition-colors"
-                    >
-                      <Download className="w-4 h-4" />
-                      Descargar motion
-                    </a>
-                  )}
-                  {resultAudioUrl && (
-                    <a
-                      href={resultAudioUrl}
-                      download={`clone-viral-audio-${Date.now()}.mp3`}
-                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-border text-text-secondary hover:bg-border/30 font-medium text-sm transition-colors"
-                    >
-                      <Download className="w-4 h-4" />
-                      Descargar audio
-                    </a>
-                  )}
-                </div>
-              )}
+              {/* Back to edit prompts */}
+              <button
+                onClick={() => setStep('generate')}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-border text-text-secondary hover:bg-border/30 font-medium text-sm transition-colors"
+              >
+                Volver a editar prompts
+              </button>
             </div>
           )}
         </div>

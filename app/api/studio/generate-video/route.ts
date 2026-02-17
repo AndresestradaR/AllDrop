@@ -79,6 +79,7 @@ export async function POST(request: Request) {
       multiShots,
       multiPrompt,
       klingElements,
+      imageUrl,
     } = body as {
       modelId: VideoModelId
       prompt: string
@@ -98,6 +99,7 @@ export async function POST(request: Request) {
         description: string
         images: string[] // base64 images
       }>
+      imageUrl?: string
     }
 
     const isVeoModel = modelId.startsWith('veo')
@@ -117,7 +119,7 @@ export async function POST(request: Request) {
       )
     }
 
-    if (modelConfig.requiresImage && !imageBase64 && !multiShots) {
+    if (modelConfig.requiresImage && !imageBase64 && !imageUrl && !multiShots) {
       return NextResponse.json({
         success: false,
         error: `${modelConfig.name} solo soporta image-to-video. Por favor sube una imagen o usa otro modelo.`,
@@ -167,6 +169,11 @@ export async function POST(request: Request) {
         const urlEnd = await uploadImageToStorage(supabase, imageBase64End, userId, 1)
         imageUrls.push(urlEnd)
       }
+    }
+    // Handle direct public URL (skip base64 upload round-trip)
+    else if (imageUrl && modelConfig.supportsStartEndFrames) {
+      console.log('[Video] Using provided imageUrl directly')
+      imageUrls.push(imageUrl)
     }
 
     console.log(`[Video] Image URLs: ${imageUrls.length}`)
