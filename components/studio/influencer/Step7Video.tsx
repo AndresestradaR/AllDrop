@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { cn } from '@/lib/utils/cn'
 import { VIDEO_MODELS, VIDEO_COMPANY_GROUPS, type VideoModelId } from '@/lib/video-providers/types'
-import { Video, Loader2, Copy, Check, Wand2, Image as ImageIcon, Heart, X, Package, Info } from 'lucide-react'
+import { Video, Loader2, Copy, Check, Wand2, Image as ImageIcon, Heart, X, Package, Info, Plus, Trash2, ChevronDown, ChevronUp, Volume2, VolumeX, Film } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 interface Step7VideoProps {
@@ -12,6 +12,17 @@ interface Step7VideoProps {
   promptDescriptor: string
   realisticImageUrl: string
   onBack: () => void
+}
+
+interface MultiPromptScene {
+  prompt: string
+  duration: number
+}
+
+interface ConstructorResult {
+  startFramePrompt: string
+  endFramePrompt: string
+  scenes: MultiPromptScene[]
 }
 
 export function Step7Video({
@@ -88,6 +99,7 @@ export function Step7Video({
   const [videoModelId, setVideoModelId] = useState<VideoModelId>('kling-3.0')
   const selectedModel = VIDEO_MODELS[videoModelId]
   const isSora = videoModelId === 'sora-2'
+  const isKling30 = videoModelId === 'kling-3.0'
 
   // Mode: text (solo prompt), image (1 imagen inicio), start_end (inicio + final)
   const [videoMode, setVideoMode] = useState<'text' | 'image' | 'start_end'>('image')
@@ -118,6 +130,24 @@ export function Step7Video({
   const [duration, setDuration] = useState(5)
   const [aspectRatio, setAspectRatio] = useState<'16:9' | '9:16' | '1:1'>('9:16')
 
+  // === Kling 3.0 specific state ===
+  const [isMultiShot, setIsMultiShot] = useState(false)
+  const [enableAudio, setEnableAudio] = useState(true)
+  const [multiPrompts, setMultiPrompts] = useState<MultiPromptScene[]>([
+    { prompt: '', duration: 4 },
+    { prompt: '', duration: 4 },
+    { prompt: '', duration: 3 },
+  ])
+  const [showConstructor, setShowConstructor] = useState(false)
+  const [constructorProduct, setConstructorProduct] = useState('')
+  const [constructorAngles, setConstructorAngles] = useState('')
+  const [constructorScenario, setConstructorScenario] = useState('')
+  const [constructorResults, setConstructorResults] = useState<ConstructorResult | null>(null)
+  const [isConstructing, setIsConstructing] = useState(false)
+
+  // Computed: total duration of multi-shot scenes
+  const multiShotTotalDuration = multiPrompts.reduce((sum, s) => sum + s.duration, 0)
+
   // Cargar galería
   useEffect(() => {
     if (!selectedInfluencerId) return
@@ -147,6 +177,36 @@ export function Step7Video({
       setVideoMode('text')
     }
   }, [videoModelId])
+
+  // Reset Kling 3.0 state when switching away
+  useEffect(() => {
+    if (!isKling30) {
+      setIsMultiShot(false)
+      setEnableAudio(true)
+      setMultiPrompts([
+        { prompt: '', duration: 4 },
+        { prompt: '', duration: 4 },
+        { prompt: '', duration: 3 },
+      ])
+      setConstructorResults(null)
+      setShowConstructor(false)
+      // Reset duration to standard 5s/10s
+      if (duration !== 5 && duration !== 10) {
+        setDuration(5)
+      }
+    }
+  }, [isKling30])
+
+  // When multi-shot is toggled on, force audio and restrict video mode
+  useEffect(() => {
+    if (isMultiShot) {
+      setEnableAudio(true)
+      // Multi-shot: only "Imagen Inicial" mode (no end frame)
+      if (videoMode === 'start_end') {
+        setVideoMode('image')
+      }
+    }
+  }, [isMultiShot])
 
   // Polling for video status
   useEffect(() => {
@@ -302,6 +362,77 @@ export function Step7Video({
     }
   }
 
+  // === Constructor Inteligente handler ===
+  const handleConstructor = async () => {
+    if (!constructorProduct.trim()) {
+      toast.error('Describe el producto')
+      return
+    }
+
+    setIsConstructing(true)
+    setError(null)
+
+    try {
+      const res = await fetch('/api/studio/influencer/video-constructor', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          influencerId: selectedInfluencerId,
+          productDescription: constructorProduct.trim(),
+          salesAngles: constructorAngles.trim(),
+          scenario: constructorScenario.trim(),
+          promptDescriptor: resolvedDescriptor,
+          influencerName: selectedInfluencerName,
+        }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Error al generar prompts')
+      }
+
+      setConstructorResults(data.result)
+      toast.success(`${data.result.scenes.length} escenas generadas`)
+    } catch (err: any) {
+      console.error('[Step7Video] Constructor error:', err)
+      setError(err.message)
+      toast.error('Error al generar prompts')
+    } finally {
+      setIsConstructing(false)
+    }
+  }
+
+  const handleApplyConstructorResults = () => {
+    if (!constructorResults) return
+    setMultiPrompts(constructorResults.scenes.map(s => ({ prompt: s.prompt, duration: s.duration })))
+    setIsMultiShot(true)
+    setShowConstructor(false)
+    toast.success('Escenas aplicadas al editor')
+  }
+
+  // === Multi-shot scene handlers ===
+  const updateScene = (index: number, field: 'prompt' | 'duration', value: string | number) => {
+    setMultiPrompts(prev => prev.map((s, i) => i === index ? { ...s, [field]: value } : s))
+  }
+
+  const addScene = () => {
+    const remaining = 15 - multiShotTotalDuration
+    if (remaining < 1) {
+      toast.error('No queda duración disponible (máx 15s)')
+      return
+    }
+    setMultiPrompts(prev => [...prev, { prompt: '', duration: Math.min(3, remaining) }])
+  }
+
+  const removeScene = (index: number) => {
+    if (multiPrompts.length <= 2) {
+      toast.error('Mínimo 2 escenas')
+      return
+    }
+    setMultiPrompts(prev => prev.filter((_, i) => i !== index))
+  }
+
   // (presets removed — direct model selection)
 
   const handleProductImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -353,6 +484,78 @@ export function Step7Video({
 
   const handleGenerate = async () => {
     console.log('[Step7Video] handleGenerate called, resolvedDescriptor:', resolvedDescriptor?.substring(0, 50))
+
+    // === Multi-shot mode (Kling 3.0) ===
+    if (isKling30 && isMultiShot) {
+      const validScenes = multiPrompts.filter(s => s.prompt.trim())
+      if (validScenes.length < 2) {
+        toast.error('Escribe al menos 2 escenas para multi-shot')
+        return
+      }
+      if (multiShotTotalDuration < 3 || multiShotTotalDuration > 15) {
+        toast.error(`La duración total debe ser entre 3 y 15 segundos (actual: ${multiShotTotalDuration}s)`)
+        return
+      }
+
+      // Use first scene prompt as the main prompt
+      const mainPrompt = validScenes[0].prompt
+
+      setIsGenerating(true)
+      setError(null)
+      setVideoUrl(null)
+      setTaskId(null)
+
+      try {
+        let imageBase64: string | undefined
+        if ((videoMode === 'image' || videoMode === 'start_end') && startImageUrl) {
+          imageBase64 = await getBase64FromUrl(startImageUrl)
+        }
+
+        console.log('[Step7Video] Generating multi-shot video:', {
+          modelId: videoModelId,
+          scenes: validScenes.length,
+          totalDuration: multiShotTotalDuration,
+          hasStartImage: !!imageBase64,
+        })
+
+        const res = await fetch('/api/studio/generate-video', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            modelId: videoModelId,
+            prompt: mainPrompt,
+            duration: multiShotTotalDuration,
+            aspectRatio,
+            enableAudio: true,
+            imageBase64,
+            multiShots: true,
+            multiPrompt: validScenes,
+          }),
+        })
+
+        const data = await res.json()
+        console.log('[Step7Video] Generate response:', { status: res.status, success: data.success, taskId: data.taskId, error: data.error })
+
+        if (!res.ok || (!data.success && !data.taskId)) {
+          throw new Error(data.error || 'Error al generar video')
+        }
+
+        if (data.videoUrl) {
+          setVideoUrl(data.videoUrl)
+          toast.success('Video generado!')
+        } else if (data.taskId) {
+          setTaskId(data.taskId)
+          toast.success('Video multi-shot en proceso...')
+        }
+      } catch (err: any) {
+        setError(err.message)
+      } finally {
+        setIsGenerating(false)
+      }
+      return
+    }
+
+    // === Standard single-shot mode ===
     // Si no hay prompt optimizado, construir uno automático desde userIdea
     let finalPrompt = prompt.trim()
     if (!finalPrompt && userIdea.trim()) {
@@ -478,7 +681,7 @@ export function Step7Video({
           prompt: finalPrompt,
           duration,
           aspectRatio,
-          enableAudio: model?.supportsAudio ? true : false,
+          enableAudio: isKling30 ? enableAudio : (model?.supportsAudio ? true : false),
           imageBase64,
           imageBase64End,
           veoGenerationType,
@@ -507,6 +710,11 @@ export function Step7Video({
       setIsGenerating(false)
     }
   }
+
+  // Determine if generate button should be enabled
+  const canGenerate = isKling30 && isMultiShot
+    ? multiPrompts.filter(s => s.prompt.trim()).length >= 2 && multiShotTotalDuration >= 3 && multiShotTotalDuration <= 15
+    : !!(prompt.trim() || userIdea.trim())
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -590,246 +798,565 @@ export function Step7Video({
         )}
       </div>
 
-          {/* ============ ALERTA SORA ============ */}
-          {isSora && (
-            <div className="mb-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl">
-              <div className="flex gap-2">
-                <Info className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-xs font-semibold text-blue-400 mb-1">Modo Sora — Texto + Producto</p>
-                  <p className="text-[11px] text-blue-300/80">
-                    Sora no permite crear videos a partir de imagenes de personas. En su lugar, usamos la descripcion
-                    detallada de tu influencer ({selectedInfluencerName}) como prompt para que Sora genere al personaje.
-                    Opcionalmente puedes subir la imagen de un <strong>producto</strong> para que aparezca en el video.
-                  </p>
+      {/* ============ ALERTA SORA ============ */}
+      {isSora && (
+        <div className="mb-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl">
+          <div className="flex gap-2">
+            <Info className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-xs font-semibold text-blue-400 mb-1">Modo Sora — Texto + Producto</p>
+              <p className="text-[11px] text-blue-300/80">
+                Sora no permite crear videos a partir de imagenes de personas. En su lugar, usamos la descripcion
+                detallada de tu influencer ({selectedInfluencerName}) como prompt para que Sora genere al personaje.
+                Opcionalmente puedes subir la imagen de un <strong>producto</strong> para que aparezca en el video.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============ MODO DE GENERACION (NO para Sora) ============ */}
+      {!isSora && (
+        <div className="mb-4">
+          <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">
+            Modo de generacion
+          </label>
+          <div className="flex gap-2">
+            {selectedModel?.apiModelIdText && !selectedModel?.requiresImage && (
+              <button
+                onClick={() => { setVideoMode('text'); setStartImageUrl(null); setEndImageUrl(null) }}
+                className={cn(
+                  'flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all border',
+                  videoMode === 'text'
+                    ? 'bg-accent/15 border-accent text-accent'
+                    : 'bg-surface-elevated border-border text-text-secondary hover:border-text-muted'
+                )}
+              >
+                Solo Texto
+              </button>
+            )}
+            <button
+              onClick={() => { setVideoMode('image'); setEndImageUrl(null); if (!startImageUrl) setStartImageUrl(selectedInfluencerImage) }}
+              className={cn(
+                'flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all border',
+                videoMode === 'image'
+                  ? 'bg-accent/15 border-accent text-accent'
+                  : 'bg-surface-elevated border-border text-text-secondary hover:border-text-muted'
+              )}
+            >
+              Imagen Inicial
+            </button>
+            {selectedModel?.supportsStartEndFrames && !isMultiShot && (
+              <button
+                onClick={() => { setVideoMode('start_end'); if (!startImageUrl) setStartImageUrl(selectedInfluencerImage) }}
+                className={cn(
+                  'flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all border',
+                  videoMode === 'start_end'
+                    ? 'bg-accent/15 border-accent text-accent'
+                    : 'bg-surface-elevated border-border text-text-secondary hover:border-text-muted'
+                )}
+              >
+                Inicio + Final
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ============ SELECTOR DE IMAGENES (NO Sora) ============ */}
+      {!isSora && (videoMode === 'image' || videoMode === 'start_end') && (
+        <>
+          {/* Imagen de inicio */}
+          <div className="mb-4">
+            <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">
+              {videoMode === 'start_end' ? 'Frame inicial' : 'Imagen de referencia'}
+            </label>
+            <div
+              onClick={() => setShowImagePicker('start')}
+              className="flex items-center gap-3 p-3 bg-surface-elevated rounded-xl border border-border cursor-pointer hover:border-accent/30 transition-colors"
+            >
+              {startImageUrl ? (
+                <>
+                  <img src={startImageUrl} alt="Start" className="w-14 h-14 rounded-lg object-cover flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-sm text-text-primary font-medium">Imagen seleccionada</p>
+                    <p className="text-[10px] text-accent">Click para cambiar</p>
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center gap-2 py-3">
+                  <ImageIcon className="w-5 h-5 text-text-muted" />
+                  <p className="text-sm text-text-secondary">Seleccionar de la galeria</p>
                 </div>
+              )}
+            </div>
+          </div>
+
+          {/* Imagen final (solo start_end, no multi-shot) */}
+          {videoMode === 'start_end' && !isMultiShot && (
+            <div className="mb-4">
+              <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">
+                Frame final
+              </label>
+              <div
+                onClick={() => setShowImagePicker('end')}
+                className="flex items-center gap-3 p-3 bg-surface-elevated rounded-xl border border-border cursor-pointer hover:border-accent/30 transition-colors"
+              >
+                {endImageUrl ? (
+                  <>
+                    <img src={endImageUrl} alt="End" className="w-14 h-14 rounded-lg object-cover flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-sm text-text-primary font-medium">Imagen final seleccionada</p>
+                      <p className="text-[10px] text-accent">Click para cambiar</p>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex items-center gap-2 py-3">
+                    <ImageIcon className="w-5 h-5 text-text-muted" />
+                    <p className="text-sm text-text-secondary">Seleccionar imagen final (opcional)</p>
+                  </div>
+                )}
               </div>
             </div>
           )}
+        </>
+      )}
 
-          {/* ============ MODO DE GENERACION (NO para Sora) ============ */}
-          {!isSora && (
-            <div className="mb-4">
-              <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">
-                Modo de generacion
-              </label>
-              <div className="flex gap-2">
-                {selectedModel?.apiModelIdText && !selectedModel?.requiresImage && (
-                  <button
-                    onClick={() => { setVideoMode('text'); setStartImageUrl(null); setEndImageUrl(null) }}
-                    className={cn(
-                      'flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all border',
-                      videoMode === 'text'
-                        ? 'bg-accent/15 border-accent text-accent'
-                        : 'bg-surface-elevated border-border text-text-secondary hover:border-text-muted'
-                    )}
-                  >
-                    Solo Texto
-                  </button>
-                )}
+      {/* ============ PRODUCTO PARA SORA ============ */}
+      {isSora && (
+        <div className="mb-4">
+          <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">
+            Imagen del producto (opcional)
+          </label>
+          <input
+            ref={productInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleProductImageUpload}
+            className="hidden"
+          />
+          <div
+            onClick={() => productInputRef.current?.click()}
+            className="flex items-center gap-3 p-3 bg-surface-elevated rounded-xl border border-dashed border-border cursor-pointer hover:border-accent/30 transition-colors"
+          >
+            {productImageUrl ? (
+              <>
+                <img src={productImageUrl} alt="Producto" className="w-14 h-14 rounded-lg object-cover flex-shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm text-text-primary font-medium">Producto seleccionado</p>
+                  <p className="text-[10px] text-accent">Click para cambiar</p>
+                </div>
                 <button
-                  onClick={() => { setVideoMode('image'); setEndImageUrl(null); if (!startImageUrl) setStartImageUrl(selectedInfluencerImage) }}
+                  onClick={(e) => { e.stopPropagation(); setProductImageUrl(null); setProductImageFile(null) }}
+                  className="p-1.5 hover:bg-border/50 rounded-lg"
+                >
+                  <X className="w-4 h-4 text-text-muted" />
+                </button>
+              </>
+            ) : (
+              <div className="flex items-center gap-2 py-3 w-full justify-center">
+                <Package className="w-5 h-5 text-text-muted" />
+                <p className="text-sm text-text-secondary">Subir imagen del producto</p>
+              </div>
+            )}
+          </div>
+          <p className="text-[10px] text-text-muted mt-1">
+            Sora creara al personaje ({selectedInfluencerName}) desde su descripcion y mostrara este producto en el video
+          </p>
+        </div>
+      )}
+
+      {/* ============ KLING 3.0 SECTION ============ */}
+      {isKling30 && (
+        <div className="mb-4 p-4 bg-purple-500/5 border border-purple-500/20 rounded-xl space-y-4">
+          <div className="flex items-center gap-2 mb-1">
+            <Film className="w-4 h-4 text-purple-400" />
+            <h3 className="text-xs font-bold text-purple-400 uppercase tracking-wide">Kling 3.0</h3>
+          </div>
+
+          {/* Shot Mode Toggle */}
+          <div>
+            <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">Shot</label>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setIsMultiShot(false)}
+                className={cn(
+                  'flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all border',
+                  !isMultiShot
+                    ? 'bg-purple-500/15 border-purple-500 text-purple-400'
+                    : 'bg-surface-elevated border-border text-text-secondary hover:border-text-muted'
+                )}
+              >
+                Single Shot
+              </button>
+              <button
+                onClick={() => setIsMultiShot(true)}
+                className={cn(
+                  'flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all border',
+                  isMultiShot
+                    ? 'bg-purple-500/15 border-purple-500 text-purple-400'
+                    : 'bg-surface-elevated border-border text-text-secondary hover:border-text-muted'
+                )}
+              >
+                Multi-Shot
+              </button>
+            </div>
+          </div>
+
+          {/* Audio Toggle */}
+          <div>
+            <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">Audio</label>
+            <button
+              onClick={() => { if (!isMultiShot) setEnableAudio(!enableAudio) }}
+              disabled={isMultiShot}
+              className={cn(
+                'flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium transition-all border',
+                enableAudio
+                  ? 'bg-blue-500/15 border-blue-500/50 text-blue-400'
+                  : 'bg-surface-elevated border-border text-text-secondary',
+                isMultiShot && 'opacity-70 cursor-not-allowed'
+              )}
+            >
+              {enableAudio ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
+              {enableAudio ? 'Audio ON' : 'Audio OFF'}
+              {isMultiShot && <span className="text-[9px] text-text-muted ml-1">(requerido en multi-shot)</span>}
+            </button>
+          </div>
+
+          {/* Duration: Slider for single-shot, hidden for multi-shot (total computed from scenes) */}
+          {!isMultiShot && (
+            <div>
+              <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">
+                Duracion: {duration}s
+              </label>
+              <input
+                type="range"
+                min={3}
+                max={15}
+                value={duration}
+                onChange={(e) => setDuration(Number(e.target.value))}
+                className="w-full h-2 bg-surface-elevated rounded-lg appearance-none cursor-pointer accent-purple-500"
+              />
+              <div className="flex justify-between text-[9px] text-text-muted mt-1">
+                <span>3s</span>
+                <span>15s</span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ============ DURACION Y ASPECTO (non-Kling 3.0) ============ */}
+      {!isKling30 && (
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          <div>
+            <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">Duracion</label>
+            <div className="flex gap-2">
+              {[5, 10].map(d => (
+                <button
+                  key={d}
+                  onClick={() => setDuration(d)}
                   className={cn(
-                    'flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all border',
-                    videoMode === 'image'
+                    'flex-1 py-2 rounded-lg text-xs font-medium transition-all border',
+                    duration === d
                       ? 'bg-accent/15 border-accent text-accent'
                       : 'bg-surface-elevated border-border text-text-secondary hover:border-text-muted'
                   )}
                 >
-                  Imagen Inicial
+                  {d}s
                 </button>
-                {selectedModel?.supportsStartEndFrames && (
-                  <button
-                    onClick={() => { setVideoMode('start_end'); if (!startImageUrl) setStartImageUrl(selectedInfluencerImage) }}
-                    className={cn(
-                      'flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all border',
-                      videoMode === 'start_end'
-                        ? 'bg-accent/15 border-accent text-accent'
-                        : 'bg-surface-elevated border-border text-text-secondary hover:border-text-muted'
-                    )}
-                  >
-                    Inicio + Final
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* ============ SELECTOR DE IMAGENES (NO Sora) ============ */}
-          {!isSora && (videoMode === 'image' || videoMode === 'start_end') && (
-            <>
-              {/* Imagen de inicio */}
-              <div className="mb-4">
-                <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">
-                  {videoMode === 'start_end' ? 'Frame inicial' : 'Imagen de referencia'}
-                </label>
-                <div
-                  onClick={() => setShowImagePicker('start')}
-                  className="flex items-center gap-3 p-3 bg-surface-elevated rounded-xl border border-border cursor-pointer hover:border-accent/30 transition-colors"
-                >
-                  {startImageUrl ? (
-                    <>
-                      <img src={startImageUrl} alt="Start" className="w-14 h-14 rounded-lg object-cover flex-shrink-0" />
-                      <div className="flex-1">
-                        <p className="text-sm text-text-primary font-medium">Imagen seleccionada</p>
-                        <p className="text-[10px] text-accent">Click para cambiar</p>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="flex items-center gap-2 py-3">
-                      <ImageIcon className="w-5 h-5 text-text-muted" />
-                      <p className="text-sm text-text-secondary">Seleccionar de la galeria</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Imagen final (solo start_end) */}
-              {videoMode === 'start_end' && (
-                <div className="mb-4">
-                  <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">
-                    Frame final
-                  </label>
-                  <div
-                    onClick={() => setShowImagePicker('end')}
-                    className="flex items-center gap-3 p-3 bg-surface-elevated rounded-xl border border-border cursor-pointer hover:border-accent/30 transition-colors"
-                  >
-                    {endImageUrl ? (
-                      <>
-                        <img src={endImageUrl} alt="End" className="w-14 h-14 rounded-lg object-cover flex-shrink-0" />
-                        <div className="flex-1">
-                          <p className="text-sm text-text-primary font-medium">Imagen final seleccionada</p>
-                          <p className="text-[10px] text-accent">Click para cambiar</p>
-                        </div>
-                      </>
-                    ) : (
-                      <div className="flex items-center gap-2 py-3">
-                        <ImageIcon className="w-5 h-5 text-text-muted" />
-                        <p className="text-sm text-text-secondary">Seleccionar imagen final (opcional)</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-
-          {/* ============ PRODUCTO PARA SORA ============ */}
-          {isSora && (
-            <div className="mb-4">
-              <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">
-                Imagen del producto (opcional)
-              </label>
-              <input
-                ref={productInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleProductImageUpload}
-                className="hidden"
-              />
-              <div
-                onClick={() => productInputRef.current?.click()}
-                className="flex items-center gap-3 p-3 bg-surface-elevated rounded-xl border border-dashed border-border cursor-pointer hover:border-accent/30 transition-colors"
-              >
-                {productImageUrl ? (
-                  <>
-                    <img src={productImageUrl} alt="Producto" className="w-14 h-14 rounded-lg object-cover flex-shrink-0" />
-                    <div className="flex-1">
-                      <p className="text-sm text-text-primary font-medium">Producto seleccionado</p>
-                      <p className="text-[10px] text-accent">Click para cambiar</p>
-                    </div>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setProductImageUrl(null); setProductImageFile(null) }}
-                      className="p-1.5 hover:bg-border/50 rounded-lg"
-                    >
-                      <X className="w-4 h-4 text-text-muted" />
-                    </button>
-                  </>
-                ) : (
-                  <div className="flex items-center gap-2 py-3 w-full justify-center">
-                    <Package className="w-5 h-5 text-text-muted" />
-                    <p className="text-sm text-text-secondary">Subir imagen del producto</p>
-                  </div>
-                )}
-              </div>
-              <p className="text-[10px] text-text-muted mt-1">
-                Sora creara al personaje ({selectedInfluencerName}) desde su descripcion y mostrara este producto en el video
-              </p>
-            </div>
-          )}
-
-          {/* ============ DURACION Y ASPECTO ============ */}
-          <div className="grid grid-cols-2 gap-3 mb-4">
-            <div>
-              <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">Duracion</label>
-              <div className="flex gap-2">
-                {[5, 10].map(d => (
-                  <button
-                    key={d}
-                    onClick={() => setDuration(d)}
-                    className={cn(
-                      'flex-1 py-2 rounded-lg text-xs font-medium transition-all border',
-                      duration === d
-                        ? 'bg-accent/15 border-accent text-accent'
-                        : 'bg-surface-elevated border-border text-text-secondary hover:border-text-muted'
-                    )}
-                  >
-                    {d}s
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">Aspecto</label>
-              <div className="flex gap-2">
-                {(['9:16', '16:9', '1:1'] as const).map(ar => (
-                  <button
-                    key={ar}
-                    onClick={() => setAspectRatio(ar)}
-                    className={cn(
-                      'flex-1 py-2 rounded-lg text-xs font-medium transition-all border',
-                      aspectRatio === ar
-                        ? 'bg-accent/15 border-accent text-accent'
-                        : 'bg-surface-elevated border-border text-text-secondary hover:border-text-muted'
-                    )}
-                  >
-                    {ar}
-                  </button>
-                ))}
-              </div>
+              ))}
             </div>
           </div>
+          <div>
+            <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">Aspecto</label>
+            <div className="flex gap-2">
+              {(['9:16', '16:9', '1:1'] as const).map(ar => (
+                <button
+                  key={ar}
+                  onClick={() => setAspectRatio(ar)}
+                  className={cn(
+                    'flex-1 py-2 rounded-lg text-xs font-medium transition-all border',
+                    aspectRatio === ar
+                      ? 'bg-accent/15 border-accent text-accent'
+                      : 'bg-surface-elevated border-border text-text-secondary hover:border-text-muted'
+                  )}
+                >
+                  {ar}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
-      {/* ============ IDEA + OPTIMIZADOR ============ */}
-      <div className="mb-4">
-        <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">Tu idea para el video</label>
-        <textarea
-          value={userIdea}
-          onChange={(e) => setUserIdea(e.target.value)}
-          placeholder={isSora
-            ? `Ej: ${selectedInfluencerName} sosteniendo el producto en la mano, caminando por la playa al atardecer, mirando a camara y sonriendo...`
-            : `Ej: ${selectedInfluencerName} caminando por la playa al atardecer, mirando a camara y sonriendo...`
-          }
-          rows={3}
-          className="w-full px-3 py-2 bg-surface-elevated border border-border rounded-xl text-sm text-text-primary placeholder:text-text-muted resize-none focus:outline-none focus:ring-2 focus:ring-accent/50"
-        />
-        <button
-          onClick={handleOptimizePrompt}
-          disabled={isOptimizing || !userIdea.trim()}
-          className={cn(
-            'mt-2 flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium transition-all',
-            isOptimizing || !userIdea.trim()
-              ? 'bg-border text-text-muted cursor-not-allowed'
-              : 'bg-accent/10 text-accent hover:bg-accent/20 border border-accent/30'
+      {/* ============ KLING 3.0: CONSTRUCTOR INTELIGENTE (only multi-shot) ============ */}
+      {isKling30 && isMultiShot && (
+        <div className="mb-4">
+          <button
+            onClick={() => setShowConstructor(!showConstructor)}
+            className="w-full flex items-center justify-between px-4 py-3 bg-gradient-to-r from-purple-500/10 to-blue-500/10 border border-purple-500/20 rounded-xl text-sm font-semibold text-purple-400 hover:from-purple-500/15 hover:to-blue-500/15 transition-all"
+          >
+            <div className="flex items-center gap-2">
+              <Wand2 className="w-4 h-4" />
+              Constructor Inteligente
+            </div>
+            {showConstructor ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </button>
+
+          {showConstructor && (
+            <div className="mt-3 p-4 bg-surface-elevated border border-border rounded-xl space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1">Descripcion del producto</label>
+                <textarea
+                  value={constructorProduct}
+                  onChange={(e) => setConstructorProduct(e.target.value)}
+                  placeholder="Ej: Suplemento de magnesio en polvo, sabor limón, ayuda a dormir mejor..."
+                  rows={2}
+                  className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-text-primary placeholder:text-text-muted resize-none focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1">Angulos de venta / puntos de dolor</label>
+                <textarea
+                  value={constructorAngles}
+                  onChange={(e) => setConstructorAngles(e.target.value)}
+                  placeholder="Ej: Mejora el sueño, reduce estrés, alivia dolor muscular, más energía..."
+                  rows={2}
+                  className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-text-primary placeholder:text-text-muted resize-none focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1">Escenario</label>
+                <input
+                  value={constructorScenario}
+                  onChange={(e) => setConstructorScenario(e.target.value)}
+                  placeholder="Ej: en la cocina, en un parque, en el gimnasio..."
+                  className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                />
+              </div>
+
+              <button
+                onClick={handleConstructor}
+                disabled={isConstructing || !constructorProduct.trim()}
+                className={cn(
+                  'w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all',
+                  isConstructing || !constructorProduct.trim()
+                    ? 'bg-border text-text-muted cursor-not-allowed'
+                    : 'bg-purple-500/15 text-purple-400 hover:bg-purple-500/25 border border-purple-500/30'
+                )}
+              >
+                {isConstructing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />}
+                Generar prompts con IA
+              </button>
+
+              {/* Constructor Results */}
+              {constructorResults && (
+                <div className="mt-3 space-y-3 pt-3 border-t border-border">
+                  <p className="text-[10px] font-bold text-purple-400 uppercase tracking-wide">Resultados generados</p>
+
+                  {/* Start Frame Prompt */}
+                  <div className="p-3 bg-green-500/5 border border-green-500/20 rounded-lg">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <ImageIcon className="w-3 h-3 text-green-400" />
+                      <span className="text-[10px] font-semibold text-green-400 uppercase">Imagen Inicial</span>
+                    </div>
+                    <p className="text-[11px] text-text-secondary leading-relaxed">{constructorResults.startFramePrompt}</p>
+                    <button
+                      onClick={async () => {
+                        await navigator.clipboard.writeText(constructorResults.startFramePrompt)
+                        toast.success('Prompt de imagen inicial copiado')
+                      }}
+                      className="mt-1.5 flex items-center gap-1 text-[9px] text-green-400 hover:text-green-300"
+                    >
+                      <Copy className="w-2.5 h-2.5" /> Copiar para generar foto en galeria
+                    </button>
+                  </div>
+
+                  {/* End Frame Prompt */}
+                  <div className="p-3 bg-blue-500/5 border border-blue-500/20 rounded-lg">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <ImageIcon className="w-3 h-3 text-blue-400" />
+                      <span className="text-[10px] font-semibold text-blue-400 uppercase">Imagen Final</span>
+                    </div>
+                    <p className="text-[11px] text-text-secondary leading-relaxed">{constructorResults.endFramePrompt}</p>
+                    <button
+                      onClick={async () => {
+                        await navigator.clipboard.writeText(constructorResults.endFramePrompt)
+                        toast.success('Prompt de imagen final copiado')
+                      }}
+                      className="mt-1.5 flex items-center gap-1 text-[9px] text-blue-400 hover:text-blue-300"
+                    >
+                      <Copy className="w-2.5 h-2.5" /> Copiar para generar foto en galeria
+                    </button>
+                  </div>
+
+                  {/* Scene Previews */}
+                  {constructorResults.scenes.map((scene, i) => (
+                    <div key={i} className="p-3 bg-purple-500/5 border border-purple-500/15 rounded-lg">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[10px] font-semibold text-purple-400">Escena {i + 1}</span>
+                        <span className="text-[9px] text-text-muted">{scene.duration}s</span>
+                      </div>
+                      <p className="text-[11px] text-text-secondary leading-relaxed">{scene.prompt}</p>
+                    </div>
+                  ))}
+
+                  {/* Apply button */}
+                  <button
+                    onClick={handleApplyConstructorResults}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-purple-500/20 text-purple-400 rounded-xl text-xs font-semibold hover:bg-purple-500/30 border border-purple-500/30 transition-all"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    Aplicar al video
+                  </button>
+                </div>
+              )}
+            </div>
           )}
-        >
-          {isOptimizing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />}
-          {isSora ? 'Optimizar prompt (incluye descripcion del personaje)' : 'Optimizar prompt con IA'}
-        </button>
-      </div>
+        </div>
+      )}
 
-      {/* ============ PROMPT OPTIMIZADO ============ */}
-      {prompt && (
+      {/* ============ KLING 3.0: SCENE EDITOR (multi-shot) ============ */}
+      {isKling30 && isMultiShot && (
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <label className="block text-xs font-medium text-text-muted uppercase tracking-wide">Editor de Escenas</label>
+            <span className={cn(
+              'text-xs font-mono font-semibold px-2 py-0.5 rounded-full',
+              multiShotTotalDuration > 15 || multiShotTotalDuration < 3
+                ? 'bg-red-500/15 text-red-400'
+                : 'bg-green-500/15 text-green-400'
+            )}>
+              {multiShotTotalDuration}s / 15s
+            </span>
+          </div>
+
+          <div className="space-y-3">
+            {multiPrompts.map((scene, index) => (
+              <div key={index} className="p-3 bg-surface-elevated border border-border rounded-xl">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-semibold text-text-primary">Escena {index + 1}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-text-muted">{scene.duration}s</span>
+                    {multiPrompts.length > 2 && (
+                      <button
+                        onClick={() => removeScene(index)}
+                        className="p-1 hover:bg-red-500/10 rounded-lg text-text-muted hover:text-red-400 transition-colors"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <textarea
+                  value={scene.prompt}
+                  onChange={(e) => updateScene(index, 'prompt', e.target.value)}
+                  placeholder={`Describe la escena ${index + 1}... (máx 500 caracteres)`}
+                  maxLength={500}
+                  rows={2}
+                  className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-text-primary placeholder:text-text-muted resize-none focus:outline-none focus:ring-2 focus:ring-purple-500/50 mb-2"
+                />
+                <div className="flex items-center justify-between">
+                  <span className="text-[9px] text-text-muted">{scene.prompt.length}/500</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-text-muted">Duracion:</span>
+                    <input
+                      type="range"
+                      min={1}
+                      max={12}
+                      value={scene.duration}
+                      onChange={(e) => updateScene(index, 'duration', Number(e.target.value))}
+                      className="w-24 h-1.5 bg-border rounded-lg appearance-none cursor-pointer accent-purple-500"
+                    />
+                    <span className="text-xs font-mono text-purple-400 w-6 text-right">{scene.duration}s</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Add scene button */}
+          <button
+            onClick={addScene}
+            disabled={multiShotTotalDuration >= 15}
+            className={cn(
+              'mt-2 w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all border border-dashed',
+              multiShotTotalDuration >= 15
+                ? 'border-border text-text-muted cursor-not-allowed'
+                : 'border-purple-500/30 text-purple-400 hover:bg-purple-500/10'
+            )}
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Agregar escena
+          </button>
+
+          {/* Total duration warning */}
+          {(multiShotTotalDuration > 15 || multiShotTotalDuration < 3) && (
+            <p className="text-[10px] text-red-400 mt-1.5">
+              {multiShotTotalDuration > 15
+                ? `La duración total excede 15s. Reduce la duración de las escenas.`
+                : `La duración total debe ser al menos 3s.`}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* ============ ASPECT RATIO (Kling 3.0 — shown after scene editor for multi-shot, or after duration for single) ============ */}
+      {isKling30 && (
+        <div className="mb-4">
+          <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">Aspecto</label>
+          <div className="flex gap-2">
+            {(['9:16', '16:9', '1:1'] as const).map(ar => (
+              <button
+                key={ar}
+                onClick={() => setAspectRatio(ar)}
+                className={cn(
+                  'flex-1 py-2 rounded-lg text-xs font-medium transition-all border',
+                  aspectRatio === ar
+                    ? 'bg-accent/15 border-accent text-accent'
+                    : 'bg-surface-elevated border-border text-text-secondary hover:border-text-muted'
+                )}
+              >
+                {ar}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ============ IDEA + OPTIMIZADOR (hidden in multi-shot mode) ============ */}
+      {!(isKling30 && isMultiShot) && (
+        <div className="mb-4">
+          <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">Tu idea para el video</label>
+          <textarea
+            value={userIdea}
+            onChange={(e) => setUserIdea(e.target.value)}
+            placeholder={isSora
+              ? `Ej: ${selectedInfluencerName} sosteniendo el producto en la mano, caminando por la playa al atardecer, mirando a camara y sonriendo...`
+              : `Ej: ${selectedInfluencerName} caminando por la playa al atardecer, mirando a camara y sonriendo...`
+            }
+            rows={3}
+            className="w-full px-3 py-2 bg-surface-elevated border border-border rounded-xl text-sm text-text-primary placeholder:text-text-muted resize-none focus:outline-none focus:ring-2 focus:ring-accent/50"
+          />
+          <button
+            onClick={handleOptimizePrompt}
+            disabled={isOptimizing || !userIdea.trim()}
+            className={cn(
+              'mt-2 flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium transition-all',
+              isOptimizing || !userIdea.trim()
+                ? 'bg-border text-text-muted cursor-not-allowed'
+                : 'bg-accent/10 text-accent hover:bg-accent/20 border border-accent/30'
+            )}
+          >
+            {isOptimizing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />}
+            {isSora ? 'Optimizar prompt (incluye descripcion del personaje)' : 'Optimizar prompt con IA'}
+          </button>
+        </div>
+      )}
+
+      {/* ============ PROMPT OPTIMIZADO (hidden in multi-shot mode) ============ */}
+      {prompt && !(isKling30 && isMultiShot) && (
         <div className="mb-4 p-4 bg-accent/5 border border-accent/30 rounded-xl">
           <div className="flex items-center justify-between mb-2">
             <h4 className="text-xs font-bold text-accent uppercase tracking-wide">Prompt optimizado</h4>
@@ -888,10 +1415,10 @@ export function Step7Video({
       {/* ============ BOTON GENERAR ============ */}
       <button
         onClick={handleGenerate}
-        disabled={isGenerating || (!prompt.trim() && !userIdea.trim())}
+        disabled={isGenerating || !canGenerate}
         className={cn(
           'w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-semibold transition-all',
-          isGenerating || (!prompt.trim() && !userIdea.trim())
+          isGenerating || !canGenerate
             ? 'bg-border text-text-secondary cursor-not-allowed'
             : 'bg-accent hover:bg-accent-hover text-background shadow-lg shadow-accent/25'
         )}
@@ -899,7 +1426,7 @@ export function Step7Video({
         {isGenerating ? (
           <><Loader2 className="w-5 h-5 animate-spin" /> Generando video...</>
         ) : (
-          <><Video className="w-5 h-5" /> Generar Video</>
+          <><Video className="w-5 h-5" /> {isKling30 && isMultiShot ? `Generar Video Multi-Shot (${multiShotTotalDuration}s)` : 'Generar Video'}</>
         )}
       </button>
 

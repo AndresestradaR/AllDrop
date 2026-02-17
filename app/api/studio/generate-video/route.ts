@@ -117,7 +117,7 @@ export async function POST(request: Request) {
       )
     }
 
-    if (modelConfig.requiresImage && !imageBase64) {
+    if (modelConfig.requiresImage && !imageBase64 && !multiShots) {
       return NextResponse.json({
         success: false,
         error: `${modelConfig.name} solo soporta image-to-video. Por favor sube una imagen o usa otro modelo.`,
@@ -194,6 +194,8 @@ export async function POST(request: Request) {
       if (multiShots && multiPrompt && multiPrompt.length > 0) {
         generationParams.multiShots = true
         generationParams.multiPrompt = multiPrompt
+        // Multi-shot requires audio enabled
+        generationParams.enableAudio = true
       }
       if (klingElements && klingElements.length > 0) {
         // Upload element reference images to get public URLs
