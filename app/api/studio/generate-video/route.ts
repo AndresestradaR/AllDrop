@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getAuthContext } from '@/lib/auth/cron-auth'
 import { decrypt } from '@/lib/services/encryption'
 import {
   generateVideo,
@@ -55,12 +55,11 @@ export async function POST(request: Request) {
   const startTime = Date.now()
 
   try {
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
+    const auth = await getAuthContext(request)
+    if (!auth) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
+    const { userId, supabase } = auth
 
     const body = await request.json()
     const {
@@ -128,7 +127,7 @@ export async function POST(request: Request) {
     const { data: profile } = await supabase
       .from('profiles')
       .select('kie_api_key')
-      .eq('id', user.id)
+      .eq('id', userId)
       .single()
 
     if (!profile?.kie_api_key) {
@@ -139,7 +138,7 @@ export async function POST(request: Request) {
 
     const kieApiKey = decrypt(profile.kie_api_key)
 
-    console.log(`[Video] Starting - Model: ${modelId}, User: ${user.id.substring(0, 8)}...`)
+    console.log(`[Video] Starting - Model: ${modelId}, User: ${userId.substring(0, 8)}...`)
     console.log(`[Video] Prompt: ${prompt.substring(0, 100)}...`)
     console.log(`[Video] Duration: ${duration}s, Aspect: ${aspectRatio}, Audio: ${enableAudio}`)
     if (isVeoModel) {
@@ -153,19 +152,19 @@ export async function POST(request: Request) {
     if (isVeoModel && veoImages && veoImages.length > 0) {
       console.log(`[Video] Uploading ${veoImages.length} Veo images...`)
       for (let i = 0; i < veoImages.length; i++) {
-        const url = await uploadImageToStorage(supabase, veoImages[i], user.id, i)
+        const url = await uploadImageToStorage(supabase, veoImages[i], userId, i)
         imageUrls.push(url)
       }
     }
     // Handle regular image-to-video
     else if (imageBase64 && modelConfig.supportsStartEndFrames) {
       console.log('[Video] Uploading start image...')
-      const url = await uploadImageToStorage(supabase, imageBase64, user.id, 0)
+      const url = await uploadImageToStorage(supabase, imageBase64, userId, 0)
       imageUrls.push(url)
 
       if (imageBase64End) {
         console.log('[Video] Uploading end image...')
-        const urlEnd = await uploadImageToStorage(supabase, imageBase64End, user.id, 1)
+        const urlEnd = await uploadImageToStorage(supabase, imageBase64End, userId, 1)
         imageUrls.push(urlEnd)
       }
     }
@@ -202,7 +201,7 @@ export async function POST(request: Request) {
           klingElements.map(async (el) => {
             const urls = await Promise.all(
               (el.images || []).map((img, i) =>
-                uploadImageToStorage(supabase, img, user.id, Date.now() + i)
+                uploadImageToStorage(supabase, img, userId, Date.now() + i)
               )
             )
             return {

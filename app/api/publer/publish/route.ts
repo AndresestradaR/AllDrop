@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getAuthContext } from '@/lib/auth/cron-auth'
 import {
   getPublerCredentials,
   getAccounts,
@@ -14,12 +14,11 @@ export const maxDuration = 60
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
+    const auth = await getAuthContext(request)
+    if (!auth) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
+    const { userId, supabase } = auth
 
     const body = await request.json()
     const {
@@ -48,7 +47,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Agrega texto o media al post' }, { status: 400 })
     }
 
-    const creds = await getPublerCredentials(user.id)
+    const creds = await getPublerCredentials(userId, supabase)
     if (!creds) {
       return NextResponse.json({ error: 'Configura Publer en Settings' }, { status: 400 })
     }

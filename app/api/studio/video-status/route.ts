@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getAuthContext } from '@/lib/auth/cron-auth'
 import { decrypt } from '@/lib/services/encryption'
 import { tryUploadUrlToR2 } from '@/lib/services/r2-upload'
 
@@ -112,12 +112,11 @@ async function checkStatus(taskId: string, apiKey: string) {
 
 export async function GET(request: Request) {
   try {
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
+    const auth = await getAuthContext(request)
+    if (!auth) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
+    const { userId, supabase } = auth
 
     const { searchParams } = new URL(request.url)
     const taskId = searchParams.get('taskId')
@@ -129,7 +128,7 @@ export async function GET(request: Request) {
     const { data: profile } = await supabase
       .from('profiles')
       .select('kie_api_key')
-      .eq('id', user.id)
+      .eq('id', userId)
       .single()
 
     if (!profile?.kie_api_key) {
@@ -154,7 +153,7 @@ export async function GET(request: Request) {
       // Try R2 upload for video (optional, non-blocking)
       if (result.videoUrl) {
         r2Url = await tryUploadUrlToR2(
-          user.id,
+          userId,
           result.videoUrl,
           `videos/${Date.now()}-${taskId.substring(0, 8)}.mp4`,
           'video/mp4'

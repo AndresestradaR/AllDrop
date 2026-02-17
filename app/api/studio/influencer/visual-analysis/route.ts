@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getAuthContext } from '@/lib/auth/cron-auth'
 import { decrypt } from '@/lib/services/encryption'
 
 export const maxDuration = 60
@@ -76,12 +76,11 @@ ADDITIONALLY, at the end, provide a "PROMPT DESCRIPTOR" section: a single, dense
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
+    const auth = await getAuthContext(request)
+    if (!auth) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
+    const { userId, supabase } = auth
 
     const body = await request.json()
     const { influencerId, optimizeVideoPrompt, videoModelId, userIdea, promptDescriptor: pdOverride, presetId, realisticImageUrl: fallbackRealisticUrl, anglesGridUrl: fallbackAnglesUrl, bodyGridUrl: fallbackBodyUrl } = body as {
@@ -104,7 +103,7 @@ export async function POST(request: Request) {
     const { data: profile } = await supabase
       .from('profiles')
       .select('google_api_key')
-      .eq('id', user.id)
+      .eq('id', userId)
       .single()
 
     if (!profile?.google_api_key) {
@@ -211,7 +210,7 @@ RULES:
       .from('influencers')
       .select('realistic_image_url, angles_grid_url, body_grid_url')
       .eq('id', influencerId)
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .single()
 
     // Use DB values first, then fallback to values sent from frontend
@@ -223,7 +222,7 @@ RULES:
       return NextResponse.json({ error: 'No se encontro imagen realista' }, { status: 400 })
     }
 
-    console.log(`[Influencer/VisualAnalysis] User: ${user.id.substring(0, 8)}..., Influencer: ${influencerId.substring(0, 8)}...`)
+    console.log(`[Influencer/VisualAnalysis] User: ${userId.substring(0, 8)}..., Influencer: ${influencerId.substring(0, 8)}...`)
 
     // Download images and convert to base64
     const imageParts: any[] = []
@@ -364,7 +363,7 @@ RULES:
             updated_at: new Date().toISOString(),
           })
           .eq('id', influencerId)
-          .eq('user_id', user.id)
+          .eq('user_id', userId)
 
         if (updateError) {
           console.error('[Influencer/VisualAnalysis] DB update FAILED:', updateError.message)

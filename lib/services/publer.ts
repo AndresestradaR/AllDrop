@@ -11,8 +11,8 @@ interface PublerCredentials {
 /**
  * Get decrypted Publer credentials for a user.
  */
-export async function getPublerCredentials(userId: string): Promise<PublerCredentials | null> {
-  const supabase = await createClient()
+export async function getPublerCredentials(userId: string, supabaseClient?: any): Promise<PublerCredentials | null> {
+  const supabase = supabaseClient || await createClient()
   const { data: profile } = await supabase
     .from('profiles')
     .select('publer_api_key, publer_workspace_id')

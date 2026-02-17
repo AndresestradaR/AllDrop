@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 
-// Vercel Cron: runs every hour
-// vercel.json: { "crons": [{ "path": "/api/cron/automations", "schedule": "0 * * * *" }] }
+// Vercel Cron: runs every 10 minutes
+// vercel.json: { "crons": [{ "path": "/api/cron/automations", "schedule": "*/10 * * * *" }] }
+export const maxDuration = 120
 
 const VOICE_INSTRUCTIONS: Record<string, string> = {
   paisa: 'Habla en español colombiano con acento paisa de Medellín, usa expresiones como "pues", "ve", "parcero". Tono cálido y cercano.',
@@ -12,26 +13,46 @@ const VOICE_INSTRUCTIONS: Record<string, string> = {
   personalizada: '', // uses voice_custom_instruction
 }
 
+/** Build headers for internal API calls with cron auth bypass */
+function cronHeaders(userId: string): Record<string, string> {
+  return {
+    'Content-Type': 'application/json',
+    'x-cron-secret': process.env.CRON_SECRET || '',
+    'x-user-id': userId,
+  }
+}
+
 export async function GET(request: Request) {
   try {
     // Verify cron secret (Vercel sends this header)
     const authHeader = request.headers.get('authorization')
     if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-      // Also allow manual trigger in dev
       if (process.env.NODE_ENV === 'production') {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
       }
     }
 
-    // Use service role for cross-user operations
     const supabase = createAdminClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
 
     const now = new Date()
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
 
-    // Fetch active flows where next_run_at <= now
+    // =============================================
+    // PHASE 1: Poll pending videos from previous runs
+    // =============================================
+    let pollResults = { checked: 0, completed: 0 }
+    try {
+      pollResults = await pollPendingVideos(supabase, appUrl)
+    } catch (err: any) {
+      console.error('[Cron/Automations] Poll phase error:', err.message)
+    }
+
+    // =============================================
+    // PHASE 2: Execute flows that are due
+    // =============================================
     const { data: flows, error: flowsError } = await supabase
       .from('automation_flows')
       .select(`
@@ -40,43 +61,44 @@ export async function GET(request: Request) {
       `)
       .eq('is_active', true)
       .lte('next_run_at', now.toISOString())
-      .limit(10) // Process max 10 per cron cycle
+      .limit(10)
 
     if (flowsError) {
       console.error('[Cron/Automations] Error fetching flows:', flowsError.message)
-      return NextResponse.json({ error: flowsError.message }, { status: 500 })
+      return NextResponse.json({ error: flowsError.message, poll: pollResults }, { status: 500 })
     }
 
-    if (!flows || flows.length === 0) {
-      return NextResponse.json({ message: 'No flows to execute', processed: 0 })
-    }
+    const flowResults: any[] = []
 
-    console.log(`[Cron/Automations] Processing ${flows.length} flows`)
+    if (flows && flows.length > 0) {
+      console.log(`[Cron/Automations] Processing ${flows.length} flows`)
 
-    const results: any[] = []
+      for (const flow of flows) {
+        try {
+          const result = await executeFlow(supabase, appUrl, flow)
+          flowResults.push({ flowId: flow.id, name: flow.name, ...result })
+        } catch (err: any) {
+          console.error(`[Cron/Automations] Flow ${flow.id} failed:`, err.message)
+          flowResults.push({ flowId: flow.id, name: flow.name, error: err.message })
+        }
 
-    for (const flow of flows) {
-      try {
-        const result = await executeFlow(supabase, flow)
-        results.push({ flowId: flow.id, name: flow.name, ...result })
-      } catch (err: any) {
-        console.error(`[Cron/Automations] Flow ${flow.id} failed:`, err.message)
-        results.push({ flowId: flow.id, name: flow.name, error: err.message })
+        // Update next_run_at based on schedule_times
+        const scheduleTimes = flow.schedule_times || ['08:00', '20:00']
+        const nextRunAt = calculateNextRunAt(scheduleTimes)
+        await supabase
+          .from('automation_flows')
+          .update({
+            last_run_at: now.toISOString(),
+            next_run_at: nextRunAt,
+          })
+          .eq('id', flow.id)
       }
-
-      // Update next_run_at based on schedule_times
-      const scheduleTimes = flow.schedule_times || ['08:00', '20:00']
-      const nextRunAt = calculateNextRunAt(scheduleTimes)
-      await supabase
-        .from('automation_flows')
-        .update({
-          last_run_at: now.toISOString(),
-          next_run_at: nextRunAt,
-        })
-        .eq('id', flow.id)
     }
 
-    return NextResponse.json({ processed: results.length, results })
+    return NextResponse.json({
+      poll: pollResults,
+      flows: { processed: flowResults.length, results: flowResults },
+    })
 
   } catch (error: any) {
     console.error('[Cron/Automations] Fatal error:', error.message)
@@ -84,137 +106,121 @@ export async function GET(request: Request) {
   }
 }
 
-// Also check for pending video polls
-export async function POST(request: Request) {
-  try {
-    const authHeader = request.headers.get('authorization')
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET}` && process.env.NODE_ENV === 'production') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+// =============================================
+// POLL PENDING VIDEOS
+// =============================================
+async function pollPendingVideos(supabase: any, appUrl: string) {
+  const { data: pendingRuns } = await supabase
+    .from('automation_runs')
+    .select('*, flow:automation_flows(*)')
+    .eq('status', 'generating_video')
+    .not('video_task_id', 'is', null)
+    .limit(20)
 
-    const supabase = createAdminClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
+  if (!pendingRuns || pendingRuns.length === 0) {
+    return { checked: 0, completed: 0 }
+  }
 
-    // Check runs that are generating_video and poll their status
-    const { data: pendingRuns } = await supabase
-      .from('automation_runs')
-      .select('*, flow:automation_flows(*)')
-      .eq('status', 'generating_video')
-      .not('video_task_id', 'is', null)
-      .limit(20)
+  console.log(`[Cron/Automations] Polling ${pendingRuns.length} pending videos`)
 
-    if (!pendingRuns || pendingRuns.length === 0) {
-      return NextResponse.json({ message: 'No pending video polls', checked: 0 })
-    }
+  let completed = 0
 
-    console.log(`[Cron/Automations] Polling ${pendingRuns.length} pending videos`)
+  for (const run of pendingRuns) {
+    try {
+      const statusRes = await fetch(
+        `${appUrl}/api/studio/video-status?taskId=${run.video_task_id}`,
+        { headers: cronHeaders(run.user_id) }
+      )
+      const statusData = await statusRes.json()
 
-    let completed = 0
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+      if (statusData.status === 'completed' && statusData.videoUrl) {
+        const flow = run.flow
+        const newStatus = flow?.mode === 'auto' ? 'publishing' : 'awaiting_approval'
 
-    for (const run of pendingRuns) {
-      try {
-        const statusRes = await fetch(`${appUrl}/api/studio/video-status?taskId=${run.video_task_id}`)
-        const statusData = await statusRes.json()
+        // Generate caption
+        let caption = ''
+        try {
+          caption = await generateCaption(appUrl, flow, run.scenario_used)
+        } catch {
+          caption = `${flow?.product_name || 'Producto'} ✨ #dropshipping #colombia`
+        }
 
-        if (statusData.status === 'completed' && statusData.videoUrl) {
-          // Video ready!
-          const flow = run.flow
-          const newStatus = flow?.mode === 'auto' ? 'publishing' : 'awaiting_approval'
+        await supabase
+          .from('automation_runs')
+          .update({
+            status: newStatus,
+            video_url: statusData.videoUrl,
+            caption,
+          })
+          .eq('id', run.id)
 
-          // Generate caption with IA
-          let caption = ''
+        // If auto mode, publish immediately
+        if (newStatus === 'publishing' && flow) {
           try {
-            caption = await generateCaption(appUrl, flow, run.scenario_used)
-          } catch {
-            caption = `${flow?.product_name || 'Producto'} ✨ #dropshipping #colombia`
-          }
-
-          await supabase
-            .from('automation_runs')
-            .update({
-              status: newStatus,
-              video_url: statusData.videoUrl,
-              caption,
-            })
-            .eq('id', run.id)
-
-          // If auto mode, publish immediately
-          if (newStatus === 'publishing' && flow) {
-            try {
-              await publishToSocial(appUrl, flow, statusData.videoUrl, caption)
-              await supabase
-                .from('automation_runs')
-                .update({
-                  status: 'published',
-                  published_at: new Date().toISOString(),
-                  completed_at: new Date().toISOString(),
-                })
-                .eq('id', run.id)
-            } catch (pubErr: any) {
-              await supabase
-                .from('automation_runs')
-                .update({
-                  status: 'failed',
-                  error_message: `Publish error: ${pubErr.message}`,
-                  completed_at: new Date().toISOString(),
-                })
-                .eq('id', run.id)
-            }
-          }
-
-          completed++
-
-        } else if (statusData.status === 'failed') {
-          await supabase
-            .from('automation_runs')
-            .update({
-              status: 'failed',
-              error_message: statusData.error || 'Video generation failed',
-              completed_at: new Date().toISOString(),
-            })
-            .eq('id', run.id)
-          completed++
-
-        } else {
-          // Check if it's been too long (> 15 min)
-          const started = new Date(run.started_at || run.created_at)
-          const elapsed = Date.now() - started.getTime()
-          if (elapsed > 15 * 60 * 1000) {
+            await publishToSocial(appUrl, flow, statusData.videoUrl, caption)
+            await supabase
+              .from('automation_runs')
+              .update({
+                status: 'published',
+                published_at: new Date().toISOString(),
+                completed_at: new Date().toISOString(),
+              })
+              .eq('id', run.id)
+          } catch (pubErr: any) {
             await supabase
               .from('automation_runs')
               .update({
                 status: 'failed',
-                error_message: 'Video generation timed out (>15 min)',
+                error_message: `Publish error: ${pubErr.message}`,
                 completed_at: new Date().toISOString(),
               })
               .eq('id', run.id)
-            completed++
           }
         }
-      } catch (err: any) {
-        console.error(`[Cron/Automations] Poll error for run ${run.id}:`, err.message)
+
+        completed++
+
+      } else if (statusData.status === 'failed') {
+        await supabase
+          .from('automation_runs')
+          .update({
+            status: 'failed',
+            error_message: statusData.error || 'Video generation failed',
+            completed_at: new Date().toISOString(),
+          })
+          .eq('id', run.id)
+        completed++
+
+      } else {
+        // Check if it's been too long (> 15 min)
+        const started = new Date(run.started_at || run.created_at)
+        const elapsed = Date.now() - started.getTime()
+        if (elapsed > 15 * 60 * 1000) {
+          await supabase
+            .from('automation_runs')
+            .update({
+              status: 'failed',
+              error_message: 'Video generation timed out (>15 min)',
+              completed_at: new Date().toISOString(),
+            })
+            .eq('id', run.id)
+          completed++
+        }
       }
+    } catch (err: any) {
+      console.error(`[Cron/Automations] Poll error for run ${run.id}:`, err.message)
     }
-
-    return NextResponse.json({ checked: pendingRuns.length, completed })
-
-  } catch (error: any) {
-    console.error('[Cron/Automations] Poll error:', error.message)
-    return NextResponse.json({ error: error.message }, { status: 500 })
   }
+
+  return { checked: pendingRuns.length, completed }
 }
 
 // =============================================
 // EXECUTE A SINGLE FLOW
 // =============================================
-async function executeFlow(supabase: any, flow: any) {
+async function executeFlow(supabase: any, appUrl: string, flow: any) {
   const influencer = flow.influencer
   if (!influencer) throw new Error('Influencer not found')
-
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
 
   // 1. Pick random scenario
   const scenarios = flow.scenarios || []
@@ -247,7 +253,7 @@ async function executeFlow(supabase: any, flow: any) {
 
     const promptRes = await fetch(`${appUrl}/api/studio/influencer/visual-analysis`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: cronHeaders(flow.user_id),
       body: JSON.stringify({
         influencerId: influencer.id,
         optimizeVideoPrompt: true,
@@ -259,11 +265,15 @@ async function executeFlow(supabase: any, flow: any) {
     })
 
     const promptData = await promptRes.json()
+
+    if (!promptRes.ok) {
+      console.error('[Cron] Prompt API error:', promptData.error || promptRes.status)
+    }
+
     let finalPrompt = ''
 
     if (promptData.optimized_prompt) {
       if (flow.video_preset === 'producto') {
-        // Sora: include descriptor
         finalPrompt = `${influencer.prompt_descriptor || ''}\n\n${promptData.optimized_prompt}`
       } else {
         finalPrompt = promptData.optimized_prompt
@@ -291,14 +301,13 @@ async function executeFlow(supabase: any, flow: any) {
       prompt: finalPrompt,
       duration: getDurationFromPreset(flow.video_preset),
       aspectRatio: '9:16',
-      enableAudio: flow.video_preset !== 'producto', // Sora no audio
+      enableAudio: flow.video_preset !== 'producto',
     }
 
     // For rapido/premium presets, include influencer image
     if (flow.video_preset !== 'producto') {
       const imageUrl = influencer.realistic_image_url || influencer.image_url
       if (imageUrl) {
-        // Fetch and convert to base64
         try {
           const imgRes = await fetch(imageUrl)
           if (imgRes.ok) {
@@ -341,7 +350,7 @@ async function executeFlow(supabase: any, flow: any) {
 
     const videoRes = await fetch(`${appUrl}/api/studio/generate-video`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: cronHeaders(flow.user_id),
       body: JSON.stringify(videoBody),
     })
 
@@ -408,10 +417,9 @@ async function generateCaption(appUrl: string, flow: any, scenario: string): Pro
     ? flow.voice_custom_instruction
     : VOICE_INSTRUCTIONS[flow.voice_style] || ''
 
-  // Use the system prompt + product info to generate caption
   const res = await fetch(`${appUrl}/api/studio/influencer/visual-analysis`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: cronHeaders(flow.user_id),
     body: JSON.stringify({
       influencerId: flow.influencer_id,
       generateCaption: true,
@@ -432,7 +440,7 @@ async function publishToSocial(appUrl: string, flow: any, videoUrl: string, capt
 
   const res = await fetch(`${appUrl}/api/publer/publish`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: cronHeaders(flow.user_id),
     body: JSON.stringify({
       accountIds,
       text: caption,
@@ -451,7 +459,6 @@ async function publishToSocial(appUrl: string, flow: any, videoUrl: string, capt
 // Calculate next run time based on schedule_times (Colombia UTC-5)
 function calculateNextRunAt(scheduleTimes: string[]): string {
   if (!scheduleTimes || scheduleTimes.length === 0) {
-    // Default: 1 hour from now
     return new Date(Date.now() + 60 * 60 * 1000).toISOString()
   }
 

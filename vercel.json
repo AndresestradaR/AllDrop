@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/automations",
-      "schedule": "0 * * * *"
+      "schedule": "*/10 * * * *"
     }
   ],
   "functions": {
@@ -13,6 +13,9 @@
       "maxDuration": 120
     },
     "app/api/studio/tools/route.ts": {
+      "maxDuration": 120
+    },
+    "app/api/cron/automations/route.ts": {
       "maxDuration": 120
     },
     "app/api/generate-landing/route.ts": {
