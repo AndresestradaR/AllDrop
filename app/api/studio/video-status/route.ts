@@ -48,12 +48,24 @@ async function checkStatus(taskId: string, apiKey: string) {
             ? JSON.parse(taskData.resultJson)
             : taskData.resultJson
 
+          console.log('[VideoStatus] Parsed resultJson keys:', Object.keys(result))
+          console.log('[VideoStatus] resultJson preview:', JSON.stringify(result).substring(0, 800))
+
           videoUrl = result.videoUrl ||
                      result.video_url ||
                      result.resultUrls?.[0] ||
                      result.videos?.[0] ||
                      result.url ||
                      result.output?.url
+
+          // Kling format: works[0].resource.resource
+          if (!videoUrl && result.works && Array.isArray(result.works) && result.works.length > 0) {
+            videoUrl = result.works[0]?.resource?.resource ||
+                       result.works[0]?.resource?.url ||
+                       result.works[0]?.url ||
+                       result.works[0]?.video_url
+            console.log('[VideoStatus] Found Kling works URL:', videoUrl?.substring(0, 100))
+          }
 
           audioUrl = result.audioUrl ||
                      result.audio_url ||
@@ -74,6 +86,8 @@ async function checkStatus(taskId: string, apiKey: string) {
         return { status: 'completed', videoUrl, audioUrl }
       }
 
+      // Log the full taskData so we can debug what field the URL is in
+      console.error('[VideoStatus] SUCCESS state but no URL found. Full taskData:', JSON.stringify(taskData).substring(0, 1500))
       return { status: 'failed', error: 'Task completed but URL not found' }
     }
 

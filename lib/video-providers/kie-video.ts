@@ -500,6 +500,14 @@ export async function checkVideoStatus(
                      result.videos?.[0] ||
                      result.url ||
                      result.output?.url
+
+          // Kling format: works[0].resource.resource
+          if (!videoUrl && result.works && Array.isArray(result.works) && result.works.length > 0) {
+            videoUrl = result.works[0]?.resource?.resource ||
+                       result.works[0]?.resource?.url ||
+                       result.works[0]?.url ||
+                       result.works[0]?.video_url
+          }
         } catch (e) {
           console.error('[Video] Failed to parse resultJson:', e)
         }
