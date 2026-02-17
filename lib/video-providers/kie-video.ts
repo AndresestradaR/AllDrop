@@ -353,10 +353,19 @@ async function generateStandardVideo(
     input.multi_shots = false // default to single shot
   }
 
+  // Kling 3.0: "mode" is REQUIRED ("pro" or "std")
+  if (isKling30) {
+    input.mode = 'pro'
+  }
+
   // Kling 3.0 multi-shot support
   if (isKling30 && request.multiShots && request.multiPrompt && request.multiPrompt.length > 0) {
     input.multi_shots = true
-    input.multi_prompt = request.multiPrompt
+    // multi_prompt durations are integers (not strings)
+    input.multi_prompt = request.multiPrompt.map(mp => ({
+      prompt: mp.prompt,
+      duration: Math.round(Number(mp.duration)),
+    }))
   }
 
   // Kling 3.0 element references
