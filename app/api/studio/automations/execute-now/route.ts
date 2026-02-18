@@ -36,6 +36,117 @@ function getDurationFromPreset(preset: string): number {
 }
 
 /**
+ * Resolve image hosting page URLs (ibb.co, imgur, etc.) to direct image URLs.
+ * Many users paste the page URL instead of the direct image link.
+ * This fetches the HTML page and extracts og:image meta tag.
+ */
+async function resolveImageUrl(url: string): Promise<string> {
+  // Already a direct image URL
+  if (/\.(jpg|jpeg|png|webp|gif|bmp)(\?.*)?$/i.test(url)) {
+    return url
+  }
+
+  // Already a known direct image host
+  if (url.includes('i.ibb.co/') || url.includes('i.imgur.com/') || url.includes('supabase.co/storage/')) {
+    return url
+  }
+
+  // ibb.co page URL → fetch HTML and extract og:image
+  // imgur.com page URL → same pattern
+  const needsResolve = url.includes('ibb.co/') || url.includes('imgur.com/')
+  if (!needsResolve) {
+    return url
+  }
+
+  try {
+    console.log(`[ResolveImage] Resolving page URL: ${url}`)
+    const controller = new AbortController()
+    const tid = setTimeout(() => controller.abort(), 8000)
+
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; bot)' },
+      signal: controller.signal,
+      redirect: 'follow',
+    })
+    clearTimeout(tid)
+
+    if (!res.ok) {
+      console.warn(`[ResolveImage] Page returned ${res.status}`)
+      return url
+    }
+
+    const contentType = res.headers.get('content-type') || ''
+
+    // If response is already an image, the URL was direct after all
+    if (contentType.startsWith('image/')) {
+      console.log(`[ResolveImage] URL is already direct image (${contentType})`)
+      return url
+    }
+
+    // Parse HTML to find og:image
+    const html = await res.text()
+
+    // Try og:image first (most reliable)
+    const ogMatch = html.match(/<meta\s+(?:property|name)="og:image"\s+content="([^"]+)"/i)
+      || html.match(/content="([^"]+)"\s+(?:property|name)="og:image"/i)
+    if (ogMatch?.[1]) {
+      console.log(`[ResolveImage] Found og:image: ${ogMatch[1]}`)
+      return ogMatch[1]
+    }
+
+    // Try image-url meta (imgbb specific)
+    const imgbbMatch = html.match(/<link\s+rel="image_src"\s+href="([^"]+)"/i)
+    if (imgbbMatch?.[1]) {
+      console.log(`[ResolveImage] Found image_src: ${imgbbMatch[1]}`)
+      return imgbbMatch[1]
+    }
+
+    // Try Twitter card image
+    const twMatch = html.match(/<meta\s+(?:property|name)="twitter:image"\s+content="([^"]+)"/i)
+      || html.match(/content="([^"]+)"\s+(?:property|name)="twitter:image"/i)
+    if (twMatch?.[1]) {
+      console.log(`[ResolveImage] Found twitter:image: ${twMatch[1]}`)
+      return twMatch[1]
+    }
+
+    console.warn(`[ResolveImage] Could not extract direct image URL from page`)
+    return url
+  } catch (err: any) {
+    console.warn(`[ResolveImage] Failed: ${err.message}`)
+    return url
+  }
+}
+
+/**
+ * Download an image URL and return its base64 + mime type.
+ * Validates that the response is actually an image.
+ */
+async function downloadImage(url: string): Promise<{ base64: string; mime: string } | null> {
+  try {
+    const res = await fetch(url)
+    if (!res.ok) {
+      console.warn(`[DownloadImage] HTTP ${res.status} for ${url.substring(0, 80)}`)
+      return null
+    }
+
+    const contentType = res.headers.get('content-type') || ''
+    if (!contentType.startsWith('image/')) {
+      console.warn(`[DownloadImage] Not an image: content-type=${contentType} for ${url.substring(0, 80)}`)
+      return null
+    }
+
+    const buffer = Buffer.from(await res.arrayBuffer())
+    return {
+      base64: buffer.toString('base64'),
+      mime: contentType,
+    }
+  } catch (err: any) {
+    console.warn(`[DownloadImage] Failed: ${err.message}`)
+    return null
+  }
+}
+
+/**
  * Composite influencer + product into a single start frame using Gemini.
  * Downloads both images, sends them to Gemini image generation,
  * uploads the result to Supabase Storage, and returns the public URL.
@@ -51,25 +162,30 @@ async function compositeStartFrame(
   promptDescriptor: string,
 ): Promise<string | null> {
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), 30000)
+  const timeoutId = setTimeout(() => controller.abort(), 45000)
 
   try {
-    // Download both images in parallel
-    const [influencerRes, productRes] = await Promise.all([
-      fetch(influencerImageUrl),
-      fetch(productImageUrl),
+    // Resolve hosting page URLs to direct image URLs
+    const resolvedProductUrl = await resolveImageUrl(productImageUrl)
+    const resolvedInfluencerUrl = await resolveImageUrl(influencerImageUrl)
+
+    console.log(`[Composite] Influencer: ${resolvedInfluencerUrl.substring(0, 80)}`)
+    console.log(`[Composite] Product: ${resolvedProductUrl.substring(0, 80)}`)
+
+    // Download both images in parallel with validation
+    const [influencerImg, productImg] = await Promise.all([
+      downloadImage(resolvedInfluencerUrl),
+      downloadImage(resolvedProductUrl),
     ])
 
-    if (!influencerRes.ok || !productRes.ok) {
-      console.warn('[Composite] Failed to download images')
+    if (!influencerImg) {
+      console.warn('[Composite] Failed to download influencer image')
       return null
     }
-
-    const influencerBase64 = Buffer.from(await influencerRes.arrayBuffer()).toString('base64')
-    const productBase64 = Buffer.from(await productRes.arrayBuffer()).toString('base64')
-
-    const influencerMime = influencerRes.headers.get('content-type') || 'image/jpeg'
-    const productMime = productRes.headers.get('content-type') || 'image/jpeg'
+    if (!productImg) {
+      console.warn('[Composite] Failed to download product image — URL may not be a direct image link')
+      return null
+    }
 
     const prompt = `Create a photorealistic image combining these two images:
 
@@ -87,7 +203,7 @@ RULES:
 - Vertical 9:16 portrait composition
 - No text overlays, no watermarks`
 
-    console.log(`[Composite] Sending to Gemini (influencer: ${(influencerBase64.length / 1024).toFixed(0)}KB, product: ${(productBase64.length / 1024).toFixed(0)}KB)`)
+    console.log(`[Composite] Sending to Gemini (influencer: ${(influencerImg.base64.length / 1024).toFixed(0)}KB [${influencerImg.mime}], product: ${(productImg.base64.length / 1024).toFixed(0)}KB [${productImg.mime}])`)
 
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${googleApiKey}`,
@@ -97,8 +213,8 @@ RULES:
         body: JSON.stringify({
           contents: [{
             parts: [
-              { inline_data: { mime_type: influencerMime, data: influencerBase64 } },
-              { inline_data: { mime_type: productMime, data: productBase64 } },
+              { inline_data: { mime_type: influencerImg.mime, data: influencerImg.base64 } },
+              { inline_data: { mime_type: productImg.mime, data: productImg.base64 } },
               { text: prompt },
             ],
           }],
