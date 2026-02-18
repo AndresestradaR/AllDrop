@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { decrypt } from '@/lib/services/encryption'
 import {
-  getPublerCredentials,
-  getAccounts,
-  uploadMediaDirect,
-  downloadFileAsBuffer,
-  pollJobUntilComplete,
-} from '@/lib/services/publer'
+  generateVideo,
+  VIDEO_MODELS,
+  type VideoModelId,
+} from '@/lib/video-providers'
 
 export const maxDuration = 120
 
@@ -18,12 +17,12 @@ const VOICE_INSTRUCTIONS: Record<string, string> = {
   personalizada: '',
 }
 
-function getModelIdFromPreset(preset: string): string {
+function getModelIdFromPreset(preset: string): VideoModelId {
   switch (preset) {
-    case 'producto': return 'sora-2'
-    case 'rapido': return 'veo-3-fast'
-    case 'premium': return 'kling-3.0'
-    default: return 'veo-3-fast'
+    case 'producto': return 'sora-2' as VideoModelId
+    case 'rapido': return 'veo-3-fast' as VideoModelId
+    case 'premium': return 'kling-3.0' as VideoModelId
+    default: return 'veo-3-fast' as VideoModelId
   }
 }
 
@@ -37,8 +36,63 @@ function getDurationFromPreset(preset: string): number {
 }
 
 /**
+ * Optimize video prompt using Gemini directly (no HTTP sub-request)
+ */
+async function optimizePrompt(
+  apiKey: string,
+  promptDescriptor: string,
+  userIdea: string,
+  modelId: string,
+  presetId: string,
+): Promise<string> {
+  const system = `You are an expert video prompt optimizer for AI video generation models. Your job is to take a character description and a user's video idea, and produce a highly detailed, model-optimized prompt.
+
+RULES:
+1. Output ONLY the optimized prompt text - no explanations, no markdown.
+2. Keep the character description intact but enhance the scene details.
+3. Add camera movements, lighting, and mood descriptions.
+4. Keep the prompt under 500 characters for Kling models, under 1000 for others.
+5. For UGC/dropshipping content: natural, iPhone-style, candid feel.
+6. Always include "speaks in Spanish" when dialogue is involved.
+7. The character must match the descriptor exactly.`
+
+  const userMessage = `CHARACTER DESCRIPTOR: ${promptDescriptor}
+VIDEO IDEA: ${userIdea}
+TARGET MODEL: ${modelId}
+PRESET: ${presetId}
+
+Generate an optimized video prompt.`
+
+  const models = ['gemini-2.5-pro-preview-06-05', 'gemini-2.0-flash']
+  for (const model of models) {
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: system }] },
+            contents: [{ parts: [{ text: userMessage }] }],
+            generationConfig: { temperature: 0.7, maxOutputTokens: 1024 },
+          }),
+        }
+      )
+      if (res.ok) {
+        const data = await res.json()
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+        if (text.trim()) return text.trim()
+      }
+    } catch {
+      continue
+    }
+  }
+  return ''
+}
+
+/**
  * POST — Execute a flow immediately (manual trigger)
- * Runs the full pipeline: generate prompt → generate video → poll → publish
+ * Calls APIs directly — no internal HTTP sub-requests that would hit the middleware.
  */
 export async function POST(request: Request) {
   try {
@@ -75,6 +129,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Influencer no encontrado' }, { status: 400 })
     }
 
+    // Get API keys
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('google_api_key, kie_api_key')
+      .eq('id', user.id)
+      .single()
+
+    if (!profile?.kie_api_key) {
+      return NextResponse.json({ error: 'Configura tu API key de KIE.ai en Settings' }, { status: 400 })
+    }
+
+    const kieApiKey = decrypt(profile.kie_api_key)
+    const googleApiKey = profile.google_api_key ? decrypt(profile.google_api_key) : null
+
     // 1. Pick random scenario
     const scenarios = flow.scenarios || []
     const scenario = scenarios.length > 0
@@ -98,47 +166,38 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: `Error creando run: ${runError.message}` }, { status: 500 })
     }
 
-    // 3. Generate prompt via visual-analysis
+    // 3. Generate optimized prompt (direct Gemini call)
     const voiceInstruction = flow.voice_style === 'personalizada'
       ? flow.voice_custom_instruction
       : VOICE_INSTRUCTIONS[flow.voice_style] || VOICE_INSTRUCTIONS.latina
 
     const userIdea = `${scenario}. Producto: ${flow.product_name}. ${flow.product_benefits ? `Beneficios: ${flow.product_benefits}.` : ''} ${voiceInstruction}`
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-
+    const modelId = getModelIdFromPreset(flow.video_preset)
     let finalPrompt = userIdea
-    try {
-      const promptRes = await fetch(`${appUrl}/api/studio/influencer/visual-analysis`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-cron-secret': process.env.CRON_SECRET || '',
-          'x-user-id': user.id,
-        },
-        body: JSON.stringify({
-          influencerId: influencer.id,
-          optimizeVideoPrompt: true,
-          videoModelId: getModelIdFromPreset(flow.video_preset),
-          userIdea,
-          promptDescriptor: influencer.prompt_descriptor || '',
-          presetId: flow.video_preset,
-        }),
-      })
 
-      const promptData = await promptRes.json()
-      if (promptData.optimized_prompt) {
-        if (flow.video_preset === 'producto') {
-          finalPrompt = `${influencer.prompt_descriptor || ''}\n\n${promptData.optimized_prompt}`
-        } else {
-          finalPrompt = promptData.optimized_prompt
-          if (!finalPrompt.toLowerCase().includes('español')) {
-            finalPrompt += `. ${voiceInstruction}`
+    if (googleApiKey) {
+      try {
+        const optimized = await optimizePrompt(
+          googleApiKey,
+          influencer.prompt_descriptor || '',
+          userIdea,
+          modelId,
+          flow.video_preset,
+        )
+        if (optimized) {
+          if (flow.video_preset === 'producto') {
+            finalPrompt = `${influencer.prompt_descriptor || ''}\n\n${optimized}`
+          } else {
+            finalPrompt = optimized
+            if (!finalPrompt.toLowerCase().includes('español')) {
+              finalPrompt += `. ${voiceInstruction}`
+            }
           }
         }
+      } catch (err: any) {
+        console.warn('[ExecuteNow] Prompt optimization failed, using raw:', err.message)
       }
-    } catch (promptErr: any) {
-      console.warn('[ExecuteNow] Prompt optimization failed, using raw:', promptErr.message)
     }
 
     // Update run with prompt
@@ -147,90 +206,72 @@ export async function POST(request: Request) {
       .update({
         prompt_generated: finalPrompt,
         status: 'generating_video',
-        video_model: getModelIdFromPreset(flow.video_preset),
+        video_model: modelId,
       })
       .eq('id', run.id)
 
-    // 4. Generate video
-    const videoBody: any = {
-      modelId: getModelIdFromPreset(flow.video_preset),
+    // 4. Generate video directly via lib (no HTTP sub-request)
+    const modelConfig = VIDEO_MODELS[modelId]
+    const imageUrls: string[] = []
+
+    // Get image URL
+    if (flow.video_preset !== 'producto') {
+      const imgUrl = influencer.realistic_image_url || influencer.image_url
+      if (imgUrl && modelConfig?.supportsStartEndFrames) {
+        imageUrls.push(imgUrl)
+      }
+    } else if (flow.product_image_url && modelConfig?.supportsStartEndFrames) {
+      imageUrls.push(flow.product_image_url)
+    }
+
+    // For Veo, need to upload images differently
+    let veoGenerationType: string | undefined
+    if (flow.video_preset === 'rapido') {
+      if (imageUrls.length > 0) {
+        veoGenerationType = 'FIRST_AND_LAST_FRAMES_2_VIDEO'
+      } else {
+        veoGenerationType = 'TEXT_2_VIDEO'
+      }
+    }
+
+    const generationParams: Parameters<typeof generateVideo>[0] = {
+      modelId,
       prompt: finalPrompt,
       duration: getDurationFromPreset(flow.video_preset),
       aspectRatio: '9:16',
+      resolution: modelConfig?.defaultResolution,
       enableAudio: flow.video_preset !== 'producto',
+      imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
+      veoGenerationType,
     }
 
-    // Include influencer image for non-producto presets
-    if (flow.video_preset !== 'producto') {
-      const imageUrl = influencer.realistic_image_url || influencer.image_url
-      if (imageUrl) {
-        videoBody.imageUrl = imageUrl // Use direct URL (no base64 round-trip)
-      }
-    }
+    console.log(`[ExecuteNow] Generating video: model=${modelId}, prompt=${finalPrompt.substring(0, 100)}...`)
 
-    // Product image for producto preset
-    if (flow.video_preset === 'producto' && flow.product_image_url) {
-      videoBody.imageUrl = flow.product_image_url
-    }
+    const result = await generateVideo(generationParams, kieApiKey)
 
-    // Veo preset adjustments
-    if (flow.video_preset === 'rapido') {
-      if (videoBody.imageUrl) {
-        // Veo needs veoImages array, download and convert
-        try {
-          const imgRes = await fetch(videoBody.imageUrl)
-          if (imgRes.ok) {
-            const imgBuffer = await imgRes.arrayBuffer()
-            const base64 = Buffer.from(imgBuffer).toString('base64')
-            const contentType = imgRes.headers.get('content-type') || 'image/png'
-            videoBody.veoImages = [`data:${contentType};base64,${base64}`]
-            videoBody.veoGenerationType = 'FIRST_AND_LAST_FRAMES_2_VIDEO'
-            delete videoBody.imageUrl
-          }
-        } catch {
-          videoBody.veoGenerationType = 'TEXT_2_VIDEO'
-          delete videoBody.imageUrl
-        }
-      } else {
-        videoBody.veoGenerationType = 'TEXT_2_VIDEO'
-      }
-    }
-
-    const videoRes = await fetch(`${appUrl}/api/studio/generate-video`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-cron-secret': process.env.CRON_SECRET || '',
-        'x-user-id': user.id,
-      },
-      body: JSON.stringify(videoBody),
-    })
-
-    const videoData = await videoRes.json()
-
-    if (!videoRes.ok || (!videoData.success && !videoData.taskId)) {
+    if (!result.success || !result.taskId) {
       await supabase
         .from('automation_runs')
-        .update({ status: 'failed', error_message: videoData.error || 'Error generating video', completed_at: new Date().toISOString() })
+        .update({ status: 'failed', error_message: result.error || 'Error generating video', completed_at: new Date().toISOString() })
         .eq('id', run.id)
-      return NextResponse.json({ error: videoData.error || 'Error generando video' }, { status: 500 })
+      return NextResponse.json({ error: result.error || 'Error generando video' }, { status: 500 })
     }
 
-    // Save task ID
+    // Save task ID — cron will poll for completion and publish
     await supabase
       .from('automation_runs')
       .update({
-        video_task_id: videoData.taskId || null,
+        video_task_id: result.taskId,
         status: 'generating_video',
       })
       .eq('id', run.id)
 
-    // Return immediately — the cron will poll for completion and publish
-    // Or the user can watch from the runs view
+    console.log(`[ExecuteNow] Video task created: ${result.taskId}`)
+
     return NextResponse.json({
       success: true,
       runId: run.id,
-      taskId: videoData.taskId,
+      taskId: result.taskId,
       scenario,
       status: 'generating_video',
       message: 'Ejecucion iniciada. El video se generara y publicara automaticamente.',
