@@ -36,6 +36,137 @@ function getDurationFromPreset(preset: string): number {
 }
 
 /**
+ * Composite influencer + product into a single start frame using Gemini.
+ * Downloads both images, sends them to Gemini image generation,
+ * uploads the result to Supabase Storage, and returns the public URL.
+ * Returns null on failure (caller falls back to influencer-only image).
+ */
+async function compositeStartFrame(
+  googleApiKey: string,
+  supabase: any,
+  userId: string,
+  influencerImageUrl: string,
+  productImageUrl: string,
+  productName: string,
+  promptDescriptor: string,
+): Promise<string | null> {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 30000)
+
+  try {
+    // Download both images in parallel
+    const [influencerRes, productRes] = await Promise.all([
+      fetch(influencerImageUrl),
+      fetch(productImageUrl),
+    ])
+
+    if (!influencerRes.ok || !productRes.ok) {
+      console.warn('[Composite] Failed to download images')
+      return null
+    }
+
+    const influencerBase64 = Buffer.from(await influencerRes.arrayBuffer()).toString('base64')
+    const productBase64 = Buffer.from(await productRes.arrayBuffer()).toString('base64')
+
+    const influencerMime = influencerRes.headers.get('content-type') || 'image/jpeg'
+    const productMime = productRes.headers.get('content-type') || 'image/jpeg'
+
+    const prompt = `Create a photorealistic image combining these two images:
+
+IMAGE 1 (person): ${promptDescriptor || 'The person shown'}
+IMAGE 2 (product): "${productName}"
+
+TASK: Generate a natural, candid photo where the EXACT person from image 1 is holding or showing the EXACT product from image 2.
+
+RULES:
+- The person must look IDENTICAL to image 1 (same face, hair, skin, features)
+- The product must look IDENTICAL to image 2 (same packaging, label, colors)
+- Natural UGC/influencer selfie style - like an iPhone photo
+- The person holds the product naturally near their face or chest
+- Soft natural lighting, slightly warm tones
+- Vertical 9:16 portrait composition
+- No text overlays, no watermarks`
+
+    console.log(`[Composite] Sending to Gemini (influencer: ${(influencerBase64.length / 1024).toFixed(0)}KB, product: ${(productBase64.length / 1024).toFixed(0)}KB)`)
+
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${googleApiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { inline_data: { mime_type: influencerMime, data: influencerBase64 } },
+              { inline_data: { mime_type: productMime, data: productBase64 } },
+              { text: prompt },
+            ],
+          }],
+          generationConfig: {
+            responseModalities: ['IMAGE'],
+            imageConfig: { aspectRatio: '9:16' },
+          },
+        }),
+        signal: controller.signal,
+      }
+    )
+    clearTimeout(timeoutId)
+
+    if (!res.ok) {
+      console.warn(`[Composite] Gemini returned ${res.status}`)
+      return null
+    }
+
+    const data = await res.json()
+
+    // Extract generated image
+    let imageBase64: string | null = null
+    let mimeType = 'image/png'
+    for (const candidate of data.candidates || []) {
+      for (const part of candidate.content?.parts || []) {
+        if (part.inlineData?.data) {
+          imageBase64 = part.inlineData.data
+          mimeType = part.inlineData.mimeType || 'image/png'
+          break
+        }
+      }
+      if (imageBase64) break
+    }
+
+    if (!imageBase64) {
+      console.warn('[Composite] No image in Gemini response')
+      return null
+    }
+
+    // Upload to Supabase Storage
+    const ext = mimeType.includes('png') ? 'png' : 'jpg'
+    const filename = `studio/video/${userId}/composite-${Date.now()}.${ext}`
+    const buffer = Buffer.from(imageBase64, 'base64')
+
+    const { error: uploadError } = await supabase.storage
+      .from('landing-images')
+      .upload(filename, buffer, { contentType: mimeType, upsert: true })
+
+    if (uploadError) {
+      console.warn('[Composite] Upload failed:', uploadError.message)
+      return null
+    }
+
+    const { data: urlData } = supabase.storage
+      .from('landing-images')
+      .getPublicUrl(filename)
+
+    console.log(`[Composite] Success: ${urlData.publicUrl}`)
+    return urlData.publicUrl
+
+  } catch (err: any) {
+    clearTimeout(timeoutId)
+    console.warn(`[Composite] Failed: ${err.name === 'AbortError' ? 'TIMEOUT (30s)' : err.message}`)
+    return null
+  }
+}
+
+/**
  * Optimize video prompt using Gemini with strict timeout
  */
 async function optimizePrompt(
@@ -242,11 +373,34 @@ export async function POST(request: Request) {
     const modelConfig = VIDEO_MODELS[modelId]
     const imageUrls: string[] = []
 
-    // Get image URL
+    // Get image URL — composite influencer+product when both exist
     if (flow.video_preset !== 'producto') {
-      const imgUrl = influencer.realistic_image_url || influencer.image_url
-      if (imgUrl && modelConfig?.supportsStartEndFrames) {
-        imageUrls.push(imgUrl)
+      const influencerImgUrl = influencer.realistic_image_url || influencer.image_url
+
+      if (influencerImgUrl && flow.product_image_url && googleApiKey && modelConfig?.supportsStartEndFrames) {
+        // Composite: influencer holding product → single start frame
+        timing('Starting composite')
+        const compositeUrl = await compositeStartFrame(
+          googleApiKey,
+          supabase,
+          user.id,
+          influencerImgUrl,
+          flow.product_image_url,
+          flow.product_name || 'producto',
+          influencer.prompt_descriptor || '',
+        )
+        timing('Composite done')
+
+        if (compositeUrl) {
+          imageUrls.push(compositeUrl)
+          console.log(`[ExecuteNow] Using composite start frame`)
+        } else {
+          // Fallback: just the influencer image
+          imageUrls.push(influencerImgUrl)
+          console.log(`[ExecuteNow] Composite failed, using influencer image only`)
+        }
+      } else if (influencerImgUrl && modelConfig?.supportsStartEndFrames) {
+        imageUrls.push(influencerImgUrl)
       }
     } else if (flow.product_image_url && modelConfig?.supportsStartEndFrames) {
       imageUrls.push(flow.product_image_url)
