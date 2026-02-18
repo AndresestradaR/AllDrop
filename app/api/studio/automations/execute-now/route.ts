@@ -118,171 +118,6 @@ async function resolveImageUrl(url: string): Promise<string> {
 }
 
 /**
- * Download an image URL and return its base64 + mime type.
- * Validates that the response is actually an image.
- */
-async function downloadImage(url: string): Promise<{ base64: string; mime: string } | null> {
-  try {
-    const res = await fetch(url)
-    if (!res.ok) {
-      console.warn(`[DownloadImage] HTTP ${res.status} for ${url.substring(0, 80)}`)
-      return null
-    }
-
-    const contentType = res.headers.get('content-type') || ''
-    if (!contentType.startsWith('image/')) {
-      console.warn(`[DownloadImage] Not an image: content-type=${contentType} for ${url.substring(0, 80)}`)
-      return null
-    }
-
-    const buffer = Buffer.from(await res.arrayBuffer())
-    return {
-      base64: buffer.toString('base64'),
-      mime: contentType,
-    }
-  } catch (err: any) {
-    console.warn(`[DownloadImage] Failed: ${err.message}`)
-    return null
-  }
-}
-
-/**
- * Composite influencer + product into a single start frame using Gemini.
- * Downloads both images, sends them to Gemini image generation,
- * uploads the result to Supabase Storage, and returns the public URL.
- * Returns null on failure (caller falls back to influencer-only image).
- */
-async function compositeStartFrame(
-  googleApiKey: string,
-  supabase: any,
-  userId: string,
-  influencerImageUrl: string,
-  productImageUrl: string,
-  productName: string,
-  promptDescriptor: string,
-): Promise<string | null> {
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), 45000)
-
-  try {
-    // Resolve hosting page URLs to direct image URLs
-    const resolvedProductUrl = await resolveImageUrl(productImageUrl)
-    const resolvedInfluencerUrl = await resolveImageUrl(influencerImageUrl)
-
-    console.log(`[Composite] Influencer: ${resolvedInfluencerUrl.substring(0, 80)}`)
-    console.log(`[Composite] Product: ${resolvedProductUrl.substring(0, 80)}`)
-
-    // Download both images in parallel with validation
-    const [influencerImg, productImg] = await Promise.all([
-      downloadImage(resolvedInfluencerUrl),
-      downloadImage(resolvedProductUrl),
-    ])
-
-    if (!influencerImg) {
-      console.warn('[Composite] Failed to download influencer image')
-      return null
-    }
-    if (!productImg) {
-      console.warn('[Composite] Failed to download product image — URL may not be a direct image link')
-      return null
-    }
-
-    const prompt = `Create a photorealistic image combining these two images:
-
-IMAGE 1 (person): ${promptDescriptor || 'The person shown'}
-IMAGE 2 (product): "${productName}"
-
-TASK: Generate a natural, candid photo where the EXACT person from image 1 is holding or showing the EXACT product from image 2.
-
-RULES:
-- The person must look IDENTICAL to image 1 (same face, hair, skin, features)
-- The product must look IDENTICAL to image 2 (same packaging, label, colors)
-- Natural UGC/influencer selfie style - like an iPhone photo
-- The person holds the product naturally near their face or chest
-- Soft natural lighting, slightly warm tones
-- Vertical 9:16 portrait composition
-- No text overlays, no watermarks`
-
-    console.log(`[Composite] Sending to Gemini (influencer: ${(influencerImg.base64.length / 1024).toFixed(0)}KB [${influencerImg.mime}], product: ${(productImg.base64.length / 1024).toFixed(0)}KB [${productImg.mime}])`)
-
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${googleApiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              { inline_data: { mime_type: influencerImg.mime, data: influencerImg.base64 } },
-              { inline_data: { mime_type: productImg.mime, data: productImg.base64 } },
-              { text: prompt },
-            ],
-          }],
-          generationConfig: {
-            responseModalities: ['IMAGE'],
-            imageConfig: { aspectRatio: '9:16' },
-          },
-        }),
-        signal: controller.signal,
-      }
-    )
-    clearTimeout(timeoutId)
-
-    if (!res.ok) {
-      console.warn(`[Composite] Gemini returned ${res.status}`)
-      return null
-    }
-
-    const data = await res.json()
-
-    // Extract generated image
-    let imageBase64: string | null = null
-    let mimeType = 'image/png'
-    for (const candidate of data.candidates || []) {
-      for (const part of candidate.content?.parts || []) {
-        if (part.inlineData?.data) {
-          imageBase64 = part.inlineData.data
-          mimeType = part.inlineData.mimeType || 'image/png'
-          break
-        }
-      }
-      if (imageBase64) break
-    }
-
-    if (!imageBase64) {
-      console.warn('[Composite] No image in Gemini response')
-      return null
-    }
-
-    // Upload to Supabase Storage
-    const ext = mimeType.includes('png') ? 'png' : 'jpg'
-    const filename = `studio/video/${userId}/composite-${Date.now()}.${ext}`
-    const buffer = Buffer.from(imageBase64, 'base64')
-
-    const { error: uploadError } = await supabase.storage
-      .from('landing-images')
-      .upload(filename, buffer, { contentType: mimeType, upsert: true })
-
-    if (uploadError) {
-      console.warn('[Composite] Upload failed:', uploadError.message)
-      return null
-    }
-
-    const { data: urlData } = supabase.storage
-      .from('landing-images')
-      .getPublicUrl(filename)
-
-    console.log(`[Composite] Success: ${urlData.publicUrl}`)
-    return urlData.publicUrl
-
-  } catch (err: any) {
-    clearTimeout(timeoutId)
-    console.warn(`[Composite] Failed: ${err.name === 'AbortError' ? 'TIMEOUT (30s)' : err.message}`)
-    return null
-  }
-}
-
-/**
  * Optimize video prompt using Gemini with strict timeout
  */
 async function optimizePrompt(
@@ -489,43 +324,34 @@ export async function POST(request: Request) {
     const modelConfig = VIDEO_MODELS[modelId]
     const imageUrls: string[] = []
 
-    // Get image URL — composite influencer+product when both exist
+    // Resolve product image URL (ibb.co page → direct image URL)
+    let resolvedProductUrl: string | null = null
+    if (flow.product_image_url) {
+      resolvedProductUrl = await resolveImageUrl(flow.product_image_url)
+      console.log(`[ExecuteNow] Product image: ${flow.product_image_url} → ${resolvedProductUrl}`)
+    }
+
+    // Build image list for video generation
     if (flow.video_preset !== 'producto') {
       const influencerImgUrl = influencer.realistic_image_url || influencer.image_url
-
-      if (influencerImgUrl && flow.product_image_url && googleApiKey && modelConfig?.supportsStartEndFrames) {
-        // Composite: influencer holding product → single start frame
-        timing('Starting composite')
-        const compositeUrl = await compositeStartFrame(
-          googleApiKey,
-          supabase,
-          user.id,
-          influencerImgUrl,
-          flow.product_image_url,
-          flow.product_name || 'producto',
-          influencer.prompt_descriptor || '',
-        )
-        timing('Composite done')
-
-        if (compositeUrl) {
-          imageUrls.push(compositeUrl)
-          console.log(`[ExecuteNow] Using composite start frame`)
-        } else {
-          // Fallback: just the influencer image
-          imageUrls.push(influencerImgUrl)
-          console.log(`[ExecuteNow] Composite failed, using influencer image only`)
-        }
-      } else if (influencerImgUrl && modelConfig?.supportsStartEndFrames) {
+      if (influencerImgUrl && modelConfig?.supportsStartEndFrames) {
         imageUrls.push(influencerImgUrl)
       }
-    } else if (flow.product_image_url && modelConfig?.supportsStartEndFrames) {
-      imageUrls.push(flow.product_image_url)
+      // Add product image as second reference (Veo REFERENCE_2_VIDEO supports up to 3)
+      if (resolvedProductUrl) {
+        imageUrls.push(resolvedProductUrl)
+      }
+    } else if (resolvedProductUrl && modelConfig?.supportsStartEndFrames) {
+      imageUrls.push(resolvedProductUrl)
     }
 
     // For Veo, set generation type
     let veoGenerationType: 'TEXT_2_VIDEO' | 'FIRST_AND_LAST_FRAMES_2_VIDEO' | 'REFERENCE_2_VIDEO' | undefined
     if (flow.video_preset === 'rapido') {
-      if (imageUrls.length > 0) {
+      if (imageUrls.length >= 2) {
+        // Both influencer + product → REFERENCE mode so Veo sees both
+        veoGenerationType = 'REFERENCE_2_VIDEO'
+      } else if (imageUrls.length === 1) {
         veoGenerationType = 'FIRST_AND_LAST_FRAMES_2_VIDEO'
       } else {
         veoGenerationType = 'TEXT_2_VIDEO'
