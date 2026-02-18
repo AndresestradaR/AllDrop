@@ -7,6 +7,8 @@ import {
   type VideoModelId,
 } from '@/lib/video-providers'
 
+import sharp from 'sharp'
+
 export const maxDuration = 120
 
 const VOICE_INSTRUCTIONS: Record<string, string> = {
@@ -114,6 +116,65 @@ async function resolveImageUrl(url: string): Promise<string> {
   } catch (err: any) {
     console.warn(`[ResolveImage] Failed: ${err.message}`)
     return url
+  }
+}
+
+/**
+ * Download an image from any URL and re-upload to Supabase as JPEG.
+ * Kling 3.0 only accepts jpeg/jpg/png - external URLs (ibb.co, etc.)
+ * often serve webp which Kling rejects.
+ */
+async function ensureJpegUrl(
+  url: string,
+  supabase: any,
+  userId: string,
+  label: string
+): Promise<string> {
+  // Supabase storage URLs with .jpg/.jpeg/.png extension are already OK
+  if (url.includes('supabase.co/storage/') && /\.(jpg|jpeg|png)(\?.*)?$/i.test(url)) {
+    return url
+  }
+
+  try {
+    console.log(`[EnsureJpeg] Converting: ${url.substring(0, 80)}...`)
+    const controller = new AbortController()
+    const tid = setTimeout(() => controller.abort(), 10000)
+
+    const res = await fetch(url, { signal: controller.signal, redirect: 'follow' })
+    clearTimeout(tid)
+
+    if (!res.ok) {
+      console.warn(`[EnsureJpeg] Download failed: ${res.status}`)
+      return url // fallback to original
+    }
+
+    const arrayBuffer = await res.arrayBuffer()
+    const inputBuffer = Buffer.from(arrayBuffer)
+
+    // Convert to JPEG using sharp (handles png, webp, avif, etc.)
+    const jpegBuffer = await sharp(inputBuffer)
+      .jpeg({ quality: 90 })
+      .toBuffer()
+
+    const filename = `studio/video/${userId}/auto-${label}-${Date.now()}.jpg`
+    const { error: uploadErr } = await supabase.storage
+      .from('landing-images')
+      .upload(filename, jpegBuffer, { contentType: 'image/jpeg', upsert: true })
+
+    if (uploadErr) {
+      console.warn(`[EnsureJpeg] Upload failed: ${uploadErr.message}`)
+      return url
+    }
+
+    const { data: urlData } = supabase.storage
+      .from('landing-images')
+      .getPublicUrl(filename)
+
+    console.log(`[EnsureJpeg] OK: ${urlData.publicUrl}`)
+    return urlData.publicUrl
+  } catch (err: any) {
+    console.warn(`[EnsureJpeg] Failed: ${err.message}`)
+    return url // fallback
   }
 }
 
@@ -332,18 +393,29 @@ export async function POST(request: Request) {
       console.log(`[ExecuteNow] Product image: ${flow.product_image_url} → ${resolvedProductUrl}`)
     }
 
+    // Kling 3.0 only accepts jpeg/jpg/png - convert images via sharp
+    const isKling = flow.video_preset === 'premium'
+
     // Build image list for video generation
     if (flow.video_preset !== 'producto') {
       const influencerImgUrl = influencer.realistic_image_url || influencer.image_url
       if (influencerImgUrl && modelConfig?.supportsStartEndFrames) {
-        imageUrls.push(influencerImgUrl)
+        const url = isKling
+          ? await ensureJpegUrl(influencerImgUrl, supabase, user.id, 'influencer')
+          : influencerImgUrl
+        imageUrls.push(url)
       }
-      // Add product image as second reference (Veo REFERENCE_2_VIDEO supports up to 3)
       if (resolvedProductUrl) {
-        imageUrls.push(resolvedProductUrl)
+        const url = isKling
+          ? await ensureJpegUrl(resolvedProductUrl, supabase, user.id, 'product')
+          : resolvedProductUrl
+        imageUrls.push(url)
       }
     } else if (resolvedProductUrl && modelConfig?.supportsStartEndFrames) {
-      imageUrls.push(resolvedProductUrl)
+      const url = isKling
+        ? await ensureJpegUrl(resolvedProductUrl, supabase, user.id, 'product')
+        : resolvedProductUrl
+      imageUrls.push(url)
     }
 
     // For Veo, set generation type
