@@ -354,8 +354,10 @@ async function generateStandardVideo(
   }
 
   // Kling 3.0: "mode" is REQUIRED ("pro" or "std")
+  // multi_shots is also REQUIRED (boolean) — KIE rejects if missing
   if (isKling30) {
     input.mode = 'pro'
+    input.multi_shots = false
   }
 
   // Kling 3.0 multi-shot support

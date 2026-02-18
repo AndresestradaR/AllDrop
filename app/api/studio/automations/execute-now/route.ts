@@ -30,7 +30,7 @@ function getDurationFromPreset(preset: string): number {
   switch (preset) {
     case 'producto': return 10
     case 'rapido': return 8
-    case 'premium': return 10
+    case 'premium': return 15
     default: return 8
   }
 }
