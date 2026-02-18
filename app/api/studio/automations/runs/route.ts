@@ -66,13 +66,26 @@ export async function POST(request: Request) {
     const body = await request.json()
     const { run_id, action, caption, video_url } = body as {
       run_id: string
-      action: 'approve' | 'reject' | 'complete'
+      action: 'approve' | 'reject' | 'complete' | 'delete'
       caption?: string
       video_url?: string
     }
 
     if (!run_id || !action) {
       return NextResponse.json({ error: 'run_id y action son requeridos' }, { status: 400 })
+    }
+
+    // Handle delete — no need to fetch the full run
+    if (action === 'delete') {
+      const { error: delError } = await supabase
+        .from('automation_runs')
+        .delete()
+        .eq('id', run_id)
+        .eq('user_id', user.id)
+      if (delError) {
+        return NextResponse.json({ error: delError.message }, { status: 500 })
+      }
+      return NextResponse.json({ success: true, status: 'deleted' })
     }
 
     // Fetch run

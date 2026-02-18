@@ -330,6 +330,20 @@ export function AutoPublisherTool({ onBack }: AutoPublisherToolProps) {
     }
   }
 
+  const handleDeleteRun = async (runId: string) => {
+    try {
+      await fetch('/api/studio/automations/runs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ run_id: runId, action: 'delete' }),
+      })
+      toast.success('Eliminado')
+      await loadRuns()
+    } catch {
+      toast.error('Error al eliminar')
+    }
+  }
+
   // =============================================
   // RENDER
   // =============================================
@@ -358,6 +372,7 @@ export function AutoPublisherTool({ onBack }: AutoPublisherToolProps) {
         onBack={() => { setView('list'); setSelectedFlowId(null) }}
         onApprove={handleApproveRun}
         onReject={handleRejectRun}
+        onDelete={handleDeleteRun}
         onRefresh={() => loadRuns(selectedFlowId)}
       />
     )
@@ -703,6 +718,7 @@ function RunsView({
   onBack,
   onApprove,
   onReject,
+  onDelete,
   onRefresh,
 }: {
   flow: AutomationFlow | null
@@ -710,6 +726,7 @@ function RunsView({
   onBack: () => void
   onApprove: (runId: string, caption?: string) => void
   onReject: (runId: string) => void
+  onDelete: (runId: string) => void
   onRefresh: () => void
 }) {
   return (
@@ -771,22 +788,33 @@ function RunsView({
                         )}
                       </div>
 
-                      {['awaiting_approval', 'video_ready'].includes(run.status) && (
-                        <div className="flex gap-1">
+                      <div className="flex gap-1">
+                        {['awaiting_approval', 'video_ready'].includes(run.status) && (
+                          <>
+                            <button
+                              onClick={() => onReject(run.id)}
+                              className="p-1.5 bg-red-500/10 hover:bg-red-500/20 rounded-lg text-red-400"
+                            >
+                              <ThumbsDown className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => onApprove(run.id)}
+                              className="p-1.5 bg-green-500/10 hover:bg-green-500/20 rounded-lg text-green-400"
+                            >
+                              <ThumbsUp className="w-3.5 h-3.5" />
+                            </button>
+                          </>
+                        )}
+                        {['generating_video', 'generating_prompt', 'failed', 'rejected'].includes(run.status) && (
                           <button
-                            onClick={() => onReject(run.id)}
+                            onClick={() => onDelete(run.id)}
                             className="p-1.5 bg-red-500/10 hover:bg-red-500/20 rounded-lg text-red-400"
+                            title="Eliminar"
                           >
-                            <ThumbsDown className="w-3.5 h-3.5" />
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
-                          <button
-                            onClick={() => onApprove(run.id)}
-                            className="p-1.5 bg-green-500/10 hover:bg-green-500/20 rounded-lg text-green-400"
-                          >
-                            <ThumbsUp className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
                   </div>
                 )
