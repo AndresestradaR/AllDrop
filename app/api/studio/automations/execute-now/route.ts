@@ -225,7 +225,7 @@ export async function POST(request: Request) {
     }
 
     // For Veo, need to upload images differently
-    let veoGenerationType: string | undefined
+    let veoGenerationType: 'TEXT_2_VIDEO' | 'FIRST_AND_LAST_FRAMES_2_VIDEO' | 'REFERENCE_2_VIDEO' | undefined
     if (flow.video_preset === 'rapido') {
       if (imageUrls.length > 0) {
         veoGenerationType = 'FIRST_AND_LAST_FRAMES_2_VIDEO'
