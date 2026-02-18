@@ -241,14 +241,60 @@ export function AutoPublisherTool({ onBack }: AutoPublisherToolProps) {
       })
       const data = await res.json()
       if (res.ok && data.success) {
-        toast.success(`Iniciado: ${data.scenario?.substring(0, 50)}...`, { id: 'execute-now' })
+        toast.success('Video en generación...', { id: 'execute-now' })
         await loadRuns()
+        // Start client-side polling for video completion
+        if (data.taskId && data.runId) {
+          pollVideoCompletion(data.taskId, data.runId)
+        }
       } else {
         toast.error(data.error || 'Error al ejecutar', { id: 'execute-now' })
       }
     } catch {
       toast.error('Error al ejecutar', { id: 'execute-now' })
     }
+  }
+
+  const pollVideoCompletion = async (taskId: string, runId: string) => {
+    const maxAttempts = 60 // 5 minutes at 5s intervals
+    for (let i = 0; i < maxAttempts; i++) {
+      await new Promise(r => setTimeout(r, 5000))
+      try {
+        const res = await fetch(`/api/studio/video-status?taskId=${taskId}`)
+        if (!res.ok) continue
+        const data = await res.json()
+
+        if (data.status === 'completed' && data.videoUrl) {
+          // Video ready! Update the run
+          await fetch('/api/studio/automations/runs', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              run_id: runId,
+              action: 'complete',
+              video_url: data.videoUrl,
+            }),
+          })
+          toast.success('Video generado! Revisa las ejecuciones.', { id: 'video-poll' })
+          await loadRuns()
+          return
+        }
+
+        if (data.status === 'failed') {
+          toast.error(`Video falló: ${data.error || 'Error desconocido'}`, { id: 'video-poll' })
+          await loadRuns()
+          return
+        }
+
+        // Still processing — update toast every 15s
+        if (i > 0 && i % 3 === 0) {
+          toast.loading(`Generando video... ${i * 5}s`, { id: 'video-poll' })
+        }
+      } catch {
+        // Ignore transient polling errors
+      }
+    }
+    toast('Video aún en proceso. El cron lo revisará.', { id: 'video-poll', icon: '⏳' })
   }
 
   const handleApproveRun = async (runId: string, caption?: string) => {

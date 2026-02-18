@@ -245,19 +245,28 @@ export async function POST(request: Request) {
       veoGenerationType,
     }
 
-    console.log(`[ExecuteNow] Generating video: model=${modelId}, prompt=${finalPrompt.substring(0, 100)}...`)
+    console.log(`[ExecuteNow] Generating video: model=${modelId}, preset=${flow.video_preset}, imageUrls=${imageUrls.length}, veoType=${veoGenerationType}`)
+    console.log(`[ExecuteNow] Prompt (first 200): ${finalPrompt.substring(0, 200)}`)
+    console.log(`[ExecuteNow] Full generation params:`, JSON.stringify({
+      ...generationParams,
+      prompt: generationParams.prompt?.substring(0, 100) + '...',
+    }))
 
     const result = await generateVideo(generationParams, kieApiKey)
 
+    console.log(`[ExecuteNow] generateVideo result:`, JSON.stringify(result))
+
     if (!result.success || !result.taskId) {
+      const errorMsg = result.error || 'Error generating video'
+      console.error(`[ExecuteNow] Video generation FAILED: ${errorMsg}`)
       await supabase
         .from('automation_runs')
-        .update({ status: 'failed', error_message: result.error || 'Error generating video', completed_at: new Date().toISOString() })
+        .update({ status: 'failed', error_message: errorMsg, completed_at: new Date().toISOString() })
         .eq('id', run.id)
-      return NextResponse.json({ error: result.error || 'Error generando video' }, { status: 500 })
+      return NextResponse.json({ error: errorMsg }, { status: 500 })
     }
 
-    // Save task ID — cron will poll for completion and publish
+    // Save task ID — client-side polling + cron will check for completion
     await supabase
       .from('automation_runs')
       .update({
@@ -266,7 +275,7 @@ export async function POST(request: Request) {
       })
       .eq('id', run.id)
 
-    console.log(`[ExecuteNow] Video task created: ${result.taskId}`)
+    console.log(`[ExecuteNow] ✓ Video task created: ${result.taskId} (provider: ${result.provider})`)
 
     return NextResponse.json({
       success: true,
@@ -274,7 +283,8 @@ export async function POST(request: Request) {
       taskId: result.taskId,
       scenario,
       status: 'generating_video',
-      message: 'Ejecucion iniciada. El video se generara y publicara automaticamente.',
+      provider: result.provider,
+      message: 'Video en generación. Se actualizará automáticamente.',
     })
 
   } catch (error: any) {

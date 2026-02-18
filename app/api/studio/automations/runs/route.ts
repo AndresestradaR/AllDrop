@@ -64,10 +64,11 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { run_id, action, caption } = body as {
+    const { run_id, action, caption, video_url } = body as {
       run_id: string
-      action: 'approve' | 'reject'
+      action: 'approve' | 'reject' | 'complete'
       caption?: string
+      video_url?: string
     }
 
     if (!run_id || !action) {
@@ -84,6 +85,30 @@ export async function POST(request: Request) {
 
     if (fetchError || !run) {
       return NextResponse.json({ error: 'Run no encontrado' }, { status: 404 })
+    }
+
+    // Handle 'complete' action — client detected video is ready via polling
+    if (action === 'complete') {
+      if (run.status !== 'generating_video') {
+        return NextResponse.json({ error: 'Run no está en estado generating_video' }, { status: 400 })
+      }
+      if (!video_url) {
+        return NextResponse.json({ error: 'video_url requerida' }, { status: 400 })
+      }
+
+      const flow = run.flow
+      const defaultCaption = `${flow?.product_name || 'Producto'} ✨ #dropshipping #colombia`
+
+      await supabase
+        .from('automation_runs')
+        .update({
+          status: 'awaiting_approval',
+          video_url,
+          caption: defaultCaption,
+        })
+        .eq('id', run_id)
+
+      return NextResponse.json({ success: true, status: 'awaiting_approval', video_url })
     }
 
     if (!['awaiting_approval', 'video_ready'].includes(run.status)) {
