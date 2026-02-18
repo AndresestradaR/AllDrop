@@ -137,7 +137,7 @@ RULES:
 5. For UGC/dropshipping content: natural, iPhone-style, candid feel.
 6. Always include "speaks in Spanish with a feminine voice" when the character is female.
 7. Always include "speaks in Spanish with a masculine voice" when the character is male.
-8. The character must match the descriptor exactly — preserve gender, ethnicity, age.
+8. The character must match the descriptor exactly - preserve gender, ethnicity, age.
 
   const userMessage = `CHARACTER DESCRIPTOR: ${promptDescriptor}
 VIDEO IDEA: ${userIdea}
