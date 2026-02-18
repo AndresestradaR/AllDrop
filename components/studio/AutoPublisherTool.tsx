@@ -231,6 +231,26 @@ export function AutoPublisherTool({ onBack }: AutoPublisherToolProps) {
     }
   }
 
+  const handleExecuteNow = async (flowId: string) => {
+    try {
+      toast.loading('Ejecutando flujo...', { id: 'execute-now' })
+      const res = await fetch('/api/studio/automations/execute-now', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ flowId }),
+      })
+      const data = await res.json()
+      if (res.ok && data.success) {
+        toast.success(`Iniciado: ${data.scenario?.substring(0, 50)}...`, { id: 'execute-now' })
+        await loadRuns()
+      } else {
+        toast.error(data.error || 'Error al ejecutar', { id: 'execute-now' })
+      }
+    } catch {
+      toast.error('Error al ejecutar', { id: 'execute-now' })
+    }
+  }
+
   const handleApproveRun = async (runId: string, caption?: string) => {
     try {
       const res = await fetch('/api/studio/automations/runs', {
@@ -386,6 +406,7 @@ export function AutoPublisherTool({ onBack }: AutoPublisherToolProps) {
                         onToggle={() => handleToggleActive(flow)}
                         onEdit={() => { setEditingFlow(flow); setView('edit') }}
                         onDelete={() => handleDeleteFlow(flow.id)}
+                        onExecuteNow={() => handleExecuteNow(flow.id)}
                         onViewRuns={() => {
                           setSelectedFlowId(flow.id)
                           loadRuns(flow.id)
@@ -412,12 +433,14 @@ function FlowCard({
   onToggle,
   onEdit,
   onDelete,
+  onExecuteNow,
   onViewRuns,
 }: {
   flow: AutomationFlow
   onToggle: () => void
   onEdit: () => void
   onDelete: () => void
+  onExecuteNow: () => void
   onViewRuns: () => void
 }) {
   const preset = PRESET_CONFIG[flow.video_preset]
@@ -499,6 +522,13 @@ function FlowCard({
 
         {/* Actions */}
         <div className="flex items-center gap-1.5 flex-shrink-0">
+          <button
+            onClick={onExecuteNow}
+            className="p-2 hover:bg-accent/10 rounded-lg transition-colors text-accent"
+            title="Ejecutar ahora"
+          >
+            <Zap className="w-4 h-4" />
+          </button>
           <button
             onClick={onViewRuns}
             className="p-2 hover:bg-border/50 rounded-lg transition-colors text-text-muted hover:text-text-primary"
