@@ -62,6 +62,10 @@ interface AutomationFlow {
   schedule_times: string[]
   account_ids: string[]
   mode: 'auto' | 'semi'
+  video_options?: {
+    kling_mode?: 'pro' | 'std'
+    sound?: boolean
+  }
   is_active: boolean
   last_run_at?: string
   next_run_at?: string
@@ -86,9 +90,9 @@ interface AutomationRun {
 }
 
 const PRESET_CONFIG = {
-  producto: { emoji: '🎯', label: 'Producto', model: 'Sora 2', color: 'text-emerald-400', bg: 'bg-emerald-500/15' },
-  rapido: { emoji: '⚡', label: 'Rapido', model: 'Veo 3 Fast', color: 'text-blue-400', bg: 'bg-blue-500/15' },
-  premium: { emoji: '💎', label: 'Premium', model: 'Kling 3.0', color: 'text-purple-400', bg: 'bg-purple-500/15' },
+  producto: { emoji: '🎯', label: 'Producto', model: 'Sora 2', duration: '10s', color: 'text-emerald-400', bg: 'bg-emerald-500/15', desc: 'Video de producto' },
+  rapido: { emoji: '⚡', label: 'Rapido', model: 'Veo 3 Fast', duration: '8s', color: 'text-blue-400', bg: 'bg-blue-500/15', desc: 'Audio + referencias' },
+  premium: { emoji: '💎', label: 'Premium', model: 'Kling 3.0', duration: '15s', color: 'text-purple-400', bg: 'bg-purple-500/15', desc: 'Audio nativo + lip sync' },
 }
 
 const VOICE_OPTIONS = [
@@ -550,7 +554,8 @@ function FlowCard({
             </span>
             <span>·</span>
             <span className={cn('flex items-center gap-1', preset.color)}>
-              {preset.emoji} {preset.label}
+              {preset.emoji} {preset.label} ({preset.duration})
+              {flow.video_preset === 'premium' && flow.video_options?.kling_mode === 'std' && ' Std'}
             </span>
             <span>·</span>
             <span className="flex items-center gap-1">
@@ -860,6 +865,8 @@ function FlowEditor({
   const [newTime, setNewTime] = useState('12:00')
   const [accountIds, setAccountIds] = useState<string[]>(flow?.account_ids || [])
   const [mode, setMode] = useState<'auto' | 'semi'>(flow?.mode || 'semi')
+  const [klingMode, setKlingMode] = useState<'pro' | 'std'>(flow?.video_options?.kling_mode || 'pro')
+  const [klingSound, setKlingSound] = useState(flow?.video_options?.sound !== false)
   const [isSaving, setIsSaving] = useState(false)
   const [showAdvanced, setShowAdvanced] = useState(false)
 
@@ -885,6 +892,10 @@ function FlowEditor({
         schedule_times: scheduleTimes,
         account_ids: accountIds,
         mode,
+        video_options: videoPreset === 'premium' ? {
+          kling_mode: klingMode,
+          sound: klingSound,
+        } : {},
       }
 
       if (isEditing) {
@@ -1013,11 +1024,77 @@ function FlowEditor({
                   >
                     <div className="text-lg mb-0.5">{config.emoji}</div>
                     <p className="text-xs font-semibold">{config.label}</p>
-                    <p className="text-[10px] text-text-muted">{config.model}</p>
+                    <p className="text-[10px] text-text-muted">{config.model} - {config.duration}</p>
+                    <p className="text-[9px] text-text-muted/70 mt-0.5">{config.desc}</p>
                   </button>
                 ))}
               </div>
             </div>
+
+            {/* Opciones Kling 3.0 (solo si preset es premium) */}
+            {videoPreset === 'premium' && (
+              <div className="p-4 rounded-xl border border-purple-500/20 bg-purple-500/5 space-y-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-sm">💎</span>
+                  <h4 className="text-xs font-semibold text-purple-400 uppercase tracking-wide">Opciones Kling 3.0</h4>
+                </div>
+
+                {/* Modo */}
+                <div>
+                  <label className="block text-[11px] font-medium text-text-muted mb-1.5">Modo de generacion</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => setKlingMode('pro')}
+                      className={cn(
+                        'p-2.5 rounded-lg border text-left transition-all',
+                        klingMode === 'pro'
+                          ? 'bg-purple-500/15 border-purple-500 text-purple-400'
+                          : 'bg-surface-elevated border-border text-text-secondary hover:border-text-muted'
+                      )}
+                    >
+                      <p className="text-xs font-semibold">Pro</p>
+                      <p className="text-[10px] text-text-muted">Mejor calidad, mas lento</p>
+                    </button>
+                    <button
+                      onClick={() => setKlingMode('std')}
+                      className={cn(
+                        'p-2.5 rounded-lg border text-left transition-all',
+                        klingMode === 'std'
+                          ? 'bg-purple-500/15 border-purple-500 text-purple-400'
+                          : 'bg-surface-elevated border-border text-text-secondary hover:border-text-muted'
+                      )}
+                    >
+                      <p className="text-xs font-semibold">Standard</p>
+                      <p className="text-[10px] text-text-muted">Mas rapido, mas economico</p>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Audio nativo */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-text-primary">Audio nativo con lip sync</p>
+                    <p className="text-[10px] text-text-muted">Genera voz, lip sync y efectos de sonido</p>
+                  </div>
+                  <button
+                    onClick={() => setKlingSound(!klingSound)}
+                    className={cn(
+                      'relative w-10 h-6 rounded-full transition-colors',
+                      klingSound ? 'bg-purple-500' : 'bg-border'
+                    )}
+                  >
+                    <span className={cn(
+                      'absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform shadow',
+                      klingSound && 'translate-x-4'
+                    )} />
+                  </button>
+                </div>
+
+                <p className="text-[10px] text-text-muted/60 leading-relaxed">
+                  Kling 3.0 genera videos de hasta 15s con audio nativo en espanol, sincronizacion labial automatica y efectos de sonido realistas.
+                </p>
+              </div>
+            )}
 
             {/* Producto */}
             <div className="grid grid-cols-2 gap-3">

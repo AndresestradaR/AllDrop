@@ -397,6 +397,8 @@ export interface GenerateVideoRequest {
   // Kling 3.0 multi-shot
   multiShots?: boolean
   multiPrompt?: Array<{ prompt: string; duration: number }>
+  // Kling 3.0 mode (pro = better quality, std = faster/cheaper)
+  klingMode?: 'pro' | 'std'
   // Kling 3.0 element references
   klingElements?: Array<{
     name: string

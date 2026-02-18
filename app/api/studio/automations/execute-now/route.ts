@@ -359,6 +359,9 @@ export async function POST(request: Request) {
       }
     }
 
+    // Read model-specific options from flow
+    const videoOpts = flow.video_options || {}
+
     const generationParams: Parameters<typeof generateVideo>[0] = {
       modelId,
       prompt: finalPrompt,
@@ -368,6 +371,12 @@ export async function POST(request: Request) {
       enableAudio: flow.video_preset !== 'producto',
       imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
       veoGenerationType,
+    }
+
+    // Kling 3.0 specific options from flow config
+    if (flow.video_preset === 'premium') {
+      generationParams.enableAudio = videoOpts.sound !== false // default ON
+      generationParams.klingMode = videoOpts.kling_mode || 'pro'
     }
 
     console.log(`[ExecuteNow] === CALLING KIE API ===`)

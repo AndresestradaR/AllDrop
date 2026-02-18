@@ -79,6 +79,7 @@ export async function POST(request: Request) {
       multiShots,
       multiPrompt,
       klingElements,
+      klingMode,
       imageUrl,
     } = body as {
       modelId: VideoModelId
@@ -99,6 +100,7 @@ export async function POST(request: Request) {
         description: string
         images: string[] // base64 images
       }>
+      klingMode?: 'pro' | 'std'
       imageUrl?: string
     }
 
@@ -198,6 +200,7 @@ export async function POST(request: Request) {
     // Add Kling 3.0 params
     const isKling30 = modelId === 'kling-3.0'
     if (isKling30) {
+      generationParams.klingMode = klingMode || 'pro'
       if (multiShots && multiPrompt && multiPrompt.length > 0) {
         generationParams.multiShots = true
         generationParams.multiPrompt = multiPrompt

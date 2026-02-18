@@ -296,12 +296,19 @@ async function executeFlow(supabase: any, appUrl: string, flow: any) {
       .eq('id', run.id)
 
     // 4. Generate video
+    const videoOpts = flow.video_options || {}
     const videoBody: any = {
       modelId: getModelIdFromPreset(flow.video_preset),
       prompt: finalPrompt,
       duration: getDurationFromPreset(flow.video_preset),
       aspectRatio: '9:16',
       enableAudio: flow.video_preset !== 'producto',
+    }
+
+    // Kling 3.0 specific options
+    if (flow.video_preset === 'premium') {
+      videoBody.enableAudio = videoOpts.sound !== false
+      videoBody.klingMode = videoOpts.kling_mode || 'pro'
     }
 
     // For rapido/premium presets, include influencer image

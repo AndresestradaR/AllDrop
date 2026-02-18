@@ -55,6 +55,7 @@ export async function POST(request: Request) {
       schedule_times,
       account_ids,
       mode,
+      video_options,
     } = body
 
     if (!influencer_id || !product_name?.trim()) {
@@ -93,6 +94,7 @@ export async function POST(request: Request) {
         schedule_times: schedule_times || ['08:00', '20:00'],
         account_ids: account_ids || [],
         mode: mode || 'semi',
+        video_options: video_options || {},
         is_active: false,
         next_run_at: new Date().toISOString(),
       })
@@ -133,6 +135,7 @@ export async function PATCH(request: Request) {
       'system_prompt', 'scenarios',
       'voice_style', 'voice_custom_instruction',
       'schedule_times', 'account_ids', 'mode', 'is_active',
+      'video_options',
     ]
 
     const safeUpdates: Record<string, any> = { updated_at: new Date().toISOString() }
