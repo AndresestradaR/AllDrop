@@ -135,8 +135,9 @@ RULES:
 3. Add camera movements, lighting, and mood descriptions.
 4. Keep the prompt under 500 characters for Kling models, under 1000 for others.
 5. For UGC/dropshipping content: natural, iPhone-style, candid feel.
-6. Always include "speaks in Spanish" when dialogue is involved.
-7. The character must match the descriptor exactly.`
+6. Always include "speaks in Spanish with a feminine voice" when the character is female.
+7. Always include "speaks in Spanish with a masculine voice" when the character is male.
+8. The character must match the descriptor exactly — preserve gender, ethnicity, age.
 
   const userMessage = `CHARACTER DESCRIPTOR: ${promptDescriptor}
 VIDEO IDEA: ${userIdea}

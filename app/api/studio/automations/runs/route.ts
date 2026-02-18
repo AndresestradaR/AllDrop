@@ -112,6 +112,97 @@ export async function POST(request: Request) {
       const flow = run.flow
       const defaultCaption = `${flow?.product_name || 'Producto'} ✨ #dropshipping #colombia`
 
+      // If flow is auto mode → publish directly, skip approval
+      if (flow?.mode === 'auto') {
+        console.log(`[AutomationRuns/Complete] Auto mode → publishing directly`)
+        await supabase
+          .from('automation_runs')
+          .update({ status: 'publishing', video_url, caption: defaultCaption })
+          .eq('id', run_id)
+
+        try {
+          const accountIds = flow.account_ids || []
+          if (accountIds.length === 0) throw new Error('No hay cuentas configuradas')
+
+          const creds = await getPublerCredentials(user.id, supabase)
+          if (!creds) throw new Error('Configura Publer en Settings')
+
+          const downloaded = await downloadFileAsBuffer(video_url)
+          const filename = `estrategas-auto-${Date.now()}.mp4`
+          const publerMedia = await uploadMediaDirect(creds, downloaded.buffer, filename, downloaded.contentType)
+
+          let allAccounts = await getAccounts(creds)
+          const selectedAccounts = allAccounts.filter((a: any) => accountIds.includes(a.id))
+
+          const PROVIDER_TO_NETWORK: Record<string, string> = {
+            facebook: 'facebook', ig_business: 'instagram', ig_personal: 'instagram',
+            instagram: 'instagram', twitter: 'twitter', linkedin: 'linkedin',
+            tiktok: 'tiktok', youtube: 'youtube', pinterest: 'pinterest', threads: 'threads',
+          }
+
+          const providerList: string[] = []
+          for (const acc of selectedAccounts) {
+            const provider = acc.type || acc.provider || 'instagram'
+            const networkKey = PROVIDER_TO_NETWORK[provider] || provider
+            if (!providerList.includes(networkKey)) providerList.push(networkKey)
+          }
+          if (providerList.length === 0) providerList.push('instagram')
+
+          const networks: Record<string, any> = {}
+          for (const networkKey of providerList) {
+            const nc: Record<string, any> = {
+              type: 'video', text: defaultCaption,
+              media: [{ id: publerMedia.id, path: publerMedia.path, type: publerMedia.type }],
+            }
+            if (networkKey === 'instagram') nc.details = { type: 'reel' }
+            networks[networkKey] = nc
+          }
+
+          const PUBLER_API_BASE = 'https://app.publer.com/api/v1'
+          const response = await fetch(`${PUBLER_API_BASE}/posts/schedule/publish`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer-API ${creds.apiKey}`,
+              'Publer-Workspace-Id': creds.workspaceId,
+              'Content-Type': 'application/json',
+              'Accept': '*/*',
+            },
+            body: JSON.stringify({
+              bulk: {
+                state: 'scheduled',
+                posts: [{ networks, accounts: accountIds.map((id: string) => ({ id })) }],
+              },
+            }),
+          })
+
+          if (!response.ok) {
+            const errorText = await response.text()
+            throw new Error(`Publer error: ${response.status} - ${errorText}`)
+          }
+
+          const pubData = await response.json()
+          const jobId = pubData.id || pubData.job_id
+          if (jobId) await pollJobUntilComplete(creds, jobId, 15, 2000)
+
+          await supabase
+            .from('automation_runs')
+            .update({ status: 'published', published_at: new Date().toISOString(), completed_at: new Date().toISOString() })
+            .eq('id', run_id)
+
+          console.log(`[AutomationRuns/Complete] Auto-published successfully`)
+          return NextResponse.json({ success: true, status: 'published', video_url })
+
+        } catch (pubErr: any) {
+          console.error('[AutomationRuns/Complete] Auto-publish failed:', pubErr.message)
+          await supabase
+            .from('automation_runs')
+            .update({ status: 'failed', error_message: pubErr.message, completed_at: new Date().toISOString() })
+            .eq('id', run_id)
+          return NextResponse.json({ error: pubErr.message }, { status: 500 })
+        }
+      }
+
+      // Manual mode → await approval
       await supabase
         .from('automation_runs')
         .update({
