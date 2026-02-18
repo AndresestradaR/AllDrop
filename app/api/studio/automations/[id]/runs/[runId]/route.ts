@@ -102,7 +102,7 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
           body: JSON.stringify({
             accountIds,
             mediaUrl: run.video_url,
-            mediaType: 'video',
+            contentType: 'video',
             text: finalCaption,
           }),
         })

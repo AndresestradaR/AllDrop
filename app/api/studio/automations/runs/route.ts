@@ -1,5 +1,13 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import {
+  getPublerCredentials,
+  getAccounts,
+  uploadMediaDirect,
+  downloadFileAsBuffer,
+  pollJobUntilComplete,
+  type PublerMediaObject,
+} from '@/lib/services/publer'
 
 // GET — List runs for a flow (or all pending approvals)
 export async function GET(request: Request) {
@@ -112,7 +120,7 @@ export async function POST(request: Request) {
       .eq('id', run_id)
 
     try {
-      // Publish via Publer
+      // Publish via Publer (direct service call, no HTTP round-trip)
       const accountIds = flow.account_ids || []
       if (accountIds.length === 0) {
         throw new Error('No hay cuentas configuradas en el flujo')
@@ -122,22 +130,86 @@ export async function POST(request: Request) {
         throw new Error('No hay video para publicar')
       }
 
-      const publishRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/publer/publish`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          accountIds,
+      // Get Publer credentials
+      const creds = await getPublerCredentials(user.id, supabase)
+      if (!creds) {
+        throw new Error('Configura Publer en Settings')
+      }
+
+      // Download and upload video to Publer
+      console.log(`[AutomationRuns/Publish] Downloading video: ${run.video_url}`)
+      const downloaded = await downloadFileAsBuffer(run.video_url)
+      const ext = downloaded.contentType.includes('mp4') ? 'mp4' : 'mp4'
+      const filename = `estrategas-auto-${Date.now()}.${ext}`
+
+      console.log(`[AutomationRuns/Publish] Uploading ${downloaded.buffer.length} bytes to Publer`)
+      const publerMedia = await uploadMediaDirect(creds, downloaded.buffer, filename, downloaded.contentType)
+
+      // Get accounts to determine networks
+      let allAccounts = await getAccounts(creds)
+      const selectedAccounts = allAccounts.filter((a) => accountIds.includes(a.id))
+
+      const PROVIDER_TO_NETWORK: Record<string, string> = {
+        facebook: 'facebook', ig_business: 'instagram', ig_personal: 'instagram',
+        instagram: 'instagram', twitter: 'twitter', linkedin: 'linkedin',
+        tiktok: 'tiktok', youtube: 'youtube', pinterest: 'pinterest', threads: 'threads',
+      }
+
+      const providerList: string[] = []
+      for (const acc of selectedAccounts) {
+        const provider = acc.type || acc.provider || 'instagram'
+        const networkKey = PROVIDER_TO_NETWORK[provider] || provider
+        if (!providerList.includes(networkKey)) providerList.push(networkKey)
+      }
+      if (providerList.length === 0) providerList.push('instagram')
+
+      // Build network content
+      const networks: Record<string, any> = {}
+      for (const networkKey of providerList) {
+        const networkContent: Record<string, any> = {
+          type: 'video',
           text: finalCaption,
-          contentType: 'video',
-          mediaUrl: run.video_url,
-        }),
+          media: [{ id: publerMedia.id, path: publerMedia.path, type: publerMedia.type }],
+        }
+        if (networkKey === 'instagram') {
+          networkContent.details = { type: 'reel' }
+        }
+        networks[networkKey] = networkContent
+      }
+
+      // Create and publish
+      const PUBLER_API_BASE = 'https://app.publer.com/api/v1'
+      const payload = {
+        bulk: {
+          state: 'scheduled',
+          posts: [{ networks, accounts: accountIds.map((id: string) => ({ id })) }],
+        },
+      }
+
+      console.log(`[AutomationRuns/Publish] Sending to Publer...`)
+      const response = await fetch(`${PUBLER_API_BASE}/posts/schedule/publish`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer-API ${creds.apiKey}`,
+          'Publer-Workspace-Id': creds.workspaceId,
+          'Content-Type': 'application/json',
+          'Accept': '*/*',
+        },
+        body: JSON.stringify(payload),
       })
 
-      const publishData = await publishRes.json()
-
-      if (!publishRes.ok || publishData.success === false) {
-        throw new Error(publishData.error || 'Error publicando')
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`Publer error: ${response.status} - ${errorText}`)
       }
+
+      const pubData = await response.json()
+      const jobId = pubData.id || pubData.job_id
+      if (jobId) {
+        await pollJobUntilComplete(creds, jobId, 15, 2000)
+      }
+
+      console.log(`[AutomationRuns/Publish] Published successfully`)
 
       await supabase
         .from('automation_runs')
@@ -151,6 +223,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, status: 'published' })
 
     } catch (pubError: any) {
+      console.error('[AutomationRuns/Publish] Error:', pubError.message)
       await supabase
         .from('automation_runs')
         .update({

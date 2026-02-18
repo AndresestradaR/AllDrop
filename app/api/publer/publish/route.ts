@@ -10,7 +10,7 @@ import {
   PublerMediaObject,
 } from '@/lib/services/publer'
 
-export const maxDuration = 60
+export const maxDuration = 120
 
 export async function POST(request: Request) {
   try {
