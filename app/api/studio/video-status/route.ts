@@ -35,18 +35,21 @@ async function checkStatus(taskId: string, apiKey: string) {
   if (veoResult.status === 'fulfilled' && veoResult.value.ok) {
     try {
       const veoData = await veoResult.value.json()
-      console.log('[VideoStatus] Veo response:', JSON.stringify(veoData).substring(0, 500))
+      const vData = veoData.data
 
-      if (veoData.code === 200 && veoData.data) {
-        const vData = veoData.data
+      // Log the KEY fields, not the huge paramJson
+      console.log(`[VideoStatus] Veo: code=${veoData.code} successFlag=${vData?.successFlag} taskStatus=${vData?.taskStatus} errorCode=${vData?.errorCode} resultUrls=${vData?.response?.resultUrls?.length || 0}`)
 
+      if (veoData.code === 200 && vData) {
         // Success — video is ready
         if (vData.successFlag === 1 && vData.response?.resultUrls?.length > 0) {
+          console.log(`[VideoStatus] Veo COMPLETED: ${vData.response.resultUrls[0].substring(0, 100)}`)
           return { status: 'completed' as const, videoUrl: vData.response.resultUrls[0], audioUrl: undefined }
         }
 
         // Failed
         if (vData.errorCode || vData.errorMessage) {
+          console.log(`[VideoStatus] Veo FAILED: ${vData.errorMessage || vData.errorCode}`)
           return { status: 'failed' as const, error: vData.errorMessage || vData.errorCode || 'Veo error' }
         }
 
