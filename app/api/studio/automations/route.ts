@@ -77,9 +77,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Influencer no encontrado' }, { status: 404 })
     }
 
-    const { data: flow, error } = await supabase
-      .from('automation_flows')
-      .insert({
+    const insertData: Record<string, any> = {
         user_id: user.id,
         name: name?.trim() || `Auto - ${product_name}`,
         influencer_id,
@@ -94,12 +92,31 @@ export async function POST(request: Request) {
         schedule_times: schedule_times || ['08:00', '20:00'],
         account_ids: account_ids || [],
         mode: mode || 'semi',
-        video_options: video_options || {},
         is_active: false,
         next_run_at: new Date().toISOString(),
-      })
+    }
+    if (video_options && Object.keys(video_options).length > 0) {
+      insertData.video_options = video_options
+    }
+
+    let { data: flow, error } = await supabase
+      .from('automation_flows')
+      .insert(insertData)
       .select()
       .single()
+
+    // If video_options column doesn't exist yet, retry without it
+    if (error?.message?.includes('video_options') && insertData.video_options !== undefined) {
+      console.warn('[Automations/Create] video_options column not found, retrying without it')
+      delete insertData.video_options
+      const retry = await supabase
+        .from('automation_flows')
+        .insert(insertData)
+        .select()
+        .single()
+      flow = retry.data
+      error = retry.error
+    }
 
     if (error) {
       console.error('[Automations/Create] Error:', error.message)
@@ -157,13 +174,28 @@ export async function PATCH(request: Request) {
       safeUpdates.next_run_at = calculateNextRunAt(times)
     }
 
-    const { data: flow, error } = await supabase
+    let { data: flow, error } = await supabase
       .from('automation_flows')
       .update(safeUpdates)
       .eq('id', id)
       .eq('user_id', user.id)
       .select()
       .single()
+
+    // If video_options column doesn't exist yet, retry without it
+    if (error?.message?.includes('video_options') && safeUpdates.video_options !== undefined) {
+      console.warn('[Automations/Update] video_options column not found, retrying without it')
+      delete safeUpdates.video_options
+      const retry = await supabase
+        .from('automation_flows')
+        .update(safeUpdates)
+        .eq('id', id)
+        .eq('user_id', user.id)
+        .select()
+        .single()
+      flow = retry.data
+      error = retry.error
+    }
 
     if (error) {
       console.error('[Automations/Update] Error:', error.message)
