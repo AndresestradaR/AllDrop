@@ -1,4 +1,5 @@
 import { ImageProvider, GenerateImageRequest, GenerateImageResult, getApiModelId } from './types'
+import { buildColorSection, buildTypographySection } from './prompt-helpers'
 
 function buildPricingSection(request: GenerateImageRequest): string {
   const { creativeControls } = request
@@ -57,6 +58,10 @@ TEXT:
 ${creativeControls?.salesAngle ? `Marketing angle: ${creativeControls.salesAngle}` : ''}
 ${creativeControls?.targetAvatar ? `Target audience: ${creativeControls.targetAvatar}` : ''}
 ${creativeControls?.additionalInstructions ? `Special: ${creativeControls.additionalInstructions}` : ''}
+
+${buildColorSection(request)}
+
+${buildTypographySection(request)}
 
 Create a stunning, professional banner ready for social media advertising.`
 }

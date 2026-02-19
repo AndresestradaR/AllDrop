@@ -120,6 +120,8 @@ export async function POST(request: Request) {
       priceBefore,
       priceCombo2,
       priceCombo3,
+      colorPalette,
+      typography,
     } = body
 
     if (!templateUrl) {
@@ -300,6 +302,8 @@ export async function POST(request: Request) {
         priceCombo2,
         priceCombo3,
         targetCountry,
+        colorPalette,
+        typography,
       },
     }
 

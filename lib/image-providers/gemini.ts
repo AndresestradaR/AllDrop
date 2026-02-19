@@ -1,4 +1,5 @@
 import { ImageProvider, GenerateImageRequest, GenerateImageResult, IMAGE_MODELS, getApiModelId } from './types'
+import { buildColorSection, buildTypographySection } from './prompt-helpers'
 
 function buildPricingSection(request: GenerateImageRequest): string {
   const { creativeControls } = request
@@ -94,6 +95,10 @@ PERO ADAPTA COMPLETAMENTE:
 - El AMBIENTE/FONDO -> debe ser coherente con el uso del producto
 - La POSE/ACCION -> debe mostrar uso natural del producto
 - Los ELEMENTOS DECORATIVOS -> deben ser relevantes al producto
+
+${buildColorSection(request)}
+
+${buildTypographySection(request)}
 
 === PASO 4: CONTENIDO DEL BANNER ===
 

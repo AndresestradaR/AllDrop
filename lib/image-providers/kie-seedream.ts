@@ -1,4 +1,5 @@
 import { ImageProvider, GenerateImageRequest, GenerateImageResult, getApiModelId } from './types'
+import { buildColorSection, buildTypographySection } from './prompt-helpers'
 
 function buildPricingSection(request: GenerateImageRequest): string {
   const { creativeControls } = request
@@ -62,6 +63,10 @@ TEXT:
 ${creativeControls?.salesAngle ? `SALES ANGLE: ${creativeControls.salesAngle}` : ''}
 ${creativeControls?.targetAvatar ? `TARGET: ${creativeControls.targetAvatar}` : ''}
 ${creativeControls?.additionalInstructions ? `EXTRA: ${creativeControls.additionalInstructions}` : ''}
+
+${buildColorSection(request)}
+
+${buildTypographySection(request)}
 
 Create a banner IDENTICAL to the template, with only product and prices changed.`
 }

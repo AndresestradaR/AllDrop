@@ -456,6 +456,17 @@ export interface GenerateImageRequest {
     currencySymbol?: string
     // Country
     targetCountry?: string
+    // Visual style
+    colorPalette?: {
+      primary: string
+      secondary: string
+      accent: string
+    }
+    typography?: {
+      headings: string
+      subheadings: string
+      body: string
+    }
   }
 }
 

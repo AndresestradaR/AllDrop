@@ -24,7 +24,8 @@ import {
   MessageCircle,
   ImagePlus,
   ExternalLink,
-  Send
+  Send,
+  Palette
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import ModelSelector from '@/components/generator/ModelSelector'
@@ -53,6 +54,14 @@ const OUTPUT_SIZES = [
   { id: '1080x1080', name: 'Cuadrada (1:1)', dimensions: '1080 x 1080 px' },
   { id: '1920x1080', name: 'Horizontal (16:9)', dimensions: '1920 x 1080 px' },
   { id: '1080x1350', name: 'Retrato (4:5)', dimensions: '1080 x 1350 px' },
+]
+
+const TYPOGRAPHY_PRESETS = [
+  { id: 'moderna-bold', name: 'Moderna Bold', family: 'Montserrat', style: 'Sans-serif gruesa, moderna, impactante. Estilo Montserrat Black/ExtraBold. Letras gruesas y contundentes.', preview: 'font-black tracking-tight' },
+  { id: 'elegante', name: 'Elegante Serif', family: 'Playfair Display', style: 'Serif elegante, sofisticada, premium. Estilo Playfair Display. Con serifs decorativos.', preview: 'font-serif italic' },
+  { id: 'minimalista', name: 'Minimalista', family: 'Helvetica/Inter', style: 'Sans-serif limpia, minimalista, moderna. Estilo Inter/Helvetica Neue. Letras delgadas y espaciadas.', preview: 'font-light tracking-wide' },
+  { id: 'deportiva', name: 'Deportiva', family: 'Oswald/Impact', style: 'Sans-serif condensada, fuerte, deportiva. Estilo Oswald/Impact. Letras altas y condensadas.', preview: 'font-extrabold uppercase tracking-wider' },
+  { id: 'amigable', name: 'Amigable', family: 'Nunito/Poppins', style: 'Sans-serif redondeada, amigable, calida. Estilo Poppins/Nunito. Letras con esquinas redondeadas.', preview: 'font-semibold' },
 ]
 
 interface Product {
@@ -128,6 +137,20 @@ export default function ProductGeneratePage() {
     salesAngle: '',
     targetAvatar: '',
     additionalInstructions: '',
+  })
+
+  // Color palette
+  const [colorPalette, setColorPalette] = useState({
+    primary: '#0F172A',
+    secondary: '#3B82F6',
+    accent: '#10B981',
+  })
+
+  // Typography
+  const [selectedTypography, setSelectedTypography] = useState({
+    headings: 'moderna-bold',
+    subheadings: 'moderna-bold',
+    body: 'amigable',
   })
 
   // Generated sections history
@@ -302,6 +325,12 @@ export default function ProductGeneratePage() {
             targetAvatar: creativeControls.targetAvatar,
             additionalInstructions: creativeControls.additionalInstructions,
           } : {},
+          colorPalette,
+          typography: {
+            headings: TYPOGRAPHY_PRESETS.find(p => p.id === selectedTypography.headings)?.style || '',
+            subheadings: TYPOGRAPHY_PRESETS.find(p => p.id === selectedTypography.subheadings)?.style || '',
+            body: TYPOGRAPHY_PRESETS.find(p => p.id === selectedTypography.body)?.style || '',
+          },
         }),
       })
 
@@ -828,6 +857,162 @@ export default function ProductGeneratePage() {
           </div>
         </div>
 
+        {/* Visual Style: Colors & Typography */}
+        <div className="border border-border rounded-xl p-4 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Palette className="w-4 h-4 text-accent" />
+              <span className="text-sm font-medium text-text-primary">
+                Estilo Visual
+              </span>
+            </div>
+          </div>
+
+          {/* Color Palette */}
+          <div className="mb-5">
+            <label className="text-xs font-medium text-text-secondary uppercase tracking-wider mb-3 block">
+              Paleta de Colores
+            </label>
+            <div className="grid grid-cols-3 gap-3">
+              {/* Color 1 - Primary */}
+              <div>
+                <span className="text-xs text-text-secondary mb-1.5 block">Primario</span>
+                <div className="relative">
+                  <input
+                    type="color"
+                    value={colorPalette.primary}
+                    onChange={(e) => setColorPalette({ ...colorPalette, primary: e.target.value })}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  />
+                  <div
+                    className="w-full h-12 rounded-xl border-2 border-border hover:border-accent/50 transition-colors cursor-pointer flex items-center justify-center gap-2"
+                    style={{ backgroundColor: colorPalette.primary }}
+                  >
+                    <span className="text-xs font-mono text-white drop-shadow-md bg-black/30 px-2 py-0.5 rounded">
+                      {colorPalette.primary.toUpperCase()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Color 2 - Secondary */}
+              <div>
+                <span className="text-xs text-text-secondary mb-1.5 block">Secundario</span>
+                <div className="relative">
+                  <input
+                    type="color"
+                    value={colorPalette.secondary}
+                    onChange={(e) => setColorPalette({ ...colorPalette, secondary: e.target.value })}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  />
+                  <div
+                    className="w-full h-12 rounded-xl border-2 border-border hover:border-accent/50 transition-colors cursor-pointer flex items-center justify-center gap-2"
+                    style={{ backgroundColor: colorPalette.secondary }}
+                  >
+                    <span className="text-xs font-mono text-white drop-shadow-md bg-black/30 px-2 py-0.5 rounded">
+                      {colorPalette.secondary.toUpperCase()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Color 3 - Accent */}
+              <div>
+                <span className="text-xs text-text-secondary mb-1.5 block">Acento</span>
+                <div className="relative">
+                  <input
+                    type="color"
+                    value={colorPalette.accent}
+                    onChange={(e) => setColorPalette({ ...colorPalette, accent: e.target.value })}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  />
+                  <div
+                    className="w-full h-12 rounded-xl border-2 border-border hover:border-accent/50 transition-colors cursor-pointer flex items-center justify-center gap-2"
+                    style={{ backgroundColor: colorPalette.accent }}
+                  >
+                    <span className="text-xs font-mono text-white drop-shadow-md bg-black/30 px-2 py-0.5 rounded">
+                      {colorPalette.accent.toUpperCase()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <p className="text-xs text-text-secondary/70 mt-2">
+              Estos colores se aplicaran en todos los banners generados
+            </p>
+          </div>
+
+          {/* Typography */}
+          <div>
+            <label className="text-xs font-medium text-text-secondary uppercase tracking-wider mb-3 block">
+              Tipografia
+            </label>
+
+            {/* Headings */}
+            <div className="mb-3">
+              <span className="text-xs text-text-secondary mb-1.5 block">Titulos</span>
+              <div className="grid grid-cols-5 gap-2">
+                {TYPOGRAPHY_PRESETS.map((preset) => (
+                  <button
+                    key={`h-${preset.id}`}
+                    onClick={() => setSelectedTypography({ ...selectedTypography, headings: preset.id })}
+                    className={`p-2 rounded-lg border-2 transition-all text-center ${
+                      selectedTypography.headings === preset.id
+                        ? 'border-accent bg-accent/10'
+                        : 'border-border hover:border-accent/30'
+                    }`}
+                  >
+                    <span className={`text-sm text-text-primary block ${preset.preview}`}>Aa</span>
+                    <span className="text-[10px] text-text-secondary block mt-0.5 truncate">{preset.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Subheadings */}
+            <div className="mb-3">
+              <span className="text-xs text-text-secondary mb-1.5 block">Subtitulos</span>
+              <div className="grid grid-cols-5 gap-2">
+                {TYPOGRAPHY_PRESETS.map((preset) => (
+                  <button
+                    key={`s-${preset.id}`}
+                    onClick={() => setSelectedTypography({ ...selectedTypography, subheadings: preset.id })}
+                    className={`p-2 rounded-lg border-2 transition-all text-center ${
+                      selectedTypography.subheadings === preset.id
+                        ? 'border-accent bg-accent/10'
+                        : 'border-border hover:border-accent/30'
+                    }`}
+                  >
+                    <span className={`text-sm text-text-primary block ${preset.preview}`}>Aa</span>
+                    <span className="text-[10px] text-text-secondary block mt-0.5 truncate">{preset.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Body Text */}
+            <div>
+              <span className="text-xs text-text-secondary mb-1.5 block">Textos</span>
+              <div className="grid grid-cols-5 gap-2">
+                {TYPOGRAPHY_PRESETS.map((preset) => (
+                  <button
+                    key={`b-${preset.id}`}
+                    onClick={() => setSelectedTypography({ ...selectedTypography, body: preset.id })}
+                    className={`p-2 rounded-lg border-2 transition-all text-center ${
+                      selectedTypography.body === preset.id
+                        ? 'border-accent bg-accent/10'
+                        : 'border-border hover:border-accent/30'
+                    }`}
+                  >
+                    <span className={`text-sm text-text-primary block ${preset.preview}`}>Aa</span>
+                    <span className="text-[10px] text-text-secondary block mt-0.5 truncate">{preset.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* AI Model Selection */}
         <div className="mb-6">
           <ModelSelector
@@ -935,14 +1120,14 @@ export default function ProductGeneratePage() {
                   <label className="text-sm font-medium text-text-primary flex items-center gap-2">
                     📄 Detalles del Producto
                   </label>
-                  <span className="text-xs text-text-secondary">Máx. 500 caracteres</span>
+                  <span className="text-xs text-text-secondary">Max. 1500 caracteres</span>
                 </div>
                 <textarea
                   placeholder="Describe las características, beneficios y detalles importantes del producto..."
                   value={creativeControls.productDetails}
-                  onChange={(e) => setCreativeControls({ ...creativeControls, productDetails: e.target.value.slice(0, 500) })}
+                  onChange={(e) => setCreativeControls({ ...creativeControls, productDetails: e.target.value.slice(0, 1500) })}
                   className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent resize-none"
-                  rows={2}
+                  rows={3}
                 />
               </div>
 
@@ -956,9 +1141,9 @@ export default function ProductGeneratePage() {
                 <textarea
                   placeholder="Ejemplo: Potenciador de testosterona para hombres fitness"
                   value={creativeControls.salesAngle}
-                  onChange={(e) => setCreativeControls({ ...creativeControls, salesAngle: e.target.value.slice(0, 500) })}
+                  onChange={(e) => setCreativeControls({ ...creativeControls, salesAngle: e.target.value.slice(0, 1500) })}
                   className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent resize-none"
-                  rows={2}
+                  rows={3}
                 />
               </div>
 
@@ -972,9 +1157,9 @@ export default function ProductGeneratePage() {
                 <textarea
                   placeholder="Ejemplo: Hombres 25-45 años, van al gimnasio, quieren aumentar masa muscular"
                   value={creativeControls.targetAvatar}
-                  onChange={(e) => setCreativeControls({ ...creativeControls, targetAvatar: e.target.value.slice(0, 500) })}
+                  onChange={(e) => setCreativeControls({ ...creativeControls, targetAvatar: e.target.value.slice(0, 1500) })}
                   className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent resize-none"
-                  rows={2}
+                  rows={3}
                 />
               </div>
 
@@ -988,9 +1173,9 @@ export default function ProductGeneratePage() {
                 <textarea
                   placeholder="Cualquier instrucción específica para la generación..."
                   value={creativeControls.additionalInstructions}
-                  onChange={(e) => setCreativeControls({ ...creativeControls, additionalInstructions: e.target.value.slice(0, 500) })}
+                  onChange={(e) => setCreativeControls({ ...creativeControls, additionalInstructions: e.target.value.slice(0, 1500) })}
                   className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent resize-none"
-                  rows={2}
+                  rows={3}
                 />
               </div>
             </div>
