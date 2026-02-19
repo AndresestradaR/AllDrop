@@ -200,10 +200,11 @@ async function generateViaKieFallback(
   console.log(`[KIE Fallback] Task created: ${taskId}, polling...`)
 
   // Poll for result using the seedream provider's checkStatus (same KIE API)
+  // Keep timeout under 60s so total (Gemini 45s + KIE 60s) < Vercel 120s limit
   const pollResult = await pollForResult('seedream', taskId, kieApiKey, {
-    maxAttempts: 120,
+    maxAttempts: 40,
     intervalMs: 1500,
-    timeoutMs: 120000,
+    timeoutMs: 60000,
   })
 
   // Tag as gemini provider so the calling code treats it the same

@@ -150,7 +150,7 @@ function isGeminiModel(modelId: string): boolean {
 async function fetchWithTimeout(
   url: string,
   options: RequestInit,
-  timeoutMs: number = 110000
+  timeoutMs: number = 45000
 ): Promise<Response> {
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
@@ -218,7 +218,7 @@ async function generateWithGemini(
     },
   })
 
-  const MAX_RETRIES = 2
+  const MAX_RETRIES = 1
   let lastError = ''
   let lastStatus = 0
 
@@ -236,7 +236,7 @@ async function generateWithGemini(
         headers: { 'Content-Type': 'application/json' },
         body: requestBody,
       },
-      110000
+      45000
     )
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
@@ -320,14 +320,14 @@ async function generateWithGemini(
     }
 
     if (response.status >= 500) {
-      throw new Error('Los servidores de Google estan experimentando problemas (reintentamos 3 veces). Esto NO es tu culpa.\nPrueba con otro modelo (OpenAI o Seedream) mientras Google se estabiliza.')
+      throw new Error('Los servidores de Google estan experimentando problemas. Esto NO es tu culpa.\nPrueba con otro modelo (OpenAI o Seedream) mientras Google se estabiliza.')
     }
 
     throw new Error(`Error inesperado de Google (codigo ${response.status}). Detalles: ${errorText.substring(0, 300)}\n\nSi este error persiste, copia este mensaje y envialo a soporte.`)
   }
 
   // Should not reach here, but just in case
-  throw new Error(`Google fallo despues de ${MAX_RETRIES + 1} intentos (ultimo status: ${lastStatus}). Prueba otro modelo.`)
+  throw new Error(`Google fallo despues de ${MAX_RETRIES + 1} intentos (status: ${lastStatus}). Prueba otro modelo.`)
 }
 
 async function generateWithImagen(
