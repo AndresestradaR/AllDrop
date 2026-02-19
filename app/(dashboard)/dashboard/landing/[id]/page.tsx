@@ -53,6 +53,9 @@ const TEMPLATE_CATEGORIES = [
   { id: 'modo-uso', name: 'Modo de Uso', icon: '📋', description: 'Pasos 1-2-3 de como usar' },
   { id: 'logistica', name: 'Logística', icon: '🚚', description: 'Envio gratis, contraentrega, tiempos' },
   { id: 'faq', name: 'FAQ', icon: '❓', description: 'Preguntas frecuentes' },
+  { id: 'casos-uso', name: 'Casos de Uso', icon: '💡', description: 'Situaciones reales donde se usa el producto' },
+  { id: 'caracteristicas', name: 'Características', icon: '⚙️', description: 'Especificaciones y features del producto' },
+  { id: 'comunidad', name: 'Comunidad', icon: '👥', description: 'Social proof, comunidad de usuarios' },
 ]
 
 const OUTPUT_SIZES = [

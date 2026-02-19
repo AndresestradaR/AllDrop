@@ -83,6 +83,9 @@ export function buildSectionTypeSection(request: GenerateImageRequest): string {
     'modo-uso': 'SECCION MODO DE USO: Pasos numerados 1-2-3 (maximo 4). Iconos o mini-ilustraciones. Instrucciones claras y simples.',
     'logistica': 'SECCION LOGISTICA: Envio gratis, pago contraentrega, tiempos de entrega, devolucion. Sellos de confianza. Iconos de camion, escudo, reloj.',
     'faq': 'SECCION FAQ: 3-4 preguntas frecuentes con respuestas cortas. Formato pregunta/respuesta claro. Resolver objeciones comunes.',
+    'casos-uso': 'SECCION CASOS DE USO: Situaciones reales donde el producto resuelve un problema. 3-4 escenarios con mini-ilustraciones. Texto que conecta con el dia a dia del cliente.',
+    'caracteristicas': 'SECCION CARACTERISTICAS: Especificaciones y features del producto. Iconos tecnicos con datos concretos (tamaño, material, capacidad). Layout tipo ficha tecnica profesional.',
+    'comunidad': 'SECCION COMUNIDAD: Numero de clientes/seguidores. Fotos de personas usando el producto. Hashtags, mentions. Social proof masivo. Estilo "unete a miles".',
   }
 
   const guide = sectionGuides[sectionType] || ''
