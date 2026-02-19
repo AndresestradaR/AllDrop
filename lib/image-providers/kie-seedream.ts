@@ -1,5 +1,5 @@
 import { ImageProvider, GenerateImageRequest, GenerateImageResult, getApiModelId } from './types'
-import { buildColorSection, buildTypographySection, buildProductContextSection } from './prompt-helpers'
+import { buildColorSection, buildTypographySection, buildProductContextSection, buildSectionTypeSection } from './prompt-helpers'
 
 function buildPricingSection(request: GenerateImageRequest): string {
   const { creativeControls } = request
@@ -66,6 +66,7 @@ ${creativeControls?.salesAngle ? `SALES ANGLE: ${creativeControls.salesAngle}` :
 ${creativeControls?.targetAvatar ? `TARGET: ${creativeControls.targetAvatar}` : ''}
 ${creativeControls?.additionalInstructions ? `EXTRA: ${creativeControls.additionalInstructions}` : ''}
 
+${buildSectionTypeSection(request)}
 ${buildColorSection(request)}
 
 ${buildTypographySection(request)}

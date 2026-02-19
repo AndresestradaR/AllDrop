@@ -64,6 +64,40 @@ export function buildProductContextSection(request: GenerateImageRequest): strin
   return lines.join('\n')
 }
 
+export function buildSectionTypeSection(request: GenerateImageRequest): string {
+  const sectionType = request.creativeControls?.sectionType
+  if (!sectionType) return ''
+
+  const angleName = request.creativeControls?.angleName || ''
+  const angleTone = request.creativeControls?.angleTone || ''
+
+  const sectionGuides: Record<string, string> = {
+    'hero': 'SECCION HERO: Banner principal. Headline GRANDE e impactante. Producto prominente. Persona del avatar. CTA claro. Maximo impacto visual.',
+    'oferta': 'SECCION OFERTA: Enfocado en PRECIO. Badge grande con precio de oferta. Precio anterior tachado. Urgencia (SOLO HOY, ULTIMAS UNIDADES). Combos si hay.',
+    'antes-despues': 'SECCION ANTES/DESPUES: Dividido visualmente. Lado izquierdo "ANTES" (problema, dolor). Lado derecho "DESPUES" (solucion, resultado). Contraste dramatico.',
+    'beneficios': 'SECCION BENEFICIOS: 3-4 beneficios con iconos/checkmarks. Layout limpio y organizado. Cada beneficio con titulo corto y una linea de descripcion.',
+    'tabla-comparativa': 'SECCION COMPARATIVA: Tabla de comparacion. Tu producto con checks verdes. Competencia generica con X rojas. Demostrar superioridad clara.',
+    'autoridad': 'SECCION AUTORIDAD: Certificaciones, estudios, endorsements, numeros de clientes satisfechos. Sellos de garantia. Credibilidad maxima.',
+    'testimonios': 'SECCION TESTIMONIOS: 2-3 testimonios con foto de persona, nombre, texto corto con resultado. Estrellas de rating. Estilo reviews reales.',
+    'ingredientes': 'SECCION INGREDIENTES: Mostrar los componentes/ingredientes/materiales clave. Iconos o imagenes de cada uno. Descripcion corta de que hace cada uno.',
+    'modo-uso': 'SECCION MODO DE USO: Pasos numerados 1-2-3 (maximo 4). Iconos o mini-ilustraciones. Instrucciones claras y simples.',
+    'logistica': 'SECCION LOGISTICA: Envio gratis, pago contraentrega, tiempos de entrega, devolucion. Sellos de confianza. Iconos de camion, escudo, reloj.',
+    'faq': 'SECCION FAQ: 3-4 preguntas frecuentes con respuestas cortas. Formato pregunta/respuesta claro. Resolver objeciones comunes.',
+  }
+
+  const guide = sectionGuides[sectionType] || ''
+
+  let result = ''
+  if (guide) {
+    result += `\n=== TIPO DE SECCION ===\n\n${guide}\n`
+  }
+  if (angleName) {
+    result += `\nANGULO DE VENTA SELECCIONADO: "${angleName}" (tono: ${angleTone})\nTODO el contenido del banner debe reflejar este angulo. El headline, los textos y la atmosfera deben alinearse con este enfoque.\n`
+  }
+
+  return result
+}
+
 export function buildTypographySection(request: GenerateImageRequest): string {
   const typo = request.creativeControls?.typography
   if (!typo?.headings) return ''

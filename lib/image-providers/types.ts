@@ -475,6 +475,10 @@ export interface GenerateImageRequest {
       ingredients?: string
       differentiator?: string
     }
+    // Section & angle info (Phase 3)
+    sectionType?: string
+    angleName?: string
+    angleTone?: string
   }
 }
 

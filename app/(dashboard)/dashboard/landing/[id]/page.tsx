@@ -41,16 +41,17 @@ import { Country, getDefaultCountry } from '@/lib/constants/countries'
 export const dynamic = 'force-dynamic'
 
 const TEMPLATE_CATEGORIES = [
-  { id: 'hero', name: 'Hero' },
-  { id: 'oferta', name: 'Oferta' },
-  { id: 'antes-despues', name: 'Antes/Después' },
-  { id: 'beneficios', name: 'Beneficios' },
-  { id: 'tabla-comparativa', name: 'Tabla Comparativa' },
-  { id: 'autoridad', name: 'Prueba de Autoridad' },
-  { id: 'testimonios', name: 'Testimonios' },
-  { id: 'modo-uso', name: 'Modo de Uso' },
-  { id: 'logistica', name: 'Logística' },
-  { id: 'faq', name: 'Preguntas Frecuentes' },
+  { id: 'hero', name: 'Hero', icon: '🏠', description: 'Banner principal con headline impactante' },
+  { id: 'oferta', name: 'Oferta', icon: '🏷️', description: 'Precios, descuentos, combos' },
+  { id: 'antes-despues', name: 'Antes/Después', icon: '🔄', description: 'Transformacion visual del resultado' },
+  { id: 'beneficios', name: 'Beneficios', icon: '✅', description: '3-4 beneficios con iconos' },
+  { id: 'tabla-comparativa', name: 'Comparativa', icon: '📊', description: 'Tu producto vs competencia' },
+  { id: 'autoridad', name: 'Autoridad', icon: '🏆', description: 'Certificaciones, estudios, respaldo' },
+  { id: 'testimonios', name: 'Testimonios', icon: '💬', description: 'Reviews y opiniones de clientes' },
+  { id: 'ingredientes', name: 'Ingredientes', icon: '🧪', description: 'Componentes, materiales, formula' },
+  { id: 'modo-uso', name: 'Modo de Uso', icon: '📋', description: 'Pasos 1-2-3 de como usar' },
+  { id: 'logistica', name: 'Logística', icon: '🚚', description: 'Envio gratis, contraentrega, tiempos' },
+  { id: 'faq', name: 'FAQ', icon: '❓', description: 'Preguntas frecuentes' },
 ]
 
 const OUTPUT_SIZES = [
@@ -174,7 +175,17 @@ export default function ProductGeneratePage() {
     tone: string
     salesAngle: string
   }>>([])
-  const [selectedAngleId, setSelectedAngleId] = useState<string | null>(null)
+  const [selectedAngleIds, setSelectedAngleIds] = useState<Set<string>>(new Set())
+
+  // Landing sections selection (Phase 3)
+  const [selectedSections, setSelectedSections] = useState<Set<string>>(
+    new Set(['hero', 'oferta', 'beneficios', 'testimonios', 'logistica'])
+  )
+  const [sectionTemplates, setSectionTemplates] = useState<Record<string, Template | null>>({})
+
+  // Bulk generation
+  const [isBulkGenerating, setIsBulkGenerating] = useState(false)
+  const [bulkProgress, setBulkProgress] = useState({ current: 0, total: 0, currentLabel: '' })
 
   // Color palette
   const [colorCount, setColorCount] = useState<3 | 4>(3)
@@ -468,6 +479,129 @@ export default function ProductGeneratePage() {
     }
   }
 
+  const handleBulkGenerate = async () => {
+    if (selectedAngleIds.size === 0) {
+      toast.error('Selecciona al menos un angulo')
+      return
+    }
+    if (selectedSections.size === 0) {
+      toast.error('Selecciona al menos una seccion')
+      return
+    }
+    if (!productPhotos.some(p => p !== null)) {
+      toast.error('Sube al menos una foto del producto')
+      return
+    }
+
+    const mainTemplate = selectedTemplate?.image_url || uploadedTemplate
+    const sectionsWithoutTemplate = Array.from(selectedSections).filter(
+      sectionId => !sectionTemplates[sectionId] && !mainTemplate
+    )
+    if (sectionsWithoutTemplate.length > 0) {
+      toast.error('Asigna una plantilla a cada seccion o sube una imagen de referencia principal')
+      return
+    }
+
+    setIsBulkGenerating(true)
+    const selectedAngles = generatedAngles.filter(a => selectedAngleIds.has(a.id))
+    const sections = Array.from(selectedSections)
+    const totalBanners = selectedAngles.length * sections.length
+    setBulkProgress({ current: 0, total: totalBanners, currentLabel: 'Preparando...' })
+
+    let completed = 0
+    let failed = 0
+
+    const CONCURRENT_LIMIT = 3
+    const tasks: Array<{ angle: typeof selectedAngles[0]; sectionId: string }> = []
+
+    for (const angle of selectedAngles) {
+      for (const sectionId of sections) {
+        tasks.push({ angle, sectionId })
+      }
+    }
+
+    for (let i = 0; i < tasks.length; i += CONCURRENT_LIMIT) {
+      const chunk = tasks.slice(i, i + CONCURRENT_LIMIT)
+
+      const promises = chunk.map(async ({ angle, sectionId }) => {
+        const sectionName = TEMPLATE_CATEGORIES.find(c => c.id === sectionId)?.name || sectionId
+        setBulkProgress(prev => ({
+          ...prev,
+          currentLabel: `${angle.name} — ${sectionName}`,
+        }))
+
+        try {
+          const sectionTemplate = sectionTemplates[sectionId]
+          const templateUrl = sectionTemplate?.image_url || mainTemplate
+
+          const response = await fetch('/api/generate-landing', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              productId,
+              productName: product?.name,
+              templateId: sectionTemplate?.id || selectedTemplate?.id,
+              templateUrl,
+              productPhotos: productPhotos.filter(p => p !== null),
+              outputSize: selectedSize.id,
+              modelId: selectedModel,
+              provider: modelIdToProviderType(selectedModel),
+              targetCountry: selectedCountry.code,
+              currencySymbol: pricing.currencySymbol,
+              priceAfter: pricing.priceAfter,
+              priceBefore: pricing.priceBefore,
+              priceCombo2: pricing.priceCombo2,
+              priceCombo3: pricing.priceCombo3,
+              creativeControls: {
+                productDetails: creativeControls.productDetails,
+                salesAngle: angle.salesAngle,
+                targetAvatar: angle.avatarSuggestion,
+                additionalInstructions: creativeControls.additionalInstructions,
+                sectionType: sectionId,
+                angleName: angle.name,
+                angleTone: angle.tone,
+              },
+              colorPalette: {
+                ...colorPalette,
+                extra: colorCount === 4 ? colorPalette.extra : undefined,
+              },
+              typography: {
+                headings: FONT_CATALOG.find(f => f.id === selectedFonts.headings)?.promptDesc || '',
+                subheadings: FONT_CATALOG.find(f => f.id === selectedFonts.subheadings)?.promptDesc || '',
+                body: FONT_CATALOG.find(f => f.id === selectedFonts.body)?.promptDesc || '',
+              },
+              productContext: showProductContext ? productContext : {},
+            }),
+          })
+
+          const data = await response.json()
+          if (data.success) {
+            completed++
+          } else {
+            failed++
+            console.error(`[Bulk] Failed: ${angle.name} - ${sectionName}:`, data.error)
+          }
+        } catch (error: any) {
+          failed++
+          console.error(`[Bulk] Error: ${angle.name} - ${sectionName}:`, error.message)
+        }
+
+        setBulkProgress(prev => ({ ...prev, current: prev.current + 1 }))
+      })
+
+      await Promise.allSettled(promises)
+    }
+
+    setIsBulkGenerating(false)
+    fetchGeneratedSections()
+
+    if (failed === 0) {
+      toast.success(`${completed} banners generados exitosamente!`)
+    } else {
+      toast.success(`${completed} banners generados, ${failed} fallaron`)
+    }
+  }
+
   const handleGenerateAngles = async () => {
     if (!productPhotos.some(p => p !== null)) {
       toast.error('Sube al menos una foto del producto')
@@ -495,7 +629,7 @@ export default function ProductGeneratePage() {
       }
 
       setGeneratedAngles(data.angles)
-      setSelectedAngleId(null)
+      setSelectedAngleIds(new Set())
       toast.success(`${data.angles.length} angulos generados!`)
     } catch (error: any) {
       toast.error(error.message || 'Error al generar angulos')
@@ -505,16 +639,27 @@ export default function ProductGeneratePage() {
   }
 
   const handleSelectAngle = (angle: typeof generatedAngles[0]) => {
-    setSelectedAngleId(angle.id)
+    setSelectedAngleIds(prev => {
+      const next = new Set(prev)
+      if (next.has(angle.id)) {
+        next.delete(angle.id)
+      } else {
+        if (next.size >= 4) {
+          toast.error('Maximo 4 angulos')
+          return prev
+        }
+        next.add(angle.id)
+      }
+      return next
+    })
 
+    // Auto-fill creative controls with the LAST selected angle
     setCreativeControls(prev => ({
       ...prev,
       salesAngle: angle.salesAngle,
       targetAvatar: angle.avatarSuggestion,
     }))
     setShowCreativeControls(true)
-
-    toast.success(`Angulo "${angle.name}" seleccionado`)
   }
 
   const handleDownload = async (imageUrl: string, quality: '2k' | 'optimized') => {
@@ -1338,13 +1483,19 @@ export default function ProductGeneratePage() {
                     </button>
                   </div>
 
+                  {selectedAngleIds.size > 0 && (
+                    <p className="text-xs text-amber-500 font-medium mb-2">
+                      {selectedAngleIds.size}/4 angulos seleccionados
+                    </p>
+                  )}
+
                   <div className="space-y-2">
                     {generatedAngles.map((angle) => (
                       <button
                         key={angle.id}
                         onClick={() => handleSelectAngle(angle)}
                         className={`w-full text-left p-3 rounded-xl border-2 transition-all ${
-                          selectedAngleId === angle.id
+                          selectedAngleIds.has(angle.id)
                             ? 'border-amber-500 bg-amber-500/10'
                             : 'border-border hover:border-amber-500/30 bg-background'
                         }`}
@@ -1361,7 +1512,7 @@ export default function ProductGeneratePage() {
                             <p className="text-xs text-text-secondary line-clamp-2">{angle.description}</p>
                             <p className="text-[10px] text-text-secondary/70 mt-1">👤 {angle.avatarSuggestion}</p>
                           </div>
-                          {selectedAngleId === angle.id && (
+                          {selectedAngleIds.has(angle.id) && (
                             <div className="w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center flex-shrink-0 mt-1">
                               <Check className="w-3 h-3 text-white" />
                             </div>
@@ -1370,6 +1521,177 @@ export default function ProductGeneratePage() {
                       </button>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {/* Landing Sections Selector — only show when angles are selected */}
+              {selectedAngleIds.size > 0 && (
+                <div className="pt-4 border-t border-border">
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="text-sm font-medium text-text-primary flex items-center gap-2">
+                      <LayoutTemplate className="w-4 h-4 text-accent" />
+                      Secciones de tu Landing
+                    </label>
+                    <span className="text-xs text-text-secondary">
+                      {selectedSections.size} secciones seleccionadas
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-text-secondary mb-3">
+                    Selecciona las secciones que quieres en tu landing y asigna una plantilla a cada una.
+                  </p>
+
+                  <div className="space-y-2">
+                    {TEMPLATE_CATEGORIES.map((category) => {
+                      const isSelected = selectedSections.has(category.id)
+                      const assignedTemplate = sectionTemplates[category.id]
+                      const categoryTemplates = templates.filter(t => t.category === category.id)
+
+                      return (
+                        <div
+                          key={category.id}
+                          className={`rounded-xl border-2 transition-all ${
+                            isSelected
+                              ? 'border-accent/50 bg-accent/5'
+                              : 'border-border bg-background'
+                          }`}
+                        >
+                          <button
+                            onClick={() => {
+                              setSelectedSections(prev => {
+                                const next = new Set(prev)
+                                if (next.has(category.id)) {
+                                  next.delete(category.id)
+                                } else {
+                                  next.add(category.id)
+                                }
+                                return next
+                              })
+                            }}
+                            className="w-full flex items-center gap-3 p-3"
+                          >
+                            <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                              isSelected
+                                ? 'bg-accent border-accent'
+                                : 'border-border'
+                            }`}>
+                              {isSelected && <Check className="w-3 h-3 text-white" />}
+                            </div>
+
+                            <span className="text-lg">{category.icon}</span>
+                            <div className="text-left flex-1 min-w-0">
+                              <span className="text-sm font-medium text-text-primary block">{category.name}</span>
+                              <span className="text-xs text-text-secondary block">{category.description}</span>
+                            </div>
+
+                            {isSelected && assignedTemplate && (
+                              <div className="w-10 h-14 rounded-lg overflow-hidden border border-border flex-shrink-0">
+                                <img
+                                  src={assignedTemplate.image_url}
+                                  alt={assignedTemplate.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                            )}
+                          </button>
+
+                          {isSelected && (
+                            <div className="px-3 pb-3">
+                              {categoryTemplates.length > 0 ? (
+                                <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                                  {categoryTemplates.map((template) => (
+                                    <button
+                                      key={template.id}
+                                      onClick={() => setSectionTemplates(prev => ({
+                                        ...prev,
+                                        [category.id]: prev[category.id]?.id === template.id ? null : template,
+                                      }))}
+                                      className={`flex-shrink-0 w-16 h-24 rounded-lg overflow-hidden border-2 transition-all ${
+                                        assignedTemplate?.id === template.id
+                                          ? 'border-accent ring-1 ring-accent/30'
+                                          : 'border-border hover:border-accent/30'
+                                      }`}
+                                    >
+                                      <img
+                                        src={template.image_url}
+                                        alt={template.name}
+                                        className="w-full h-full object-cover"
+                                        loading="lazy"
+                                      />
+                                    </button>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-2 py-2">
+                                  <span className="text-xs text-text-secondary/70">Sin plantillas en galeria —</span>
+                                  <button
+                                    onClick={() => {
+                                      if (uploadedTemplate || selectedTemplate) {
+                                        setSectionTemplates(prev => ({
+                                          ...prev,
+                                          [category.id]: selectedTemplate || { id: 'uploaded', name: 'Subida', image_url: uploadedTemplate!, category: category.id } as Template,
+                                        }))
+                                        toast.success('Plantilla principal asignada')
+                                      } else {
+                                        toast.error('Sube una imagen de referencia arriba')
+                                      }
+                                    }}
+                                    className="text-xs text-accent hover:underline"
+                                  >
+                                    Usar plantilla principal
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  {selectedSections.size > 0 && (
+                    <div className="mt-4 pt-4 border-t border-border">
+                      <button
+                        onClick={handleBulkGenerate}
+                        disabled={isBulkGenerating}
+                        className="w-full flex items-center justify-center gap-3 px-4 py-4 bg-gradient-to-r from-accent to-emerald-500 hover:from-accent-hover hover:to-emerald-600 text-white rounded-xl font-bold text-base transition-all disabled:opacity-50 shadow-lg"
+                      >
+                        {isBulkGenerating ? (
+                          <>
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                            Generando... {bulkProgress.current}/{bulkProgress.total}
+                            <span className="text-sm font-normal opacity-80">({bulkProgress.currentLabel})</span>
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="w-5 h-5" />
+                            Generar {selectedAngleIds.size} Landing{selectedAngleIds.size > 1 ? 's' : ''} Completa{selectedAngleIds.size > 1 ? 's' : ''}
+                            <span className="text-sm font-normal opacity-80">
+                              ({selectedAngleIds.size} x {selectedSections.size} = {selectedAngleIds.size * selectedSections.size} banners)
+                            </span>
+                          </>
+                        )}
+                      </button>
+
+                      {isBulkGenerating && bulkProgress.total > 0 && (
+                        <div className="mt-3">
+                          <div className="w-full h-2 bg-border rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-gradient-to-r from-accent to-emerald-500 rounded-full transition-all duration-500"
+                              style={{ width: `${(bulkProgress.current / bulkProgress.total) * 100}%` }}
+                            />
+                          </div>
+                          <p className="text-xs text-text-secondary text-center mt-1">
+                            {bulkProgress.currentLabel}
+                          </p>
+                        </div>
+                      )}
+
+                      <p className="text-xs text-text-secondary text-center mt-2">
+                        Se generaran {selectedAngleIds.size * selectedSections.size} banners en paralelo (maximo 3 simultaneos)
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

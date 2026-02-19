@@ -1,5 +1,5 @@
 import { ImageProvider, GenerateImageRequest, GenerateImageResult, IMAGE_MODELS, getApiModelId } from './types'
-import { buildColorSection, buildTypographySection, buildProductContextSection } from './prompt-helpers'
+import { buildColorSection, buildTypographySection, buildProductContextSection, buildSectionTypeSection } from './prompt-helpers'
 
 function buildPricingSection(request: GenerateImageRequest): string {
   const { creativeControls } = request
@@ -122,6 +122,7 @@ TEXTOS:
 
 ${additionalInstructions ? `=== INSTRUCCIONES ESPECIALES DEL CLIENTE ===\n${additionalInstructions}` : ''}
 
+${buildSectionTypeSection(request)}
 ${buildColorSection(request)}
 ${buildTypographySection(request)}
 
