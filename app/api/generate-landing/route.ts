@@ -380,7 +380,7 @@ export async function POST(request: Request) {
     insertError = res.error
 
     // If section_type column doesn't exist yet, retry without it
-    if (insertError && insertError.code === 'PGRST204' && insertData.section_type) {
+    if (insertError && insertData.section_type) {
       delete insertData.section_type
       const retry = await serviceClient
         .from('landing_sections')

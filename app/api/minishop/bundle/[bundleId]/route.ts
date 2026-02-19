@@ -24,7 +24,7 @@ export async function GET(
       .eq('id', bundleId)
       .single()
 
-    if (res1.error && res1.error.code === 'PGRST204') {
+    if (res1.error) {
       // metadata column doesn't exist yet — query without it
       const res2 = await serviceClient
         .from('import_bundles')

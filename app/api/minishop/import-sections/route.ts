@@ -81,7 +81,7 @@ export async function POST(request: Request) {
         .in('id', section_ids.map((s: any) => s.id))
         .eq('user_id', user.id)
 
-      if (res1.error && res1.error.code === 'PGRST204') {
+      if (res1.error) {
         // section_type column doesn't exist yet, query without it
         const res2 = await serviceClient
           .from('landing_sections')
@@ -157,7 +157,7 @@ export async function POST(request: Request) {
       insertError = res.error
 
       // If metadata column doesn't exist, retry without it
-      if (insertError && insertError.code === 'PGRST204') {
+      if (insertError) {
         console.warn('[import-sections] metadata column not found, retrying without it')
         const retry = await serviceClient
           .from('import_bundles')
