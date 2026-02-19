@@ -124,18 +124,42 @@ export async function POST(request: Request) {
 
     validSections.sort((a, b) => a.order - b.order)
 
-    const { data: bundle, error } = await serviceClient
-      .from('import_bundles')
-      .insert({
-        user_id: user.id,
-        sections: validSections,
-        ...(metadata && typeof metadata === 'object' ? { metadata } : {}),
-      })
-      .select('id')
-      .single()
+    // Try inserting with metadata; fall back to without if column doesn't exist yet
+    let bundle: { id: string } | null = null
+    let insertError: any = null
 
-    if (error) {
-      console.error('Error creating import bundle:', error)
+    if (metadata && typeof metadata === 'object') {
+      const res = await serviceClient
+        .from('import_bundles')
+        .insert({ user_id: user.id, sections: validSections, metadata })
+        .select('id')
+        .single()
+      bundle = res.data
+      insertError = res.error
+
+      // If metadata column doesn't exist, retry without it
+      if (insertError && insertError.code === 'PGRST204') {
+        console.warn('[import-sections] metadata column not found, retrying without it')
+        const retry = await serviceClient
+          .from('import_bundles')
+          .insert({ user_id: user.id, sections: validSections })
+          .select('id')
+          .single()
+        bundle = retry.data
+        insertError = retry.error
+      }
+    } else {
+      const res = await serviceClient
+        .from('import_bundles')
+        .insert({ user_id: user.id, sections: validSections })
+        .select('id')
+        .single()
+      bundle = res.data
+      insertError = res.error
+    }
+
+    if (insertError) {
+      console.error('Error creating import bundle:', insertError)
       return NextResponse.json(
         { error: 'Error al crear el paquete de importacion' },
         { status: 500 }
