@@ -56,12 +56,35 @@ const OUTPUT_SIZES = [
   { id: '1080x1350', name: 'Retrato (4:5)', dimensions: '1080 x 1350 px' },
 ]
 
-const TYPOGRAPHY_PRESETS = [
-  { id: 'moderna-bold', name: 'Moderna Bold', family: 'Montserrat', style: 'Sans-serif gruesa, moderna, impactante. Estilo Montserrat Black/ExtraBold. Letras gruesas y contundentes.', preview: 'font-black tracking-tight' },
-  { id: 'elegante', name: 'Elegante Serif', family: 'Playfair Display', style: 'Serif elegante, sofisticada, premium. Estilo Playfair Display. Con serifs decorativos.', preview: 'font-serif italic' },
-  { id: 'minimalista', name: 'Minimalista', family: 'Helvetica/Inter', style: 'Sans-serif limpia, minimalista, moderna. Estilo Inter/Helvetica Neue. Letras delgadas y espaciadas.', preview: 'font-light tracking-wide' },
-  { id: 'deportiva', name: 'Deportiva', family: 'Oswald/Impact', style: 'Sans-serif condensada, fuerte, deportiva. Estilo Oswald/Impact. Letras altas y condensadas.', preview: 'font-extrabold uppercase tracking-wider' },
-  { id: 'amigable', name: 'Amigable', family: 'Nunito/Poppins', style: 'Sans-serif redondeada, amigable, calida. Estilo Poppins/Nunito. Letras con esquinas redondeadas.', preview: 'font-semibold' },
+const FONT_OPTIONS = [
+  {
+    id: 'montserrat',
+    name: 'Montserrat',
+    description: 'Bold, moderna, impactante',
+    promptStyle: 'Tipografia estilo Montserrat: sans-serif geometrica, bold, moderna, con trazos limpios y contundentes. Ideal para titulos grandes e impactantes.',
+    cssClass: 'font-sans font-extrabold',
+  },
+  {
+    id: 'opensans',
+    name: 'Open Sans',
+    description: 'Limpia, legible, profesional',
+    promptStyle: 'Tipografia estilo Open Sans: sans-serif humanista, limpia, muy legible, profesional. Neutral y versatil. Ideal para textos claros.',
+    cssClass: 'font-sans font-semibold',
+  },
+  {
+    id: 'playfair',
+    name: 'Playfair Display',
+    description: 'Elegante, premium, sofisticada',
+    promptStyle: 'Tipografia estilo Playfair Display: serif con alto contraste entre trazos gruesos y finos, elegante, sofisticada, premium. Ideal para productos de lujo.',
+    cssClass: 'font-serif font-bold italic',
+  },
+  {
+    id: 'poppins',
+    name: 'Poppins',
+    description: 'Redondeada, amigable, moderna',
+    promptStyle: 'Tipografia estilo Poppins: sans-serif geometrica con bordes ligeramente redondeados, amigable, moderna, juvenil. Ideal para productos de lifestyle.',
+    cssClass: 'font-sans font-bold',
+  },
 ]
 
 interface Product {
@@ -140,18 +163,16 @@ export default function ProductGeneratePage() {
   })
 
   // Color palette
+  const [colorCount, setColorCount] = useState<3 | 4>(3)
   const [colorPalette, setColorPalette] = useState({
     primary: '#0F172A',
     secondary: '#3B82F6',
     accent: '#10B981',
+    extra: '#F59E0B',
   })
 
   // Typography
-  const [selectedTypography, setSelectedTypography] = useState({
-    headings: 'moderna-bold',
-    subheadings: 'moderna-bold',
-    body: 'amigable',
-  })
+  const [selectedFont, setSelectedFont] = useState('montserrat')
 
   // Generated sections history
   const [generatedSections, setGeneratedSections] = useState<GeneratedSection[]>([])
@@ -325,11 +346,13 @@ export default function ProductGeneratePage() {
             targetAvatar: creativeControls.targetAvatar,
             additionalInstructions: creativeControls.additionalInstructions,
           } : {},
-          colorPalette,
+          colorPalette: {
+            ...colorPalette,
+            extra: colorCount === 4 ? colorPalette.extra : undefined,
+          },
           typography: {
-            headings: TYPOGRAPHY_PRESETS.find(p => p.id === selectedTypography.headings)?.style || '',
-            subheadings: TYPOGRAPHY_PRESETS.find(p => p.id === selectedTypography.subheadings)?.style || '',
-            body: TYPOGRAPHY_PRESETS.find(p => p.id === selectedTypography.body)?.style || '',
+            fontName: FONT_OPTIONS.find(f => f.id === selectedFont)?.name || 'Montserrat',
+            fontStyle: FONT_OPTIONS.find(f => f.id === selectedFont)?.promptStyle || '',
           },
         }),
       })
@@ -873,7 +896,35 @@ export default function ProductGeneratePage() {
             <label className="text-xs font-medium text-text-secondary uppercase tracking-wider mb-3 block">
               Paleta de Colores
             </label>
-            <div className="grid grid-cols-3 gap-3">
+
+            {/* Color count selector */}
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-xs text-text-secondary">Cantidad:</span>
+              <div className="flex rounded-lg border border-border overflow-hidden">
+                <button
+                  onClick={() => setColorCount(3)}
+                  className={`px-3 py-1 text-xs font-medium transition-colors ${
+                    colorCount === 3
+                      ? 'bg-accent text-white'
+                      : 'bg-background text-text-secondary hover:text-text-primary'
+                  }`}
+                >
+                  3 colores
+                </button>
+                <button
+                  onClick={() => setColorCount(4)}
+                  className={`px-3 py-1 text-xs font-medium transition-colors ${
+                    colorCount === 4
+                      ? 'bg-accent text-white'
+                      : 'bg-background text-text-secondary hover:text-text-primary'
+                  }`}
+                >
+                  4 colores
+                </button>
+              </div>
+            </div>
+
+            <div className={`grid gap-3 ${colorCount === 4 ? 'grid-cols-4' : 'grid-cols-3'}`}>
               {/* Color 1 - Primary */}
               <div>
                 <span className="text-xs text-text-secondary mb-1.5 block">Primario</span>
@@ -936,79 +987,68 @@ export default function ProductGeneratePage() {
                   </div>
                 </div>
               </div>
+
+              {/* Color 4 - Extra (only if 4 colors selected) */}
+              {colorCount === 4 && (
+                <div>
+                  <span className="text-xs text-text-secondary mb-1.5 block">Extra</span>
+                  <div className="relative">
+                    <input
+                      type="color"
+                      value={colorPalette.extra}
+                      onChange={(e) => setColorPalette({ ...colorPalette, extra: e.target.value })}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    />
+                    <div
+                      className="w-full h-12 rounded-xl border-2 border-border hover:border-accent/50 transition-colors cursor-pointer flex items-center justify-center gap-2"
+                      style={{ backgroundColor: colorPalette.extra }}
+                    >
+                      <span className="text-xs font-mono text-white drop-shadow-md bg-black/30 px-2 py-0.5 rounded">
+                        {colorPalette.extra.toUpperCase()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
             <p className="text-xs text-text-secondary/70 mt-2">
               Estos colores se aplicaran en todos los banners generados
             </p>
           </div>
 
-          {/* Typography */}
+          {/* Typography - Single font selector */}
           <div>
             <label className="text-xs font-medium text-text-secondary uppercase tracking-wider mb-3 block">
               Tipografia
             </label>
-
-            {/* Headings */}
-            <div className="mb-3">
-              <span className="text-xs text-text-secondary mb-1.5 block">Titulos</span>
-              <div className="grid grid-cols-5 gap-2">
-                {TYPOGRAPHY_PRESETS.map((preset) => (
-                  <button
-                    key={`h-${preset.id}`}
-                    onClick={() => setSelectedTypography({ ...selectedTypography, headings: preset.id })}
-                    className={`p-2 rounded-lg border-2 transition-all text-center ${
-                      selectedTypography.headings === preset.id
-                        ? 'border-accent bg-accent/10'
-                        : 'border-border hover:border-accent/30'
-                    }`}
-                  >
-                    <span className={`text-sm text-text-primary block ${preset.preview}`}>Aa</span>
-                    <span className="text-[10px] text-text-secondary block mt-0.5 truncate">{preset.name}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Subheadings */}
-            <div className="mb-3">
-              <span className="text-xs text-text-secondary mb-1.5 block">Subtitulos</span>
-              <div className="grid grid-cols-5 gap-2">
-                {TYPOGRAPHY_PRESETS.map((preset) => (
-                  <button
-                    key={`s-${preset.id}`}
-                    onClick={() => setSelectedTypography({ ...selectedTypography, subheadings: preset.id })}
-                    className={`p-2 rounded-lg border-2 transition-all text-center ${
-                      selectedTypography.subheadings === preset.id
-                        ? 'border-accent bg-accent/10'
-                        : 'border-border hover:border-accent/30'
-                    }`}
-                  >
-                    <span className={`text-sm text-text-primary block ${preset.preview}`}>Aa</span>
-                    <span className="text-[10px] text-text-secondary block mt-0.5 truncate">{preset.name}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Body Text */}
-            <div>
-              <span className="text-xs text-text-secondary mb-1.5 block">Textos</span>
-              <div className="grid grid-cols-5 gap-2">
-                {TYPOGRAPHY_PRESETS.map((preset) => (
-                  <button
-                    key={`b-${preset.id}`}
-                    onClick={() => setSelectedTypography({ ...selectedTypography, body: preset.id })}
-                    className={`p-2 rounded-lg border-2 transition-all text-center ${
-                      selectedTypography.body === preset.id
-                        ? 'border-accent bg-accent/10'
-                        : 'border-border hover:border-accent/30'
-                    }`}
-                  >
-                    <span className={`text-sm text-text-primary block ${preset.preview}`}>Aa</span>
-                    <span className="text-[10px] text-text-secondary block mt-0.5 truncate">{preset.name}</span>
-                  </button>
-                ))}
-              </div>
+            <div className="space-y-2">
+              {FONT_OPTIONS.map((font) => (
+                <button
+                  key={font.id}
+                  onClick={() => setSelectedFont(font.id)}
+                  className={`w-full flex items-center gap-4 p-3 rounded-xl border-2 transition-all ${
+                    selectedFont === font.id
+                      ? 'border-accent bg-accent/10'
+                      : 'border-border hover:border-accent/30 bg-background'
+                  }`}
+                >
+                  {/* Font preview */}
+                  <div className="w-16 text-center flex-shrink-0">
+                    <span className={`text-2xl text-text-primary ${font.cssClass}`}>Aa</span>
+                  </div>
+                  {/* Font info */}
+                  <div className="text-left flex-1 min-w-0">
+                    <span className="text-sm font-medium text-text-primary block">{font.name}</span>
+                    <span className="text-xs text-text-secondary block">{font.description}</span>
+                  </div>
+                  {/* Selected indicator */}
+                  {selectedFont === font.id && (
+                    <div className="w-5 h-5 rounded-full bg-accent flex items-center justify-center flex-shrink-0">
+                      <Check className="w-3 h-3 text-white" />
+                    </div>
+                  )}
+                </button>
+              ))}
             </div>
           </div>
         </div>

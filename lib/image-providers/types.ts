@@ -461,11 +461,11 @@ export interface GenerateImageRequest {
       primary: string
       secondary: string
       accent: string
+      extra?: string
     }
     typography?: {
-      headings: string
-      subheadings: string
-      body: string
+      fontName: string
+      fontStyle: string
     }
   }
 }
