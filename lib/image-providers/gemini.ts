@@ -1,5 +1,5 @@
 import { ImageProvider, GenerateImageRequest, GenerateImageResult, IMAGE_MODELS, getApiModelId } from './types'
-import { buildColorSection, buildTypographySection } from './prompt-helpers'
+import { buildColorSection, buildTypographySection, buildProductContextSection } from './prompt-helpers'
 
 function buildPricingSection(request: GenerateImageRequest): string {
   const { creativeControls } = request
@@ -52,6 +52,8 @@ function buildPrompt(request: GenerateImageRequest): string {
   const additionalInstructions = creativeControls?.additionalInstructions || ''
 
   return `Eres un director creativo experto en publicidad e-commerce para LATAM. Tu trabajo es crear banners que VENDEN.
+
+${buildProductContextSection(request)}
 
 === PASO 1: ANALISIS DEL PRODUCTO (PIENSA ANTES DE DISENAR) ===
 

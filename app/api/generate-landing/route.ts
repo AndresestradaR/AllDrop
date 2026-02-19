@@ -122,6 +122,7 @@ export async function POST(request: Request) {
       priceCombo3,
       colorPalette,
       typography,
+      productContext,
     } = body
 
     if (!templateUrl) {
@@ -304,6 +305,7 @@ export async function POST(request: Request) {
         targetCountry,
         colorPalette,
         typography,
+        productContext,
       },
     }
 

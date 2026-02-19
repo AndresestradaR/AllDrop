@@ -1,5 +1,5 @@
 import { ImageProvider, GenerateImageRequest, GenerateImageResult, getApiModelId } from './types'
-import { buildColorSection, buildTypographySection } from './prompt-helpers'
+import { buildColorSection, buildTypographySection, buildProductContextSection } from './prompt-helpers'
 
 function buildPricingSection(request: GenerateImageRequest): string {
   const { creativeControls } = request
@@ -37,6 +37,8 @@ function buildPrompt(request: GenerateImageRequest): string {
   const pricingSection = buildPricingSection(request)
 
   return `Professional e-commerce marketing banner for "${productName}" in Spanish.
+
+${buildProductContextSection(request)}
 
 STYLE:
 - Modern, clean e-commerce banner design

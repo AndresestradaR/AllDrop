@@ -25,7 +25,11 @@ import {
   ImagePlus,
   ExternalLink,
   Send,
-  Palette
+  Palette,
+  FileText,
+  Lightbulb,
+  Target,
+  RefreshCw
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import ModelSelector from '@/components/generator/ModelSelector'
@@ -148,6 +152,29 @@ export default function ProductGeneratePage() {
     targetAvatar: '',
     additionalInstructions: '',
   })
+
+  // Product context (Phase 2)
+  const [showProductContext, setShowProductContext] = useState(false)
+  const [productContext, setProductContext] = useState({
+    description: '',
+    benefits: '',
+    problems: '',
+    ingredients: '',
+    differentiator: '',
+  })
+
+  // AI Angles
+  const [isGeneratingAngles, setIsGeneratingAngles] = useState(false)
+  const [generatedAngles, setGeneratedAngles] = useState<Array<{
+    id: string
+    name: string
+    hook: string
+    description: string
+    avatarSuggestion: string
+    tone: string
+    salesAngle: string
+  }>>([])
+  const [selectedAngleId, setSelectedAngleId] = useState<string | null>(null)
 
   // Color palette
   const [colorCount, setColorCount] = useState<3 | 4>(3)
@@ -356,6 +383,7 @@ export default function ProductGeneratePage() {
             subheadings: FONT_CATALOG.find(f => f.id === selectedFonts.subheadings)?.promptDesc || '',
             body: FONT_CATALOG.find(f => f.id === selectedFonts.body)?.promptDesc || '',
           },
+          productContext: showProductContext ? productContext : {},
         }),
       })
 
@@ -413,6 +441,7 @@ export default function ProductGeneratePage() {
           templateUrl: selectedTemplate?.image_url || uploadedTemplate,
           productPhotos: productPhotos.filter(p => p !== null),
           productName: product?.name,
+          productContext: showProductContext ? productContext : {},
         }),
       })
 
@@ -437,6 +466,55 @@ export default function ProductGeneratePage() {
     } finally {
       setIsEnhancing(false)
     }
+  }
+
+  const handleGenerateAngles = async () => {
+    if (!productPhotos.some(p => p !== null)) {
+      toast.error('Sube al menos una foto del producto')
+      return
+    }
+
+    setIsGeneratingAngles(true)
+
+    try {
+      const response = await fetch('/api/generate-angles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productName: product?.name,
+          productPhotos: productPhotos.filter(p => p !== null),
+          productContext: showProductContext ? productContext : {},
+          targetCountry: selectedCountry.code,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Error al generar angulos')
+      }
+
+      setGeneratedAngles(data.angles)
+      setSelectedAngleId(null)
+      toast.success(`${data.angles.length} angulos generados!`)
+    } catch (error: any) {
+      toast.error(error.message || 'Error al generar angulos')
+    } finally {
+      setIsGeneratingAngles(false)
+    }
+  }
+
+  const handleSelectAngle = (angle: typeof generatedAngles[0]) => {
+    setSelectedAngleId(angle.id)
+
+    setCreativeControls(prev => ({
+      ...prev,
+      salesAngle: angle.salesAngle,
+      targetAvatar: angle.avatarSuggestion,
+    }))
+    setShowCreativeControls(true)
+
+    toast.success(`Angulo "${angle.name}" seleccionado`)
   }
 
   const handleDownload = async (imageUrl: string, quality: '2k' | 'optimized') => {
@@ -1117,6 +1195,185 @@ export default function ProductGeneratePage() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Product Context (Phase 2) */}
+        <div className="border border-border rounded-xl p-4 mb-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FileText className="w-4 h-4 text-accent" />
+              <span className="text-sm font-medium text-text-primary">
+                Contexto del Producto
+              </span>
+              <span className="text-xs text-text-secondary">(Recomendado)</span>
+            </div>
+            <button
+              onClick={() => setShowProductContext(!showProductContext)}
+              className={`relative w-12 h-6 rounded-full transition-colors ${
+                showProductContext ? 'bg-accent' : 'bg-border'
+              }`}
+            >
+              <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
+                showProductContext ? 'left-7' : 'left-1'
+              }`} />
+            </button>
+          </div>
+
+          {showProductContext && (
+            <div className="mt-4 space-y-4">
+              <p className="text-xs text-text-secondary">
+                Entre mas contexto proporciones, mejores seran los banners y angulos generados.
+              </p>
+
+              {/* Description */}
+              <div>
+                <label className="text-sm font-medium text-text-primary flex items-center gap-2 mb-1.5">
+                  📦 Descripcion del Producto
+                </label>
+                <textarea
+                  placeholder="Describe el producto en detalle: que es, como funciona, materiales, presentacion, cantidad, etc."
+                  value={productContext.description}
+                  onChange={(e) => setProductContext({ ...productContext, description: e.target.value.slice(0, 2000) })}
+                  className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent resize-none"
+                  rows={3}
+                />
+                <span className="text-xs text-text-secondary">{productContext.description.length}/2000</span>
+              </div>
+
+              {/* Benefits */}
+              <div>
+                <label className="text-sm font-medium text-text-primary flex items-center gap-2 mb-1.5">
+                  ✅ Beneficios Principales
+                </label>
+                <textarea
+                  placeholder="Lista los beneficios clave. Ej: Reduce arrugas 67% en 28 dias, hidratacion 24h, no grasa..."
+                  value={productContext.benefits}
+                  onChange={(e) => setProductContext({ ...productContext, benefits: e.target.value.slice(0, 1000) })}
+                  className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent resize-none"
+                  rows={2}
+                />
+              </div>
+
+              {/* Problems it solves */}
+              <div>
+                <label className="text-sm font-medium text-text-primary flex items-center gap-2 mb-1.5">
+                  🎯 Problemas que Resuelve
+                </label>
+                <textarea
+                  placeholder="Que dolor o frustracion tiene el cliente? Ej: Piel seca, arrugas prematuras, productos caros que no funcionan..."
+                  value={productContext.problems}
+                  onChange={(e) => setProductContext({ ...productContext, problems: e.target.value.slice(0, 1000) })}
+                  className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent resize-none"
+                  rows={2}
+                />
+              </div>
+
+              {/* Ingredients/Materials */}
+              <div>
+                <label className="text-sm font-medium text-text-primary flex items-center gap-2 mb-1.5">
+                  🧪 Ingredientes / Materiales / Componentes
+                </label>
+                <textarea
+                  placeholder="Ej: Acido hialuronico, retinol, vitamina C, extracto de aloe vera..."
+                  value={productContext.ingredients}
+                  onChange={(e) => setProductContext({ ...productContext, ingredients: e.target.value.slice(0, 500) })}
+                  className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent resize-none"
+                  rows={2}
+                />
+              </div>
+
+              {/* Differentiator */}
+              <div>
+                <label className="text-sm font-medium text-text-primary flex items-center gap-2 mb-1.5">
+                  💎 Diferenciador
+                </label>
+                <textarea
+                  placeholder="Que lo hace diferente de la competencia? Ej: Unico con 20 ingredientes activos, formula patentada, resultados en 14 dias..."
+                  value={productContext.differentiator}
+                  onChange={(e) => setProductContext({ ...productContext, differentiator: e.target.value.slice(0, 500) })}
+                  className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent resize-none"
+                  rows={2}
+                />
+              </div>
+
+              {/* Generate Angles Button */}
+              <div className="pt-2 border-t border-border">
+                <button
+                  onClick={handleGenerateAngles}
+                  disabled={isGeneratingAngles}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl font-medium transition-all disabled:opacity-50"
+                >
+                  {isGeneratingAngles ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Generando angulos...
+                    </>
+                  ) : (
+                    <>
+                      <Lightbulb className="w-5 h-5" />
+                      Generar Angulos de Venta con IA
+                    </>
+                  )}
+                </button>
+                <p className="text-xs text-text-secondary text-center mt-2">
+                  Analiza las fotos del producto + contexto para generar angulos de venta
+                </p>
+              </div>
+
+              {/* Generated Angles */}
+              {generatedAngles.length > 0 && (
+                <div className="pt-4 border-t border-border">
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="text-sm font-medium text-text-primary flex items-center gap-2">
+                      <Target className="w-4 h-4 text-amber-500" />
+                      Angulos de Venta Generados
+                    </label>
+                    <button
+                      onClick={handleGenerateAngles}
+                      disabled={isGeneratingAngles}
+                      className="flex items-center gap-1 px-2 py-1 text-xs text-text-secondary hover:text-accent transition-colors"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${isGeneratingAngles ? 'animate-spin' : ''}`} />
+                      Regenerar
+                    </button>
+                  </div>
+
+                  <div className="space-y-2">
+                    {generatedAngles.map((angle) => (
+                      <button
+                        key={angle.id}
+                        onClick={() => handleSelectAngle(angle)}
+                        className={`w-full text-left p-3 rounded-xl border-2 transition-all ${
+                          selectedAngleId === angle.id
+                            ? 'border-amber-500 bg-amber-500/10'
+                            : 'border-border hover:border-amber-500/30 bg-background'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-sm font-semibold text-text-primary">{angle.name}</span>
+                              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-600 font-medium">
+                                {angle.tone}
+                              </span>
+                            </div>
+                            <p className="text-xs text-amber-600 font-medium mb-1">&quot;{angle.hook}&quot;</p>
+                            <p className="text-xs text-text-secondary line-clamp-2">{angle.description}</p>
+                            <p className="text-[10px] text-text-secondary/70 mt-1">👤 {angle.avatarSuggestion}</p>
+                          </div>
+                          {selectedAngleId === angle.id && (
+                            <div className="w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center flex-shrink-0 mt-1">
+                              <Check className="w-3 h-3 text-white" />
+                            </div>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* AI Model Selection */}

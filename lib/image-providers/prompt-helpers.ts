@@ -34,6 +34,36 @@ TAMBIEN PERMITIDOS (neutros complementarios):
 PRUEBA MENTAL: Antes de generar, verifica que CADA pixel de color en el banner proviene de esta paleta o de blanco/negro. Si encuentras beige, crema, marron u otro color externo → ELIMINALO y reemplazalo con uno de la paleta.`
 }
 
+export function buildProductContextSection(request: GenerateImageRequest): string {
+  const ctx = request.creativeControls?.productContext
+  if (!ctx) return ''
+
+  const hasContent = ctx.description || ctx.benefits || ctx.problems || ctx.ingredients || ctx.differentiator
+  if (!hasContent) return ''
+
+  const lines: string[] = ['=== CONTEXTO DETALLADO DEL PRODUCTO ===']
+
+  if (ctx.description) {
+    lines.push(`\nDESCRIPCION COMPLETA: ${ctx.description}`)
+  }
+  if (ctx.benefits) {
+    lines.push(`\nBENEFICIOS CLAVE: ${ctx.benefits}`)
+  }
+  if (ctx.problems) {
+    lines.push(`\nPROBLEMAS QUE RESUELVE: ${ctx.problems}`)
+  }
+  if (ctx.ingredients) {
+    lines.push(`\nINGREDIENTES/MATERIALES: ${ctx.ingredients}`)
+  }
+  if (ctx.differentiator) {
+    lines.push(`\nDIFERENCIADOR CLAVE: ${ctx.differentiator}`)
+  }
+
+  lines.push('\nUSA esta informacion para crear textos y beneficios MAS ESPECIFICOS y relevantes en el banner. NO uses textos genericos — usa datos concretos del producto.')
+
+  return lines.join('\n')
+}
+
 export function buildTypographySection(request: GenerateImageRequest): string {
   const typo = request.creativeControls?.typography
   if (!typo?.headings) return ''

@@ -468,6 +468,13 @@ export interface GenerateImageRequest {
       subheadings: string
       body: string
     }
+    productContext?: {
+      description?: string
+      benefits?: string
+      problems?: string
+      ingredients?: string
+      differentiator?: string
+    }
   }
 }
 
