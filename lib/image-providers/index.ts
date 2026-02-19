@@ -65,31 +65,10 @@ export async function generateImage(
     }
   }
 
-  // ── Gemini special routing: KIE primary, Google direct fallback ──
+  // ── Gemini: route through KIE (Nano Banana Pro) for stability ──
   if (request.provider === 'gemini' && apiKeys.kie) {
-    console.log('[generateImage] Gemini via KIE (Nano Banana Pro) — primary path')
-    try {
-      const kieResult = await generateViaKie(request, apiKeys.kie)
-      if (kieResult.success) {
-        console.log('[generateImage] KIE success!')
-        return kieResult
-      }
-      console.warn('[generateImage] KIE failed:', kieResult.error)
-    } catch (e: any) {
-      console.error('[generateImage] KIE exception:', e.message)
-    }
-
-    // KIE failed — try direct Google as fallback if key available
-    if (apiKeys.gemini) {
-      console.log('[generateImage] Falling back to direct Google API...')
-      return provider.generate(request, apiKeys.gemini)
-    }
-
-    return {
-      success: false,
-      error: 'No se pudo generar la imagen via KIE. Verifica tus creditos en kie.ai o configura una API key de Google como respaldo.',
-      provider: 'gemini',
-    }
+    console.log('[generateImage] Gemini via KIE (Nano Banana Pro)')
+    return generateViaKie(request, apiKeys.kie)
   }
 
   // ── Normal flow for all other providers (and Gemini without KIE key) ──
@@ -194,12 +173,20 @@ async function generateViaKie(
 
   console.log(`[KIE] Task created: ${taskId}, polling...`)
 
-  // KIE is primary — give it generous time (100s, well within Vercel 120s limit)
+  // Full Vercel budget: 110s polling (leaves ~10s buffer for Vercel 120s limit)
   const pollResult = await pollForResult('seedream', taskId, kieApiKey, {
-    maxAttempts: 60,
+    maxAttempts: 55,
     intervalMs: 2000,
-    timeoutMs: 100000,
+    timeoutMs: 110000,
   })
+
+  if (!pollResult.success) {
+    return {
+      success: false,
+      error: pollResult.error || 'KIE no pudo generar la imagen. Intenta de nuevo en unos segundos.',
+      provider: 'gemini',
+    }
+  }
 
   return { ...pollResult, provider: 'gemini' }
 }
