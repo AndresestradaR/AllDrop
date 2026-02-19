@@ -100,6 +100,7 @@ interface Template {
 interface GeneratedSection {
   id: string
   template_id?: string
+  section_type?: string
   generated_image_url: string
   prompt_used: string
   output_size: string
@@ -1071,9 +1072,9 @@ export default function ProductGeneratePage() {
     }
   }
 
-  // Group sections by category
+  // Group sections by category (prefer section_type, fallback to template category)
   const sectionsByCategory = generatedSections.reduce((acc, section) => {
-    const category = section.template?.category || 'hero'
+    const category = section.section_type || section.template?.category || 'hero'
     if (!acc[category]) acc[category] = []
     acc[category].push(section)
     return acc

@@ -354,19 +354,42 @@ export async function POST(request: Request) {
 
     // Save to database (use service client for bypassing RLS)
     const serviceClient = await createServiceClient()
-    const { data: insertedSection, error: insertError } = await serviceClient
+    const sectionType = creativeControls?.sectionType || null
+    const insertData: Record<string, any> = {
+      product_id: productId,
+      user_id: user.id,
+      template_id: templateId || null,
+      output_size: outputSize,
+      generated_image_url: generatedImageUrl,
+      prompt_used: `Product: ${productName} | Provider: ${selectedProvider}`,
+      status: 'completed',
+    }
+    if (sectionType) {
+      insertData.section_type = sectionType
+    }
+
+    let insertedSection: any = null
+    let insertError: any = null
+
+    const res = await serviceClient
       .from('landing_sections')
-      .insert({
-        product_id: productId,
-        user_id: user.id,
-        template_id: templateId || null,
-        output_size: outputSize,
-        generated_image_url: generatedImageUrl,
-        prompt_used: `Product: ${productName} | Provider: ${selectedProvider}`,
-        status: 'completed',
-      })
+      .insert(insertData)
       .select()
       .single()
+    insertedSection = res.data
+    insertError = res.error
+
+    // If section_type column doesn't exist yet, retry without it
+    if (insertError && insertError.code === 'PGRST204' && insertData.section_type) {
+      delete insertData.section_type
+      const retry = await serviceClient
+        .from('landing_sections')
+        .insert(insertData)
+        .select()
+        .single()
+      insertedSection = retry.data
+      insertError = retry.error
+    }
 
     if (insertError) {
       return NextResponse.json({
