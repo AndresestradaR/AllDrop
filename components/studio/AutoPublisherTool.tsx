@@ -238,6 +238,8 @@ export function AutoPublisherTool({ onBack }: AutoPublisherToolProps) {
   const handleExecuteNow = async (flowId: string) => {
     try {
       toast.loading('Ejecutando flujo...', { id: 'execute-now' })
+      const flow = flows.find(f => f.id === flowId)
+      const isPremium = flow?.video_preset === 'premium'
       const res = await fetch('/api/studio/automations/execute-now', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -245,11 +247,11 @@ export function AutoPublisherTool({ onBack }: AutoPublisherToolProps) {
       })
       const data = await res.json()
       if (res.ok && data.success) {
-        toast.success('Video en generación...', { id: 'execute-now' })
+        toast.success(isPremium ? 'Video Kling 3.0 en generación (puede tomar hasta 25 min)...' : 'Video en generación...', { id: 'execute-now' })
         await loadRuns()
         // Start client-side polling for video completion
         if (data.taskId && data.runId) {
-          pollVideoCompletion(data.taskId, data.runId)
+          pollVideoCompletion(data.taskId, data.runId, isPremium)
         }
       } else {
         toast.error(data.error || 'Error al ejecutar', { id: 'execute-now' })
@@ -259,8 +261,9 @@ export function AutoPublisherTool({ onBack }: AutoPublisherToolProps) {
     }
   }
 
-  const pollVideoCompletion = async (taskId: string, runId: string) => {
-    const maxAttempts = 60 // 5 minutes at 5s intervals
+  const pollVideoCompletion = async (taskId: string, runId: string, isPremium = false) => {
+    // Premium (Kling 3.0) can take up to 25 min; others ~5 min
+    const maxAttempts = isPremium ? 360 : 60 // 30 min vs 5 min at 5s intervals
     for (let i = 0; i < maxAttempts; i++) {
       await new Promise(r => setTimeout(r, 5000))
       try {
@@ -292,7 +295,10 @@ export function AutoPublisherTool({ onBack }: AutoPublisherToolProps) {
 
         // Still processing — update toast every 15s
         if (i > 0 && i % 3 === 0) {
-          toast.loading(`Generando video... ${i * 5}s`, { id: 'video-poll' })
+          const elapsed = Math.floor(i * 5 / 60)
+          const secs = (i * 5) % 60
+          const timeStr = elapsed > 0 ? `${elapsed}m ${secs}s` : `${secs}s`
+          toast.loading(`Generando video... ${timeStr}${isPremium ? ' (Kling 3.0 tarda más)' : ''}`, { id: 'video-poll' })
         }
       } catch {
         // Ignore transient polling errors

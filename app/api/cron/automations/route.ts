@@ -192,15 +192,20 @@ async function pollPendingVideos(supabase: any, appUrl: string) {
         completed++
 
       } else {
-        // Check if it's been too long (> 15 min)
+        // Check if it's been too long
+        // Kling 3.0 (premium) can take 25+ min, other models ~10 min
+        const isPremium = run.flow?.video_preset === 'premium'
+        const timeoutMs = isPremium ? 35 * 60 * 1000 : 15 * 60 * 1000
+        const timeoutLabel = isPremium ? '35 min' : '15 min'
+
         const started = new Date(run.started_at || run.created_at)
         const elapsed = Date.now() - started.getTime()
-        if (elapsed > 15 * 60 * 1000) {
+        if (elapsed > timeoutMs) {
           await supabase
             .from('automation_runs')
             .update({
               status: 'failed',
-              error_message: 'Video generation timed out (>15 min)',
+              error_message: `Video generation timed out (>${timeoutLabel})`,
               completed_at: new Date().toISOString(),
             })
             .eq('id', run.id)
@@ -414,7 +419,7 @@ function getDurationFromPreset(preset: string): number {
   switch (preset) {
     case 'producto': return 10
     case 'rapido': return 8
-    case 'premium': return 10
+    case 'premium': return 15
     default: return 8
   }
 }
