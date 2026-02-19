@@ -99,8 +99,9 @@ export async function generateImage(
     const isServerError = err.includes('servidores') || err.includes('experimentando problemas')
     const isQuotaError = err.includes('limite diario') || err.includes('limite')
     const isRateError = err.includes('demasiadas solicitudes')
+    const isTimeout = err.includes('tardo demasiado')
 
-    if (isServerError || isQuotaError || isRateError) {
+    if (isServerError || isQuotaError || isRateError || isTimeout) {
       console.log('[generateImage] Gemini failed, trying KIE Nano Banana Pro fallback...')
       try {
         const fallbackResult = await generateViaKieFallback(request, apiKeys.kie)
