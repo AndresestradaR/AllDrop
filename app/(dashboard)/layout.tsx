@@ -17,7 +17,8 @@ import {
   Clock,
   Target,
   Wand2,
-  Store
+  Store,
+  Upload
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -37,6 +38,7 @@ const creatorNavigation = [
 const otherNavigation = [
   { name: 'Mi Tienda', href: '/constructor/', icon: Store, external: true },
   { name: 'Galería', href: '/dashboard/gallery', icon: Images },
+  { name: 'Admin Plantillas', href: '/dashboard/admin/templates', icon: Upload },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
 ]
 
