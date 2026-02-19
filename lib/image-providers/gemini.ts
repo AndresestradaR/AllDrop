@@ -96,10 +96,6 @@ PERO ADAPTA COMPLETAMENTE:
 - La POSE/ACCION -> debe mostrar uso natural del producto
 - Los ELEMENTOS DECORATIVOS -> deben ser relevantes al producto
 
-${buildColorSection(request)}
-
-${buildTypographySection(request)}
-
 === PASO 4: CONTENIDO DEL BANNER ===
 
 PRODUCTO: ${productName}
@@ -123,6 +119,9 @@ TEXTOS:
 6. FOOTER: Sellos de confianza (envio gratis, garantia, etc.)
 
 ${additionalInstructions ? `=== INSTRUCCIONES ESPECIALES DEL CLIENTE ===\n${additionalInstructions}` : ''}
+
+${buildColorSection(request)}
+${buildTypographySection(request)}
 
 === PROHIBIDO ===
 - Persona en contexto incoherente (atleta con sarten, chef en gimnasio)

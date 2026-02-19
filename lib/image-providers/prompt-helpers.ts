@@ -29,19 +29,20 @@ IMPORTANTE:
 
 export function buildTypographySection(request: GenerateImageRequest): string {
   const typo = request.creativeControls?.typography
-  if (!typo?.fontStyle) return ''
+  if (!typo?.headings) return ''
 
-  return `=== TIPOGRAFIA OBLIGATORIA ===
+  return `
+=== TIPOGRAFIA DEL BANNER ===
 
-REGLA CRITICA DE TIPOGRAFIA: Usa CONSISTENTEMENTE el estilo tipografico "${typo.fontName}" en todo el banner.
+Usa CONSISTENTEMENTE estos estilos tipograficos en el banner:
 
-${typo.fontStyle}
+- TITULOS PRINCIPALES: ${typo.headings}
+- SUBTITULOS, BADGES Y PRECIOS: ${typo.subheadings}
+- TEXTOS DE CUERPO, BENEFICIOS Y FOOTER: ${typo.body}
 
-IMPORTANTE:
-- TODOS los textos del banner (titulos, subtitulos, beneficios, precios, CTAs) deben usar este estilo tipografico
-- Los titulos usan la version MAS BOLD y GRANDE de esta tipografia
-- Los subtitulos usan una version semibold/medium
-- Los textos pequenos usan una version regular/light
-- MANTÉN el mismo estilo tipografico en TODOS los banners que generes
-- NO cambies la tipografia por la del template de referencia`
+Reglas:
+- Mantén estas mismas fuentes en TODOS los banners de la landing
+- Los titulos deben ser GRANDES y en version BOLD/BLACK de la fuente indicada
+- NO sustituyas estas fuentes por las del template de referencia
+- Respeta la ESTRUCTURA y LAYOUT del template, solo cambia la tipografia`
 }

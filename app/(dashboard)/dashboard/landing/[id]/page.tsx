@@ -56,35 +56,22 @@ const OUTPUT_SIZES = [
   { id: '1080x1350', name: 'Retrato (4:5)', dimensions: '1080 x 1350 px' },
 ]
 
-const FONT_OPTIONS = [
-  {
-    id: 'montserrat',
-    name: 'Montserrat',
-    description: 'Bold, moderna, impactante',
-    promptStyle: 'Tipografia estilo Montserrat: sans-serif geometrica, bold, moderna, con trazos limpios y contundentes. Ideal para titulos grandes e impactantes.',
-    cssClass: 'font-sans font-extrabold',
-  },
-  {
-    id: 'opensans',
-    name: 'Open Sans',
-    description: 'Limpia, legible, profesional',
-    promptStyle: 'Tipografia estilo Open Sans: sans-serif humanista, limpia, muy legible, profesional. Neutral y versatil. Ideal para textos claros.',
-    cssClass: 'font-sans font-semibold',
-  },
-  {
-    id: 'playfair',
-    name: 'Playfair Display',
-    description: 'Elegante, premium, sofisticada',
-    promptStyle: 'Tipografia estilo Playfair Display: serif con alto contraste entre trazos gruesos y finos, elegante, sofisticada, premium. Ideal para productos de lujo.',
-    cssClass: 'font-serif font-bold italic',
-  },
-  {
-    id: 'poppins',
-    name: 'Poppins',
-    description: 'Redondeada, amigable, moderna',
-    promptStyle: 'Tipografia estilo Poppins: sans-serif geometrica con bordes ligeramente redondeados, amigable, moderna, juvenil. Ideal para productos de lifestyle.',
-    cssClass: 'font-sans font-bold',
-  },
+const FONT_CATALOG = [
+  { id: 'montserrat', name: 'Montserrat', category: 'Sans-serif', promptDesc: 'Montserrat: sans-serif geometrica, bold, moderna, trazos limpios y contundentes' },
+  { id: 'opensans', name: 'Open Sans', category: 'Sans-serif', promptDesc: 'Open Sans: sans-serif humanista, limpia, muy legible, profesional y neutral' },
+  { id: 'poppins', name: 'Poppins', category: 'Sans-serif', promptDesc: 'Poppins: sans-serif geometrica con bordes redondeados, amigable, moderna, juvenil' },
+  { id: 'roboto', name: 'Roboto', category: 'Sans-serif', promptDesc: 'Roboto: sans-serif neo-grotesca, mecanica pero amigable, versatil y moderna' },
+  { id: 'inter', name: 'Inter', category: 'Sans-serif', promptDesc: 'Inter: sans-serif disenada para pantallas, limpia, neutra, excelente legibilidad' },
+  { id: 'lato', name: 'Lato', category: 'Sans-serif', promptDesc: 'Lato: sans-serif semi-redondeada, calida pero estable, profesional y amigable' },
+  { id: 'nunito', name: 'Nunito', category: 'Sans-serif', promptDesc: 'Nunito: sans-serif redondeada, suave, amigable, ideal para productos de bienestar' },
+  { id: 'oswald', name: 'Oswald', category: 'Sans-serif', promptDesc: 'Oswald: sans-serif condensada, fuerte, deportiva, impactante en titulos grandes' },
+  { id: 'raleway', name: 'Raleway', category: 'Sans-serif', promptDesc: 'Raleway: sans-serif elegante con trazos finos, sofisticada y moderna' },
+  { id: 'bebas-neue', name: 'Bebas Neue', category: 'Sans-serif', promptDesc: 'Bebas Neue: sans-serif condensada todo mayusculas, dramatica, impactante, estilo poster' },
+  { id: 'playfair', name: 'Playfair Display', category: 'Serif', promptDesc: 'Playfair Display: serif con alto contraste, elegante, sofisticada, premium' },
+  { id: 'merriweather', name: 'Merriweather', category: 'Serif', promptDesc: 'Merriweather: serif disenada para pantallas, alta legibilidad, seria y profesional' },
+  { id: 'lora', name: 'Lora', category: 'Serif', promptDesc: 'Lora: serif caligrafica contemporanea, elegante pero accesible' },
+  { id: 'dm-serif', name: 'DM Serif Display', category: 'Serif', promptDesc: 'DM Serif Display: serif con personalidad, moderna pero clasica, excelente para titulos' },
+  { id: 'archivo-black', name: 'Archivo Black', category: 'Sans-serif', promptDesc: 'Archivo Black: sans-serif extra bold, contundente, maxima presencia visual en titulos' },
 ]
 
 interface Product {
@@ -172,7 +159,11 @@ export default function ProductGeneratePage() {
   })
 
   // Typography
-  const [selectedFont, setSelectedFont] = useState('montserrat')
+  const [selectedFonts, setSelectedFonts] = useState({
+    headings: 'montserrat',
+    subheadings: 'opensans',
+    body: 'opensans',
+  })
 
   // Generated sections history
   const [generatedSections, setGeneratedSections] = useState<GeneratedSection[]>([])
@@ -203,6 +194,16 @@ export default function ProductGeneratePage() {
     fetchGeneratedSections()
     fetchApiKeyStatus()
   }, [productId])
+
+  // Load Google Fonts for typography preview
+  useEffect(() => {
+    const fontFamilies = FONT_CATALOG.map(f => f.name.replace(/ /g, '+')).join('&family=')
+    const link = document.createElement('link')
+    link.href = `https://fonts.googleapis.com/css2?family=${fontFamilies}&display=swap`
+    link.rel = 'stylesheet'
+    document.head.appendChild(link)
+    return () => { document.head.removeChild(link) }
+  }, [])
 
   const fetchApiKeyStatus = async () => {
     try {
@@ -351,8 +352,9 @@ export default function ProductGeneratePage() {
             extra: colorCount === 4 ? colorPalette.extra : undefined,
           },
           typography: {
-            fontName: FONT_OPTIONS.find(f => f.id === selectedFont)?.name || 'Montserrat',
-            fontStyle: FONT_OPTIONS.find(f => f.id === selectedFont)?.promptStyle || '',
+            headings: FONT_CATALOG.find(f => f.id === selectedFonts.headings)?.promptDesc || '',
+            subheadings: FONT_CATALOG.find(f => f.id === selectedFonts.subheadings)?.promptDesc || '',
+            body: FONT_CATALOG.find(f => f.id === selectedFonts.body)?.promptDesc || '',
           },
         }),
       })
@@ -1016,39 +1018,103 @@ export default function ProductGeneratePage() {
             </p>
           </div>
 
-          {/* Typography - Single font selector */}
+          {/* Typography - 3 independent dropdowns */}
           <div>
             <label className="text-xs font-medium text-text-secondary uppercase tracking-wider mb-3 block">
               Tipografia
             </label>
-            <div className="space-y-2">
-              {FONT_OPTIONS.map((font) => (
-                <button
-                  key={font.id}
-                  onClick={() => setSelectedFont(font.id)}
-                  className={`w-full flex items-center gap-4 p-3 rounded-xl border-2 transition-all ${
-                    selectedFont === font.id
-                      ? 'border-accent bg-accent/10'
-                      : 'border-border hover:border-accent/30 bg-background'
-                  }`}
-                >
-                  {/* Font preview */}
-                  <div className="w-16 text-center flex-shrink-0">
-                    <span className={`text-2xl text-text-primary ${font.cssClass}`}>Aa</span>
-                  </div>
-                  {/* Font info */}
-                  <div className="text-left flex-1 min-w-0">
-                    <span className="text-sm font-medium text-text-primary block">{font.name}</span>
-                    <span className="text-xs text-text-secondary block">{font.description}</span>
-                  </div>
-                  {/* Selected indicator */}
-                  {selectedFont === font.id && (
-                    <div className="w-5 h-5 rounded-full bg-accent flex items-center justify-center flex-shrink-0">
-                      <Check className="w-3 h-3 text-white" />
-                    </div>
-                  )}
-                </button>
-              ))}
+
+            {/* Titles */}
+            <div className="mb-3">
+              <span className="text-xs text-text-secondary mb-1.5 block">Titulos</span>
+              <div className="flex items-center gap-3">
+                <div className="relative flex-1">
+                  <select
+                    value={selectedFonts.headings}
+                    onChange={(e) => setSelectedFonts({ ...selectedFonts, headings: e.target.value })}
+                    className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent"
+                  >
+                    <optgroup label="Sans-serif">
+                      {FONT_CATALOG.filter(f => f.category === 'Sans-serif').map(font => (
+                        <option key={font.id} value={font.id}>{font.name}</option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Serif">
+                      {FONT_CATALOG.filter(f => f.category === 'Serif').map(font => (
+                        <option key={font.id} value={font.id}>{font.name}</option>
+                      ))}
+                    </optgroup>
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-text-secondary pointer-events-none" />
+                </div>
+                <div className="w-28 h-12 flex items-center justify-center bg-background border border-border rounded-xl flex-shrink-0">
+                  <span className="text-xl text-text-primary" style={{ fontFamily: `'${FONT_CATALOG.find(f => f.id === selectedFonts.headings)?.name}', sans-serif` }}>
+                    Ejemplo
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Subtitles */}
+            <div className="mb-3">
+              <span className="text-xs text-text-secondary mb-1.5 block">Subtitulos</span>
+              <div className="flex items-center gap-3">
+                <div className="relative flex-1">
+                  <select
+                    value={selectedFonts.subheadings}
+                    onChange={(e) => setSelectedFonts({ ...selectedFonts, subheadings: e.target.value })}
+                    className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent"
+                  >
+                    <optgroup label="Sans-serif">
+                      {FONT_CATALOG.filter(f => f.category === 'Sans-serif').map(font => (
+                        <option key={font.id} value={font.id}>{font.name}</option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Serif">
+                      {FONT_CATALOG.filter(f => f.category === 'Serif').map(font => (
+                        <option key={font.id} value={font.id}>{font.name}</option>
+                      ))}
+                    </optgroup>
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-text-secondary pointer-events-none" />
+                </div>
+                <div className="w-28 h-12 flex items-center justify-center bg-background border border-border rounded-xl flex-shrink-0">
+                  <span className="text-xl text-text-primary" style={{ fontFamily: `'${FONT_CATALOG.find(f => f.id === selectedFonts.subheadings)?.name}', sans-serif` }}>
+                    Ejemplo
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Body text */}
+            <div>
+              <span className="text-xs text-text-secondary mb-1.5 block">Textos</span>
+              <div className="flex items-center gap-3">
+                <div className="relative flex-1">
+                  <select
+                    value={selectedFonts.body}
+                    onChange={(e) => setSelectedFonts({ ...selectedFonts, body: e.target.value })}
+                    className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent"
+                  >
+                    <optgroup label="Sans-serif">
+                      {FONT_CATALOG.filter(f => f.category === 'Sans-serif').map(font => (
+                        <option key={font.id} value={font.id}>{font.name}</option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Serif">
+                      {FONT_CATALOG.filter(f => f.category === 'Serif').map(font => (
+                        <option key={font.id} value={font.id}>{font.name}</option>
+                      ))}
+                    </optgroup>
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-text-secondary pointer-events-none" />
+                </div>
+                <div className="w-28 h-12 flex items-center justify-center bg-background border border-border rounded-xl flex-shrink-0">
+                  <span className="text-xl text-text-primary" style={{ fontFamily: `'${FONT_CATALOG.find(f => f.id === selectedFonts.body)?.name}', sans-serif` }}>
+                    Ejemplo
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
         </div>

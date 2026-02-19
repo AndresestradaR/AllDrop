@@ -464,8 +464,9 @@ export interface GenerateImageRequest {
       extra?: string
     }
     typography?: {
-      fontName: string
-      fontStyle: string
+      headings: string
+      subheadings: string
+      body: string
     }
   }
 }
