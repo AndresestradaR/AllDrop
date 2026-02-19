@@ -41,7 +41,10 @@ export function getAllProviders() {
 }
 
 /**
- * Generate image with automatic provider routing
+ * Generate image with automatic provider routing.
+ *
+ * For Gemini: routes through KIE (Nano Banana Pro) as primary for stability.
+ * Direct Google API is used as fallback only if KIE fails or is unavailable.
  */
 export async function generateImage(
   request: GenerateImageRequest,
@@ -62,7 +65,34 @@ export async function generateImage(
     }
   }
 
-  // Get the appropriate API key
+  // ── Gemini special routing: KIE primary, Google direct fallback ──
+  if (request.provider === 'gemini' && apiKeys.kie) {
+    console.log('[generateImage] Gemini via KIE (Nano Banana Pro) — primary path')
+    try {
+      const kieResult = await generateViaKie(request, apiKeys.kie)
+      if (kieResult.success) {
+        console.log('[generateImage] KIE success!')
+        return kieResult
+      }
+      console.warn('[generateImage] KIE failed:', kieResult.error)
+    } catch (e: any) {
+      console.error('[generateImage] KIE exception:', e.message)
+    }
+
+    // KIE failed — try direct Google as fallback if key available
+    if (apiKeys.gemini) {
+      console.log('[generateImage] Falling back to direct Google API...')
+      return provider.generate(request, apiKeys.gemini)
+    }
+
+    return {
+      success: false,
+      error: 'No se pudo generar la imagen via KIE. Verifica tus creditos en kie.ai o configura una API key de Google como respaldo.',
+      provider: 'gemini',
+    }
+  }
+
+  // ── Normal flow for all other providers (and Gemini without KIE key) ──
   let apiKey: string | undefined
   switch (request.provider) {
     case 'gemini':
@@ -87,53 +117,18 @@ export async function generateImage(
     }
   }
 
-  const result = await provider.generate(request, apiKey)
-
-  // Auto-fallback: if Gemini failed with server/quota errors, try KIE (Nano Banana Pro)
-  if (
-    !result.success &&
-    request.provider === 'gemini' &&
-    apiKeys.kie
-  ) {
-    const err = (result.error || '').toLowerCase()
-    const isServerError = err.includes('servidores') || err.includes('experimentando problemas')
-    const isQuotaError = err.includes('limite diario') || err.includes('limite')
-    const isRateError = err.includes('demasiadas solicitudes')
-    const isTimeout = err.includes('tardo demasiado')
-
-    if (isServerError || isQuotaError || isRateError || isTimeout) {
-      console.log('[generateImage] Gemini failed, trying KIE Nano Banana Pro fallback...')
-      try {
-        const fallbackResult = await generateViaKieFallback(request, apiKeys.kie)
-        if (fallbackResult.success) {
-          console.log('[generateImage] KIE fallback succeeded!')
-          return fallbackResult
-        }
-        console.warn('[generateImage] KIE fallback also failed:', fallbackResult.error)
-        // Return combined error so user knows both were tried
-        return {
-          ...result,
-          error: `${result.error}\n\nTambien intentamos via KIE (Nano Banana Pro) pero fallo: ${fallbackResult.error}`,
-        }
-      } catch (e: any) {
-        console.error('[generateImage] KIE fallback exception:', e.message)
-      }
-    }
-  }
-
-  return result
+  return provider.generate(request, apiKey)
 }
 
 /**
- * Fallback: Generate image via KIE's Nano Banana Pro (Gemini 3 Pro) when direct Google API fails.
- * Uses the same prompt style as the Gemini provider but routes through KIE servers.
- * Handles the full async cycle (createTask → poll → return image).
+ * Generate image via KIE's Nano Banana Pro (Gemini 3 Pro Image).
+ * Uses the same prompt style as the Gemini provider but routes through KIE's stable servers.
+ * Handles the full async cycle: createTask → poll → return image.
  */
-async function generateViaKieFallback(
+async function generateViaKie(
   request: GenerateImageRequest,
   kieApiKey: string
 ): Promise<GenerateImageResult> {
-  // Build the same prompt Gemini would use
   const prompt = request.prompt?.trim() || buildGeminiPrompt(request)
 
   // Collect public image URLs for KIE (requires URLs, not base64)
@@ -145,7 +140,7 @@ async function generateViaKieFallback(
     imageUrls.push(...request.productImageUrls)
   }
 
-  console.log(`[KIE Fallback] Prompt length: ${prompt.length}, image URLs: ${imageUrls.length}`)
+  console.log(`[KIE] Prompt length: ${prompt.length}, image URLs: ${imageUrls.length}`)
 
   // Create task via KIE API with Nano Banana Pro (Gemini 3 Pro Image)
   const createResponse = await fetch('https://api.kie.ai/api/v1/jobs/createTask', {
@@ -167,7 +162,7 @@ async function generateViaKieFallback(
   })
 
   const responseText = await createResponse.text()
-  console.log(`[KIE Fallback] Create response: ${createResponse.status} - ${responseText.substring(0, 300)}`)
+  console.log(`[KIE] Create response: ${createResponse.status} - ${responseText.substring(0, 300)}`)
 
   let createData: any
   try {
@@ -175,7 +170,7 @@ async function generateViaKieFallback(
   } catch {
     return {
       success: false,
-      error: `KIE fallback: respuesta invalida`,
+      error: 'KIE: respuesta invalida del servidor',
       provider: 'gemini',
     }
   }
@@ -183,7 +178,7 @@ async function generateViaKieFallback(
   if (createData.code !== 200 && createData.code !== 0) {
     return {
       success: false,
-      error: `KIE fallback: ${createData.msg || JSON.stringify(createData).substring(0, 200)}`,
+      error: `KIE: ${createData.msg || JSON.stringify(createData).substring(0, 200)}`,
       provider: 'gemini',
     }
   }
@@ -192,22 +187,20 @@ async function generateViaKieFallback(
   if (!taskId) {
     return {
       success: false,
-      error: 'KIE fallback: no taskId received',
+      error: 'KIE: no se recibio taskId',
       provider: 'gemini',
     }
   }
 
-  console.log(`[KIE Fallback] Task created: ${taskId}, polling...`)
+  console.log(`[KIE] Task created: ${taskId}, polling...`)
 
-  // Poll for result using the seedream provider's checkStatus (same KIE API)
-  // Keep timeout under 60s so total (Gemini 45s + KIE 60s) < Vercel 120s limit
+  // KIE is primary — give it generous time (100s, well within Vercel 120s limit)
   const pollResult = await pollForResult('seedream', taskId, kieApiKey, {
-    maxAttempts: 40,
-    intervalMs: 1500,
-    timeoutMs: 60000,
+    maxAttempts: 60,
+    intervalMs: 2000,
+    timeoutMs: 100000,
   })
 
-  // Tag as gemini provider so the calling code treats it the same
   return { ...pollResult, provider: 'gemini' }
 }
 

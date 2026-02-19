@@ -182,9 +182,14 @@ export async function POST(request: Request) {
     }
 
     const requiredKey = providerKeyMap[selectedProvider]
-    if (!apiKeys[requiredKey]) {
+    // For Gemini: accept either Google key OR KIE key (KIE routes Gemini via Nano Banana Pro)
+    const hasValidKey = selectedProvider === 'gemini'
+      ? !!(apiKeys.gemini || apiKeys.kie)
+      : !!apiKeys[requiredKey]
+
+    if (!hasValidKey) {
       const keyNames: Record<ImageProviderType, string> = {
-        gemini: 'Google (Gemini)',
+        gemini: 'Google (Gemini) o KIE.ai',
         openai: 'OpenAI',
         seedream: 'KIE.ai',
         flux: 'Black Forest Labs',
