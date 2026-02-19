@@ -29,7 +29,8 @@ import {
   FileText,
   Lightbulb,
   Target,
-  RefreshCw
+  RefreshCw,
+  Plus
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import ModelSelector from '@/components/generator/ModelSelector'
@@ -176,6 +177,12 @@ export default function ProductGeneratePage() {
     salesAngle: string
   }>>([])
   const [selectedAngleIds, setSelectedAngleIds] = useState<Set<string>>(new Set())
+
+  // Manual angle creation
+  const [showAddAngleForm, setShowAddAngleForm] = useState(false)
+  const [newAngle, setNewAngle] = useState({
+    name: '', hook: '', salesAngle: '', avatarSuggestion: '', tone: 'Emocional' as string
+  })
 
   // Landing sections selection (Phase 3)
   const [selectedSections, setSelectedSections] = useState<Set<string>>(
@@ -661,6 +668,80 @@ export default function ProductGeneratePage() {
     }))
     setShowCreativeControls(true)
   }
+
+  const handleAddManualAngle = () => {
+    if (!newAngle.name.trim() || !newAngle.salesAngle.trim()) {
+      toast.error('Nombre y angulo de venta son requeridos')
+      return
+    }
+
+    const manualAngle = {
+      id: `manual-${Date.now()}`,
+      name: newAngle.name.trim(),
+      hook: newAngle.hook.trim() || newAngle.salesAngle.trim().substring(0, 60),
+      description: `Angulo manual: ${newAngle.salesAngle.trim()}`,
+      avatarSuggestion: newAngle.avatarSuggestion.trim() || 'Publico general',
+      tone: newAngle.tone,
+      salesAngle: newAngle.salesAngle.trim(),
+    }
+
+    setGeneratedAngles(prev => [...prev, manualAngle])
+    setNewAngle({ name: '', hook: '', salesAngle: '', avatarSuggestion: '', tone: 'Emocional' })
+    setShowAddAngleForm(false)
+    toast.success(`Angulo "${manualAngle.name}" agregado`)
+  }
+
+  const renderAddAngleForm = () => (
+    <div className="p-3 rounded-xl border-2 border-dashed border-amber-500/40 bg-amber-500/5 space-y-2">
+      <input
+        type="text"
+        placeholder="Nombre del angulo (ej: Urgencia)"
+        value={newAngle.name}
+        onChange={(e) => setNewAngle(prev => ({ ...prev, name: e.target.value }))}
+        className="w-full text-sm px-3 py-2 rounded-lg border border-border bg-background text-text-primary focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 outline-none"
+      />
+      <textarea
+        placeholder="Angulo de venta / mensaje principal"
+        value={newAngle.salesAngle}
+        onChange={(e) => setNewAngle(prev => ({ ...prev, salesAngle: e.target.value }))}
+        rows={2}
+        className="w-full text-sm px-3 py-2 rounded-lg border border-border bg-background text-text-primary focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 outline-none resize-none"
+      />
+      <input
+        type="text"
+        placeholder="Avatar / publico objetivo (opcional)"
+        value={newAngle.avatarSuggestion}
+        onChange={(e) => setNewAngle(prev => ({ ...prev, avatarSuggestion: e.target.value }))}
+        className="w-full text-sm px-3 py-2 rounded-lg border border-border bg-background text-text-primary focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 outline-none"
+      />
+      <select
+        value={newAngle.tone}
+        onChange={(e) => setNewAngle(prev => ({ ...prev, tone: e.target.value }))}
+        className="w-full text-sm px-3 py-2 rounded-lg border border-border bg-background text-text-primary focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 outline-none"
+      >
+        <option value="Emocional">Emocional</option>
+        <option value="Racional">Racional</option>
+        <option value="Urgencia">Urgencia</option>
+        <option value="Aspiracional">Aspiracional</option>
+        <option value="Social Proof">Social Proof</option>
+        <option value="Educativo">Educativo</option>
+      </select>
+      <div className="flex gap-2">
+        <button
+          onClick={handleAddManualAngle}
+          className="flex-1 text-sm py-2 rounded-lg bg-amber-500 text-white font-medium hover:bg-amber-600 transition-colors"
+        >
+          Agregar angulo
+        </button>
+        <button
+          onClick={() => { setShowAddAngleForm(false); setNewAngle({ name: '', hook: '', salesAngle: '', avatarSuggestion: '', tone: 'Emocional' }) }}
+          className="px-3 text-sm py-2 rounded-lg border border-border text-text-secondary hover:bg-background-secondary transition-colors"
+        >
+          Cancelar
+        </button>
+      </div>
+    </div>
+  )
 
   const handleDownload = async (imageUrl: string, quality: '2k' | 'optimized') => {
     try {
@@ -1521,6 +1602,45 @@ export default function ProductGeneratePage() {
                       </button>
                     ))}
                   </div>
+
+                  {/* Add manual angle button + form */}
+                  {showAddAngleForm ? (
+                    <div className="mt-3">
+                      {renderAddAngleForm()}
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setShowAddAngleForm(true)}
+                      className="mt-3 w-full flex items-center justify-center gap-2 py-2 rounded-xl border-2 border-dashed border-border text-sm text-text-secondary hover:border-amber-500/40 hover:text-amber-600 transition-all"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Agregar angulo manual
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Add manual angle when no AI angles exist yet */}
+              {generatedAngles.length === 0 && (
+                <div className="pt-4 border-t border-border">
+                  <label className="text-sm font-medium text-text-primary flex items-center gap-2 mb-3">
+                    <Target className="w-4 h-4 text-amber-500" />
+                    Angulos de Venta
+                  </label>
+                  <p className="text-xs text-text-secondary mb-3">
+                    Genera angulos con IA arriba, o agrega uno manual:
+                  </p>
+                  {showAddAngleForm ? (
+                    renderAddAngleForm()
+                  ) : (
+                    <button
+                      onClick={() => setShowAddAngleForm(true)}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-dashed border-amber-500/30 text-sm text-amber-600 hover:border-amber-500/50 hover:bg-amber-500/5 transition-all"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Agregar angulo manual
+                    </button>
+                  )}
                 </div>
               )}
 
