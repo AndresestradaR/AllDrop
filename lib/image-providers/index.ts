@@ -173,11 +173,11 @@ async function generateViaKie(
 
   console.log(`[KIE] Task created: ${taskId}, polling...`)
 
-  // Full Vercel budget: 110s polling (leaves ~10s buffer for Vercel 120s limit)
+  // With maxDuration=300 on the route, we have up to 5 min
   const pollResult = await pollForResult('seedream', taskId, kieApiKey, {
-    maxAttempts: 55,
+    maxAttempts: 120,
     intervalMs: 2000,
-    timeoutMs: 110000,
+    timeoutMs: 270000,
   })
 
   if (!pollResult.success) {

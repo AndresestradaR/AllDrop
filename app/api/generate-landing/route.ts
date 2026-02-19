@@ -10,6 +10,9 @@ import {
   GenerateImageRequest,
 } from '@/lib/image-providers'
 
+// Allow up to 5 minutes for image generation (KIE polling can take time)
+export const maxDuration = 300
+
 async function optimizeImage(
   buffer: Buffer,
   mimeType: string
