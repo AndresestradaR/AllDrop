@@ -4,27 +4,34 @@ export function buildColorSection(request: GenerateImageRequest): string {
   const palette = request.creativeControls?.colorPalette
   if (!palette?.primary) return ''
 
-  let colorLines = `- COLOR PRIMARIO: ${palette.primary} (fondos principales, headers, areas grandes)
-- COLOR SECUNDARIO: ${palette.secondary} (acentos, badges de precio, botones)
-- COLOR ACENTO: ${palette.accent} (detalles, iconos, highlights, CTAs)`
+  const extraLine = palette.extra
+    ? `- COLOR 4 (EXTRA): ${palette.extra} → elementos secundarios, decoraciones, variaciones, bordes`
+    : ''
 
-  if (palette.extra) {
-    colorLines += `\n- COLOR EXTRA: ${palette.extra} (elementos secundarios, decoraciones, variaciones)`
-  }
+  return `
+=== ⚠️ PALETA DE COLORES — RESTRICCION ABSOLUTA ⚠️ ===
 
-  return `=== PALETA DE COLORES OBLIGATORIA ===
+ESTOS SON LOS UNICOS COLORES PERMITIDOS EN ESTE BANNER:
 
-REGLA CRITICA DE COLORES: DEBES usar EXACTAMENTE estos colores como los colores dominantes del banner. NO cambies la paleta sin importar el template de referencia. Mantén estos colores en TODA la composicion.
+🎨 COLOR 1 (PRIMARIO): ${palette.primary} → fondo principal del banner, areas grandes, headers
+🎨 COLOR 2 (SECUNDARIO): ${palette.secondary} → acentos principales, badges de precio, botones, CTAs
+🎨 COLOR 3 (ACENTO): ${palette.accent} → iconos, checkmarks, highlights, detalles decorativos
+${extraLine}
 
-${colorLines}
+TAMBIEN PERMITIDOS (neutros complementarios):
+- Blanco (#FFFFFF) para textos sobre fondos oscuros
+- Negro (#000000) para textos sobre fondos claros
+- Variaciones de opacidad de los colores de arriba (mas claros o mas oscuros)
 
-IMPORTANTE:
-- El fondo del banner debe usar el color PRIMARIO como base dominante
-- Los precios y CTAs deben usar el color SECUNDARIO o ACENTO
-- Los textos blancos o muy claros contrastan sobre el color primario
-- NUNCA cambies estos colores por los del template de referencia
-- Si el template tiene otros colores, REEMPLAZALOS por esta paleta
-- MANTÉN esta misma paleta en TODOS los banners que generes`
+🚫 COLORES ABSOLUTAMENTE PROHIBIDOS:
+- NO usar beige, crema, marron, cafe, arena, dorado, amarillo, naranja NI NINGUN otro color que NO este en la paleta de arriba
+- NO usar los colores del template de referencia si son diferentes a esta paleta
+- NO inventar colores nuevos basandote en el "contexto" del producto
+- NO usar grises como fondo principal (solo como texto)
+- El FONDO del banner DEBE ser el color PRIMARIO (${palette.primary}) o una variacion clara/oscura de este
+- CADA area visible del banner debe usar EXCLUSIVAMENTE colores de esta paleta
+
+PRUEBA MENTAL: Antes de generar, verifica que CADA pixel de color en el banner proviene de esta paleta o de blanco/negro. Si encuentras beige, crema, marron u otro color externo → ELIMINALO y reemplazalo con uno de la paleta.`
 }
 
 export function buildTypographySection(request: GenerateImageRequest): string {
