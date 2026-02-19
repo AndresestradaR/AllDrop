@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -35,11 +35,16 @@ const creatorNavigation = [
   { name: 'Encuentra tu Producto Ganador', href: '/dashboard/product-research', icon: Target, isNew: true },
 ]
 
+const ADMIN_EMAIL = 'trucosecomydrop@gmail.com'
+
 const otherNavigation = [
   { name: 'Mi Tienda', href: '/constructor/', icon: Store, external: true },
   { name: 'Galería', href: '/dashboard/gallery', icon: Images },
-  { name: 'Admin Plantillas', href: '/dashboard/admin/templates', icon: Upload },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
+]
+
+const adminNavigation = [
+  { name: 'Admin Plantillas', href: '/dashboard/admin/templates', icon: Upload },
 ]
 
 export default function DashboardLayout({
@@ -50,6 +55,16 @@ export default function DashboardLayout({
   const pathname = usePathname()
   const router = useRouter()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [userEmail, setUserEmail] = useState<string | null>(null)
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data }) => {
+      setUserEmail(data.user?.email || null)
+    })
+  }, [])
+
+  const isAdmin = userEmail === ADMIN_EMAIL
 
   const handleLogout = async () => {
     const supabase = createClient()
@@ -170,6 +185,20 @@ export default function DashboardLayout({
                 ))}
               </div>
             </div>
+
+            {/* Admin — only for admin email */}
+            {isAdmin && (
+              <div>
+                <p className="px-3 mb-2 text-xs font-semibold text-text-secondary/70 uppercase tracking-wider">
+                  Admin
+                </p>
+                <div className="space-y-1">
+                  {adminNavigation.map((item) => (
+                    <NavLink key={item.name} item={item} />
+                  ))}
+                </div>
+              </div>
+            )}
           </nav>
 
           {/* Logout */}

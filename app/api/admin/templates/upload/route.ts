@@ -12,6 +12,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
+    if (user.email !== 'trucosecomydrop@gmail.com') {
+      return NextResponse.json({ error: 'Solo administradores pueden subir plantillas' }, { status: 403 })
+    }
+
     // Direct supabase-js client with service role key — truly bypasses RLS
     const adminClient = createSupabaseClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
