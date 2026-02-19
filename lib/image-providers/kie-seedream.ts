@@ -1,4 +1,5 @@
 import { ImageProvider, GenerateImageRequest, GenerateImageResult, getApiModelId } from './types'
+import { buildColorSection, buildTypographySection, buildProductContextSection, buildSectionTypeSection } from './prompt-helpers'
 
 function buildPricingSection(request: GenerateImageRequest): string {
   const { creativeControls } = request
@@ -37,6 +38,8 @@ function buildPrompt(request: GenerateImageRequest): string {
 
   return `Create a professional e-commerce banner in SPANISH.
 
+${buildProductContextSection(request)}
+
 COMPOSITION (copy EXACTLY from the reference template):
 - Keep the SAME layout, positions, and structure
 - Keep ALL decorative elements (splashes, fruits, effects)
@@ -62,6 +65,11 @@ TEXT:
 ${creativeControls?.salesAngle ? `SALES ANGLE: ${creativeControls.salesAngle}` : ''}
 ${creativeControls?.targetAvatar ? `TARGET: ${creativeControls.targetAvatar}` : ''}
 ${creativeControls?.additionalInstructions ? `EXTRA: ${creativeControls.additionalInstructions}` : ''}
+
+${buildSectionTypeSection(request)}
+${buildColorSection(request)}
+
+${buildTypographySection(request)}
 
 Create a banner IDENTICAL to the template, with only product and prices changed.`
 }

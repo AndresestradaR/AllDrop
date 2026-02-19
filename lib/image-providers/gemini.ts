@@ -1,4 +1,5 @@
 import { ImageProvider, GenerateImageRequest, GenerateImageResult, IMAGE_MODELS, getApiModelId } from './types'
+import { buildColorSection, buildTypographySection, buildProductContextSection, buildSectionTypeSection } from './prompt-helpers'
 
 function buildPricingSection(request: GenerateImageRequest): string {
   const { creativeControls } = request
@@ -32,7 +33,8 @@ function buildPricingSection(request: GenerateImageRequest): string {
   return lines.join('\n')
 }
 
-function buildPrompt(request: GenerateImageRequest): string {
+// Exported for reuse in KIE Gemini fallback
+export function buildGeminiPrompt(request: GenerateImageRequest): string {
   const { productName, creativeControls } = request
   const targetCountry = creativeControls?.targetCountry || 'CO'
 
@@ -51,6 +53,8 @@ function buildPrompt(request: GenerateImageRequest): string {
   const additionalInstructions = creativeControls?.additionalInstructions || ''
 
   return `Eres un director creativo experto en publicidad e-commerce para LATAM. Tu trabajo es crear banners que VENDEN.
+
+${buildProductContextSection(request)}
 
 === PASO 1: ANALISIS DEL PRODUCTO (PIENSA ANTES DE DISENAR) ===
 
@@ -118,6 +122,10 @@ TEXTOS:
 6. FOOTER: Sellos de confianza (envio gratis, garantia, etc.)
 
 ${additionalInstructions ? `=== INSTRUCCIONES ESPECIALES DEL CLIENTE ===\n${additionalInstructions}` : ''}
+
+${buildSectionTypeSection(request)}
+${buildColorSection(request)}
+${buildTypographySection(request)}
 
 === PROHIBIDO ===
 - Persona en contexto incoherente (atleta con sarten, chef en gimnasio)
@@ -194,49 +202,90 @@ async function generateWithGemini(
 
   const prompt = request.prompt && request.prompt.trim()
     ? request.prompt
-    : buildPrompt(request)
+    : buildGeminiPrompt(request)
   parts.push({ text: prompt })
 
   console.log(`[Gemini] Starting generation with model: ${apiModelId}`)
   const startTime = Date.now()
 
-  const response = await fetchWithTimeout(
-    `${endpoint}?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts }],
-        generationConfig: {
-          responseModalities: ['IMAGE'],
-          imageConfig: {
-            aspectRatio: request.aspectRatio || '9:16',
-          },
-        },
-      }),
+  const requestBody = JSON.stringify({
+    contents: [{ parts }],
+    generationConfig: {
+      responseModalities: ['IMAGE'],
+      imageConfig: {
+        aspectRatio: request.aspectRatio || '9:16',
+      },
     },
-    110000
-  )
+  })
 
-  const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
-  console.log(`[Gemini] Response received in ${elapsed}s, status: ${response.status}`)
+  const MAX_RETRIES = 2
+  let lastError = ''
+  let lastStatus = 0
 
-  if (!response.ok) {
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    if (attempt > 0) {
+      const delay = attempt * 3000 // 3s, 6s
+      console.log(`[Gemini] Retry ${attempt}/${MAX_RETRIES} after ${delay}ms...`)
+      await new Promise(r => setTimeout(r, delay))
+    }
+
+    const response = await fetchWithTimeout(
+      `${endpoint}?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: requestBody,
+      },
+      110000
+    )
+
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
+    console.log(`[Gemini] Response in ${elapsed}s, status: ${response.status}, attempt: ${attempt + 1}`)
+
+    // Success — break out of retry loop
+    if (response.ok) {
+      const data = await response.json()
+
+      for (const candidate of data.candidates || []) {
+        for (const part of candidate.content?.parts || []) {
+          if (part.inlineData?.data) {
+            console.log(`[Gemini] Image generated successfully in ${elapsed}s`)
+            return {
+              success: true,
+              imageBase64: part.inlineData.data,
+              mimeType: part.inlineData.mimeType || 'image/png',
+              provider: 'gemini' as const,
+            }
+          }
+        }
+      }
+
+      // No image in response
+      console.error('[Gemini] No image in response:', JSON.stringify(data).substring(0, 300))
+      throw new Error('Google proceso la solicitud pero no devolvio imagen. Intenta de nuevo.')
+    }
+
+    // Retryable errors (500/503, 429 rate limit)
     const errorText = await response.text()
+    lastError = errorText
+    lastStatus = response.status
+
+    if ((response.status >= 500 || response.status === 429) && attempt < MAX_RETRIES) {
+      console.warn(`[Gemini] Retryable error ${response.status}, will retry...`)
+      continue
+    }
+
+    // Non-retryable or last attempt — throw detailed error
     console.error(`[Gemini] API error: ${response.status} - ${errorText}`)
-    
-    // === ERRORES DETALLADOS Y ACCIONABLES ===
     const errorLower = errorText.toLowerCase()
 
-    // --- 429: Rate Limit / Cuota ---
     if (response.status === 429) {
       if (errorLower.includes('resource_exhausted') || errorLower.includes('quota')) {
         throw new Error('Limite diario de tu API de Google alcanzado. Opciones:\n1. Espera 24 horas para que se renueve\n2. Ve a console.cloud.google.com → APIs → Gemini API → Quotas para aumentar tu limite\n3. Prueba con otro modelo (OpenAI, Seedream)')
       }
-      throw new Error('Demasiadas solicitudes seguidas. Espera 30 segundos e intenta de nuevo.')
+      throw new Error('Demasiadas solicitudes seguidas a Google. Espera 30 segundos e intenta de nuevo.')
     }
 
-    // --- 400: Bad Request ---
     if (response.status === 400) {
       if (errorLower.includes('safety') || errorLower.includes('block_reason')) {
         throw new Error('Imagen bloqueada por filtros de seguridad de Google. Intenta:\n1. Cambiar la plantilla por una menos provocativa\n2. Modificar el texto/descripcion del producto\n3. Quitar instrucciones sobre personas en el prompt')
@@ -253,7 +302,6 @@ async function generateWithGemini(
       throw new Error(`Error de solicitud (400): ${errorText.substring(0, 200)}`)
     }
 
-    // --- 403: Permission / Billing ---
     if (response.status === 403) {
       if (errorLower.includes('billing') || errorLower.includes('payment') || errorLower.includes('account_billing')) {
         throw new Error('Tu cuenta de Google Cloud NO tiene facturacion activa. Para generar imagenes:\n1. Ve a console.cloud.google.com/billing\n2. Click en "Establecer cuenta" o "Link a billing account"\n3. Agrega un metodo de pago\n4. Vuelve a intentar (el cambio aplica en 1-2 minutos)')
@@ -267,50 +315,19 @@ async function generateWithGemini(
       throw new Error('Acceso denegado (403). Verifica tu API key y facturacion en console.cloud.google.com')
     }
 
-    // --- 404: Model Not Found ---
     if (response.status === 404) {
       throw new Error(`Modelo "${apiModelId}" no disponible. Puede que Google lo haya cambiado de nombre o retirado.\nVe a Settings y selecciona otro modelo de la lista.`)
     }
 
-    // --- 500/503: Server Error ---
     if (response.status >= 500) {
-      throw new Error('Error temporal en los servidores de Google. Esto NO es tu culpa.\nEspera 2-3 minutos e intenta de nuevo. Si persiste, prueba con otro modelo.')
+      throw new Error('Los servidores de Google estan experimentando problemas (reintentamos 3 veces). Esto NO es tu culpa.\nPrueba con otro modelo (OpenAI o Seedream) mientras Google se estabiliza.')
     }
 
-    // --- Default ---
     throw new Error(`Error inesperado de Google (codigo ${response.status}). Detalles: ${errorText.substring(0, 300)}\n\nSi este error persiste, copia este mensaje y envialo a soporte.`)
   }
 
-  const data = await response.json()
-
-  for (const candidate of data.candidates || []) {
-    for (const part of candidate.content?.parts || []) {
-      if (part.inlineData?.data) {
-        console.log(`[Gemini] Image generated successfully in ${elapsed}s`)
-        return {
-          success: true,
-          imageBase64: part.inlineData.data,
-          mimeType: part.inlineData.mimeType || 'image/png',
-          provider: 'gemini',
-        }
-      }
-    }
-  }
-
-  if (data.candidates?.[0]?.finishReason === 'SAFETY') {
-    return {
-      success: false,
-      error: 'Contenido bloqueado por filtros de seguridad. Modifica el prompt.',
-      provider: 'gemini',
-    }
-  }
-
-  console.error('[Gemini] No image in response:', JSON.stringify(data).substring(0, 500))
-  return {
-    success: false,
-    error: 'No se genero imagen. Intenta con otro prompt.',
-    provider: 'gemini',
-  }
+  // Should not reach here, but just in case
+  throw new Error(`Google fallo despues de ${MAX_RETRIES + 1} intentos (ultimo status: ${lastStatus}). Prueba otro modelo.`)
 }
 
 async function generateWithImagen(
@@ -322,7 +339,7 @@ async function generateWithImagen(
 
   const prompt = request.prompt && request.prompt.trim()
     ? request.prompt
-    : buildPrompt(request)
+    : buildGeminiPrompt(request)
 
   const aspectRatioMap: Record<string, string> = {
     '1:1': '1:1',

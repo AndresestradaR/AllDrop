@@ -63,7 +63,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { section_ids, sections } = body
+    const { section_ids, sections, metadata } = body
 
     const serviceClient = await createServiceClient()
 
@@ -71,11 +71,29 @@ export async function POST(request: Request) {
 
     if (section_ids && Array.isArray(section_ids) && section_ids.length > 0) {
       // New flow: receive IDs, look up from DB
-      const { data: dbSections, error: fetchError } = await serviceClient
+      let dbSections: any[] | null = null
+      let fetchError: any = null
+
+      // Try with section_type column first
+      const res1 = await serviceClient
         .from('landing_sections')
-        .select('id, generated_image_url, template_id')
+        .select('id, generated_image_url, template_id, section_type')
         .in('id', section_ids.map((s: any) => s.id))
         .eq('user_id', user.id)
+
+      if (res1.error) {
+        // section_type column doesn't exist yet, query without it
+        const res2 = await serviceClient
+          .from('landing_sections')
+          .select('id, generated_image_url, template_id')
+          .in('id', section_ids.map((s: any) => s.id))
+          .eq('user_id', user.id)
+        dbSections = res2.data
+        fetchError = res2.error
+      } else {
+        dbSections = res1.data
+        fetchError = res1.error
+      }
 
       if (fetchError || !dbSections) {
         return NextResponse.json(
@@ -98,11 +116,12 @@ export async function POST(request: Request) {
       }
 
       // Build sections with storage URLs
+      // Use section_type first (direct category), then template category as fallback
       const idOrderMap = new Map(section_ids.map((s: any) => [s.id, s.order]))
       validSections = await Promise.all(
         dbSections.map(async (s, i) => ({
           url: await optimizeAndUpload(serviceClient, s.generated_image_url, user.id, i),
-          category: templateMap[s.template_id] || 'sin categoria',
+          category: s.section_type || templateMap[s.template_id] || 'sin categoria',
           order: idOrderMap.get(s.id) ?? i + 1,
         }))
       )
@@ -124,17 +143,42 @@ export async function POST(request: Request) {
 
     validSections.sort((a, b) => a.order - b.order)
 
-    const { data: bundle, error } = await serviceClient
-      .from('import_bundles')
-      .insert({
-        user_id: user.id,
-        sections: validSections,
-      })
-      .select('id')
-      .single()
+    // Try inserting with metadata; fall back to without if column doesn't exist yet
+    let bundle: { id: string } | null = null
+    let insertError: any = null
 
-    if (error) {
-      console.error('Error creating import bundle:', error)
+    if (metadata && typeof metadata === 'object') {
+      const res = await serviceClient
+        .from('import_bundles')
+        .insert({ user_id: user.id, sections: validSections, metadata })
+        .select('id')
+        .single()
+      bundle = res.data
+      insertError = res.error
+
+      // If metadata column doesn't exist, retry without it
+      if (insertError) {
+        console.warn('[import-sections] metadata column not found, retrying without it')
+        const retry = await serviceClient
+          .from('import_bundles')
+          .insert({ user_id: user.id, sections: validSections })
+          .select('id')
+          .single()
+        bundle = retry.data
+        insertError = retry.error
+      }
+    } else {
+      const res = await serviceClient
+        .from('import_bundles')
+        .insert({ user_id: user.id, sections: validSections })
+        .select('id')
+        .single()
+      bundle = res.data
+      insertError = res.error
+    }
+
+    if (insertError || !bundle) {
+      console.error('Error creating import bundle:', insertError)
       return NextResponse.json(
         { error: 'Error al crear el paquete de importacion' },
         { status: 500 }

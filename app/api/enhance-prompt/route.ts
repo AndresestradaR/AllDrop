@@ -154,12 +154,20 @@ export async function POST(request: Request) {
       productName,
       sectionType,
       targetCountry,
+      productContext,
     } = body as {
       templateUrl?: string
       productPhotos?: string[]
       productName?: string
       sectionType?: string
       targetCountry?: string
+      productContext?: {
+        description?: string
+        benefits?: string
+        problems?: string
+        ingredients?: string
+        differentiator?: string
+      }
     }
 
     // Get user's API key
@@ -213,6 +221,14 @@ export async function POST(request: Request) {
     }
     if (targetCountry && COUNTRY_CONTEXT[targetCountry]) {
       promptLines.push(`Pais destino: ${COUNTRY_CONTEXT[targetCountry]}`)
+    }
+
+    if (productContext) {
+      if (productContext.description) promptLines.push(`Descripcion del producto: ${productContext.description}`)
+      if (productContext.benefits) promptLines.push(`Beneficios: ${productContext.benefits}`)
+      if (productContext.problems) promptLines.push(`Problemas que resuelve: ${productContext.problems}`)
+      if (productContext.ingredients) promptLines.push(`Ingredientes/materiales: ${productContext.ingredients}`)
+      if (productContext.differentiator) promptLines.push(`Diferenciador: ${productContext.differentiator}`)
     }
 
     promptLines.push('')

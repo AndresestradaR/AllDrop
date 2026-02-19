@@ -120,6 +120,9 @@ export async function POST(request: Request) {
       priceBefore,
       priceCombo2,
       priceCombo3,
+      colorPalette,
+      typography,
+      productContext,
     } = body
 
     if (!templateUrl) {
@@ -212,8 +215,9 @@ export async function POST(request: Request) {
 
     // Determine if this provider needs public URLs
     // KIE.ai (Seedream) and BFL (FLUX) require public URLs for images
-    const needsPublicUrls = selectedProvider === 'seedream' || selectedProvider === 'flux'
-    
+    // Also upload if user has KIE key (for Gemini → KIE fallback)
+    const needsPublicUrls = selectedProvider === 'seedream' || selectedProvider === 'flux' || (selectedProvider === 'gemini' && !!apiKeys.kie)
+
     console.log(`[Generate] Provider: ${selectedProvider}, needs public URLs: ${needsPublicUrls}`)
 
     // Parse product photos
@@ -300,6 +304,9 @@ export async function POST(request: Request) {
         priceCombo2,
         priceCombo3,
         targetCountry,
+        colorPalette,
+        typography,
+        productContext,
       },
     }
 
@@ -348,19 +355,42 @@ export async function POST(request: Request) {
 
     // Save to database (use service client for bypassing RLS)
     const serviceClient = await createServiceClient()
-    const { data: insertedSection, error: insertError } = await serviceClient
+    const sectionType = creativeControls?.sectionType || null
+    const insertData: Record<string, any> = {
+      product_id: productId,
+      user_id: user.id,
+      template_id: templateId || null,
+      output_size: outputSize,
+      generated_image_url: generatedImageUrl,
+      prompt_used: `Product: ${productName} | Provider: ${selectedProvider}`,
+      status: 'completed',
+    }
+    if (sectionType) {
+      insertData.section_type = sectionType
+    }
+
+    let insertedSection: any = null
+    let insertError: any = null
+
+    const res = await serviceClient
       .from('landing_sections')
-      .insert({
-        product_id: productId,
-        user_id: user.id,
-        template_id: templateId || null,
-        output_size: outputSize,
-        generated_image_url: generatedImageUrl,
-        prompt_used: `Product: ${productName} | Provider: ${selectedProvider}`,
-        status: 'completed',
-      })
+      .insert(insertData)
       .select()
       .single()
+    insertedSection = res.data
+    insertError = res.error
+
+    // If section_type column doesn't exist yet, retry without it
+    if (insertError && insertData.section_type) {
+      delete insertData.section_type
+      const retry = await serviceClient
+        .from('landing_sections')
+        .insert(insertData)
+        .select()
+        .single()
+      insertedSection = retry.data
+      insertError = retry.error
+    }
 
     if (insertError) {
       return NextResponse.json({

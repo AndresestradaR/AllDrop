@@ -1,4 +1,5 @@
 import { ImageProvider, GenerateImageRequest, GenerateImageResult, getApiModelId } from './types'
+import { buildColorSection, buildTypographySection, buildProductContextSection, buildSectionTypeSection } from './prompt-helpers'
 
 function buildPricingSection(request: GenerateImageRequest): string {
   const { creativeControls } = request
@@ -56,6 +57,8 @@ function buildPrompt(request: GenerateImageRequest): string {
 
   return `Create a professional e-commerce banner in SPANISH for the product "${productName}".
 
+${buildProductContextSection(request)}
+
 COMPOSITION:
 - Professional marketing banner style
 - Clean, modern layout with the product as hero
@@ -82,6 +85,11 @@ TEXT REQUIREMENTS:
 ${creativeControls?.salesAngle ? `SALES ANGLE: ${creativeControls.salesAngle}` : ''}
 ${creativeControls?.targetAvatar ? `TARGET AUDIENCE: ${creativeControls.targetAvatar}` : ''}
 ${creativeControls?.additionalInstructions ? `SPECIAL INSTRUCTIONS: ${creativeControls.additionalInstructions}` : ''}
+
+${buildSectionTypeSection(request)}
+${buildColorSection(request)}
+
+${buildTypographySection(request)}
 
 Create a stunning, professional e-commerce banner ready for social media advertising.`
 }

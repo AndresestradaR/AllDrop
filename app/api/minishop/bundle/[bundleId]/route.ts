@@ -14,13 +14,31 @@ export async function GET(
 
     const serviceClient = await createServiceClient()
 
-    const { data: bundle, error } = await serviceClient
+    // Try with metadata column; fall back to without if it doesn't exist yet
+    let bundle: any = null
+    let fetchErr: any = null
+
+    const res1 = await serviceClient
       .from('import_bundles')
-      .select('id, sections, created_at, expires_at')
+      .select('id, sections, metadata, created_at, expires_at')
       .eq('id', bundleId)
       .single()
 
-    if (error || !bundle) {
+    if (res1.error) {
+      // metadata column doesn't exist yet — query without it
+      const res2 = await serviceClient
+        .from('import_bundles')
+        .select('id, sections, created_at, expires_at')
+        .eq('id', bundleId)
+        .single()
+      bundle = res2.data
+      fetchErr = res2.error
+    } else {
+      bundle = res1.data
+      fetchErr = res1.error
+    }
+
+    if (fetchErr || !bundle) {
       return NextResponse.json(
         { error: 'Paquete no encontrado' },
         { status: 404 }

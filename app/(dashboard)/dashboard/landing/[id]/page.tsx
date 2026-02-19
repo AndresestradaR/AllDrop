@@ -24,7 +24,13 @@ import {
   MessageCircle,
   ImagePlus,
   ExternalLink,
-  Send
+  Send,
+  Palette,
+  FileText,
+  Lightbulb,
+  Target,
+  RefreshCw,
+  Plus
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import ModelSelector from '@/components/generator/ModelSelector'
@@ -36,16 +42,20 @@ import { Country, getDefaultCountry } from '@/lib/constants/countries'
 export const dynamic = 'force-dynamic'
 
 const TEMPLATE_CATEGORIES = [
-  { id: 'hero', name: 'Hero' },
-  { id: 'oferta', name: 'Oferta' },
-  { id: 'antes-despues', name: 'Antes/Después' },
-  { id: 'beneficios', name: 'Beneficios' },
-  { id: 'tabla-comparativa', name: 'Tabla Comparativa' },
-  { id: 'autoridad', name: 'Prueba de Autoridad' },
-  { id: 'testimonios', name: 'Testimonios' },
-  { id: 'modo-uso', name: 'Modo de Uso' },
-  { id: 'logistica', name: 'Logística' },
-  { id: 'faq', name: 'Preguntas Frecuentes' },
+  { id: 'hero', name: 'Hero', icon: '🏠', description: 'Banner principal con headline impactante' },
+  { id: 'oferta', name: 'Oferta', icon: '🏷️', description: 'Precios, descuentos, combos' },
+  { id: 'antes-despues', name: 'Antes/Después', icon: '🔄', description: 'Transformacion visual del resultado' },
+  { id: 'beneficios', name: 'Beneficios', icon: '✅', description: '3-4 beneficios con iconos' },
+  { id: 'tabla-comparativa', name: 'Comparativa', icon: '📊', description: 'Tu producto vs competencia' },
+  { id: 'autoridad', name: 'Autoridad', icon: '🏆', description: 'Certificaciones, estudios, respaldo' },
+  { id: 'testimonios', name: 'Testimonios', icon: '💬', description: 'Reviews y opiniones de clientes' },
+  { id: 'ingredientes', name: 'Ingredientes', icon: '🧪', description: 'Componentes, materiales, formula' },
+  { id: 'modo-uso', name: 'Modo de Uso', icon: '📋', description: 'Pasos 1-2-3 de como usar' },
+  { id: 'logistica', name: 'Logística', icon: '🚚', description: 'Envio gratis, contraentrega, tiempos' },
+  { id: 'faq', name: 'FAQ', icon: '❓', description: 'Preguntas frecuentes' },
+  { id: 'casos-uso', name: 'Casos de Uso', icon: '💡', description: 'Situaciones reales donde se usa el producto' },
+  { id: 'caracteristicas', name: 'Características', icon: '⚙️', description: 'Especificaciones y features del producto' },
+  { id: 'comunidad', name: 'Comunidad', icon: '👥', description: 'Social proof, comunidad de usuarios' },
 ]
 
 const OUTPUT_SIZES = [
@@ -53,6 +63,24 @@ const OUTPUT_SIZES = [
   { id: '1080x1080', name: 'Cuadrada (1:1)', dimensions: '1080 x 1080 px' },
   { id: '1920x1080', name: 'Horizontal (16:9)', dimensions: '1920 x 1080 px' },
   { id: '1080x1350', name: 'Retrato (4:5)', dimensions: '1080 x 1350 px' },
+]
+
+const FONT_CATALOG = [
+  { id: 'montserrat', name: 'Montserrat', category: 'Sans-serif', promptDesc: 'Montserrat: sans-serif geometrica, bold, moderna, trazos limpios y contundentes' },
+  { id: 'opensans', name: 'Open Sans', category: 'Sans-serif', promptDesc: 'Open Sans: sans-serif humanista, limpia, muy legible, profesional y neutral' },
+  { id: 'poppins', name: 'Poppins', category: 'Sans-serif', promptDesc: 'Poppins: sans-serif geometrica con bordes redondeados, amigable, moderna, juvenil' },
+  { id: 'roboto', name: 'Roboto', category: 'Sans-serif', promptDesc: 'Roboto: sans-serif neo-grotesca, mecanica pero amigable, versatil y moderna' },
+  { id: 'inter', name: 'Inter', category: 'Sans-serif', promptDesc: 'Inter: sans-serif disenada para pantallas, limpia, neutra, excelente legibilidad' },
+  { id: 'lato', name: 'Lato', category: 'Sans-serif', promptDesc: 'Lato: sans-serif semi-redondeada, calida pero estable, profesional y amigable' },
+  { id: 'nunito', name: 'Nunito', category: 'Sans-serif', promptDesc: 'Nunito: sans-serif redondeada, suave, amigable, ideal para productos de bienestar' },
+  { id: 'oswald', name: 'Oswald', category: 'Sans-serif', promptDesc: 'Oswald: sans-serif condensada, fuerte, deportiva, impactante en titulos grandes' },
+  { id: 'raleway', name: 'Raleway', category: 'Sans-serif', promptDesc: 'Raleway: sans-serif elegante con trazos finos, sofisticada y moderna' },
+  { id: 'bebas-neue', name: 'Bebas Neue', category: 'Sans-serif', promptDesc: 'Bebas Neue: sans-serif condensada todo mayusculas, dramatica, impactante, estilo poster' },
+  { id: 'playfair', name: 'Playfair Display', category: 'Serif', promptDesc: 'Playfair Display: serif con alto contraste, elegante, sofisticada, premium' },
+  { id: 'merriweather', name: 'Merriweather', category: 'Serif', promptDesc: 'Merriweather: serif disenada para pantallas, alta legibilidad, seria y profesional' },
+  { id: 'lora', name: 'Lora', category: 'Serif', promptDesc: 'Lora: serif caligrafica contemporanea, elegante pero accesible' },
+  { id: 'dm-serif', name: 'DM Serif Display', category: 'Serif', promptDesc: 'DM Serif Display: serif con personalidad, moderna pero clasica, excelente para titulos' },
+  { id: 'archivo-black', name: 'Archivo Black', category: 'Sans-serif', promptDesc: 'Archivo Black: sans-serif extra bold, contundente, maxima presencia visual en titulos' },
 ]
 
 interface Product {
@@ -72,6 +100,7 @@ interface Template {
 interface GeneratedSection {
   id: string
   template_id?: string
+  section_type?: string
   generated_image_url: string
   prompt_used: string
   output_size: string
@@ -130,6 +159,61 @@ export default function ProductGeneratePage() {
     additionalInstructions: '',
   })
 
+  // Product context (Phase 2)
+  const [showProductContext, setShowProductContext] = useState(false)
+  const [productContext, setProductContext] = useState({
+    description: '',
+    benefits: '',
+    problems: '',
+    ingredients: '',
+    differentiator: '',
+  })
+
+  // AI Angles
+  const [isGeneratingAngles, setIsGeneratingAngles] = useState(false)
+  const [generatedAngles, setGeneratedAngles] = useState<Array<{
+    id: string
+    name: string
+    hook: string
+    description: string
+    avatarSuggestion: string
+    tone: string
+    salesAngle: string
+  }>>([])
+  const [selectedAngleIds, setSelectedAngleIds] = useState<Set<string>>(new Set())
+
+  // Manual angle creation
+  const [showAddAngleForm, setShowAddAngleForm] = useState(false)
+  const [newAngle, setNewAngle] = useState({
+    name: '', hook: '', salesAngle: '', avatarSuggestion: '', tone: 'Emocional' as string
+  })
+
+  // Landing sections selection (Phase 3)
+  const [selectedSections, setSelectedSections] = useState<Set<string>>(
+    new Set(['hero', 'oferta', 'beneficios', 'testimonios', 'logistica'])
+  )
+  const [sectionTemplates, setSectionTemplates] = useState<Record<string, Template | null>>({})
+
+  // Bulk generation
+  const [isBulkGenerating, setIsBulkGenerating] = useState(false)
+  const [bulkProgress, setBulkProgress] = useState({ current: 0, total: 0, currentLabel: '' })
+
+  // Color palette
+  const [colorCount, setColorCount] = useState<3 | 4>(3)
+  const [colorPalette, setColorPalette] = useState({
+    primary: '#0F172A',
+    secondary: '#3B82F6',
+    accent: '#10B981',
+    extra: '#F59E0B',
+  })
+
+  // Typography
+  const [selectedFonts, setSelectedFonts] = useState({
+    headings: 'montserrat',
+    subheadings: 'opensans',
+    body: 'opensans',
+  })
+
   // Generated sections history
   const [generatedSections, setGeneratedSections] = useState<GeneratedSection[]>([])
   const [isLoadingSections, setIsLoadingSections] = useState(true)
@@ -159,6 +243,16 @@ export default function ProductGeneratePage() {
     fetchGeneratedSections()
     fetchApiKeyStatus()
   }, [productId])
+
+  // Load Google Fonts for typography preview
+  useEffect(() => {
+    const fontFamilies = FONT_CATALOG.map(f => f.name.replace(/ /g, '+')).join('&family=')
+    const link = document.createElement('link')
+    link.href = `https://fonts.googleapis.com/css2?family=${fontFamilies}&display=swap`
+    link.rel = 'stylesheet'
+    document.head.appendChild(link)
+    return () => { document.head.removeChild(link) }
+  }, [])
 
   const fetchApiKeyStatus = async () => {
     try {
@@ -302,6 +396,16 @@ export default function ProductGeneratePage() {
             targetAvatar: creativeControls.targetAvatar,
             additionalInstructions: creativeControls.additionalInstructions,
           } : {},
+          colorPalette: {
+            ...colorPalette,
+            extra: colorCount === 4 ? colorPalette.extra : undefined,
+          },
+          typography: {
+            headings: FONT_CATALOG.find(f => f.id === selectedFonts.headings)?.promptDesc || '',
+            subheadings: FONT_CATALOG.find(f => f.id === selectedFonts.subheadings)?.promptDesc || '',
+            body: FONT_CATALOG.find(f => f.id === selectedFonts.body)?.promptDesc || '',
+          },
+          productContext: showProductContext ? productContext : {},
         }),
       })
 
@@ -359,6 +463,7 @@ export default function ProductGeneratePage() {
           templateUrl: selectedTemplate?.image_url || uploadedTemplate,
           productPhotos: productPhotos.filter(p => p !== null),
           productName: product?.name,
+          productContext: showProductContext ? productContext : {},
         }),
       })
 
@@ -384,6 +489,263 @@ export default function ProductGeneratePage() {
       setIsEnhancing(false)
     }
   }
+
+  const handleBulkGenerate = async () => {
+    if (selectedAngleIds.size === 0) {
+      toast.error('Selecciona al menos un angulo')
+      return
+    }
+    if (selectedSections.size === 0) {
+      toast.error('Selecciona al menos una seccion')
+      return
+    }
+    if (!productPhotos.some(p => p !== null)) {
+      toast.error('Sube al menos una foto del producto')
+      return
+    }
+
+    const mainTemplate = selectedTemplate?.image_url || uploadedTemplate
+    const sectionsWithoutTemplate = Array.from(selectedSections).filter(
+      sectionId => !sectionTemplates[sectionId] && !mainTemplate
+    )
+    if (sectionsWithoutTemplate.length > 0) {
+      toast.error('Asigna una plantilla a cada seccion o sube una imagen de referencia principal')
+      return
+    }
+
+    setIsBulkGenerating(true)
+    const selectedAngles = generatedAngles.filter(a => selectedAngleIds.has(a.id))
+    const sections = Array.from(selectedSections)
+    const totalBanners = selectedAngles.length * sections.length
+    setBulkProgress({ current: 0, total: totalBanners, currentLabel: 'Preparando...' })
+
+    let completed = 0
+    let failed = 0
+
+    const CONCURRENT_LIMIT = 3
+    const tasks: Array<{ angle: typeof selectedAngles[0]; sectionId: string }> = []
+
+    for (const angle of selectedAngles) {
+      for (const sectionId of sections) {
+        tasks.push({ angle, sectionId })
+      }
+    }
+
+    for (let i = 0; i < tasks.length; i += CONCURRENT_LIMIT) {
+      const chunk = tasks.slice(i, i + CONCURRENT_LIMIT)
+
+      const promises = chunk.map(async ({ angle, sectionId }) => {
+        const sectionName = TEMPLATE_CATEGORIES.find(c => c.id === sectionId)?.name || sectionId
+        setBulkProgress(prev => ({
+          ...prev,
+          currentLabel: `${angle.name} — ${sectionName}`,
+        }))
+
+        try {
+          const sectionTemplate = sectionTemplates[sectionId]
+          const templateUrl = sectionTemplate?.image_url || mainTemplate
+
+          const response = await fetch('/api/generate-landing', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              productId,
+              productName: product?.name,
+              templateId: sectionTemplate?.id || selectedTemplate?.id,
+              templateUrl,
+              productPhotos: productPhotos.filter(p => p !== null),
+              outputSize: selectedSize.id,
+              modelId: selectedModel,
+              provider: modelIdToProviderType(selectedModel),
+              targetCountry: selectedCountry.code,
+              currencySymbol: pricing.currencySymbol,
+              priceAfter: pricing.priceAfter,
+              priceBefore: pricing.priceBefore,
+              priceCombo2: pricing.priceCombo2,
+              priceCombo3: pricing.priceCombo3,
+              creativeControls: {
+                productDetails: creativeControls.productDetails,
+                salesAngle: angle.salesAngle,
+                targetAvatar: angle.avatarSuggestion,
+                additionalInstructions: creativeControls.additionalInstructions,
+                sectionType: sectionId,
+                angleName: angle.name,
+                angleTone: angle.tone,
+              },
+              colorPalette: {
+                ...colorPalette,
+                extra: colorCount === 4 ? colorPalette.extra : undefined,
+              },
+              typography: {
+                headings: FONT_CATALOG.find(f => f.id === selectedFonts.headings)?.promptDesc || '',
+                subheadings: FONT_CATALOG.find(f => f.id === selectedFonts.subheadings)?.promptDesc || '',
+                body: FONT_CATALOG.find(f => f.id === selectedFonts.body)?.promptDesc || '',
+              },
+              productContext: showProductContext ? productContext : {},
+            }),
+          })
+
+          const data = await response.json()
+          if (data.success) {
+            completed++
+          } else {
+            failed++
+            console.error(`[Bulk] Failed: ${angle.name} - ${sectionName}:`, data.error)
+          }
+        } catch (error: any) {
+          failed++
+          console.error(`[Bulk] Error: ${angle.name} - ${sectionName}:`, error.message)
+        }
+
+        setBulkProgress(prev => ({ ...prev, current: prev.current + 1 }))
+      })
+
+      await Promise.allSettled(promises)
+    }
+
+    setIsBulkGenerating(false)
+    fetchGeneratedSections()
+
+    if (failed === 0) {
+      toast.success(`${completed} banners generados exitosamente!`)
+    } else {
+      toast.success(`${completed} banners generados, ${failed} fallaron`)
+    }
+  }
+
+  const handleGenerateAngles = async () => {
+    if (!productPhotos.some(p => p !== null)) {
+      toast.error('Sube al menos una foto del producto')
+      return
+    }
+
+    setIsGeneratingAngles(true)
+
+    try {
+      const response = await fetch('/api/generate-angles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productName: product?.name,
+          productPhotos: productPhotos.filter(p => p !== null),
+          productContext: showProductContext ? productContext : {},
+          targetCountry: selectedCountry.code,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Error al generar angulos')
+      }
+
+      setGeneratedAngles(data.angles)
+      setSelectedAngleIds(new Set())
+      toast.success(`${data.angles.length} angulos generados!`)
+    } catch (error: any) {
+      toast.error(error.message || 'Error al generar angulos')
+    } finally {
+      setIsGeneratingAngles(false)
+    }
+  }
+
+  const handleSelectAngle = (angle: typeof generatedAngles[0]) => {
+    setSelectedAngleIds(prev => {
+      const next = new Set(prev)
+      if (next.has(angle.id)) {
+        next.delete(angle.id)
+      } else {
+        if (next.size >= 4) {
+          toast.error('Maximo 4 angulos')
+          return prev
+        }
+        next.add(angle.id)
+      }
+      return next
+    })
+
+    // Auto-fill creative controls with the LAST selected angle
+    setCreativeControls(prev => ({
+      ...prev,
+      salesAngle: angle.salesAngle,
+      targetAvatar: angle.avatarSuggestion,
+    }))
+    setShowCreativeControls(true)
+  }
+
+  const handleAddManualAngle = () => {
+    if (!newAngle.name.trim() || !newAngle.salesAngle.trim()) {
+      toast.error('Nombre y angulo de venta son requeridos')
+      return
+    }
+
+    const manualAngle = {
+      id: `manual-${Date.now()}`,
+      name: newAngle.name.trim(),
+      hook: newAngle.hook.trim() || newAngle.salesAngle.trim().substring(0, 60),
+      description: `Angulo manual: ${newAngle.salesAngle.trim()}`,
+      avatarSuggestion: newAngle.avatarSuggestion.trim() || 'Publico general',
+      tone: newAngle.tone,
+      salesAngle: newAngle.salesAngle.trim(),
+    }
+
+    setGeneratedAngles(prev => [...prev, manualAngle])
+    setNewAngle({ name: '', hook: '', salesAngle: '', avatarSuggestion: '', tone: 'Emocional' })
+    setShowAddAngleForm(false)
+    toast.success(`Angulo "${manualAngle.name}" agregado`)
+  }
+
+  const renderAddAngleForm = () => (
+    <div className="p-3 rounded-xl border-2 border-dashed border-amber-500/40 bg-amber-500/5 space-y-2">
+      <input
+        type="text"
+        placeholder="Nombre del angulo (ej: Urgencia)"
+        value={newAngle.name}
+        onChange={(e) => setNewAngle(prev => ({ ...prev, name: e.target.value }))}
+        className="w-full text-sm px-3 py-2 rounded-lg border border-border bg-background text-text-primary focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 outline-none"
+      />
+      <textarea
+        placeholder="Angulo de venta / mensaje principal"
+        value={newAngle.salesAngle}
+        onChange={(e) => setNewAngle(prev => ({ ...prev, salesAngle: e.target.value }))}
+        rows={2}
+        className="w-full text-sm px-3 py-2 rounded-lg border border-border bg-background text-text-primary focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 outline-none resize-none"
+      />
+      <input
+        type="text"
+        placeholder="Avatar / publico objetivo (opcional)"
+        value={newAngle.avatarSuggestion}
+        onChange={(e) => setNewAngle(prev => ({ ...prev, avatarSuggestion: e.target.value }))}
+        className="w-full text-sm px-3 py-2 rounded-lg border border-border bg-background text-text-primary focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 outline-none"
+      />
+      <select
+        value={newAngle.tone}
+        onChange={(e) => setNewAngle(prev => ({ ...prev, tone: e.target.value }))}
+        className="w-full text-sm px-3 py-2 rounded-lg border border-border bg-background text-text-primary focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 outline-none"
+      >
+        <option value="Emocional">Emocional</option>
+        <option value="Racional">Racional</option>
+        <option value="Urgencia">Urgencia</option>
+        <option value="Aspiracional">Aspiracional</option>
+        <option value="Social Proof">Social Proof</option>
+        <option value="Educativo">Educativo</option>
+      </select>
+      <div className="flex gap-2">
+        <button
+          onClick={handleAddManualAngle}
+          className="flex-1 text-sm py-2 rounded-lg bg-amber-500 text-white font-medium hover:bg-amber-600 transition-colors"
+        >
+          Agregar angulo
+        </button>
+        <button
+          onClick={() => { setShowAddAngleForm(false); setNewAngle({ name: '', hook: '', salesAngle: '', avatarSuggestion: '', tone: 'Emocional' }) }}
+          className="px-3 text-sm py-2 rounded-lg border border-border text-text-secondary hover:bg-background-secondary transition-colors"
+        >
+          Cancelar
+        </button>
+      </div>
+    </div>
+  )
 
   const handleDownload = async (imageUrl: string, quality: '2k' | 'optimized') => {
     try {
@@ -655,10 +1017,40 @@ export default function ProductGeneratePage() {
         .sort((a, b) => a[1] - b[1])
         .map(([sectionId, order]) => ({ id: sectionId, order }))
 
+      // Build product metadata for the constructor's AI content generation
+      const selectedAnglesData = generatedAngles.filter(a => selectedAngleIds.has(a.id))
+      const metadata = {
+        product_name: product?.name || '',
+        product_description: product?.description || '',
+        country: selectedCountry?.code || '',
+        country_name: selectedCountry?.name || '',
+        currency: selectedCountry?.currency || '',
+        pricing: {
+          priceAfter: pricing.priceAfter,
+          priceBefore: pricing.priceBefore,
+          priceCombo2: pricing.priceCombo2,
+          priceCombo3: pricing.priceCombo3,
+        },
+        product_context: {
+          description: productContext.description,
+          benefits: productContext.benefits,
+          problems: productContext.problems,
+          ingredients: productContext.ingredients,
+          differentiator: productContext.differentiator,
+        },
+        angles: selectedAnglesData.map(a => ({
+          name: a.name,
+          hook: a.hook,
+          salesAngle: a.salesAngle,
+          tone: a.tone,
+        })),
+        sections_selected: Array.from(selectedSections),
+      }
+
       const response = await fetch('/api/minishop/import-sections', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ section_ids }),
+        body: JSON.stringify({ section_ids, metadata }),
       })
 
       if (!response.ok) {
@@ -680,9 +1072,9 @@ export default function ProductGeneratePage() {
     }
   }
 
-  // Group sections by category
+  // Group sections by category (prefer section_type, fallback to template category)
   const sectionsByCategory = generatedSections.reduce((acc, section) => {
-    const category = section.template?.category || 'hero'
+    const category = section.section_type || section.template?.category || 'hero'
     if (!acc[category]) acc[category] = []
     acc[category].push(section)
     return acc
@@ -828,6 +1220,638 @@ export default function ProductGeneratePage() {
           </div>
         </div>
 
+        {/* Visual Style: Colors & Typography */}
+        <div className="border border-border rounded-xl p-4 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Palette className="w-4 h-4 text-accent" />
+              <span className="text-sm font-medium text-text-primary">
+                Estilo Visual
+              </span>
+            </div>
+          </div>
+
+          {/* Color Palette */}
+          <div className="mb-5">
+            <label className="text-xs font-medium text-text-secondary uppercase tracking-wider mb-3 block">
+              Paleta de Colores
+            </label>
+
+            {/* Color count selector */}
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-xs text-text-secondary">Cantidad:</span>
+              <div className="flex rounded-lg border border-border overflow-hidden">
+                <button
+                  onClick={() => setColorCount(3)}
+                  className={`px-3 py-1 text-xs font-medium transition-colors ${
+                    colorCount === 3
+                      ? 'bg-accent text-white'
+                      : 'bg-background text-text-secondary hover:text-text-primary'
+                  }`}
+                >
+                  3 colores
+                </button>
+                <button
+                  onClick={() => setColorCount(4)}
+                  className={`px-3 py-1 text-xs font-medium transition-colors ${
+                    colorCount === 4
+                      ? 'bg-accent text-white'
+                      : 'bg-background text-text-secondary hover:text-text-primary'
+                  }`}
+                >
+                  4 colores
+                </button>
+              </div>
+            </div>
+
+            <div className={`grid gap-3 ${colorCount === 4 ? 'grid-cols-4' : 'grid-cols-3'}`}>
+              {/* Color 1 - Primary */}
+              <div>
+                <span className="text-xs text-text-secondary mb-1.5 block">Primario</span>
+                <div className="relative">
+                  <input
+                    type="color"
+                    value={colorPalette.primary}
+                    onChange={(e) => setColorPalette({ ...colorPalette, primary: e.target.value })}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  />
+                  <div
+                    className="w-full h-12 rounded-xl border-2 border-border hover:border-accent/50 transition-colors cursor-pointer flex items-center justify-center gap-2"
+                    style={{ backgroundColor: colorPalette.primary }}
+                  >
+                    <span className="text-xs font-mono text-white drop-shadow-md bg-black/30 px-2 py-0.5 rounded">
+                      {colorPalette.primary.toUpperCase()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Color 2 - Secondary */}
+              <div>
+                <span className="text-xs text-text-secondary mb-1.5 block">Secundario</span>
+                <div className="relative">
+                  <input
+                    type="color"
+                    value={colorPalette.secondary}
+                    onChange={(e) => setColorPalette({ ...colorPalette, secondary: e.target.value })}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  />
+                  <div
+                    className="w-full h-12 rounded-xl border-2 border-border hover:border-accent/50 transition-colors cursor-pointer flex items-center justify-center gap-2"
+                    style={{ backgroundColor: colorPalette.secondary }}
+                  >
+                    <span className="text-xs font-mono text-white drop-shadow-md bg-black/30 px-2 py-0.5 rounded">
+                      {colorPalette.secondary.toUpperCase()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Color 3 - Accent */}
+              <div>
+                <span className="text-xs text-text-secondary mb-1.5 block">Acento</span>
+                <div className="relative">
+                  <input
+                    type="color"
+                    value={colorPalette.accent}
+                    onChange={(e) => setColorPalette({ ...colorPalette, accent: e.target.value })}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  />
+                  <div
+                    className="w-full h-12 rounded-xl border-2 border-border hover:border-accent/50 transition-colors cursor-pointer flex items-center justify-center gap-2"
+                    style={{ backgroundColor: colorPalette.accent }}
+                  >
+                    <span className="text-xs font-mono text-white drop-shadow-md bg-black/30 px-2 py-0.5 rounded">
+                      {colorPalette.accent.toUpperCase()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Color 4 - Extra (only if 4 colors selected) */}
+              {colorCount === 4 && (
+                <div>
+                  <span className="text-xs text-text-secondary mb-1.5 block">Extra</span>
+                  <div className="relative">
+                    <input
+                      type="color"
+                      value={colorPalette.extra}
+                      onChange={(e) => setColorPalette({ ...colorPalette, extra: e.target.value })}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    />
+                    <div
+                      className="w-full h-12 rounded-xl border-2 border-border hover:border-accent/50 transition-colors cursor-pointer flex items-center justify-center gap-2"
+                      style={{ backgroundColor: colorPalette.extra }}
+                    >
+                      <span className="text-xs font-mono text-white drop-shadow-md bg-black/30 px-2 py-0.5 rounded">
+                        {colorPalette.extra.toUpperCase()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+            <p className="text-xs text-text-secondary/70 mt-2">
+              Estos colores se aplicaran en todos los banners generados
+            </p>
+          </div>
+
+          {/* Typography - 3 independent dropdowns */}
+          <div>
+            <label className="text-xs font-medium text-text-secondary uppercase tracking-wider mb-3 block">
+              Tipografia
+            </label>
+
+            {/* Titles */}
+            <div className="mb-3">
+              <span className="text-xs text-text-secondary mb-1.5 block">Titulos</span>
+              <div className="flex items-center gap-3">
+                <div className="relative flex-1">
+                  <select
+                    value={selectedFonts.headings}
+                    onChange={(e) => setSelectedFonts({ ...selectedFonts, headings: e.target.value })}
+                    className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent"
+                  >
+                    <optgroup label="Sans-serif">
+                      {FONT_CATALOG.filter(f => f.category === 'Sans-serif').map(font => (
+                        <option key={font.id} value={font.id}>{font.name}</option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Serif">
+                      {FONT_CATALOG.filter(f => f.category === 'Serif').map(font => (
+                        <option key={font.id} value={font.id}>{font.name}</option>
+                      ))}
+                    </optgroup>
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-text-secondary pointer-events-none" />
+                </div>
+                <div className="w-28 h-12 flex items-center justify-center bg-background border border-border rounded-xl flex-shrink-0">
+                  <span className="text-xl text-text-primary" style={{ fontFamily: `'${FONT_CATALOG.find(f => f.id === selectedFonts.headings)?.name}', sans-serif` }}>
+                    Ejemplo
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Subtitles */}
+            <div className="mb-3">
+              <span className="text-xs text-text-secondary mb-1.5 block">Subtitulos</span>
+              <div className="flex items-center gap-3">
+                <div className="relative flex-1">
+                  <select
+                    value={selectedFonts.subheadings}
+                    onChange={(e) => setSelectedFonts({ ...selectedFonts, subheadings: e.target.value })}
+                    className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent"
+                  >
+                    <optgroup label="Sans-serif">
+                      {FONT_CATALOG.filter(f => f.category === 'Sans-serif').map(font => (
+                        <option key={font.id} value={font.id}>{font.name}</option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Serif">
+                      {FONT_CATALOG.filter(f => f.category === 'Serif').map(font => (
+                        <option key={font.id} value={font.id}>{font.name}</option>
+                      ))}
+                    </optgroup>
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-text-secondary pointer-events-none" />
+                </div>
+                <div className="w-28 h-12 flex items-center justify-center bg-background border border-border rounded-xl flex-shrink-0">
+                  <span className="text-xl text-text-primary" style={{ fontFamily: `'${FONT_CATALOG.find(f => f.id === selectedFonts.subheadings)?.name}', sans-serif` }}>
+                    Ejemplo
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Body text */}
+            <div>
+              <span className="text-xs text-text-secondary mb-1.5 block">Textos</span>
+              <div className="flex items-center gap-3">
+                <div className="relative flex-1">
+                  <select
+                    value={selectedFonts.body}
+                    onChange={(e) => setSelectedFonts({ ...selectedFonts, body: e.target.value })}
+                    className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent"
+                  >
+                    <optgroup label="Sans-serif">
+                      {FONT_CATALOG.filter(f => f.category === 'Sans-serif').map(font => (
+                        <option key={font.id} value={font.id}>{font.name}</option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Serif">
+                      {FONT_CATALOG.filter(f => f.category === 'Serif').map(font => (
+                        <option key={font.id} value={font.id}>{font.name}</option>
+                      ))}
+                    </optgroup>
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-text-secondary pointer-events-none" />
+                </div>
+                <div className="w-28 h-12 flex items-center justify-center bg-background border border-border rounded-xl flex-shrink-0">
+                  <span className="text-xl text-text-primary" style={{ fontFamily: `'${FONT_CATALOG.find(f => f.id === selectedFonts.body)?.name}', sans-serif` }}>
+                    Ejemplo
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Product Context (Phase 2) */}
+        <div className="border border-border rounded-xl p-4 mb-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FileText className="w-4 h-4 text-accent" />
+              <span className="text-sm font-medium text-text-primary">
+                Contexto del Producto
+              </span>
+              <span className="text-xs text-text-secondary">(Recomendado)</span>
+            </div>
+            <button
+              onClick={() => setShowProductContext(!showProductContext)}
+              className={`relative w-12 h-6 rounded-full transition-colors ${
+                showProductContext ? 'bg-accent' : 'bg-border'
+              }`}
+            >
+              <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
+                showProductContext ? 'left-7' : 'left-1'
+              }`} />
+            </button>
+          </div>
+
+          {showProductContext && (
+            <div className="mt-4 space-y-4">
+              <p className="text-xs text-text-secondary">
+                Entre mas contexto proporciones, mejores seran los banners y angulos generados.
+              </p>
+
+              {/* Description */}
+              <div>
+                <label className="text-sm font-medium text-text-primary flex items-center gap-2 mb-1.5">
+                  📦 Descripcion del Producto
+                </label>
+                <textarea
+                  placeholder="Describe el producto en detalle: que es, como funciona, materiales, presentacion, cantidad, etc."
+                  value={productContext.description}
+                  onChange={(e) => setProductContext({ ...productContext, description: e.target.value.slice(0, 2000) })}
+                  className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent resize-none"
+                  rows={3}
+                />
+                <span className="text-xs text-text-secondary">{productContext.description.length}/2000</span>
+              </div>
+
+              {/* Benefits */}
+              <div>
+                <label className="text-sm font-medium text-text-primary flex items-center gap-2 mb-1.5">
+                  ✅ Beneficios Principales
+                </label>
+                <textarea
+                  placeholder="Lista los beneficios clave. Ej: Reduce arrugas 67% en 28 dias, hidratacion 24h, no grasa..."
+                  value={productContext.benefits}
+                  onChange={(e) => setProductContext({ ...productContext, benefits: e.target.value.slice(0, 1000) })}
+                  className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent resize-none"
+                  rows={2}
+                />
+              </div>
+
+              {/* Problems it solves */}
+              <div>
+                <label className="text-sm font-medium text-text-primary flex items-center gap-2 mb-1.5">
+                  🎯 Problemas que Resuelve
+                </label>
+                <textarea
+                  placeholder="Que dolor o frustracion tiene el cliente? Ej: Piel seca, arrugas prematuras, productos caros que no funcionan..."
+                  value={productContext.problems}
+                  onChange={(e) => setProductContext({ ...productContext, problems: e.target.value.slice(0, 1000) })}
+                  className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent resize-none"
+                  rows={2}
+                />
+              </div>
+
+              {/* Ingredients/Materials */}
+              <div>
+                <label className="text-sm font-medium text-text-primary flex items-center gap-2 mb-1.5">
+                  🧪 Ingredientes / Materiales / Componentes
+                </label>
+                <textarea
+                  placeholder="Ej: Acido hialuronico, retinol, vitamina C, extracto de aloe vera..."
+                  value={productContext.ingredients}
+                  onChange={(e) => setProductContext({ ...productContext, ingredients: e.target.value.slice(0, 500) })}
+                  className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent resize-none"
+                  rows={2}
+                />
+              </div>
+
+              {/* Differentiator */}
+              <div>
+                <label className="text-sm font-medium text-text-primary flex items-center gap-2 mb-1.5">
+                  💎 Diferenciador
+                </label>
+                <textarea
+                  placeholder="Que lo hace diferente de la competencia? Ej: Unico con 20 ingredientes activos, formula patentada, resultados en 14 dias..."
+                  value={productContext.differentiator}
+                  onChange={(e) => setProductContext({ ...productContext, differentiator: e.target.value.slice(0, 500) })}
+                  className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent resize-none"
+                  rows={2}
+                />
+              </div>
+
+              {/* Generate Angles Button */}
+              <div className="pt-2 border-t border-border">
+                <button
+                  onClick={handleGenerateAngles}
+                  disabled={isGeneratingAngles}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl font-medium transition-all disabled:opacity-50"
+                >
+                  {isGeneratingAngles ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Generando angulos...
+                    </>
+                  ) : (
+                    <>
+                      <Lightbulb className="w-5 h-5" />
+                      Generar Angulos de Venta con IA
+                    </>
+                  )}
+                </button>
+                <p className="text-xs text-text-secondary text-center mt-2">
+                  Analiza las fotos del producto + contexto para generar angulos de venta
+                </p>
+              </div>
+
+              {/* Generated Angles */}
+              {generatedAngles.length > 0 && (
+                <div className="pt-4 border-t border-border">
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="text-sm font-medium text-text-primary flex items-center gap-2">
+                      <Target className="w-4 h-4 text-amber-500" />
+                      Angulos de Venta Generados
+                    </label>
+                    <button
+                      onClick={handleGenerateAngles}
+                      disabled={isGeneratingAngles}
+                      className="flex items-center gap-1 px-2 py-1 text-xs text-text-secondary hover:text-accent transition-colors"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${isGeneratingAngles ? 'animate-spin' : ''}`} />
+                      Regenerar
+                    </button>
+                  </div>
+
+                  {selectedAngleIds.size > 0 && (
+                    <p className="text-xs text-amber-500 font-medium mb-2">
+                      {selectedAngleIds.size}/4 angulos seleccionados
+                    </p>
+                  )}
+
+                  <div className="space-y-2">
+                    {generatedAngles.map((angle) => (
+                      <button
+                        key={angle.id}
+                        onClick={() => handleSelectAngle(angle)}
+                        className={`w-full text-left p-3 rounded-xl border-2 transition-all ${
+                          selectedAngleIds.has(angle.id)
+                            ? 'border-amber-500 bg-amber-500/10'
+                            : 'border-border hover:border-amber-500/30 bg-background'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-sm font-semibold text-text-primary">{angle.name}</span>
+                              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-600 font-medium">
+                                {angle.tone}
+                              </span>
+                            </div>
+                            <p className="text-xs text-amber-600 font-medium mb-1">&quot;{angle.hook}&quot;</p>
+                            <p className="text-xs text-text-secondary line-clamp-2">{angle.description}</p>
+                            <p className="text-[10px] text-text-secondary/70 mt-1">👤 {angle.avatarSuggestion}</p>
+                          </div>
+                          {selectedAngleIds.has(angle.id) && (
+                            <div className="w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center flex-shrink-0 mt-1">
+                              <Check className="w-3 h-3 text-white" />
+                            </div>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Add manual angle button + form */}
+                  {showAddAngleForm ? (
+                    <div className="mt-3">
+                      {renderAddAngleForm()}
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setShowAddAngleForm(true)}
+                      className="mt-3 w-full flex items-center justify-center gap-2 py-2 rounded-xl border-2 border-dashed border-border text-sm text-text-secondary hover:border-amber-500/40 hover:text-amber-600 transition-all"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Agregar angulo manual
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Add manual angle when no AI angles exist yet */}
+              {generatedAngles.length === 0 && (
+                <div className="pt-4 border-t border-border">
+                  <label className="text-sm font-medium text-text-primary flex items-center gap-2 mb-3">
+                    <Target className="w-4 h-4 text-amber-500" />
+                    Angulos de Venta
+                  </label>
+                  <p className="text-xs text-text-secondary mb-3">
+                    Genera angulos con IA arriba, o agrega uno manual:
+                  </p>
+                  {showAddAngleForm ? (
+                    renderAddAngleForm()
+                  ) : (
+                    <button
+                      onClick={() => setShowAddAngleForm(true)}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-dashed border-amber-500/30 text-sm text-amber-600 hover:border-amber-500/50 hover:bg-amber-500/5 transition-all"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Agregar angulo manual
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Landing Sections Selector — only show when angles are selected */}
+              {selectedAngleIds.size > 0 && (
+                <div className="pt-4 border-t border-border">
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="text-sm font-medium text-text-primary flex items-center gap-2">
+                      <LayoutTemplate className="w-4 h-4 text-accent" />
+                      Secciones de tu Landing
+                    </label>
+                    <span className="text-xs text-text-secondary">
+                      {selectedSections.size} secciones seleccionadas
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-text-secondary mb-3">
+                    Selecciona las secciones que quieres en tu landing y asigna una plantilla a cada una.
+                  </p>
+
+                  <div className="space-y-2">
+                    {TEMPLATE_CATEGORIES.map((category) => {
+                      const isSelected = selectedSections.has(category.id)
+                      const assignedTemplate = sectionTemplates[category.id]
+                      const categoryTemplates = templates.filter(t => t.category === category.id)
+
+                      return (
+                        <div
+                          key={category.id}
+                          className={`rounded-xl border-2 transition-all ${
+                            isSelected
+                              ? 'border-accent/50 bg-accent/5'
+                              : 'border-border bg-background'
+                          }`}
+                        >
+                          <button
+                            onClick={() => {
+                              setSelectedSections(prev => {
+                                const next = new Set(prev)
+                                if (next.has(category.id)) {
+                                  next.delete(category.id)
+                                } else {
+                                  next.add(category.id)
+                                }
+                                return next
+                              })
+                            }}
+                            className="w-full flex items-center gap-3 p-3"
+                          >
+                            <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                              isSelected
+                                ? 'bg-accent border-accent'
+                                : 'border-border'
+                            }`}>
+                              {isSelected && <Check className="w-3 h-3 text-white" />}
+                            </div>
+
+                            <span className="text-lg">{category.icon}</span>
+                            <div className="text-left flex-1 min-w-0">
+                              <span className="text-sm font-medium text-text-primary block">{category.name}</span>
+                              <span className="text-xs text-text-secondary block">{category.description}</span>
+                            </div>
+
+                            {isSelected && assignedTemplate && (
+                              <div className="w-10 h-14 rounded-lg overflow-hidden border border-border flex-shrink-0">
+                                <img
+                                  src={assignedTemplate.image_url}
+                                  alt={assignedTemplate.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                            )}
+                          </button>
+
+                          {isSelected && (
+                            <div className="px-3 pb-3">
+                              {categoryTemplates.length > 0 ? (
+                                <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                                  {categoryTemplates.map((template) => (
+                                    <button
+                                      key={template.id}
+                                      onClick={() => setSectionTemplates(prev => ({
+                                        ...prev,
+                                        [category.id]: prev[category.id]?.id === template.id ? null : template,
+                                      }))}
+                                      className={`flex-shrink-0 w-16 h-24 rounded-lg overflow-hidden border-2 transition-all ${
+                                        assignedTemplate?.id === template.id
+                                          ? 'border-accent ring-1 ring-accent/30'
+                                          : 'border-border hover:border-accent/30'
+                                      }`}
+                                    >
+                                      <img
+                                        src={template.image_url}
+                                        alt={template.name}
+                                        className="w-full h-full object-cover"
+                                        loading="lazy"
+                                      />
+                                    </button>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-2 py-2">
+                                  <span className="text-xs text-text-secondary/70">Sin plantillas en galeria —</span>
+                                  <button
+                                    onClick={() => {
+                                      if (uploadedTemplate || selectedTemplate) {
+                                        setSectionTemplates(prev => ({
+                                          ...prev,
+                                          [category.id]: selectedTemplate || { id: 'uploaded', name: 'Subida', image_url: uploadedTemplate!, category: category.id } as Template,
+                                        }))
+                                        toast.success('Plantilla principal asignada')
+                                      } else {
+                                        toast.error('Sube una imagen de referencia arriba')
+                                      }
+                                    }}
+                                    className="text-xs text-accent hover:underline"
+                                  >
+                                    Usar plantilla principal
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  {selectedSections.size > 0 && (
+                    <div className="mt-4 pt-4 border-t border-border">
+                      <button
+                        onClick={handleBulkGenerate}
+                        disabled={isBulkGenerating}
+                        className="w-full flex items-center justify-center gap-3 px-4 py-4 bg-gradient-to-r from-accent to-emerald-500 hover:from-accent-hover hover:to-emerald-600 text-white rounded-xl font-bold text-base transition-all disabled:opacity-50 shadow-lg"
+                      >
+                        {isBulkGenerating ? (
+                          <>
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                            Generando... {bulkProgress.current}/{bulkProgress.total}
+                            <span className="text-sm font-normal opacity-80">({bulkProgress.currentLabel})</span>
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="w-5 h-5" />
+                            Generar {selectedAngleIds.size} Landing{selectedAngleIds.size > 1 ? 's' : ''} Completa{selectedAngleIds.size > 1 ? 's' : ''}
+                            <span className="text-sm font-normal opacity-80">
+                              ({selectedAngleIds.size} x {selectedSections.size} = {selectedAngleIds.size * selectedSections.size} banners)
+                            </span>
+                          </>
+                        )}
+                      </button>
+
+                      {isBulkGenerating && bulkProgress.total > 0 && (
+                        <div className="mt-3">
+                          <div className="w-full h-2 bg-border rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-gradient-to-r from-accent to-emerald-500 rounded-full transition-all duration-500"
+                              style={{ width: `${(bulkProgress.current / bulkProgress.total) * 100}%` }}
+                            />
+                          </div>
+                          <p className="text-xs text-text-secondary text-center mt-1">
+                            {bulkProgress.currentLabel}
+                          </p>
+                        </div>
+                      )}
+
+                      <p className="text-xs text-text-secondary text-center mt-2">
+                        Se generaran {selectedAngleIds.size * selectedSections.size} banners en paralelo (maximo 3 simultaneos)
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* AI Model Selection */}
         <div className="mb-6">
           <ModelSelector
@@ -935,14 +1959,14 @@ export default function ProductGeneratePage() {
                   <label className="text-sm font-medium text-text-primary flex items-center gap-2">
                     📄 Detalles del Producto
                   </label>
-                  <span className="text-xs text-text-secondary">Máx. 500 caracteres</span>
+                  <span className="text-xs text-text-secondary">Max. 1500 caracteres</span>
                 </div>
                 <textarea
                   placeholder="Describe las características, beneficios y detalles importantes del producto..."
                   value={creativeControls.productDetails}
-                  onChange={(e) => setCreativeControls({ ...creativeControls, productDetails: e.target.value.slice(0, 500) })}
+                  onChange={(e) => setCreativeControls({ ...creativeControls, productDetails: e.target.value.slice(0, 1500) })}
                   className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent resize-none"
-                  rows={2}
+                  rows={3}
                 />
               </div>
 
@@ -956,9 +1980,9 @@ export default function ProductGeneratePage() {
                 <textarea
                   placeholder="Ejemplo: Potenciador de testosterona para hombres fitness"
                   value={creativeControls.salesAngle}
-                  onChange={(e) => setCreativeControls({ ...creativeControls, salesAngle: e.target.value.slice(0, 500) })}
+                  onChange={(e) => setCreativeControls({ ...creativeControls, salesAngle: e.target.value.slice(0, 1500) })}
                   className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent resize-none"
-                  rows={2}
+                  rows={3}
                 />
               </div>
 
@@ -972,9 +1996,9 @@ export default function ProductGeneratePage() {
                 <textarea
                   placeholder="Ejemplo: Hombres 25-45 años, van al gimnasio, quieren aumentar masa muscular"
                   value={creativeControls.targetAvatar}
-                  onChange={(e) => setCreativeControls({ ...creativeControls, targetAvatar: e.target.value.slice(0, 500) })}
+                  onChange={(e) => setCreativeControls({ ...creativeControls, targetAvatar: e.target.value.slice(0, 1500) })}
                   className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent resize-none"
-                  rows={2}
+                  rows={3}
                 />
               </div>
 
@@ -988,9 +2012,9 @@ export default function ProductGeneratePage() {
                 <textarea
                   placeholder="Cualquier instrucción específica para la generación..."
                   value={creativeControls.additionalInstructions}
-                  onChange={(e) => setCreativeControls({ ...creativeControls, additionalInstructions: e.target.value.slice(0, 500) })}
+                  onChange={(e) => setCreativeControls({ ...creativeControls, additionalInstructions: e.target.value.slice(0, 1500) })}
                   className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent resize-none"
-                  rows={2}
+                  rows={3}
                 />
               </div>
             </div>

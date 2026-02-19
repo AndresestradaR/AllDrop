@@ -58,7 +58,7 @@ export function createRateLimiter({ maxRequests, windowMs }: RateLimiterOptions)
 // Pre-configured limiters for common use cases
 export const authLimiter = createRateLimiter({ maxRequests: 10, windowMs: 60_000 })
 export const apiLimiter = createRateLimiter({ maxRequests: 30, windowMs: 60_000 })
-export const aiLimiter = createRateLimiter({ maxRequests: 10, windowMs: 60_000 })
+export const aiLimiter = createRateLimiter({ maxRequests: 30, windowMs: 60_000 })
 
 export function getClientIp(request: Request): string {
   const forwarded = request.headers.get("x-forwarded-for")

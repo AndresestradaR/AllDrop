@@ -1,0 +1,232 @@
+import { NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+import { decrypt } from '@/lib/services/encryption'
+import { aiLimiter, getClientIp } from '@/lib/rate-limit'
+
+function parseDataUrl(dataUrl: string): { data: string; mimeType: string } | null {
+  if (!dataUrl.startsWith('data:')) return null
+  const [header, data] = dataUrl.split(',')
+  const mimeType = header.split(':')[1]?.split(';')[0] || 'image/jpeg'
+  return { data, mimeType }
+}
+
+const COUNTRY_CONTEXT: Record<string, string> = {
+  CO: 'Colombia — moneda COP, pago contraentrega popular, envio 2-5 dias',
+  MX: 'Mexico — moneda MXN, pago contra entrega u Oxxo, envio 3-7 dias',
+  GT: 'Guatemala — moneda GTQ, contraentrega en zona metropolitana',
+  CL: 'Chile — moneda CLP, envio 2-5 dias, transferencia o tarjeta',
+  PE: 'Peru — moneda PEN, contraentrega en Lima, envio 3-7 dias',
+  EC: 'Ecuador — moneda USD, envio 3-7 dias',
+  PA: 'Panama — moneda USD, envio 3-7 dias',
+  PY: 'Paraguay — moneda PYG, envio 3-7 dias',
+  AR: 'Argentina — moneda ARS, envio 3-7 dias',
+  ES: 'Espana — moneda EUR, envio 2-5 dias',
+}
+
+const ANGLES_SYSTEM_PROMPT = `# ROL
+Eres un estratega de marketing senior especializado en dropshipping COD para Latinoamerica. Dominas las tecnicas de Eugene Schwartz (niveles de consciencia), David Ogilvy (headlines que venden) y Russell Brunson (funnels y angulos).
+
+Tu trabajo es generar ANGULOS DE VENTA diversificados para un producto. Cada angulo es una perspectiva diferente para vender el MISMO producto a DIFERENTES tipos de compradores o con DIFERENTES motivaciones.
+
+# QUE ES UN ANGULO DE VENTA
+Un angulo es la PERSPECTIVA o ENFOQUE desde el cual presentas el producto. El mismo suplemento de magnesio puede venderse como:
+- Angulo DOLOR: "Deja de sufrir calambres nocturnos"
+- Angulo RENDIMIENTO: "Duplica tu energia en el gym"
+- Angulo CIENCIA: "El mineral que el 80% de latinos no consume"
+- Angulo COMPARACION: "Mejor que cualquier multivitaminico"
+- Angulo MIEDO: "La deficiencia silenciosa que envejece tu cuerpo"
+- Angulo ASPIRACIONAL: "El secreto de los atletas olimpicos"
+
+# TIPOS DE ANGULO (genera variedad de estos)
+1. TRANSFORMACION: Antes/despues, resultado visible, cambio de vida
+2. DOLOR/PROBLEMA: Agitar el dolor, mostrar la solucion
+3. AUTORIDAD/CIENCIA: Datos, estudios, ingredientes, respaldo profesional
+4. URGENCIA/ESCASEZ: Oferta limitada, stock agotandose, solo hoy
+5. COMPARACION: Mejor que alternativas, reemplaza X productos
+6. ASPIRACIONAL: Lifestyle, como se ven las personas exitosas
+7. SOCIAL PROOF: Testimonios, reviews, miles de clientes satisfechos
+8. CURIOSIDAD: Secreto revelado, lo que nadie te cuenta, descubre por que
+
+# CADENA DE PENSAMIENTO
+1. Analizar producto: que es, beneficios, ingredientes, publico natural
+2. Identificar MULTIPLES dolores/deseos que resuelve
+3. Para cada dolor/deseo, crear un angulo unico con gancho diferente
+4. Asegurar que cada angulo apunta a un AVATAR diferente o motivacion diferente
+5. Escribir hooks que generen CURIOSIDAD y CLICK
+
+# REGLAS
+- Generar EXACTAMENTE 6 angulos diversificados
+- Cada angulo debe ser SUFICIENTEMENTE DIFERENTE del resto
+- Los hooks deben ser cortos (max 80 chars), impactantes, en espanol
+- SIN TILDES en los hooks y salesAngle (para banners)
+- El salesAngle es la version larga del hook (max 150 chars)
+- El avatarSuggestion debe ser ESPECIFICO: edad, genero, actividad, motivacion
+- El tone debe ser UNA palabra: Urgente, Aspiracional, Cientifico, Emocional, Provocador, Educativo
+
+# FORMATO DE RESPUESTA
+JSON valido con esta estructura:
+{
+  "angles": [
+    {
+      "id": "angle-1",
+      "name": "Nombre corto del angulo (3-5 palabras)",
+      "hook": "El gancho principal en max 80 chars SIN TILDES",
+      "description": "Descripcion de la estrategia del angulo en 1-2 oraciones",
+      "avatarSuggestion": "Perfil especifico: genero, edad, actividad, motivacion",
+      "tone": "Urgente|Aspiracional|Cientifico|Emocional|Provocador|Educativo",
+      "salesAngle": "Version expandida del hook para el prompt del banner, max 150 chars SIN TILDES"
+    }
+  ]
+}`
+
+export async function POST(request: Request) {
+  try {
+    const ip = getClientIp(request)
+    const { success } = aiLimiter.check(ip)
+    if (!success) {
+      return NextResponse.json({ error: 'Demasiadas solicitudes. Intenta de nuevo en un momento.' }, { status: 429 })
+    }
+
+    const supabase = await createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
+    const body = await request.json()
+    const {
+      productName,
+      productPhotos,
+      productContext,
+      targetCountry,
+    } = body as {
+      productName?: string
+      productPhotos?: string[]
+      productContext?: {
+        description?: string
+        benefits?: string
+        problems?: string
+        ingredients?: string
+        differentiator?: string
+      }
+      targetCountry?: string
+    }
+
+    // Get API key
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('google_api_key')
+      .eq('id', user.id)
+      .single()
+
+    if (!profile?.google_api_key) {
+      return NextResponse.json({ error: 'Configura tu API key de Google en Settings' }, { status: 400 })
+    }
+
+    const apiKey = decrypt(profile.google_api_key)
+
+    // Build multimodal parts
+    const parts: any[] = []
+
+    // Add product photos (so AI can analyze the actual product)
+    if (productPhotos) {
+      for (const photo of productPhotos) {
+        if (photo) {
+          const parsed = parseDataUrl(photo)
+          if (parsed) {
+            parts.push({ inline_data: { mime_type: parsed.mimeType, data: parsed.data } })
+          }
+        }
+      }
+    }
+
+    // Build the user prompt with all available context
+    const promptLines: string[] = []
+
+    promptLines.push(`PRODUCTO: ${productName || 'Analiza las imagenes para identificar el producto'}`)
+
+    if (productPhotos?.length) {
+      promptLines.push(`\nIMAGENES: ${productPhotos.length} foto(s) del producto — analiza empaques, textos visibles, ingredientes, marca, beneficios impresos`)
+    }
+
+    if (productContext) {
+      if (productContext.description) {
+        promptLines.push(`\nDESCRIPCION: ${productContext.description}`)
+      }
+      if (productContext.benefits) {
+        promptLines.push(`\nBENEFICIOS: ${productContext.benefits}`)
+      }
+      if (productContext.problems) {
+        promptLines.push(`\nPROBLEMAS QUE RESUELVE: ${productContext.problems}`)
+      }
+      if (productContext.ingredients) {
+        promptLines.push(`\nINGREDIENTES/MATERIALES: ${productContext.ingredients}`)
+      }
+      if (productContext.differentiator) {
+        promptLines.push(`\nDIFERENCIADOR: ${productContext.differentiator}`)
+      }
+    }
+
+    if (targetCountry && COUNTRY_CONTEXT[targetCountry]) {
+      promptLines.push(`\nPAIS DESTINO: ${COUNTRY_CONTEXT[targetCountry]}`)
+    }
+
+    promptLines.push('\nGenera 6 angulos de venta diversificados en JSON.')
+
+    parts.push({ text: promptLines.join('\n') })
+
+    // Call Gemini TEXT (not image)
+    const models = ['gemini-2.5-pro-preview-06-05', 'gemini-2.0-flash']
+    let lastError = ''
+
+    for (const model of models) {
+      try {
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
+
+        const response = await fetch(`${endpoint}?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: ANGLES_SYSTEM_PROMPT }] },
+            contents: [{ parts }],
+            generationConfig: {
+              responseMimeType: 'application/json',
+              temperature: 0.9,
+            },
+          }),
+        })
+
+        if (!response.ok) {
+          const errBody = await response.text()
+          console.error(`[GenerateAngles] ${model} failed (${response.status}):`, errBody.substring(0, 300))
+          lastError = `${model}: ${response.status}`
+          continue
+        }
+
+        const data = await response.json()
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}'
+        const result = JSON.parse(text)
+
+        console.log(`[GenerateAngles] User: ${user.id.substring(0, 8)}..., Model: ${model}, Product: ${productName}, Angles: ${result.angles?.length || 0}`)
+
+        if (!result.angles || result.angles.length === 0) {
+          lastError = 'No angles generated'
+          continue
+        }
+
+        return NextResponse.json({ success: true, angles: result.angles })
+      } catch (modelError: any) {
+        console.error(`[GenerateAngles] ${model} error:`, modelError.message)
+        lastError = modelError.message
+        continue
+      }
+    }
+
+    return NextResponse.json({ error: `Error al generar angulos: ${lastError}` }, { status: 500 })
+
+  } catch (error: any) {
+    console.error('[GenerateAngles] Error:', error.message)
+    return NextResponse.json({ error: error.message || 'Error al generar angulos' }, { status: 500 })
+  }
+}

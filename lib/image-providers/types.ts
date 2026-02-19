@@ -456,6 +456,29 @@ export interface GenerateImageRequest {
     currencySymbol?: string
     // Country
     targetCountry?: string
+    // Visual style
+    colorPalette?: {
+      primary: string
+      secondary: string
+      accent: string
+      extra?: string
+    }
+    typography?: {
+      headings: string
+      subheadings: string
+      body: string
+    }
+    productContext?: {
+      description?: string
+      benefits?: string
+      problems?: string
+      ingredients?: string
+      differentiator?: string
+    }
+    // Section & angle info (Phase 3)
+    sectionType?: string
+    angleName?: string
+    angleTone?: string
   }
 }
 
