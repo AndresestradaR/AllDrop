@@ -33,7 +33,8 @@ function buildPricingSection(request: GenerateImageRequest): string {
   return lines.join('\n')
 }
 
-function buildPrompt(request: GenerateImageRequest): string {
+// Exported for reuse in KIE Gemini fallback
+export function buildGeminiPrompt(request: GenerateImageRequest): string {
   const { productName, creativeControls } = request
   const targetCountry = creativeControls?.targetCountry || 'CO'
 
@@ -201,7 +202,7 @@ async function generateWithGemini(
 
   const prompt = request.prompt && request.prompt.trim()
     ? request.prompt
-    : buildPrompt(request)
+    : buildGeminiPrompt(request)
   parts.push({ text: prompt })
 
   console.log(`[Gemini] Starting generation with model: ${apiModelId}`)
@@ -338,7 +339,7 @@ async function generateWithImagen(
 
   const prompt = request.prompt && request.prompt.trim()
     ? request.prompt
-    : buildPrompt(request)
+    : buildGeminiPrompt(request)
 
   const aspectRatioMap: Record<string, string> = {
     '1:1': '1:1',

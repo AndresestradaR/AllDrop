@@ -215,8 +215,9 @@ export async function POST(request: Request) {
 
     // Determine if this provider needs public URLs
     // KIE.ai (Seedream) and BFL (FLUX) require public URLs for images
-    const needsPublicUrls = selectedProvider === 'seedream' || selectedProvider === 'flux'
-    
+    // Also upload if user has KIE key (for Gemini → KIE fallback)
+    const needsPublicUrls = selectedProvider === 'seedream' || selectedProvider === 'flux' || (selectedProvider === 'gemini' && !!apiKeys.kie)
+
     console.log(`[Generate] Provider: ${selectedProvider}, needs public URLs: ${needsPublicUrls}`)
 
     // Parse product photos
