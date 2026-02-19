@@ -1025,10 +1025,10 @@ export default function ProductGeneratePage() {
         country_name: selectedCountry?.name || '',
         currency: selectedCountry?.currency || '',
         pricing: {
-          price: pricing.price,
-          comparePrice: pricing.comparePrice,
-          showCompare: pricing.showCompare,
-          freeShipping: pricing.freeShipping,
+          priceAfter: pricing.priceAfter,
+          priceBefore: pricing.priceBefore,
+          priceCombo2: pricing.priceCombo2,
+          priceCombo3: pricing.priceCombo3,
         },
         product_context: {
           description: productContext.description,
