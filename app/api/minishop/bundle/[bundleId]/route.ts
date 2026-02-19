@@ -16,7 +16,7 @@ export async function GET(
 
     const { data: bundle, error } = await serviceClient
       .from('import_bundles')
-      .select('id, sections, created_at, expires_at')
+      .select('id, sections, metadata, created_at, expires_at')
       .eq('id', bundleId)
       .single()
 

@@ -63,7 +63,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { section_ids, sections } = body
+    const { section_ids, sections, metadata } = body
 
     const serviceClient = await createServiceClient()
 
@@ -129,6 +129,7 @@ export async function POST(request: Request) {
       .insert({
         user_id: user.id,
         sections: validSections,
+        ...(metadata && typeof metadata === 'object' ? { metadata } : {}),
       })
       .select('id')
       .single()

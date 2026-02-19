@@ -1016,10 +1016,40 @@ export default function ProductGeneratePage() {
         .sort((a, b) => a[1] - b[1])
         .map(([sectionId, order]) => ({ id: sectionId, order }))
 
+      // Build product metadata for the constructor's AI content generation
+      const selectedAnglesData = generatedAngles.filter(a => selectedAngleIds.has(a.id))
+      const metadata = {
+        product_name: product?.name || '',
+        product_description: product?.description || '',
+        country: selectedCountry?.code || '',
+        country_name: selectedCountry?.name || '',
+        currency: selectedCountry?.currency || '',
+        pricing: {
+          price: pricing.price,
+          comparePrice: pricing.comparePrice,
+          showCompare: pricing.showCompare,
+          freeShipping: pricing.freeShipping,
+        },
+        product_context: {
+          description: productContext.description,
+          benefits: productContext.benefits,
+          problems: productContext.problems,
+          ingredients: productContext.ingredients,
+          differentiator: productContext.differentiator,
+        },
+        angles: selectedAnglesData.map(a => ({
+          name: a.name,
+          hook: a.hook,
+          salesAngle: a.salesAngle,
+          tone: a.tone,
+        })),
+        sections_selected: Array.from(selectedSections),
+      }
+
       const response = await fetch('/api/minishop/import-sections', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ section_ids }),
+        body: JSON.stringify({ section_ids, metadata }),
       })
 
       if (!response.ok) {
