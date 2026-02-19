@@ -177,7 +177,7 @@ export async function POST(request: Request) {
       insertError = res.error
     }
 
-    if (insertError) {
+    if (insertError || !bundle) {
       console.error('Error creating import bundle:', insertError)
       return NextResponse.json(
         { error: 'Error al crear el paquete de importacion' },
