@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 
 export async function POST(request: Request) {
   try {
@@ -11,8 +12,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    // Service client to bypass RLS for admin operations
-    const serviceClient = await createServiceClient()
+    // Direct supabase-js client with service role key — truly bypasses RLS
+    const adminClient = createSupabaseClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
 
     const formData = await request.formData()
     const file = formData.get('file') as File
@@ -28,11 +32,11 @@ export async function POST(request: Request) {
     const fileName = `${category}-${crypto.randomUUID()}.${ext}`
     const storagePath = `templates/${category}/${fileName}`
 
-    // Upload to Supabase Storage using service client (bypasses storage RLS too)
+    // Upload to Supabase Storage
     const arrayBuffer = await file.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
 
-    const { error: uploadError } = await serviceClient.storage
+    const { error: uploadError } = await adminClient.storage
       .from('landing-images')
       .upload(storagePath, buffer, {
         contentType: file.type || 'image/webp',
@@ -45,14 +49,14 @@ export async function POST(request: Request) {
     }
 
     // Get public URL
-    const { data: urlData } = serviceClient.storage
+    const { data: urlData } = adminClient.storage
       .from('landing-images')
       .getPublicUrl(storagePath)
 
     const publicUrl = urlData.publicUrl
 
-    // Insert into templates table (service client bypasses RLS)
-    const { error: insertError } = await serviceClient
+    // Insert into templates table (admin client bypasses RLS)
+    const { error: insertError } = await adminClient
       .from('templates')
       .insert({
         name: name || fileName,
