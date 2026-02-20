@@ -35,6 +35,9 @@
     },
     "app/api/minishop/import-sections/route.ts": {
       "maxDuration": 60
+    },
+    "app/api/landing-ia/stream/route.ts": {
+      "maxDuration": 120
     }
   },
   "rewrites": [

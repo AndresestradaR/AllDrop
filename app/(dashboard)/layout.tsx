@@ -18,7 +18,8 @@ import {
   Target,
   Wand2,
   Store,
-  Upload
+  Upload,
+  Zap
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -33,6 +34,7 @@ const creatorNavigation = [
   { name: 'Crea tu Landing', href: '/dashboard/landing', icon: LayoutTemplate },
   { name: 'Estudio IA', href: '/dashboard/studio', icon: Wand2, isNew: true },
   { name: 'Encuentra tu Producto Ganador', href: '/dashboard/product-research', icon: Target, isNew: true },
+  { name: 'Landing Code', href: '/dashboard/landing-ia', icon: Zap, isNew: true },
 ]
 
 const ADMIN_EMAIL = 'trucosecomydrop@gmail.com'
