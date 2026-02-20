@@ -450,7 +450,7 @@ export const geminiProvider: ImageProvider = {
 
   async generate(request: GenerateImageRequest, apiKey: string): Promise<GenerateImageResult> {
     try {
-      const apiModelId = request.modelId ? getApiModelId(request.modelId) : 'gemini-2.0-flash-exp-image-generation'
+      const apiModelId = request.modelId ? getApiModelId(request.modelId) : 'gemini-2.5-flash-image'
 
       console.log(`[Gemini Provider] Using model: ${request.modelId} -> API: ${apiModelId}`)
 

@@ -100,7 +100,7 @@ ${transcript}
 Analyze this transcript and generate ${sectionCount} multi-shot video section(s) as structured JSON. Each section should be ~14 seconds (3-4 scenes). Adapt the spoken content into visual scenes that SHOW what the transcript describes.`
 
     // Try Gemini 2.5 Pro first, fallback to Flash
-    const models = ['gemini-2.5-pro-preview-06-05', 'gemini-2.0-flash']
+    const models = ['gemini-2.5-pro', 'gemini-2.5-flash']
     let lastError = ''
 
     for (const model of models) {

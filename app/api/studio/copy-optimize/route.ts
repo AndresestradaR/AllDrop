@@ -416,8 +416,8 @@ export async function POST(request: Request) {
 
     // Try Gemini 2.5 Pro first, fallback to 2.0 Flash
     const models = [
-      'gemini-2.5-pro-preview-06-05',
-      'gemini-2.0-flash',
+      'gemini-2.5-pro',
+      'gemini-2.5-flash',
     ]
 
     let lastError = ''

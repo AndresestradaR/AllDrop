@@ -172,7 +172,7 @@ CONSTRAINTS:
 - The 8K CHARACTER DESCRIPTOR must be self-contained and usable directly in any AI video prompt`
 
 async function callGemini(apiKey: string, systemPrompt: string, imageParts: any[], userPrompt: string): Promise<string> {
-  const models = ['gemini-2.5-pro-preview-06-05', 'gemini-2.0-flash']
+  const models = ['gemini-2.5-pro', 'gemini-2.5-flash']
 
   for (const model of models) {
     try {

@@ -177,7 +177,7 @@ export async function POST(request: Request) {
     parts.push({ text: promptLines.join('\n') })
 
     // Call Gemini TEXT (not image)
-    const models = ['gemini-2.5-pro-preview-06-05', 'gemini-2.0-flash']
+    const models = ['gemini-2.5-pro', 'gemini-2.5-flash']
     let lastError = ''
 
     for (const model of models) {
