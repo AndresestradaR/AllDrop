@@ -61,7 +61,7 @@ Do NOT include "images" in the JSON.
 Write all text in Spanish for Latin American audience (COD/cash-on-delivery market).`
 
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -158,9 +158,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'La pagina no tiene suficiente contenido. Intenta con otra URL.' }, { status: 400 })
     }
 
-    // Detect captcha/blocked pages
+    // Detect captcha/blocked pages (only trigger on strong signals, not false positives)
     const lower = pageContent.toLowerCase()
-    if (lower.includes('captcha') || lower.includes('verify you are human') || lower.includes('access denied') || lower.includes('robot')) {
+    const isBlocked = (
+      (lower.includes('recaptcha') || lower.includes('hcaptcha') || lower.includes('cf-challenge')) ||
+      (lower.includes('verify you are human') || lower.includes('checking your browser')) ||
+      (lower.includes('access denied') && pageContent.length < 500)
+    )
+    if (isBlocked) {
       console.error('[scrape] Captcha/block detected')
       return NextResponse.json({ error: 'La pagina tiene proteccion anti-bots. Intenta con otra URL (Shopify o tiendas sin captcha funcionan mejor).' }, { status: 400 })
     }
