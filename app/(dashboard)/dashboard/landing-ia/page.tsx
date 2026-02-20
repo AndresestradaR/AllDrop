@@ -1,38 +1,125 @@
 'use client'
 
-import { useState, useRef } from 'react'
-import type { SSEEvent, CountryCode } from '@/lib/landing-ia/types'
+import { useState, useRef, useEffect } from 'react'
+import toast from 'react-hot-toast'
+import type { SSEEvent, CountryCode, ProductMetadata } from '@/lib/landing-ia/types'
 
-type WizardState = 'idle' | 'generating' | 'done'
+type WizardState = 'idle' | 'analyzing' | 'ready' | 'generating' | 'done'
 
 interface AgentStatus {
   name: string
   status: 'pending' | 'done' | 'error'
 }
 
+const ANALYZING_MESSAGES = [
+  'Leyendo la pagina del producto...',
+  'Extrayendo informacion con IA...',
+  'Casi listo...',
+]
+
 export default function LandingIAPage() {
   const [state, setState] = useState<WizardState>('idle')
-  const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
-  const [benefits, setBenefits] = useState('')
-  const [pains, setPains] = useState('')
-  const [price, setPrice] = useState('')
+  const [url, setUrl] = useState('')
+  const [metadata, setMetadata] = useState<ProductMetadata | null>(null)
   const [country, setCountry] = useState<CountryCode>('CO')
+  const [editableForm, setEditableForm] = useState({
+    title: '',
+    description: '',
+    benefits: '',
+    pains: '',
+    price: '',
+  })
   const [progress, setProgress] = useState(0)
   const [draftId, setDraftId] = useState<string | null>(null)
   const [sectionsCount, setSectionsCount] = useState(0)
   const [error, setError] = useState<string | null>(null)
+  const [analyzingMsg, setAnalyzingMsg] = useState(0)
   const abortRef = useRef<AbortController | null>(null)
 
   const [agents, setAgents] = useState<AgentStatus[]>([
     { name: 'Hero & Oferta final', status: 'pending' },
     { name: 'Testimonios de clientes', status: 'pending' },
     { name: 'FAQs & Beneficios', status: 'pending' },
-    { name: 'Transformación & Modo de uso', status: 'pending' },
+    { name: 'Transformacion & Modo de uso', status: 'pending' },
   ])
 
+  // Rotating analyzing messages
+  useEffect(() => {
+    if (state !== 'analyzing') return
+    const interval = setInterval(() => {
+      setAnalyzingMsg(prev => (prev + 1) % ANALYZING_MESSAGES.length)
+    }, 2000)
+    return () => clearInterval(interval)
+  }, [state])
+
+  const handleAnalyze = async () => {
+    let finalUrl = url.trim()
+    if (!finalUrl) return
+    if (!finalUrl.startsWith('http://') && !finalUrl.startsWith('https://')) {
+      finalUrl = `https://${finalUrl}`
+      setUrl(finalUrl)
+    }
+
+    setState('analyzing')
+    setAnalyzingMsg(0)
+    setError(null)
+
+    try {
+      const res = await fetch('/api/landing-ia/scrape', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: finalUrl }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        toast.error(data.error)
+        setState('idle')
+        return
+      }
+
+      setMetadata(data.metadata)
+      setEditableForm({
+        title: data.metadata.title || '',
+        description: data.metadata.description || '',
+        benefits: (data.metadata.benefits || []).join('\n'),
+        pains: (data.metadata.pains || []).join('\n'),
+        price: data.metadata.price || '',
+      })
+      setState('ready')
+    } catch (err: any) {
+      toast.error('Error al analizar la URL')
+      setState('idle')
+    }
+  }
+
+  const handleManual = () => {
+    setMetadata(null)
+    setEditableForm({ title: '', description: '', benefits: '', pains: '', price: '' })
+    setState('ready')
+  }
+
+  const handleChangeUrl = () => {
+    setState('idle')
+    setUrl('')
+    setMetadata(null)
+    setError(null)
+  }
+
   const handleGenerate = async () => {
-    if (!title.trim() || !description.trim()) return
+    if (!editableForm.title.trim() || !editableForm.description.trim()) return
+
+    const finalMetadata: ProductMetadata = {
+      title: editableForm.title.trim(),
+      description: editableForm.description.trim(),
+      benefits: editableForm.benefits.split('\n').filter(Boolean),
+      pains: editableForm.pains.split('\n').filter(Boolean),
+      angles: metadata?.angles || [],
+      images: metadata?.images || [],
+      price: editableForm.price.trim() || undefined,
+      category: metadata?.category,
+    }
 
     setState('generating')
     setProgress(0)
@@ -49,15 +136,7 @@ export default function LandingIAPage() {
         headers: { 'Content-Type': 'application/json' },
         signal: controller.signal,
         body: JSON.stringify({
-          productMetadata: {
-            title: title.trim(),
-            description: description.trim(),
-            benefits: benefits.split('\n').filter(Boolean),
-            pains: pains.split('\n').filter(Boolean),
-            images: [],
-            angles: [],
-            price: price.trim() || undefined,
-          },
+          productMetadata: finalMetadata,
           country,
         }),
       })
@@ -93,7 +172,7 @@ export default function LandingIAPage() {
                   'Hero & Oferta': 0,
                   'Testimonios': 1,
                   'FAQs & Beneficios': 2,
-                  'Transformación': 3,
+                  'Transformacion': 3,
                 }
                 const idx = agentMap[event.agent]
                 if (idx === undefined) return prev
@@ -109,7 +188,7 @@ export default function LandingIAPage() {
                   'Hero & Oferta': 0,
                   'Testimonios': 1,
                   'FAQs & Beneficios': 2,
-                  'Transformación': 3,
+                  'Transformacion': 3,
                 }
                 const idx = agentMap[event.agent]
                 if (idx === undefined) return prev
@@ -144,18 +223,26 @@ export default function LandingIAPage() {
 
   const handleReset = () => {
     setState('idle')
+    setUrl('')
+    setMetadata(null)
     setProgress(0)
     setDraftId(null)
     setError(null)
     setSectionsCount(0)
-    setTitle('')
-    setDescription('')
-    setBenefits('')
-    setPains('')
-    setPrice('')
+    setEditableForm({ title: '', description: '', benefits: '', pains: '', price: '' })
     setCountry('CO')
     setAgents(prev => prev.map(a => ({ ...a, status: 'pending' })))
   }
+
+  const stepLabels = ['URL', 'Datos', 'Generando', 'Listo']
+  const stateToStep: Record<WizardState, number> = {
+    idle: 0,
+    analyzing: 0,
+    ready: 1,
+    generating: 2,
+    done: 3,
+  }
+  const currentStep = stateToStep[state]
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -163,16 +250,14 @@ export default function LandingIAPage() {
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-text-primary">Landing Code</h1>
         <p className="mt-1 text-text-secondary">
-          Genera landings de venta COD con inteligencia artificial en segundos
+          Genera tu landing completa con IA en segundos
         </p>
       </div>
 
       {/* Step indicators */}
       <div className="flex items-center gap-3 mb-8">
-        {['Datos', 'Generando', 'Listo'].map((step, i) => {
-          const stepStates: WizardState[] = ['idle', 'generating', 'done']
-          const currentIdx = stepStates.indexOf(state)
-          const isActive = i <= currentIdx
+        {stepLabels.map((step, i) => {
+          const isActive = i <= currentStep
           return (
             <div key={step} className="flex items-center gap-2">
               <div
@@ -191,10 +276,10 @@ export default function LandingIAPage() {
               >
                 {step}
               </span>
-              {i < 2 && (
+              {i < stepLabels.length - 1 && (
                 <div
-                  className={`w-12 h-0.5 ${
-                    i < currentIdx ? 'bg-accent' : 'bg-border'
+                  className={`w-8 h-0.5 ${
+                    i < currentStep ? 'bg-accent' : 'bg-border'
                   }`}
                 />
               )}
@@ -210,17 +295,88 @@ export default function LandingIAPage() {
         </div>
       )}
 
-      {/* IDLE STATE - Form */}
+      {/* IDLE STATE - URL Input */}
       {state === 'idle' && (
+        <div className="space-y-6">
+          <div className="p-8 rounded-2xl bg-surface border border-border text-center space-y-5">
+            <div>
+              <label className="block text-sm font-medium text-text-primary mb-2">
+                URL del producto
+              </label>
+              <input
+                type="text"
+                value={url}
+                onChange={e => setUrl(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleAnalyze()}
+                placeholder="Pega la URL del producto: Amazon, AliExpress, Shopify..."
+                className="w-full px-4 py-3 rounded-lg bg-background border border-border text-text-primary placeholder:text-text-secondary/50 focus:border-accent focus:ring-2 focus:ring-accent/20 outline-none transition text-center"
+              />
+            </div>
+
+            <button
+              onClick={handleAnalyze}
+              disabled={!url.trim()}
+              className="w-full py-3 rounded-lg bg-accent text-background font-semibold text-base hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed transition"
+            >
+              Analizar Producto
+            </button>
+
+            <p className="text-xs text-text-secondary">
+              Funciona con: Amazon &middot; AliExpress &middot; Shopify &middot; cualquier tienda online
+            </p>
+          </div>
+
+          <div className="text-center">
+            <button
+              onClick={handleManual}
+              className="text-sm text-text-secondary hover:text-accent transition"
+            >
+              No tienes URL? &rarr; Completar informacion manualmente
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ANALYZING STATE */}
+      {state === 'analyzing' && (
+        <div className="p-8 rounded-2xl bg-surface border border-border text-center space-y-6">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-accent/10">
+            <div className="w-8 h-8 border-3 border-accent/30 border-t-accent rounded-full animate-spin" />
+          </div>
+          <div>
+            <p className="text-base font-medium text-text-primary">
+              {ANALYZING_MESSAGES[analyzingMsg]}
+            </p>
+            <p className="mt-2 text-sm text-text-secondary truncate max-w-md mx-auto">
+              {url}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* READY STATE - Editable Form */}
+      {state === 'ready' && (
         <div className="space-y-5">
+          {metadata && (
+            <div className="flex items-center justify-between p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+              <span className="text-sm font-medium text-emerald-400">Producto analizado</span>
+              <button
+                onClick={handleChangeUrl}
+                className="text-sm text-text-secondary hover:text-accent transition"
+              >
+                Cambiar URL
+              </button>
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-medium text-text-primary mb-1.5">
               Nombre del producto *
             </label>
             <input
               type="text"
-              value={title}
-              onChange={e => setTitle(e.target.value)}
+              value={editableForm.title}
+              onChange={e => setEditableForm(f => ({ ...f, title: e.target.value }))}
               placeholder="Ej: Faja Reductora Premium"
               className="w-full px-4 py-2.5 rounded-lg bg-surface border border-border text-text-primary placeholder:text-text-secondary/50 focus:border-accent focus:ring-2 focus:ring-accent/20 outline-none transition"
             />
@@ -231,8 +387,8 @@ export default function LandingIAPage() {
               Descripcion del producto *
             </label>
             <textarea
-              value={description}
-              onChange={e => setDescription(e.target.value)}
+              value={editableForm.description}
+              onChange={e => setEditableForm(f => ({ ...f, description: e.target.value }))}
               rows={3}
               placeholder="Describe tu producto: que hace, para quien es..."
               className="w-full px-4 py-2.5 rounded-lg bg-surface border border-border text-text-primary placeholder:text-text-secondary/50 focus:border-accent focus:ring-2 focus:ring-accent/20 outline-none transition resize-none"
@@ -244,8 +400,8 @@ export default function LandingIAPage() {
               Beneficios (uno por linea)
             </label>
             <textarea
-              value={benefits}
-              onChange={e => setBenefits(e.target.value)}
+              value={editableForm.benefits}
+              onChange={e => setEditableForm(f => ({ ...f, benefits: e.target.value }))}
               rows={3}
               placeholder={"Reduce medidas al instante\nMaterial transpirable\nSoporte lumbar"}
               className="w-full px-4 py-2.5 rounded-lg bg-surface border border-border text-text-primary placeholder:text-text-secondary/50 focus:border-accent focus:ring-2 focus:ring-accent/20 outline-none transition resize-none"
@@ -257,8 +413,8 @@ export default function LandingIAPage() {
               Dolores del cliente (uno por linea)
             </label>
             <textarea
-              value={pains}
-              onChange={e => setPains(e.target.value)}
+              value={editableForm.pains}
+              onChange={e => setEditableForm(f => ({ ...f, pains: e.target.value }))}
               rows={3}
               placeholder={"No me siento comoda con mi cuerpo\nLa ropa no me queda bien\nHe probado de todo sin resultados"}
               className="w-full px-4 py-2.5 rounded-lg bg-surface border border-border text-text-primary placeholder:text-text-secondary/50 focus:border-accent focus:ring-2 focus:ring-accent/20 outline-none transition resize-none"
@@ -272,8 +428,8 @@ export default function LandingIAPage() {
               </label>
               <input
                 type="text"
-                value={price}
-                onChange={e => setPrice(e.target.value)}
+                value={editableForm.price}
+                onChange={e => setEditableForm(f => ({ ...f, price: e.target.value }))}
                 placeholder="$99.900"
                 className="w-full px-4 py-2.5 rounded-lg bg-surface border border-border text-text-primary placeholder:text-text-secondary/50 focus:border-accent focus:ring-2 focus:ring-accent/20 outline-none transition"
               />
@@ -297,7 +453,7 @@ export default function LandingIAPage() {
 
           <button
             onClick={handleGenerate}
-            disabled={!title.trim() || !description.trim()}
+            disabled={!editableForm.title.trim() || !editableForm.description.trim()}
             className="w-full py-3 rounded-lg bg-accent text-background font-semibold text-base hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed transition"
           >
             Generar Landing Code
@@ -363,7 +519,7 @@ export default function LandingIAPage() {
               Tu landing esta lista!
             </h2>
             <p className="mt-2 text-text-secondary">
-              Se generaron {sectionsCount} secciones para tu landing de {title}
+              Se generaron {sectionsCount} secciones para tu landing de {editableForm.title}
             </p>
           </div>
 

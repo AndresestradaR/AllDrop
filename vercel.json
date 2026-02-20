@@ -38,6 +38,9 @@
     },
     "app/api/landing-ia/stream/route.ts": {
       "maxDuration": 120
+    },
+    "app/api/landing-ia/scrape/route.ts": {
+      "maxDuration": 60
     }
   },
   "rewrites": [
