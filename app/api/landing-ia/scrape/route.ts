@@ -5,17 +5,30 @@ import { decrypt } from '@/lib/services/encryption'
 export const maxDuration = 60
 
 async function extractWithGemini(geminiKey: string, pageContent: string): Promise<any> {
-  const truncated = pageContent.slice(0, 8000)
+  // Sanitize: remove URLs, excessive whitespace, and non-printable chars
+  const sanitized = pageContent
+    .replace(/https?:\/\/[^\s)]+/g, '')
+    .replace(/[^\x20-\x7E\xA0-\xFF\n]/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/ {2,}/g, ' ')
+    .slice(0, 5000)
 
-  const extractPrompt = `Analiza el siguiente contenido de una pagina de producto de e-commerce y extrae la informacion estructurada.
+  const extractPrompt = `Extract product info from this e-commerce page content.
 
-Contenido de la pagina:
-${truncated}
+Page content:
+${sanitized}
 
-Extrae y devuelve SOLO un JSON valido con esta estructura exacta (sin markdown, sin explicaciones, sin texto antes o despues):
-{"title":"nombre del producto","description":"descripcion en 2-3 oraciones","benefits":["beneficio 1","beneficio 2","beneficio 3","beneficio 4","beneficio 5"],"pains":["dolor 1","dolor 2","dolor 3"],"angles":["angulo de venta 1","angulo de venta 2","angulo de venta 3"],"price":"precio o null","images":[],"category":"belleza/salud/hogar/ropa/tecnologia/mascotas/deportes/otro"}
+Return a JSON object with these keys. Keep values SHORT (max 20 words each):
+- title: product name (max 8 words)
+- description: what it does, who it's for (max 30 words)
+- benefits: array of 5 short benefit strings (max 8 words each)
+- pains: array of 3 customer pain points (max 10 words each)
+- angles: array of 3 sales angles (max 8 words each)
+- price: price string or null
+- images: empty array []
+- category: one of belleza/salud/hogar/ropa/tecnologia/mascotas/deportes/otro
 
-Si no encuentras algun campo, inventa valores razonables basados en el tipo de producto.`
+Write in Spanish. If a field is unclear, invent reasonable values.`
 
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
@@ -27,7 +40,7 @@ Si no encuentras algun campo, inventa valores razonables basados en el tipo de p
         contents: [{ role: 'user', parts: [{ text: extractPrompt }] }],
         generationConfig: {
           temperature: 0.2,
-          maxOutputTokens: 1024,
+          maxOutputTokens: 2048,
           responseMimeType: 'application/json',
         }
       })
