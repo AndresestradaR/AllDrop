@@ -495,6 +495,8 @@ export default function LandingIAPage() {
                   <img
                     src={imgUrl}
                     alt={`Producto ${i + 1}`}
+                    referrerPolicy="no-referrer"
+                    crossOrigin="anonymous"
                     className="w-full h-full object-cover"
                     onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
                   />
