@@ -1045,6 +1045,13 @@ export default function ProductGeneratePage() {
           tone: a.tone,
         })),
         sections_selected: Array.from(selectedSections),
+        colorPalette: {
+          primary: colorPalette.primary,
+          secondary: colorPalette.secondary,
+          accent: colorPalette.accent,
+          ...(colorCount === 4 && { extra: colorPalette.extra }),
+        },
+        product_photos: productPhotos.filter((p): p is string => p !== null),
       }
 
       const response = await fetch('/api/minishop/import-sections', {

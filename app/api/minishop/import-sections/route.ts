@@ -143,6 +143,40 @@ export async function POST(request: Request) {
 
     validSections.sort((a, b) => a.order - b.order)
 
+    // Upload base64 product_photos to Supabase storage so MiniShop gets public URLs
+    if (metadata?.product_photos && Array.isArray(metadata.product_photos)) {
+      const uploadedPhotos: string[] = []
+      for (let i = 0; i < metadata.product_photos.length; i++) {
+        const photo = metadata.product_photos[i]
+        if (!photo) continue
+        if (typeof photo === 'string' && photo.startsWith('http')) {
+          uploadedPhotos.push(photo)
+        } else if (typeof photo === 'string' && photo.startsWith('data:')) {
+          try {
+            const base64Data = photo.split(',')[1]
+            const buffer = Buffer.from(base64Data, 'base64')
+            const fileName = `product-photos/${user.id}/${Date.now()}-${i}.webp`
+            const optimized = await sharp(buffer)
+              .resize({ width: 800, withoutEnlargement: true })
+              .webp({ quality: 80 })
+              .toBuffer()
+            const { error: upErr } = await serviceClient.storage
+              .from('landing-images')
+              .upload(fileName, optimized, { contentType: 'image/webp', upsert: true })
+            if (!upErr) {
+              const { data: urlData } = serviceClient.storage
+                .from('landing-images')
+                .getPublicUrl(fileName)
+              uploadedPhotos.push(urlData.publicUrl)
+            }
+          } catch (e: any) {
+            console.warn('[import-sections] Photo upload error:', e.message)
+          }
+        }
+      }
+      metadata.product_photos = uploadedPhotos
+    }
+
     // Try inserting with metadata; fall back to without if column doesn't exist yet
     let bundle: { id: string } | null = null
     let insertError: any = null
