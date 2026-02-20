@@ -75,7 +75,12 @@ Write all text in Spanish for Latin American audience (COD/cash-on-delivery mark
   }
 
   const clean = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
-  const parsed = JSON.parse(clean)
+  let parsed = JSON.parse(clean)
+
+  // Gemini sometimes wraps in array
+  if (Array.isArray(parsed)) {
+    parsed = parsed[0] || {}
+  }
 
   // Attach images extracted from markdown (more reliable than Gemini)
   parsed.images = imageUrls
@@ -129,6 +134,13 @@ export async function POST(request: Request) {
 
     if (pageContent.length < 100) {
       return NextResponse.json({ error: 'La pagina no tiene suficiente contenido. Intenta con otra URL.' }, { status: 400 })
+    }
+
+    // Detect captcha/blocked pages
+    const lower = pageContent.toLowerCase()
+    if (lower.includes('captcha') || lower.includes('verify you are human') || lower.includes('access denied') || lower.includes('robot')) {
+      console.error('[scrape] Captcha/block detected')
+      return NextResponse.json({ error: 'La pagina tiene proteccion anti-bots. Intenta con otra URL (Shopify o tiendas sin captcha funcionan mejor).' }, { status: 400 })
     }
 
     // 5. Extract images from markdown before sanitizing
