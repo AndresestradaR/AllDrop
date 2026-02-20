@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { Button, Card, CardHeader, CardTitle, CardContent } from '@/components/ui'
-import { ImagePlus, Clock, Images, Store, ArrowRight } from 'lucide-react'
+import { Clock, Images, Store, ArrowRight } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
@@ -43,12 +43,6 @@ export default async function DashboardPage() {
             Bienvenido a tu panel de generación de imágenes
           </p>
         </div>
-        <Link href="/dashboard/generate">
-          <Button>
-            <ImagePlus className="w-4 h-4 mr-2" />
-            Nueva Generación
-          </Button>
-        </Link>
       </div>
 
       {/* Plan card */}
