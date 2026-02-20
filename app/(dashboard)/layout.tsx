@@ -32,9 +32,9 @@ const mainNavigation = [
 const creatorNavigation = [
   { name: 'Crea tu Banner', href: '/dashboard/banner', icon: ImageIcon, soon: true },
   { name: 'Crea tu Landing', href: '/dashboard/landing', icon: LayoutTemplate },
+  { name: 'Landing Code', href: '/dashboard/landing-ia', icon: Zap, isNew: true },
   { name: 'Estudio IA', href: '/dashboard/studio', icon: Wand2, isNew: true },
   { name: 'Encuentra tu Producto Ganador', href: '/dashboard/product-research', icon: Target, isNew: true },
-  { name: 'Landing Code', href: '/dashboard/landing-ia', icon: Zap, isNew: true },
 ]
 
 const ADMIN_EMAIL = 'trucosecomydrop@gmail.com'
