@@ -1,56 +1,105 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import toast from 'react-hot-toast'
 import type { SSEEvent, CountryCode, ProductMetadata } from '@/lib/landing-ia/types'
 
-type WizardState = 'idle' | 'analyzing' | 'ready' | 'generating' | 'done'
+type WizardStep = 'url' | 'angles' | 'images' | 'generating' | 'done'
 
-interface AgentStatus {
-  name: string
-  status: 'pending' | 'done' | 'error'
+interface Angle {
+  id: string
+  emoji: string
+  titulo: string
+  descripcion: string
+  tagline: string
+}
+
+interface TaskStatus {
+  label: string
+  key: string
+  status: 'pending' | 'processing' | 'done' | 'error'
 }
 
 const ANALYZING_MESSAGES = [
   'Leyendo la pagina del producto...',
   'Extrayendo informacion con IA...',
+  'Generando angulos de venta...',
   'Casi listo...',
 ]
 
+function CircularProgress({ progress }: { progress: number }) {
+  const radius = 80
+  const circumference = 2 * Math.PI * radius
+  const strokeDashoffset = circumference - (progress / 100) * circumference
+
+  return (
+    <div className="relative flex items-center justify-center" style={{ width: 200, height: 200 }}>
+      <div
+        className="absolute inset-0 rounded-full"
+        style={{
+          background: 'radial-gradient(circle, rgba(77,190,164,0.15) 0%, transparent 70%)',
+          filter: 'blur(20px)',
+        }}
+      />
+      <svg width="200" height="200" className="transform -rotate-90">
+        <circle cx="100" cy="100" r={radius} fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="8" />
+        <circle
+          cx="100" cy="100" r={radius}
+          fill="none"
+          stroke="#4DBEA4"
+          strokeWidth="8"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={strokeDashoffset}
+          style={{
+            transition: 'stroke-dashoffset 0.5s ease',
+            filter: 'drop-shadow(0 0 8px #4DBEA4) drop-shadow(0 0 20px #4DBEA4)',
+          }}
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-4xl font-bold text-white">{progress}</span>
+        <span className="text-sm text-text-secondary">Completo</span>
+      </div>
+    </div>
+  )
+}
+
 export default function LandingIAPage() {
-  const [state, setState] = useState<WizardState>('idle')
+  const [step, setStep] = useState<WizardStep>('url')
+  const [analyzing, setAnalyzing] = useState(false)
+  const [analyzingMsg, setAnalyzingMsg] = useState(0)
   const [url, setUrl] = useState('')
-  const [metadata, setMetadata] = useState<ProductMetadata | null>(null)
   const [country, setCountry] = useState<CountryCode>('CO')
-  const [editableForm, setEditableForm] = useState({
-    title: '',
-    description: '',
-    benefits: '',
-    pains: '',
-    price: '',
-  })
+  const [metadata, setMetadata] = useState<any>(null)
+  const [angles, setAngles] = useState<Angle[]>([])
+  const [selectedAngle, setSelectedAngle] = useState<Angle | null>(null)
+  const [iaDecides, setIaDecides] = useState(false)
+  const [imageUrls, setImageUrls] = useState<string[]>([])
+  const [selectedImages, setSelectedImages] = useState<string[]>([])
   const [progress, setProgress] = useState(0)
   const [draftId, setDraftId] = useState<string | null>(null)
   const [sectionsCount, setSectionsCount] = useState(0)
   const [error, setError] = useState<string | null>(null)
-  const [analyzingMsg, setAnalyzingMsg] = useState(0)
   const abortRef = useRef<AbortController | null>(null)
 
-  const [agents, setAgents] = useState<AgentStatus[]>([
-    { name: 'Hero & Oferta final', status: 'pending' },
-    { name: 'Testimonios de clientes', status: 'pending' },
-    { name: 'FAQs & Beneficios', status: 'pending' },
-    { name: 'Transformacion & Modo de uso', status: 'pending' },
+  const [tasks, setTasks] = useState<TaskStatus[]>([
+    { label: 'Analizando el producto...', key: 'init', status: 'pending' },
+    { label: 'Escribiendo hero y oferta...', key: 'Hero & Oferta', status: 'pending' },
+    { label: 'Generando testimonios...', key: 'Testimonios', status: 'pending' },
+    { label: 'Creando FAQs y beneficios...', key: 'FAQs & Beneficios', status: 'pending' },
+    { label: 'Preparando transformacion...', key: 'Transformacion', status: 'pending' },
+    { label: 'Finalizando tu landing...', key: 'assembler', status: 'pending' },
   ])
 
   // Rotating analyzing messages
   useEffect(() => {
-    if (state !== 'analyzing') return
+    if (!analyzing) return
     const interval = setInterval(() => {
       setAnalyzingMsg(prev => (prev + 1) % ANALYZING_MESSAGES.length)
     }, 2000)
     return () => clearInterval(interval)
-  }, [state])
+  }, [analyzing])
 
   const handleAnalyze = async () => {
     let finalUrl = url.trim()
@@ -60,7 +109,7 @@ export default function LandingIAPage() {
       setUrl(finalUrl)
     }
 
-    setState('analyzing')
+    setAnalyzing(true)
     setAnalyzingMsg(0)
     setError(null)
 
@@ -75,57 +124,70 @@ export default function LandingIAPage() {
 
       if (!res.ok) {
         toast.error(data.error)
-        setState('idle')
+        setAnalyzing(false)
         return
       }
 
       setMetadata(data.metadata)
-      setEditableForm({
-        title: data.metadata.title || '',
-        description: data.metadata.description || '',
-        benefits: (data.metadata.benefits || []).join('\n'),
-        pains: (data.metadata.pains || []).join('\n'),
-        price: data.metadata.price || '',
-      })
-      setState('ready')
-    } catch (err: any) {
+      setAngles(data.metadata.angles || [])
+      setImageUrls(data.metadata.images || [])
+      setSelectedImages(data.metadata.images || [])
+      setAnalyzing(false)
+      setStep('angles')
+    } catch {
       toast.error('Error al analizar la URL')
-      setState('idle')
+      setAnalyzing(false)
     }
   }
 
   const handleManual = () => {
-    setMetadata(null)
-    setEditableForm({ title: '', description: '', benefits: '', pains: '', price: '' })
-    setState('ready')
+    setMetadata({
+      title: '',
+      description: '',
+      benefits: [],
+      pains: [],
+      angles: [],
+      images: [],
+      price: null,
+      category: 'otro',
+    })
+    setAngles([])
+    setImageUrls([])
+    setSelectedImages([])
+    setAnalyzing(false)
+    // Skip to generating directly with empty metadata for manual mode
+    setStep('angles')
   }
 
-  const handleChangeUrl = () => {
-    setState('idle')
-    setUrl('')
-    setMetadata(null)
-    setError(null)
+  const handleContinueFromAngles = () => {
+    if (imageUrls.length > 0) {
+      setStep('images')
+    } else {
+      handleGenerate()
+    }
+  }
+
+  const toggleImage = (imgUrl: string) => {
+    setSelectedImages(prev =>
+      prev.includes(imgUrl) ? prev.filter(u => u !== imgUrl) : [...prev, imgUrl]
+    )
   }
 
   const handleGenerate = async () => {
-    if (!editableForm.title.trim() || !editableForm.description.trim()) return
+    setStep('generating')
+    setProgress(5)
+    setTasks(prev => prev.map(t => ({ ...t, status: t.key === 'init' ? 'processing' : 'pending' })))
 
     const finalMetadata: ProductMetadata = {
-      title: editableForm.title.trim(),
-      description: editableForm.description.trim(),
-      benefits: editableForm.benefits.split('\n').filter(Boolean),
-      pains: editableForm.pains.split('\n').filter(Boolean),
-      angles: metadata?.angles || [],
-      images: metadata?.images || [],
-      price: editableForm.price.trim() || undefined,
+      title: metadata?.title || '',
+      description: metadata?.description || '',
+      benefits: metadata?.benefits || [],
+      pains: metadata?.pains || [],
+      angles: iaDecides ? ['best_angle'] : selectedAngle ? [selectedAngle.tagline] : [],
+      images: selectedImages,
+      price: metadata?.price || undefined,
       category: metadata?.category,
     }
-
-    setState('generating')
-    setProgress(0)
-    setError(null)
-    setDraftId(null)
-    setAgents(prev => prev.map(a => ({ ...a, status: 'pending' })))
 
     const controller = new AbortController()
     abortRef.current = controller
@@ -135,10 +197,7 @@ export default function LandingIAPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         signal: controller.signal,
-        body: JSON.stringify({
-          productMetadata: finalMetadata,
-          country,
-        }),
+        body: JSON.stringify({ productMetadata: finalMetadata, country }),
       })
 
       if (!res.ok) {
@@ -148,6 +207,9 @@ export default function LandingIAPage() {
 
       const reader = res.body?.getReader()
       if (!reader) throw new Error('No se pudo leer la respuesta')
+
+      // Mark init as done once stream starts
+      setTasks(prev => prev.map(t => t.key === 'init' ? { ...t, status: 'done' } : t))
 
       const decoder = new TextDecoder()
       let buffer = ''
@@ -166,47 +228,43 @@ export default function LandingIAPage() {
             const event: SSEEvent = JSON.parse(line.slice(6))
             setProgress(event.progress)
 
-            if (event.type === 'agent_done' && event.agent !== 'init' && event.agent !== 'assembler') {
-              setAgents(prev => {
-                const agentMap: Record<string, number> = {
-                  'Hero & Oferta': 0,
-                  'Testimonios': 1,
-                  'FAQs & Beneficios': 2,
-                  'Transformacion': 3,
-                }
-                const idx = agentMap[event.agent]
-                if (idx === undefined) return prev
+            // Update task statuses
+            if (event.type === 'agent_done' && event.agent !== 'init') {
+              setTasks(prev => prev.map(t => {
+                if (t.key === event.agent) return { ...t, status: 'done' }
+                // Mark next pending as processing
+                return t
+              }))
+              // Mark next pending task as processing
+              setTasks(prev => {
+                const firstPending = prev.findIndex(t => t.status === 'pending')
+                if (firstPending === -1) return prev
                 const next = [...prev]
-                next[idx] = { ...next[idx], status: 'done' }
+                next[firstPending] = { ...next[firstPending], status: 'processing' }
                 return next
               })
             }
 
             if (event.type === 'agent_error') {
-              setAgents(prev => {
-                const agentMap: Record<string, number> = {
-                  'Hero & Oferta': 0,
-                  'Testimonios': 1,
-                  'FAQs & Beneficios': 2,
-                  'Transformacion': 3,
-                }
-                const idx = agentMap[event.agent]
-                if (idx === undefined) return prev
-                const next = [...prev]
-                next[idx] = { ...next[idx], status: 'error' }
-                return next
-              })
+              setTasks(prev => prev.map(t =>
+                t.key === event.agent ? { ...t, status: 'error' } : t
+              ))
             }
 
             if (event.type === 'completed') {
               setDraftId(event.draftId || null)
               setSectionsCount(event.sectionsCount || 0)
-              setState('done')
+              setTasks(prev => prev.map(t => ({
+                ...t,
+                status: t.status === 'pending' || t.status === 'processing' ? 'done' : t.status,
+              })))
+              setProgress(100)
+              setTimeout(() => setStep('done'), 800)
             }
 
             if (event.type === 'error') {
               setError(event.message)
-              setState('idle')
+              setStep('url')
             }
           } catch {
             // skip malformed SSE
@@ -216,77 +274,59 @@ export default function LandingIAPage() {
     } catch (err: any) {
       if (err.name !== 'AbortError') {
         setError(err.message)
-        setState('idle')
+        setStep('url')
       }
     }
   }
 
   const handleReset = () => {
-    setState('idle')
+    setStep('url')
     setUrl('')
     setMetadata(null)
+    setAngles([])
+    setSelectedAngle(null)
+    setIaDecides(false)
+    setImageUrls([])
+    setSelectedImages([])
     setProgress(0)
     setDraftId(null)
-    setError(null)
     setSectionsCount(0)
-    setEditableForm({ title: '', description: '', benefits: '', pains: '', price: '' })
-    setCountry('CO')
-    setAgents(prev => prev.map(a => ({ ...a, status: 'pending' })))
+    setError(null)
+    setTasks(prev => prev.map(t => ({ ...t, status: 'pending' })))
   }
 
-  const stepLabels = ['URL', 'Datos', 'Generando', 'Listo']
-  const stateToStep: Record<WizardState, number> = {
-    idle: 0,
-    analyzing: 0,
-    ready: 1,
-    generating: 2,
-    done: 3,
-  }
-  const currentStep = stateToStep[state]
+  const stepIndex = { url: 0, angles: 1, images: 2, generating: 3, done: 4 }[step]
+  const totalSteps = imageUrls.length > 0 ? 3 : 2
+  const showStepBar = step === 'url' || step === 'angles' || step === 'images'
 
   return (
     <div className="max-w-2xl mx-auto">
       {/* Header */}
-      <div className="mb-8">
+      <div className="mb-6">
         <h1 className="text-2xl font-bold text-text-primary">Landing Code</h1>
         <p className="mt-1 text-text-secondary">
           Genera tu landing completa con IA en segundos
         </p>
       </div>
 
-      {/* Step indicators */}
-      <div className="flex items-center gap-3 mb-8">
-        {stepLabels.map((step, i) => {
-          const isActive = i <= currentStep
-          return (
-            <div key={step} className="flex items-center gap-2">
+      {/* Step bar */}
+      {showStepBar && (
+        <div className="mb-8">
+          <div className="flex gap-2">
+            {Array.from({ length: totalSteps }, (_, i) => (
               <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-colors ${
-                  isActive
-                    ? 'bg-accent text-background'
-                    : 'bg-border text-text-secondary'
+                key={i}
+                className={`h-1 flex-1 rounded-full transition-colors ${
+                  i <= stepIndex ? 'bg-accent' : 'bg-border'
                 }`}
-              >
-                {i + 1}
-              </div>
-              <span
-                className={`text-sm font-medium ${
-                  isActive ? 'text-text-primary' : 'text-text-secondary'
-                }`}
-              >
-                {step}
-              </span>
-              {i < stepLabels.length - 1 && (
-                <div
-                  className={`w-8 h-0.5 ${
-                    i < currentStep ? 'bg-accent' : 'bg-border'
-                  }`}
-                />
-              )}
-            </div>
-          )
-        })}
-      </div>
+              />
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-text-secondary">
+            Paso {Math.min(stepIndex + 1, totalSteps)} de {totalSteps}
+          </p>
+        </div>
+      )}
 
       {/* Error banner */}
       {error && (
@@ -295,8 +335,8 @@ export default function LandingIAPage() {
         </div>
       )}
 
-      {/* IDLE STATE - URL Input */}
-      {state === 'idle' && (
+      {/* ===== STEP: URL ===== */}
+      {step === 'url' && !analyzing && (
         <div className="space-y-6">
           <div className="p-8 rounded-2xl bg-surface border border-border text-center space-y-5">
             <div>
@@ -308,9 +348,23 @@ export default function LandingIAPage() {
                 value={url}
                 onChange={e => setUrl(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleAnalyze()}
-                placeholder="Pega la URL del producto: Amazon, AliExpress, Shopify..."
+                placeholder="Pega la URL del producto..."
                 className="w-full px-4 py-3 rounded-lg bg-background border border-border text-text-primary placeholder:text-text-secondary/50 focus:border-accent focus:ring-2 focus:ring-accent/20 outline-none transition text-center"
               />
+            </div>
+
+            <div>
+              <label className="block text-xs text-text-secondary mb-1.5">Pais de venta</label>
+              <select
+                value={country}
+                onChange={e => setCountry(e.target.value as CountryCode)}
+                className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-text-primary focus:border-accent focus:ring-2 focus:ring-accent/20 outline-none transition text-center"
+              >
+                <option value="CO">Colombia</option>
+                <option value="MX">Mexico</option>
+                <option value="GT">Guatemala</option>
+                <option value="EC">Ecuador</option>
+              </select>
             </div>
 
             <button
@@ -321,9 +375,19 @@ export default function LandingIAPage() {
               Analizar Producto
             </button>
 
-            <p className="text-xs text-text-secondary">
-              Funciona con: Amazon &middot; AliExpress &middot; Shopify &middot; cualquier tienda online
-            </p>
+            <div className="flex flex-wrap justify-center gap-2">
+              {['AliExpress', 'Amazon', 'Shopify', 'Cualquier tienda'].map(name => (
+                <span key={name} className="text-xs px-2.5 py-1 rounded-full bg-border/50 text-text-secondary">
+                  {name}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="flex-1 h-px bg-border" />
+            <span className="text-xs text-text-secondary">o</span>
+            <div className="flex-1 h-px bg-border" />
           </div>
 
           <div className="text-center">
@@ -331,17 +395,17 @@ export default function LandingIAPage() {
               onClick={handleManual}
               className="text-sm text-text-secondary hover:text-accent transition"
             >
-              No tienes URL? &rarr; Completar informacion manualmente
+              No tienes URL? Completar manualmente
             </button>
           </div>
         </div>
       )}
 
-      {/* ANALYZING STATE */}
-      {state === 'analyzing' && (
-        <div className="p-8 rounded-2xl bg-surface border border-border text-center space-y-6">
+      {/* ===== ANALYZING ===== */}
+      {step === 'url' && analyzing && (
+        <div className="p-12 rounded-2xl bg-surface border border-border text-center space-y-6">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-accent/10">
-            <div className="w-8 h-8 border-3 border-accent/30 border-t-accent rounded-full animate-spin" />
+            <div className="w-8 h-8 border-[3px] border-accent/30 border-t-accent rounded-full animate-spin" />
           </div>
           <div>
             <p className="text-base font-medium text-text-primary">
@@ -354,202 +418,161 @@ export default function LandingIAPage() {
         </div>
       )}
 
-      {/* READY STATE - Editable Form */}
-      {state === 'ready' && (
-        <div className="space-y-5">
-          {metadata && (
-            <div className="flex items-center justify-between p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-              <span className="text-sm font-medium text-emerald-400">Producto analizado</span>
-              <button
-                onClick={handleChangeUrl}
-                className="text-sm text-text-secondary hover:text-accent transition"
-              >
-                Cambiar URL
-              </button>
+      {/* ===== STEP: ANGLES ===== */}
+      {step === 'angles' && (
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-lg font-bold text-text-primary">Como quieres vender este producto?</h2>
+            <p className="mt-1 text-sm text-text-secondary">Elige el angulo que mejor conecte con tus clientes</p>
+          </div>
+
+          {angles.length > 0 && (
+            <div className="grid grid-cols-2 gap-3">
+              {angles.map(angle => (
+                <button
+                  key={angle.id}
+                  onClick={() => { setSelectedAngle(angle); setIaDecides(false) }}
+                  className={`p-4 rounded-xl border text-left transition-all ${
+                    selectedAngle?.id === angle.id && !iaDecides
+                      ? 'border-accent bg-accent/5'
+                      : 'border-border bg-surface hover:border-accent/50'
+                  }`}
+                >
+                  <div className="text-2xl mb-2">{angle.emoji}</div>
+                  <div className="text-sm font-semibold text-text-primary">{angle.titulo}</div>
+                  <div className="mt-1 text-xs text-text-secondary leading-relaxed">{angle.descripcion}</div>
+                </button>
+              ))}
             </div>
           )}
 
-          <div>
-            <label className="block text-sm font-medium text-text-primary mb-1.5">
-              Nombre del producto *
-            </label>
-            <input
-              type="text"
-              value={editableForm.title}
-              onChange={e => setEditableForm(f => ({ ...f, title: e.target.value }))}
-              placeholder="Ej: Faja Reductora Premium"
-              className="w-full px-4 py-2.5 rounded-lg bg-surface border border-border text-text-primary placeholder:text-text-secondary/50 focus:border-accent focus:ring-2 focus:ring-accent/20 outline-none transition"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-text-primary mb-1.5">
-              Descripcion del producto *
-            </label>
-            <textarea
-              value={editableForm.description}
-              onChange={e => setEditableForm(f => ({ ...f, description: e.target.value }))}
-              rows={3}
-              placeholder="Describe tu producto: que hace, para quien es..."
-              className="w-full px-4 py-2.5 rounded-lg bg-surface border border-border text-text-primary placeholder:text-text-secondary/50 focus:border-accent focus:ring-2 focus:ring-accent/20 outline-none transition resize-none"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-text-primary mb-1.5">
-              Beneficios (uno por linea)
-            </label>
-            <textarea
-              value={editableForm.benefits}
-              onChange={e => setEditableForm(f => ({ ...f, benefits: e.target.value }))}
-              rows={3}
-              placeholder={"Reduce medidas al instante\nMaterial transpirable\nSoporte lumbar"}
-              className="w-full px-4 py-2.5 rounded-lg bg-surface border border-border text-text-primary placeholder:text-text-secondary/50 focus:border-accent focus:ring-2 focus:ring-accent/20 outline-none transition resize-none"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-text-primary mb-1.5">
-              Dolores del cliente (uno por linea)
-            </label>
-            <textarea
-              value={editableForm.pains}
-              onChange={e => setEditableForm(f => ({ ...f, pains: e.target.value }))}
-              rows={3}
-              placeholder={"No me siento comoda con mi cuerpo\nLa ropa no me queda bien\nHe probado de todo sin resultados"}
-              className="w-full px-4 py-2.5 rounded-lg bg-surface border border-border text-text-primary placeholder:text-text-secondary/50 focus:border-accent focus:ring-2 focus:ring-accent/20 outline-none transition resize-none"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-text-primary mb-1.5">
-                Precio (opcional)
-              </label>
-              <input
-                type="text"
-                value={editableForm.price}
-                onChange={e => setEditableForm(f => ({ ...f, price: e.target.value }))}
-                placeholder="$99.900"
-                className="w-full px-4 py-2.5 rounded-lg bg-surface border border-border text-text-primary placeholder:text-text-secondary/50 focus:border-accent focus:ring-2 focus:ring-accent/20 outline-none transition"
-              />
+          <button
+            onClick={() => { setIaDecides(true); setSelectedAngle(null) }}
+            className={`w-full p-4 rounded-xl border text-left transition-all ${
+              iaDecides
+                ? 'border-accent bg-accent/5'
+                : 'border-border bg-surface hover:border-accent/50'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">&#129504;</span>
+              <div>
+                <div className="text-sm font-semibold text-text-primary">Dejar que la IA decida</div>
+                <div className="text-xs text-text-secondary">Elegiremos el mejor angulo automaticamente</div>
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-text-primary mb-1.5">
-                Pais
-              </label>
-              <select
-                value={country}
-                onChange={e => setCountry(e.target.value as CountryCode)}
-                className="w-full px-4 py-2.5 rounded-lg bg-surface border border-border text-text-primary focus:border-accent focus:ring-2 focus:ring-accent/20 outline-none transition"
-              >
-                <option value="CO">Colombia</option>
-                <option value="MX">Mexico</option>
-                <option value="GT">Guatemala</option>
-                <option value="EC">Ecuador</option>
-              </select>
-            </div>
-          </div>
+          </button>
 
           <button
-            onClick={handleGenerate}
-            disabled={!editableForm.title.trim() || !editableForm.description.trim()}
+            onClick={handleContinueFromAngles}
+            disabled={!selectedAngle && !iaDecides}
             className="w-full py-3 rounded-lg bg-accent text-background font-semibold text-base hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed transition"
           >
-            Generar Landing Code
+            Continuar
           </button>
         </div>
       )}
 
-      {/* GENERATING STATE */}
-      {state === 'generating' && (
+      {/* ===== STEP: IMAGES ===== */}
+      {step === 'images' && (
         <div className="space-y-6">
-          {/* Progress bar */}
           <div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-text-primary">Generando con IA...</span>
-              <span className="text-sm font-bold text-accent">{progress}%</span>
-            </div>
-            <div className="w-full h-2.5 bg-border rounded-full overflow-hidden">
-              <div
-                className="h-full bg-accent rounded-full transition-all duration-500 ease-out"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
+            <h2 className="text-lg font-bold text-text-primary">Imagenes del producto</h2>
+            <p className="mt-1 text-sm text-text-secondary">Selecciona las que quieres usar en tu landing</p>
           </div>
 
-          {/* Agent statuses */}
-          <div className="space-y-3">
-            {agents.map(agent => (
-              <div
-                key={agent.name}
-                className="flex items-center gap-3 p-3 rounded-lg bg-surface border border-border"
-              >
-                <span className="text-lg">
-                  {agent.status === 'pending' && (
-                    <span className="inline-block animate-spin">&#9203;</span>
-                  )}
-                  {agent.status === 'done' && '✅'}
-                  {agent.status === 'error' && '⚠️'}
-                </span>
-                <span
-                  className={`text-sm font-medium ${
-                    agent.status === 'done'
-                      ? 'text-emerald-400'
-                      : agent.status === 'error'
-                        ? 'text-amber-400'
-                        : 'text-text-secondary'
+          <div className="grid grid-cols-3 gap-3">
+            {imageUrls.map((imgUrl, i) => {
+              const isSelected = selectedImages.includes(imgUrl)
+              return (
+                <button
+                  key={i}
+                  onClick={() => toggleImage(imgUrl)}
+                  className={`relative aspect-square rounded-xl border-2 overflow-hidden transition-all ${
+                    isSelected ? 'border-accent' : 'border-border opacity-50'
                   }`}
                 >
-                  {agent.name}
-                  {agent.status === 'pending' && '...'}
-                </span>
-              </div>
-            ))}
+                  <img
+                    src={imgUrl}
+                    alt={`Producto ${i + 1}`}
+                    className="w-full h-full object-cover"
+                    onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+                  />
+                  {isSelected && (
+                    <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-accent flex items-center justify-center">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    </div>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+
+          <button
+            onClick={handleGenerate}
+            className="w-full py-3 rounded-lg bg-accent text-background font-semibold text-base hover:bg-accent/90 transition"
+          >
+            Generar mi Landing Code
+          </button>
+        </div>
+      )}
+
+      {/* ===== STEP: GENERATING ===== */}
+      {step === 'generating' && (
+        <div
+          className="py-12 -mx-6 px-6"
+          style={{
+            backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.05) 1px, transparent 1px)',
+            backgroundSize: '24px 24px',
+          }}
+        >
+          <div className="flex flex-col items-center space-y-8">
+            <CircularProgress progress={progress} />
+
+            <div className="text-center">
+              <h2 className="text-lg font-bold text-text-primary">Generando tu Landing Code</h2>
+              <p className="mt-1 text-sm text-text-secondary">Preparando tu contenido...</p>
+            </div>
+
+            <div className="w-full max-w-sm space-y-3">
+              {tasks.map(task => (
+                <div key={task.key} className="flex items-center justify-between">
+                  <span className={`text-sm ${
+                    task.status === 'done' ? 'text-text-primary' :
+                    task.status === 'processing' ? 'text-text-primary' :
+                    task.status === 'error' ? 'text-amber-400' :
+                    'text-text-secondary/50'
+                  }`}>
+                    {task.label}
+                  </span>
+                  <span className="text-sm ml-3">
+                    {task.status === 'done' && <span className="text-accent">&#10003;</span>}
+                    {task.status === 'processing' && <span className="inline-block animate-spin text-accent">&#9696;</span>}
+                    {task.status === 'error' && <span className="text-amber-400">&#9888;</span>}
+                    {task.status === 'pending' && <span className="text-text-secondary/30">&#183;</span>}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
 
-      {/* DONE STATE */}
-      {state === 'done' && (
-        <div className="space-y-6">
+      {/* ===== STEP: DONE ===== */}
+      {step === 'done' && (
+        <div className="space-y-8">
           <div className="text-center py-8">
             <div className="text-5xl mb-4">&#127881;</div>
             <h2 className="text-xl font-bold text-text-primary">
-              Tu landing esta lista!
+              Tu Landing Code esta lista!
             </h2>
             <p className="mt-2 text-text-secondary">
-              Se generaron {sectionsCount} secciones para tu landing de {editableForm.title}
+              Se generaron {sectionsCount} secciones optimizadas para ventas COD
             </p>
           </div>
 
-          {/* Agent results */}
-          <div className="space-y-2">
-            {agents.map(agent => (
-              <div
-                key={agent.name}
-                className="flex items-center gap-3 p-3 rounded-lg bg-surface border border-border"
-              >
-                <span className="text-lg">
-                  {agent.status === 'done' ? '✅' : '⚠️'}
-                </span>
-                <span className="text-sm font-medium text-text-primary">
-                  {agent.name}
-                </span>
-                <span
-                  className={`ml-auto text-xs font-medium px-2 py-0.5 rounded-full ${
-                    agent.status === 'done'
-                      ? 'bg-emerald-500/10 text-emerald-400'
-                      : 'bg-amber-500/10 text-amber-400'
-                  }`}
-                >
-                  {agent.status === 'done' ? 'Completado' : 'Parcial'}
-                </span>
-              </div>
-            ))}
-          </div>
-
-          {/* Actions */}
           <div className="flex gap-3">
             {draftId && (
               <a
