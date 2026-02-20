@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { Button, Card, CardHeader, CardTitle, CardContent } from '@/components/ui'
-import { ImagePlus, Zap, Clock, Images, Store, ArrowRight } from 'lucide-react'
+import { ImagePlus, Clock, Images, Store, ArrowRight } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,10 +24,12 @@ export default async function DashboardPage() {
     .order('created_at', { ascending: false })
     .limit(4)
 
-  const creditsUsed = profile?.credits_used || 0
-  const creditsLimit = profile?.credits_limit || 50
-  const creditsRemaining = creditsLimit - creditsUsed
-  const creditsPercentage = (creditsUsed / creditsLimit) * 100
+  // Derive display name: full_name first word, or email username, or empty
+  const displayName = profile?.full_name
+    ? profile.full_name.split(' ')[0]
+    : user?.email
+      ? user.email.split('@')[0]
+      : ''
 
   return (
     <div className="space-y-8">
@@ -35,7 +37,7 @@ export default async function DashboardPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-text-primary">
-            ¡Hola{profile?.full_name ? `, ${profile.full_name.split(' ')[0]}` : ''}! 👋
+            ¡Hola{displayName ? `, ${displayName}` : ''}! 👋
           </h1>
           <p className="text-text-secondary mt-1">
             Bienvenido a tu panel de generación de imágenes
@@ -49,48 +51,8 @@ export default async function DashboardPage() {
         </Link>
       </div>
 
-      {/* Stats */}
-      <div className="grid sm:grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-accent/10 rounded-xl flex items-center justify-center">
-                <Zap className="w-6 h-6 text-accent" />
-              </div>
-              <div>
-                <p className="text-sm text-text-secondary">Créditos Disponibles</p>
-                <p className="text-2xl font-bold text-text-primary">{creditsRemaining}</p>
-              </div>
-            </div>
-            <div className="mt-4">
-              <div className="flex justify-between text-xs text-text-secondary mb-1">
-                <span>{creditsUsed} usados</span>
-                <span>{creditsLimit} total</span>
-              </div>
-              <div className="h-2 bg-border rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-accent rounded-full transition-all duration-300"
-                  style={{ width: `${creditsPercentage}%` }}
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-accent/10 rounded-xl flex items-center justify-center">
-                <Images className="w-6 h-6 text-accent" />
-              </div>
-              <div>
-                <p className="text-sm text-text-secondary">Imágenes Generadas</p>
-                <p className="text-2xl font-bold text-text-primary">{creditsUsed}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
+      {/* Plan card */}
+      <div className="grid sm:grid-cols-1 gap-4 max-w-sm">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-4">
