@@ -5,11 +5,27 @@ import { decrypt } from '@/lib/services/encryption'
 export const maxDuration = 60
 
 function extractImagesFromMarkdown(content: string): string[] {
-  const matches = content.match(/!\[.*?\]\((https?:\/\/[^)]+)\)/g)
-  if (!matches) return []
-  return matches
-    .map(m => m.match(/\((https?:\/\/[^)]+)\)/)?.[1])
-    .filter((url): url is string => !!url && !url.includes('svg') && !url.includes('icon') && !url.includes('logo'))
+  const urls = new Set<string>()
+
+  // 1. Markdown images: ![alt](url)
+  const mdMatches = content.match(/!\[.*?\]\((https?:\/\/[^)]+)\)/g)
+  if (mdMatches) {
+    for (const m of mdMatches) {
+      const url = m.match(/\((https?:\/\/[^)]+)\)/)?.[1]
+      if (url) urls.add(url)
+    }
+  }
+
+  // 2. Plain image URLs (jpg, png, webp)
+  const plainMatches = content.match(/https?:\/\/[^\s"'<>)]+\.(?:jpg|jpeg|png|webp)(?:\?[^\s"'<>)]*)?/gi)
+  if (plainMatches) {
+    for (const url of plainMatches) {
+      urls.add(url)
+    }
+  }
+
+  return Array.from(urls)
+    .filter(url => !url.includes('svg') && !url.includes('icon') && !url.includes('logo') && !url.includes('favicon') && !url.includes('1x1') && url.length < 500)
     .slice(0, 8)
 }
 
@@ -116,21 +132,27 @@ export async function POST(request: Request) {
     const geminiKey = decrypt(profile.google_api_key)
 
     // 4. Scraping con Jina AI Reader
-    const jinaRes = await fetch(`https://r.jina.ai/${url}`, {
-      headers: {
-        'Accept': 'text/plain',
-        'X-Return-Format': 'markdown',
-      },
-      signal: AbortSignal.timeout(20000),
-    })
+    let pageContent: string
+    try {
+      const jinaRes = await fetch(`https://r.jina.ai/${url}`, {
+        headers: {
+          'Accept': 'text/plain',
+          'X-Return-Format': 'markdown',
+        },
+        signal: AbortSignal.timeout(30000),
+      })
 
-    if (!jinaRes.ok) {
-      console.error('[scrape] Jina error:', jinaRes.status)
-      return NextResponse.json({ error: 'No se pudo leer la pagina. Verifica la URL.' }, { status: 400 })
+      if (!jinaRes.ok) {
+        console.error('[scrape] Jina error:', jinaRes.status)
+        return NextResponse.json({ error: 'No se pudo leer la pagina. Verifica la URL.' }, { status: 400 })
+      }
+
+      pageContent = await jinaRes.text()
+      console.log('[scrape] Jina content length:', pageContent.length)
+    } catch (jinaErr: any) {
+      console.error('[scrape] Jina fetch failed:', jinaErr.message)
+      return NextResponse.json({ error: 'La pagina tardo demasiado en responder. Intenta con otra URL.' }, { status: 400 })
     }
-
-    const pageContent = await jinaRes.text()
-    console.log('[scrape] Jina content length:', pageContent.length)
 
     if (pageContent.length < 100) {
       return NextResponse.json({ error: 'La pagina no tiene suficiente contenido. Intenta con otra URL.' }, { status: 400 })
@@ -174,7 +196,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, metadata })
 
   } catch (e: any) {
-    console.error('[scrape] error:', e.message)
-    return NextResponse.json({ error: 'Error al analizar la URL. Intenta de nuevo.' }, { status: 500 })
+    console.error('[scrape] unexpected error:', e.message, e.stack?.slice(0, 300))
+    const msg = e.name === 'AbortError'
+      ? 'La pagina tardo demasiado. Intenta con otra URL.'
+      : 'Error al analizar la URL. Intenta de nuevo.'
+    return NextResponse.json({ error: msg }, { status: 500 })
   }
 }
