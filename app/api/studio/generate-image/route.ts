@@ -210,7 +210,10 @@ export async function POST(request: Request) {
     }
 
     // Generate image
-    let result = await generateImage(generateRequest, apiKeys)
+    const elapsedMs = Date.now() - startTime
+    let result = await generateImage(generateRequest, apiKeys, {
+      maxTotalMs: Math.max(95000 - elapsedMs, 30000),
+    })
 
     // For async providers (KIE, BFL), poll for result
     // Use shorter timeout to stay within Vercel limits

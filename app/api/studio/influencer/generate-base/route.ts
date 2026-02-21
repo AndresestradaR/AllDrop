@@ -136,7 +136,10 @@ export async function POST(request: Request) {
       aspectRatio: '9:16',
     }
 
-    let result = await generateImage(generateRequest, apiKeys)
+    const genElapsed = Date.now() - startTime
+    let result = await generateImage(generateRequest, apiKeys, {
+      maxTotalMs: Math.max(95000 - genElapsed, 30000),
+    })
 
     // Poll for async providers
     if (result.success && result.status === 'processing' && result.taskId) {

@@ -51,6 +51,9 @@ export function getAllProviders() {
  *
  * For Seedream models: KIE direct (already works)
  * For other providers: direct call
+ *
+ * @param options.maxTotalMs - Max time budget for KIE cascade (default 80s).
+ *   Routes with more time (e.g. landing = 300s) should pass a larger value.
  */
 export async function generateImage(
   request: GenerateImageRequest,
@@ -59,7 +62,8 @@ export async function generateImage(
     openai?: string
     kie?: string
     bfl?: string
-  }
+  },
+  options?: { maxTotalMs?: number }
 ): Promise<GenerateImageResult> {
   const provider = getProvider(request.provider)
 
@@ -74,7 +78,7 @@ export async function generateImage(
   // ── Gemini: ALL through KIE with internal fallback cascade ──
   if (request.provider === 'gemini') {
     if (apiKeys.kie) {
-      return generateViaKieCascade(request, apiKeys.kie)
+      return generateViaKieCascade(request, apiKeys.kie, options?.maxTotalMs)
     }
 
     // No KIE key — last resort: direct Google API
@@ -117,7 +121,8 @@ export async function generateImage(
 
 /**
  * KIE model cascade for Gemini image generation.
- * Tries multiple KIE models in order until one works:
+ * Time-aware: distributes available time across models.
+ *
  *   1. nano-banana-pro  (Gemini 3 Pro Image — best quality)
  *   2. nano-banana       (Gemini 2.5 Flash Image — fast)
  *   3. seedream/4.5-text-to-image (Seedream — always works as ultimate fallback)
@@ -130,8 +135,12 @@ const KIE_IMAGE_MODELS = [
 
 async function generateViaKieCascade(
   request: GenerateImageRequest,
-  kieApiKey: string
+  kieApiKey: string,
+  maxTotalMs?: number
 ): Promise<GenerateImageResult> {
+  const cascadeStart = Date.now()
+  const totalBudget = maxTotalMs || 80000 // Default 80s (fits in 120s routes with prep buffer)
+
   const prompt = request.prompt?.trim() || buildGeminiPrompt(request)
 
   // Collect public image URLs for KIE (requires URLs, not base64)
@@ -146,7 +155,19 @@ async function generateViaKieCascade(
   const errors: string[] = []
 
   for (const kieModel of KIE_IMAGE_MODELS) {
-    console.log(`[KIE Cascade] Trying ${kieModel.model} (${kieModel.name})...`)
+    const elapsed = Date.now() - cascadeStart
+    const remaining = totalBudget - elapsed
+
+    // Need at least 15s to attempt a model
+    if (remaining < 15000) {
+      console.warn(`[KIE Cascade] Only ${Math.round(remaining / 1000)}s left, skipping ${kieModel.model}`)
+      errors.push(`${kieModel.name}: Tiempo insuficiente`)
+      break
+    }
+
+    // Per-model timeout: use remaining time but cap at 70s per model
+    const modelTimeout = Math.min(remaining - 3000, 70000)
+    console.log(`[KIE Cascade] Trying ${kieModel.model} (${kieModel.name}), timeout: ${Math.round(modelTimeout / 1000)}s...`)
 
     // Build input based on model capabilities
     const input: any = {
@@ -166,18 +187,16 @@ async function generateViaKieCascade(
       input.quality = 'basic'
       // Seedream edit mode needs image_urls (different field name)
       if (imageUrls.length > 0) {
-        // Switch to edit model for image input
         const editModel = kieModel.model.replace('text-to-image', 'edit')
         console.log(`[KIE Cascade] Seedream with images, switching to edit model: ${editModel}`)
-        // Use edit model and image_urls field
-        const editResult = await callKieCreateTask(editModel, { ...input, image_urls: imageUrls }, kieApiKey)
+        const editTimeout = Math.min(remaining - 3000, 70000)
+        const editResult = await callKieCreateTask(editModel, { ...input, image_urls: imageUrls }, kieApiKey, editTimeout)
         if (editResult.success) return { ...editResult, provider: 'gemini' }
-        // If edit fails, try text-only
         console.warn(`[KIE Cascade] Seedream edit failed, trying text-only`)
       }
     }
 
-    const result = await callKieCreateTask(kieModel.model, input, kieApiKey)
+    const result = await callKieCreateTask(kieModel.model, input, kieApiKey, modelTimeout)
 
     if (result.success) {
       console.log(`[KIE Cascade] ${kieModel.model} succeeded!`)
@@ -188,8 +207,8 @@ async function generateViaKieCascade(
     errors.push(`${kieModel.name}: ${result.error || 'Unknown error'}`)
     console.warn(`[KIE Cascade] ${kieModel.model} failed: ${result.error}`)
 
-    // Only BREAK if it's a prompt/content error (all models will fail the same way).
-    // CONTINUE cascade for transient errors (timeout, rate limit, server errors, access).
+    // Only BREAK on content/safety errors (all models will fail the same way).
+    // CONTINUE for transient errors (timeout, rate limit, server, access).
     const isContentError =
       errorMsg.includes('safety') ||
       errorMsg.includes('blocked') ||
@@ -213,11 +232,13 @@ async function generateViaKieCascade(
 
 /**
  * Create a single KIE task, poll for result, return image.
+ * @param timeoutMs - Max time for polling (default 80s)
  */
 async function callKieCreateTask(
   model: string,
   input: any,
-  kieApiKey: string
+  kieApiKey: string,
+  timeoutMs: number = 80000
 ): Promise<GenerateImageResult> {
   try {
     const createResponse = await fetch('https://api.kie.ai/api/v1/jobs/createTask', {
@@ -252,13 +273,12 @@ async function callKieCreateTask(
       return { success: false, error: 'KIE: no taskId', provider: 'gemini' }
     }
 
-    console.log(`[KIE:${model}] Task: ${taskId}, polling...`)
+    console.log(`[KIE:${model}] Task: ${taskId}, polling (max ${Math.round(timeoutMs / 1000)}s)...`)
 
-    // 90s max polling — fits within 120s route maxDuration with buffer
     const pollResult = await pollForResult('seedream', taskId, kieApiKey, {
-      maxAttempts: 45,
+      maxAttempts: Math.ceil(timeoutMs / 2000),
       intervalMs: 2000,
-      timeoutMs: 90000,
+      timeoutMs,
     })
 
     if (!pollResult.success) {

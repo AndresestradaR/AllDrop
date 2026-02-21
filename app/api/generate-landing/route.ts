@@ -92,6 +92,7 @@ async function uploadToStorage(
 }
 
 export async function POST(request: Request) {
+  const startTime = Date.now()
   try {
     const ip = getClientIp(request)
     const { success } = aiLimiter.check(ip)
@@ -326,8 +327,11 @@ export async function POST(request: Request) {
     console.log(`  - Product URLs: ${productImageUrls.length}`)
     console.log(`  - Product Base64: ${productImagesBase64.length}`)
 
-    // Generate image
-    let result = await generateImage(generateRequest, apiKeys)
+    // Generate image (pass time budget — landing has 300s maxDuration)
+    const elapsedMs = Date.now() - startTime
+    let result = await generateImage(generateRequest, apiKeys, {
+      maxTotalMs: Math.max(250000 - elapsedMs, 60000), // Up to 250s, min 60s
+    })
 
     // For async providers, poll for result
     if (result.success && result.status === 'processing' && result.taskId) {
