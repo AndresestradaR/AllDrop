@@ -323,15 +323,7 @@ export const LANDING_COMPANY_GROUPS: ImageCompanyGroup[] = [
       IMAGE_MODELS['gpt-image-1.5'],
     ], 'landing'),
   },
-  {
-    id: 'bytedance',
-    name: 'ByteDance',
-    icon: 'Image',
-    color: 'from-orange-500 to-red-500',
-    models: filterModelsByAvailability([
-      IMAGE_MODELS['seedream-4.5'],
-    ], 'landing'),
-  },
+  // No Seedream for landings — quality too low for banner generation
   // No BFL/FLUX for landings - they don't preserve product
 ]
 
