@@ -1294,6 +1294,14 @@ export default function ProductGeneratePage() {
                     </span>
                   </div>
                 </div>
+                <input
+                  type="text"
+                  value={colorPalette.primary.toUpperCase()}
+                  onChange={(e) => { const v = e.target.value; if (/^#[0-9A-Fa-f]{0,6}$/.test(v)) setColorPalette({ ...colorPalette, primary: v }) }}
+                  onBlur={(e) => { const v = e.target.value; if (!/^#[0-9A-Fa-f]{6}$/.test(v)) setColorPalette({ ...colorPalette, primary: colorPalette.primary }) }}
+                  className="mt-1 w-full rounded-lg border border-border bg-surface px-2 py-1 text-xs font-mono text-text-primary text-center focus:border-accent focus:outline-none"
+                  placeholder="#000000"
+                />
               </div>
 
               {/* Color 2 - Secondary */}
@@ -1318,6 +1326,14 @@ export default function ProductGeneratePage() {
                     </span>
                   </div>
                 </div>
+                <input
+                  type="text"
+                  value={colorPalette.secondary.toUpperCase()}
+                  onChange={(e) => { const v = e.target.value; if (/^#[0-9A-Fa-f]{0,6}$/.test(v)) setColorPalette({ ...colorPalette, secondary: v }) }}
+                  onBlur={(e) => { const v = e.target.value; if (!/^#[0-9A-Fa-f]{6}$/.test(v)) setColorPalette({ ...colorPalette, secondary: colorPalette.secondary }) }}
+                  className="mt-1 w-full rounded-lg border border-border bg-surface px-2 py-1 text-xs font-mono text-text-primary text-center focus:border-accent focus:outline-none"
+                  placeholder="#000000"
+                />
               </div>
 
               {/* Color 3 - Accent */}
@@ -1342,6 +1358,14 @@ export default function ProductGeneratePage() {
                     </span>
                   </div>
                 </div>
+                <input
+                  type="text"
+                  value={colorPalette.accent.toUpperCase()}
+                  onChange={(e) => { const v = e.target.value; if (/^#[0-9A-Fa-f]{0,6}$/.test(v)) setColorPalette({ ...colorPalette, accent: v }) }}
+                  onBlur={(e) => { const v = e.target.value; if (!/^#[0-9A-Fa-f]{6}$/.test(v)) setColorPalette({ ...colorPalette, accent: colorPalette.accent }) }}
+                  className="mt-1 w-full rounded-lg border border-border bg-surface px-2 py-1 text-xs font-mono text-text-primary text-center focus:border-accent focus:outline-none"
+                  placeholder="#000000"
+                />
               </div>
 
               {/* Color 4 - Extra (only if 4 colors selected) */}
@@ -1367,6 +1391,14 @@ export default function ProductGeneratePage() {
                       </span>
                     </div>
                   </div>
+                  <input
+                    type="text"
+                    value={colorPalette.extra.toUpperCase()}
+                    onChange={(e) => { const v = e.target.value; if (/^#[0-9A-Fa-f]{0,6}$/.test(v)) setColorPalette({ ...colorPalette, extra: v }) }}
+                    onBlur={(e) => { const v = e.target.value; if (!/^#[0-9A-Fa-f]{6}$/.test(v)) setColorPalette({ ...colorPalette, extra: colorPalette.extra }) }}
+                    className="mt-1 w-full rounded-lg border border-border bg-surface px-2 py-1 text-xs font-mono text-text-primary text-center focus:border-accent focus:outline-none"
+                    placeholder="#000000"
+                  />
                 </div>
               )}
             </div>

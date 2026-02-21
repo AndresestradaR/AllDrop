@@ -333,15 +333,18 @@ export async function POST(request: Request) {
       maxTotalMs: Math.max(250000 - elapsedMs, 60000), // Up to 250s, min 60s
     })
 
-    // For async providers, poll for result
+    // For async providers, poll for result using remaining time budget
     if (result.success && result.status === 'processing' && result.taskId) {
       console.log(`Task created: ${result.taskId}, polling for result...`)
 
       const apiKey = apiKeys[requiredKey]!
+      const pollElapsed = Date.now() - startTime
+      const pollTimeout = Math.max(250000 - pollElapsed, 60000) // use remaining time, min 60s
+      console.log(`[Poll] timeout: ${Math.round(pollTimeout / 1000)}s (elapsed: ${Math.round(pollElapsed / 1000)}s)`)
       result = await pollForResult(selectedProvider, result.taskId, apiKey, {
-        maxAttempts: 120,
-        intervalMs: 1000,
-        timeoutMs: 120000,
+        maxAttempts: 200,
+        intervalMs: 2000,
+        timeoutMs: pollTimeout,
       })
     }
 
