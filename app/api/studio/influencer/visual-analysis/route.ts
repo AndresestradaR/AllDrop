@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAuthContext } from '@/lib/auth/cron-auth'
 import { generateAIText, getAIKeys, requireAIKeys } from '@/lib/services/ai-text'
 
-export const maxDuration = 60
+export const maxDuration = 120
 
 const ANALYSIS_SYSTEM = `Act as a professional visual analyst specialized in hyperrealistic human description, with expertise in breaking down human appearance into precise, observable parameters for artistic, generative AI, or technical reproduction purposes.
 
@@ -174,11 +174,19 @@ RULES:
 
         userMessage += `\n\nGenerate the optimized video prompt:`
 
-        const text = await generateAIText(keys, {
-          systemPrompt,
-          userMessage,
-          temperature: 0.7,
-        })
+        const videoAbort = new AbortController()
+        const videoTimeout = setTimeout(() => videoAbort.abort(), 50000) // 50s
+        let text: string
+        try {
+          text = await generateAIText(keys, {
+            systemPrompt,
+            userMessage,
+            temperature: 0.7,
+            signal: videoAbort.signal,
+          })
+        } finally {
+          clearTimeout(videoTimeout)
+        }
 
         return NextResponse.json({ success: true, optimized_prompt: text.trim() })
       } catch (err: any) {
@@ -244,15 +252,24 @@ RULES:
       return NextResponse.json({ error: 'No se pudieron descargar las imagenes' }, { status: 500 })
     }
 
-    // Call AI for visual analysis
-    const text = await generateAIText(keys, {
-      systemPrompt: ANALYSIS_SYSTEM,
-      userMessage: 'Analyze these reference images of the same person and generate an exhaustive visual analysis following the format specified in your instructions.',
-      images,
-      temperature: 0.3,
-      kieModel: 'gemini-2.5-pro',
-      googleModel: 'gemini-2.5-pro',
-    })
+    // Call AI for visual analysis (with timeout to avoid Vercel 504)
+    const abortController = new AbortController()
+    const timeout = setTimeout(() => abortController.abort(), 100000) // 100s safety limit
+
+    let text: string
+    try {
+      text = await generateAIText(keys, {
+        systemPrompt: ANALYSIS_SYSTEM,
+        userMessage: 'Analyze these reference images of the same person and generate an exhaustive visual analysis following the format specified in your instructions.',
+        images,
+        temperature: 0.3,
+        kieModel: 'gemini-2.5-pro',
+        googleModel: 'gemini-2.5-pro',
+        signal: abortController.signal,
+      })
+    } finally {
+      clearTimeout(timeout)
+    }
 
     if (!text) {
       return NextResponse.json({ error: 'Error al analizar: empty response' }, { status: 500 })
