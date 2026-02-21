@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { decrypt } from '@/lib/services/encryption'
+import { generateAIText, getAIKeys, requireAIKeys, extractJSON } from '@/lib/services/ai-text'
 import { aiLimiter, getClientIp } from '@/lib/rate-limit'
 
 // ---------------------------------------------------------------------------
@@ -170,27 +170,18 @@ export async function POST(request: Request) {
       }
     }
 
-    // Get user's API key
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('google_api_key')
-      .eq('id', user.id)
-      .single()
+    // Get AI keys
+    const keys = await getAIKeys(supabase, user.id)
+    requireAIKeys(keys)
 
-    if (!profile?.google_api_key) {
-      return NextResponse.json({ error: 'Configura tu API key de Google' }, { status: 400 })
-    }
-
-    const apiKey = decrypt(profile.google_api_key)
-
-    // Build multimodal parts
-    const parts: any[] = []
+    // Build images array
+    const images: { mimeType: string; base64: string }[] = []
 
     // Add template image
     if (templateUrl) {
       const parsed = parseDataUrl(templateUrl)
       if (parsed) {
-        parts.push({ inline_data: { mime_type: parsed.mimeType, data: parsed.data } })
+        images.push({ mimeType: parsed.mimeType, base64: parsed.data })
       }
     }
 
@@ -200,7 +191,7 @@ export async function POST(request: Request) {
         if (photo) {
           const parsed = parseDataUrl(photo)
           if (parsed) {
-            parts.push({ inline_data: { mime_type: parsed.mimeType, data: parsed.data } })
+            images.push({ mimeType: parsed.mimeType, base64: parsed.data })
           }
         }
       }
@@ -234,56 +225,21 @@ export async function POST(request: Request) {
     promptLines.push('')
     promptLines.push('Genera los 4 Controles Creativos optimizados para VENTA + 2 variantes alternativas por campo, en JSON.')
 
-    parts.push({ text: promptLines.join('\n') })
+    const responseText = await generateAIText(keys, {
+      systemPrompt: ENHANCE_SYSTEM_PROMPT,
+      userMessage: promptLines.join('\n'),
+      images: images.length > 0 ? images : undefined,
+      temperature: 0.8,
+      jsonMode: true,
+      kieModel: 'gemini-2.5-pro',
+      googleModel: 'gemini-2.5-pro',
+    })
 
-    // Try Gemini 2.5 Pro first, fallback to 2.0 Flash
-    const models = [
-      'gemini-2.5-pro',
-      'gemini-2.5-flash',
-    ]
+    const suggestions = JSON.parse(extractJSON(responseText))
 
-    let lastError: string = ''
+    console.log(`[EnhancePrompt] User: ${user.id.substring(0, 8)}..., Product: ${productName || 'images-only'}`)
 
-    for (const model of models) {
-      try {
-        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
-
-        const response = await fetch(`${endpoint}?key=${apiKey}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            systemInstruction: { parts: [{ text: ENHANCE_SYSTEM_PROMPT }] },
-            contents: [{ parts }],
-            generationConfig: {
-              responseMimeType: 'application/json',
-              temperature: 0.8,
-            },
-          }),
-        })
-
-        if (!response.ok) {
-          const errBody = await response.text()
-          console.error(`[EnhancePrompt] ${model} failed (${response.status}):`, errBody.substring(0, 300))
-          lastError = `${model}: ${response.status}`
-          continue
-        }
-
-        const data = await response.json()
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}'
-        const suggestions = JSON.parse(text)
-
-        console.log(`[EnhancePrompt] User: ${user.id.substring(0, 8)}..., Model: ${model}, Product: ${productName || 'images-only'}`)
-
-        return NextResponse.json({ success: true, suggestions })
-      } catch (modelError: any) {
-        console.error(`[EnhancePrompt] ${model} error:`, modelError.message)
-        lastError = modelError.message
-        continue
-      }
-    }
-
-    // Both models failed
-    return NextResponse.json({ error: `Error al generar sugerencias: ${lastError}` }, { status: 500 })
+    return NextResponse.json({ success: true, suggestions })
 
   } catch (error: any) {
     console.error('[EnhancePrompt] Error:', error.message)

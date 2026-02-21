@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { decrypt } from '@/lib/services/encryption'
-import { GoogleGenerativeAI } from '@google/generative-ai'
+import { generateAIText, getAIKeys, requireAIKeys, extractJSON } from '@/lib/services/ai-text'
 
 export const maxDuration = 30
 
@@ -43,49 +42,25 @@ export async function POST(request: Request) {
       )
     }
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('google_api_key')
-      .eq('id', user.id)
-      .single()
-
-    if (!profile?.google_api_key) {
-      return NextResponse.json({
-        error: 'Configura tu API key de Google en Settings',
-      }, { status: 400 })
-    }
-
-    const apiKey = decrypt(profile.google_api_key)
-    const genAI = new GoogleGenerativeAI(apiKey)
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash',
-      systemInstruction: ANALYZE_SYSTEM,
-      generationConfig: {
-        responseMimeType: 'application/json',
-        temperature: 0.3,
-      },
-    })
+    const keys = await getAIKeys(supabase, user.id)
+    requireAIKeys(keys)
 
     // Clean base64 data
     const base64Clean = image_base64.includes(',')
       ? image_base64.split(',')[1]
       : image_base64
 
-    const result = await model.generateContent([
-      'Analyze this person and generate a detailed Character Profile.',
-      {
-        inlineData: {
-          mimeType: 'image/jpeg',
-          data: base64Clean,
-        },
-      },
-    ])
-
-    const responseText = result.response.text()
+    const responseText = await generateAIText(keys, {
+      systemPrompt: ANALYZE_SYSTEM,
+      userMessage: 'Analyze this person and generate a detailed Character Profile.',
+      images: [{ mimeType: 'image/jpeg', base64: base64Clean }],
+      temperature: 0.3,
+      jsonMode: true,
+    })
 
     let parsed: any
     try {
-      parsed = JSON.parse(responseText)
+      parsed = JSON.parse(extractJSON(responseText))
     } catch {
       console.error('[Influencer/Analyze] Failed to parse JSON:', responseText.substring(0, 500))
       return NextResponse.json({

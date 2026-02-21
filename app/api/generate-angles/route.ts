@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { decrypt } from '@/lib/services/encryption'
 import { aiLimiter, getClientIp } from '@/lib/rate-limit'
+import { getAIKeys, requireAIKeys, generateAIText, extractJSON, type AIImageInput } from '@/lib/services/ai-text'
 
 function parseDataUrl(dataUrl: string): { data: string; mimeType: string } | null {
   if (!dataUrl.startsWith('data:')) return null
@@ -113,29 +113,22 @@ export async function POST(request: Request) {
       targetCountry?: string
     }
 
-    // Get API key
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('google_api_key')
-      .eq('id', user.id)
-      .single()
-
-    if (!profile?.google_api_key) {
-      return NextResponse.json({ error: 'Configura tu API key de Google en Settings' }, { status: 400 })
+    // Get API keys (KIE primary, Google fallback)
+    const aiKeys = await getAIKeys(supabase, user.id)
+    try {
+      requireAIKeys(aiKeys)
+    } catch {
+      return NextResponse.json({ error: 'Configura tu API key de KIE o Google en Settings' }, { status: 400 })
     }
 
-    const apiKey = decrypt(profile.google_api_key)
-
-    // Build multimodal parts
-    const parts: any[] = []
-
-    // Add product photos (so AI can analyze the actual product)
+    // Build images array for multimodal
+    const images: AIImageInput[] = []
     if (productPhotos) {
       for (const photo of productPhotos) {
         if (photo) {
           const parsed = parseDataUrl(photo)
           if (parsed) {
-            parts.push({ inline_data: { mime_type: parsed.mimeType, data: parsed.data } })
+            images.push({ mimeType: parsed.mimeType, base64: parsed.data })
           }
         }
       }
@@ -174,56 +167,27 @@ export async function POST(request: Request) {
 
     promptLines.push('\nGenera 6 angulos de venta diversificados en JSON.')
 
-    parts.push({ text: promptLines.join('\n') })
+    try {
+      const raw = await generateAIText(aiKeys, {
+        systemPrompt: ANGLES_SYSTEM_PROMPT,
+        userMessage: promptLines.join('\n'),
+        images: images.length > 0 ? images : undefined,
+        temperature: 0.9,
+        jsonMode: true,
+      })
 
-    // Call Gemini TEXT (not image)
-    const models = ['gemini-2.5-pro', 'gemini-2.5-flash']
-    let lastError = ''
+      const result = JSON.parse(extractJSON(raw))
 
-    for (const model of models) {
-      try {
-        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
+      console.log(`[GenerateAngles] User: ${user.id.substring(0, 8)}..., Product: ${productName}, Angles: ${result.angles?.length || 0}`)
 
-        const response = await fetch(`${endpoint}?key=${apiKey}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            systemInstruction: { parts: [{ text: ANGLES_SYSTEM_PROMPT }] },
-            contents: [{ parts }],
-            generationConfig: {
-              responseMimeType: 'application/json',
-              temperature: 0.9,
-            },
-          }),
-        })
-
-        if (!response.ok) {
-          const errBody = await response.text()
-          console.error(`[GenerateAngles] ${model} failed (${response.status}):`, errBody.substring(0, 300))
-          lastError = `${model}: ${response.status}`
-          continue
-        }
-
-        const data = await response.json()
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}'
-        const result = JSON.parse(text)
-
-        console.log(`[GenerateAngles] User: ${user.id.substring(0, 8)}..., Model: ${model}, Product: ${productName}, Angles: ${result.angles?.length || 0}`)
-
-        if (!result.angles || result.angles.length === 0) {
-          lastError = 'No angles generated'
-          continue
-        }
-
-        return NextResponse.json({ success: true, angles: result.angles })
-      } catch (modelError: any) {
-        console.error(`[GenerateAngles] ${model} error:`, modelError.message)
-        lastError = modelError.message
-        continue
+      if (!result.angles || result.angles.length === 0) {
+        return NextResponse.json({ error: 'No se generaron ángulos. Intenta de nuevo.' }, { status: 500 })
       }
-    }
 
-    return NextResponse.json({ error: `Error al generar angulos: ${lastError}` }, { status: 500 })
+      return NextResponse.json({ success: true, angles: result.angles })
+    } catch (aiError: any) {
+      return NextResponse.json({ error: `Error al generar angulos: ${aiError.message}` }, { status: 500 })
+    }
 
   } catch (error: any) {
     console.error('[GenerateAngles] Error:', error.message)

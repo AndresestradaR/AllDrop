@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { decrypt } from '@/lib/services/encryption'
-import { GoogleGenerativeAI } from '@google/generative-ai'
+import { generateAIText, getAIKeys, requireAIKeys, extractJSON } from '@/lib/services/ai-text'
 
 export const maxDuration = 30
 
@@ -44,37 +43,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Se requiere la transcripción' }, { status: 400 })
     }
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('google_api_key')
-      .eq('id', user.id)
-      .single()
-
-    if (!profile?.google_api_key) {
-      return NextResponse.json({ error: 'Configura tu API key de Google en Settings' }, { status: 400 })
-    }
-
-    const apiKey = decrypt(profile.google_api_key)
-    const genAI = new GoogleGenerativeAI(apiKey)
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash',
-      systemInstruction: TRANSLATE_SYSTEM,
-      generationConfig: {
-        responseMimeType: 'application/json',
-        temperature: 0.6,
-      },
-    })
+    const keys = await getAIKeys(supabase, user.id)
+    requireAIKeys(keys)
 
     const parts = [`Transcripción original:\n"""${transcript}"""`]
     if (product_name) parts.push(`\nProducto destino: ${product_name}`)
     parts.push(`\nIdioma destino: ${target_language}`)
 
-    const result = await model.generateContent(parts.join('\n'))
-    const responseText = result.response.text()
+    const responseText = await generateAIText(keys, {
+      systemPrompt: TRANSLATE_SYSTEM,
+      userMessage: parts.join('\n'),
+      temperature: 0.6,
+      jsonMode: true,
+    })
 
     let parsed: any
     try {
-      parsed = JSON.parse(responseText)
+      parsed = JSON.parse(extractJSON(responseText))
     } catch {
       return NextResponse.json({ error: 'Error al traducir' }, { status: 500 })
     }

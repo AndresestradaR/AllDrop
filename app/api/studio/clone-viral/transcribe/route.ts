@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { decrypt } from '@/lib/services/encryption'
-import { GoogleGenerativeAI } from '@google/generative-ai'
+import { generateAIText, getAIKeys, requireAIKeys, extractJSON } from '@/lib/services/ai-text'
 
 export const maxDuration = 60
 
@@ -30,28 +29,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Se requiere URL del video' }, { status: 400 })
     }
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('google_api_key')
-      .eq('id', user.id)
-      .single()
+    const keys = await getAIKeys(supabase, user.id)
+    requireAIKeys(keys)
 
-    if (!profile?.google_api_key) {
-      return NextResponse.json({ error: 'Configura tu API key de Google en Settings' }, { status: 400 })
-    }
-
-    const apiKey = decrypt(profile.google_api_key)
-    const genAI = new GoogleGenerativeAI(apiKey)
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash',
-      systemInstruction: TRANSCRIBE_SYSTEM,
-      generationConfig: {
-        responseMimeType: 'application/json',
-        temperature: 0.1,
-      },
-    })
-
-    // Download video and send as file to Gemini
+    // Download video and send as file
     const videoResponse = await fetch(video_url)
     const videoBuffer = await videoResponse.arrayBuffer()
     const base64Video = Buffer.from(videoBuffer).toString('base64')
@@ -59,21 +40,17 @@ export async function POST(request: Request) {
 
     console.log(`[CloneViral/Transcribe] User: ${user.id.substring(0, 8)}..., Video size: ${(videoBuffer.byteLength / 1024 / 1024).toFixed(1)}MB`)
 
-    const result = await model.generateContent([
-      'Transcribe all spoken audio from this video accurately.',
-      {
-        inlineData: {
-          mimeType: contentType,
-          data: base64Video,
-        },
-      },
-    ])
-
-    const responseText = result.response.text()
+    const responseText = await generateAIText(keys, {
+      systemPrompt: TRANSCRIBE_SYSTEM,
+      userMessage: 'Transcribe all spoken audio from this video accurately.',
+      images: [{ mimeType: contentType, base64: base64Video }],
+      temperature: 0.1,
+      jsonMode: true,
+    })
 
     let parsed: any
     try {
-      parsed = JSON.parse(responseText)
+      parsed = JSON.parse(extractJSON(responseText))
     } catch {
       return NextResponse.json({ error: 'Error al transcribir' }, { status: 500 })
     }

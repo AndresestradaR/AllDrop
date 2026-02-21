@@ -1,10 +1,10 @@
 import { createClient, createServiceClient } from '@/lib/supabase/server'
-import { decrypt } from '@/lib/services/encryption'
 import { assembleSections } from '@/lib/landing-ia/assembler'
 import { heroAgent } from '@/lib/landing-ia/agents/hero-agent'
 import { testimoniosAgent } from '@/lib/landing-ia/agents/testimonios-agent'
 import { faqsAgent } from '@/lib/landing-ia/agents/faqs-agent'
 import { antesAgent } from '@/lib/landing-ia/agents/antes-agent'
+import { getAIKeys, requireAIKeys } from '@/lib/services/ai-text'
 import type { ProductMetadata, CountryCode, SSEEvent, AgentResult } from '@/lib/landing-ia/types'
 
 export const maxDuration = 120
@@ -29,18 +29,13 @@ export async function POST(request: Request) {
       return new Response(JSON.stringify({ error: 'Datos incompletos' }), { status: 400 })
     }
 
-    // 3. Get Gemini key
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('google_api_key')
-      .eq('id', user.id)
-      .single()
-
-    if (!profile?.google_api_key) {
-      return new Response(JSON.stringify({ error: 'Configura tu API Key de Google en Settings' }), { status: 400 })
+    // 3. Get AI keys (KIE primary, Google fallback)
+    const aiKeys = await getAIKeys(supabase, user.id)
+    try {
+      requireAIKeys(aiKeys)
+    } catch {
+      return new Response(JSON.stringify({ error: 'Configura tu API key de KIE o Google en Settings' }), { status: 400 })
     }
-
-    const geminiKey = decrypt(profile.google_api_key)
 
     // 4. Create draft
     const { data: draft, error: draftError } = await supabase
@@ -96,10 +91,10 @@ export async function POST(request: Request) {
 
         try {
           const results = await Promise.allSettled([
-            withProgress(heroAgent(productMetadata, country, geminiKey), 'Hero & Oferta', 20),
-            withProgress(testimoniosAgent(productMetadata, country, geminiKey), 'Testimonios', 40),
-            withProgress(faqsAgent(productMetadata, country, geminiKey), 'FAQs & Beneficios', 60),
-            withProgress(antesAgent(productMetadata, country, geminiKey), 'Transformación', 75),
+            withProgress(heroAgent(productMetadata, country, aiKeys), 'Hero & Oferta', 20),
+            withProgress(testimoniosAgent(productMetadata, country, aiKeys), 'Testimonios', 40),
+            withProgress(faqsAgent(productMetadata, country, aiKeys), 'FAQs & Beneficios', 60),
+            withProgress(antesAgent(productMetadata, country, aiKeys), 'Transformación', 75),
           ])
 
           // Collect fulfilled results

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthContext } from '@/lib/auth/cron-auth'
-import { decrypt } from '@/lib/services/encryption'
+import { generateAIText, getAIKeys, requireAIKeys, extractJSON } from '@/lib/services/ai-text'
 
 export const maxDuration = 60
 
@@ -70,18 +70,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'transcript y sectionCount son requeridos' }, { status: 400 })
     }
 
-    // Get Google API key
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('google_api_key')
-      .eq('id', userId)
-      .single()
-
-    if (!profile?.google_api_key) {
-      return NextResponse.json({ error: 'Configura tu API key de Google en Settings' }, { status: 400 })
-    }
-
-    const apiKey = decrypt(profile.google_api_key)
+    // Get AI keys
+    const keys = await getAIKeys(supabase, userId)
+    requireAIKeys(keys)
 
     const userMessage = `INFLUENCER VISUAL DESCRIPTOR:
 ${promptDescriptor || `A person called ${influencerName}`}
@@ -99,103 +90,64 @@ ${transcript}
 
 Analyze this transcript and generate ${sectionCount} multi-shot video section(s) as structured JSON. Each section should be ~14 seconds (3-4 scenes). Adapt the spoken content into visual scenes that SHOW what the transcript describes.`
 
-    // Try Gemini 2.5 Pro first, fallback to Flash
-    const models = ['gemini-2.5-pro', 'gemini-2.5-flash']
-    let lastError = ''
+    const responseText = await generateAIText(keys, {
+      systemPrompt: SYSTEM_PROMPT,
+      userMessage,
+      temperature: 0.7,
+      jsonMode: true,
+      kieModel: 'gemini-2.5-pro',
+      googleModel: 'gemini-2.5-pro',
+    })
 
-    for (const model of models) {
-      try {
-        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
-
-        const response = await fetch(`${endpoint}?key=${apiKey}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-            contents: [{ parts: [{ text: userMessage }] }],
-            generationConfig: {
-              temperature: 0.7,
-              maxOutputTokens: 4096,
-              responseMimeType: 'application/json',
-            },
-          }),
-        })
-
-        if (!response.ok) {
-          const errBody = await response.text()
-          console.error(`[CloneViralPrompts] ${model} failed (${response.status}):`, errBody.substring(0, 300))
-          lastError = `${model}: ${response.status}`
-          continue
-        }
-
-        const data = await response.json()
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
-
-        if (!text) {
-          lastError = `${model}: empty response`
-          continue
-        }
-
-        // Parse JSON response
-        let result: any
-        try {
-          const cleaned = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim()
-          result = JSON.parse(cleaned)
-        } catch (parseErr) {
-          console.error(`[CloneViralPrompts] JSON parse error:`, parseErr, 'Raw:', text.substring(0, 200))
-          lastError = `${model}: invalid JSON`
-          continue
-        }
-
-        // Validate structure
-        if (!result.sections || !Array.isArray(result.sections) || result.sections.length === 0) {
-          lastError = `${model}: invalid structure (no sections)`
-          continue
-        }
-
-        // Enforce constraints on each section
-        result.sections = result.sections.slice(0, sectionCount).map((section: any, idx: number) => {
-          const scenes = (section.scenes || []).slice(0, 5).map((s: any) => ({
-            prompt: String(s.prompt || '').substring(0, 500),
-            duration: Math.max(2, Math.min(5, Math.round(Number(s.duration) || 3))),
-          }))
-
-          // Enforce total duration per section: 10-15s
-          let totalDuration = scenes.reduce((sum: number, s: any) => sum + s.duration, 0)
-          if (totalDuration > 15) {
-            const scale = 15 / totalDuration
-            scenes.forEach((s: any) => {
-              s.duration = Math.max(2, Math.round(s.duration * scale))
-            })
-          }
-          if (totalDuration < 10 && scenes.length > 0) {
-            // Distribute remaining time
-            const deficit = 10 - totalDuration
-            const perScene = Math.ceil(deficit / scenes.length)
-            scenes.forEach((s: any) => {
-              s.duration = Math.min(5, s.duration + perScene)
-            })
-          }
-
-          return {
-            title: String(section.title || `Seccion ${idx + 1}`),
-            startImagePrompt: String(section.startImagePrompt || '').substring(0, 500),
-            scenes,
-          }
-        })
-
-        console.log(`[CloneViralPrompts] Success with ${model}, ${result.sections.length} sections`)
-
-        return NextResponse.json({ success: true, sections: result.sections })
-
-      } catch (modelError: any) {
-        console.error(`[CloneViralPrompts] ${model} error:`, modelError.message)
-        lastError = modelError.message
-        continue
-      }
+    // Parse JSON response
+    let result: any
+    try {
+      const cleaned = extractJSON(responseText)
+      result = JSON.parse(cleaned)
+    } catch (parseErr) {
+      console.error(`[CloneViralPrompts] JSON parse error:`, parseErr, 'Raw:', responseText.substring(0, 200))
+      return NextResponse.json({ error: 'Error al generar prompts: invalid JSON' }, { status: 500 })
     }
 
-    return NextResponse.json({ error: `Error al generar prompts: ${lastError}` }, { status: 500 })
+    // Validate structure
+    if (!result.sections || !Array.isArray(result.sections) || result.sections.length === 0) {
+      return NextResponse.json({ error: 'Error al generar prompts: invalid structure (no sections)' }, { status: 500 })
+    }
+
+    // Enforce constraints on each section
+    result.sections = result.sections.slice(0, sectionCount).map((section: any, idx: number) => {
+      const scenes = (section.scenes || []).slice(0, 5).map((s: any) => ({
+        prompt: String(s.prompt || '').substring(0, 500),
+        duration: Math.max(2, Math.min(5, Math.round(Number(s.duration) || 3))),
+      }))
+
+      // Enforce total duration per section: 10-15s
+      let totalDuration = scenes.reduce((sum: number, s: any) => sum + s.duration, 0)
+      if (totalDuration > 15) {
+        const scale = 15 / totalDuration
+        scenes.forEach((s: any) => {
+          s.duration = Math.max(2, Math.round(s.duration * scale))
+        })
+      }
+      if (totalDuration < 10 && scenes.length > 0) {
+        // Distribute remaining time
+        const deficit = 10 - totalDuration
+        const perScene = Math.ceil(deficit / scenes.length)
+        scenes.forEach((s: any) => {
+          s.duration = Math.min(5, s.duration + perScene)
+        })
+      }
+
+      return {
+        title: String(section.title || `Seccion ${idx + 1}`),
+        startImagePrompt: String(section.startImagePrompt || '').substring(0, 500),
+        scenes,
+      }
+    })
+
+    console.log(`[CloneViralPrompts] Success, ${result.sections.length} sections`)
+
+    return NextResponse.json({ success: true, sections: result.sections })
 
   } catch (error: any) {
     console.error('[CloneViralPrompts] Error:', error.message)

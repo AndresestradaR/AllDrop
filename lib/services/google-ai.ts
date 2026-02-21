@@ -1,12 +1,13 @@
 import { GoogleGenerativeAI } from '@google/generative-ai'
+import { generateAIText, type AITextKeys } from './ai-text'
 
 /**
  * Build a base prompt for landing page image generation
  */
 export function buildBasePrompt(productName: string, notes?: string): string {
-  let prompt = `Professional e-commerce product landing page hero image for "${productName}". 
-Clean white background, studio lighting, high-quality product photography style. 
-Modern, minimalist aesthetic suitable for a premium dropshipping store. 
+  let prompt = `Professional e-commerce product landing page hero image for "${productName}".
+Clean white background, studio lighting, high-quality product photography style.
+Modern, minimalist aesthetic suitable for a premium dropshipping store.
 Sharp focus, professional composition, commercial quality.`
 
   if (notes) {
@@ -17,18 +18,14 @@ Sharp focus, professional composition, commercial quality.`
 }
 
 /**
- * Enhance prompt using Gemini
+ * Enhance prompt using unified AI text service
  */
 export async function enhancePrompt(
-  apiKey: string,
+  keys: AITextKeys,
   productName: string,
   notes?: string
 ): Promise<string> {
-  const genAI = new GoogleGenerativeAI(apiKey)
-  
-  const model = genAI.getGenerativeModel({ 
-    model: 'gemini-2.5-flash',
-    systemInstruction: `You are an expert at creating prompts for AI image generation, specifically for e-commerce product landing pages.
+  const systemPrompt = `You are an expert at creating prompts for AI image generation, specifically for e-commerce product landing pages.
 Your task is to transform simple product descriptions into detailed, professional prompts that will generate high-quality hero images for landing pages.
 
 Focus on:
@@ -40,7 +37,6 @@ Focus on:
 - High contrast and sharp details
 
 Always output ONLY the enhanced prompt, nothing else. No explanations, no quotes, just the prompt text.`
-  })
 
   const userMessage = `Create an optimized image generation prompt for a landing page hero image.
 
@@ -50,17 +46,18 @@ ${notes ? `Additional notes: ${notes}` : ''}
 Generate a detailed prompt that will create a professional, conversion-optimized hero image.`
 
   try {
-    const result = await model.generateContent(userMessage)
-    const response = await result.response
-    const enhancedPrompt = response.text()?.trim()
-    
-    if (!enhancedPrompt) {
-      throw new Error('Empty response from Gemini')
+    const enhancedPrompt = await generateAIText(keys, {
+      systemPrompt,
+      userMessage,
+    })
+
+    if (!enhancedPrompt?.trim()) {
+      throw new Error('Empty response')
     }
 
-    return enhancedPrompt
+    return enhancedPrompt.trim()
   } catch (error) {
-    console.error('Gemini enhancement failed:', error)
+    console.error('AI enhancement failed:', error)
     // Return base prompt if enhancement fails
     return buildBasePrompt(productName, notes)
   }
@@ -68,6 +65,8 @@ Generate a detailed prompt that will create a professional, conversion-optimized
 
 /**
  * Generate image using Nano Banana Pro (Google's Imagen 3 model)
+ * Note: This still uses GoogleGenerativeAI SDK directly because it's image generation,
+ * not text generation. It requires a Google API key specifically.
  */
 export async function generateImage(
   apiKey: string,
@@ -77,14 +76,14 @@ export async function generateImage(
 
   try {
     // Use Imagen 3 model for image generation
-    const model = genAI.getGenerativeModel({ 
+    const model = genAI.getGenerativeModel({
       model: 'imagen-3.0-generate-002'
     })
 
     const result = await model.generateContent({
-      contents: [{ 
-        role: 'user', 
-        parts: [{ text: prompt }] 
+      contents: [{
+        role: 'user',
+        parts: [{ text: prompt }]
       }],
       generationConfig: {
         responseMimeType: 'image/png',
@@ -93,7 +92,7 @@ export async function generateImage(
 
     const response = await result.response
     const parts = response.candidates?.[0]?.content?.parts || []
-    
+
     for (const part of parts) {
       if (part.inlineData?.mimeType?.startsWith('image/')) {
         // Convert base64 to data URL
@@ -108,9 +107,9 @@ export async function generateImage(
       return { success: true, imageUrl: textResponse.trim() }
     }
 
-    return { 
-      success: false, 
-      error: 'No image generated in response' 
+    return {
+      success: false,
+      error: 'No image generated in response'
     }
   } catch (error: any) {
     console.error('Image generation failed:', error)

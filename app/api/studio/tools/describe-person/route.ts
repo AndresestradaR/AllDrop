@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { decrypt } from '@/lib/services/encryption'
+import { generateAIText, getAIKeys, requireAIKeys } from '@/lib/services/ai-text'
 
 export const maxDuration = 120
 
@@ -171,38 +171,6 @@ CONSTRAINTS:
 - Be extremely precise — vague descriptions destroy consistency
 - The 8K CHARACTER DESCRIPTOR must be self-contained and usable directly in any AI video prompt`
 
-async function callGemini(apiKey: string, systemPrompt: string, imageParts: any[], userPrompt: string): Promise<string> {
-  const models = ['gemini-2.5-pro', 'gemini-2.5-flash']
-
-  for (const model of models) {
-    try {
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
-      const response = await fetch(`${endpoint}?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: systemPrompt }] },
-          contents: [{ parts: [...imageParts, { text: userPrompt }] }],
-          generationConfig: { temperature: 0.3, maxOutputTokens: 8192 },
-        }),
-      })
-
-      if (!response.ok) {
-        console.error(`[DescribePerson] ${model} failed: ${response.status}`)
-        continue
-      }
-
-      const data = await response.json()
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
-      if (text) return text
-    } catch (err: any) {
-      console.error(`[DescribePerson] ${model} error:`, err.message)
-      continue
-    }
-  }
-  return ''
-}
-
 function extractDescriptor(text: string, patterns: RegExp[]): string {
   for (const pattern of patterns) {
     const match = text.match(pattern)
@@ -227,18 +195,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    // Get Google API key
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('google_api_key')
-      .eq('id', user.id)
-      .single()
-
-    if (!profile?.google_api_key) {
-      return NextResponse.json({ error: 'Configura tu API key de Google en Settings' }, { status: 400 })
-    }
-
-    const apiKey = decrypt(profile.google_api_key)
+    // Get AI keys
+    const keys = await getAIKeys(supabase, user.id)
+    requireAIKeys(keys)
 
     // Read image from FormData
     const formData = await request.formData()
@@ -252,20 +211,32 @@ export async function POST(request: Request) {
     const base64 = Buffer.from(buffer).toString('base64')
     const mimeType = imageFile.type || 'image/jpeg'
 
-    const imageParts = [
-      { inline_data: { mime_type: mimeType, data: base64 } },
-    ]
-
     console.log(`[DescribePerson] User: ${user.id.substring(0, 8)}..., image size: ${imageFile.size}, type: ${mimeType}`)
+
+    const imageInput = [{ mimeType, base64 }]
 
     // Execute BOTH techniques in parallel
     const [text1, text2] = await Promise.all([
-      callGemini(apiKey, TECHNIQUE_1_SYSTEM, imageParts, 'Analyze this person and generate an exhaustive visual analysis following the format specified in your instructions.'),
-      callGemini(apiKey, TECHNIQUE_2_SYSTEM, imageParts, 'Decompose this person\'s facial structure and generate the 8K cinematographic character profile following your instructions.'),
+      generateAIText(keys, {
+        systemPrompt: TECHNIQUE_1_SYSTEM,
+        userMessage: 'Analyze this person and generate an exhaustive visual analysis following the format specified in your instructions.',
+        images: imageInput,
+        temperature: 0.3,
+        kieModel: 'gemini-2.5-pro',
+        googleModel: 'gemini-2.5-pro',
+      }).catch(() => ''),
+      generateAIText(keys, {
+        systemPrompt: TECHNIQUE_2_SYSTEM,
+        userMessage: 'Decompose this person\'s facial structure and generate the 8K cinematographic character profile following your instructions.',
+        images: imageInput,
+        temperature: 0.3,
+        kieModel: 'gemini-2.5-pro',
+        googleModel: 'gemini-2.5-pro',
+      }).catch(() => ''),
     ])
 
     if (!text1 && !text2) {
-      return NextResponse.json({ error: 'Error al analizar la imagen. Verifica tu API key de Google.' }, { status: 500 })
+      return NextResponse.json({ error: 'Error al analizar la imagen. Verifica tu API key de KIE o Google.' }, { status: 500 })
     }
 
     // Extract Technique 1 descriptor

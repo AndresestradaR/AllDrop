@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { decrypt } from '@/lib/services/encryption'
+import { generateAIText, getAIKeys, requireAIKeys, extractJSON } from '@/lib/services/ai-text'
 
 export const maxDuration = 60
 
@@ -269,18 +269,9 @@ export async function POST(request: Request) {
       }>
     }
 
-    // Get user's Google API key
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('google_api_key')
-      .eq('id', user.id)
-      .single()
-
-    if (!profile?.google_api_key) {
-      return NextResponse.json({
-        error: 'Configura tu API key de Google en Settings para usar el generador de textos',
-      }, { status: 400 })
-    }
+    // Get AI keys
+    const keys = await getAIKeys(supabase, user.id)
+    requireAIKeys(keys)
 
     let resolvedProductName = product_name
     let resolvedDescription = ''
@@ -337,10 +328,8 @@ export async function POST(request: Request) {
       }
     }
 
-    const apiKey = decrypt(profile.google_api_key)
-
-    // Build multimodal parts
-    const parts: any[] = []
+    // Build images array for AI text
+    const images: { mimeType: string; base64: string }[] = []
 
     // Add product photos for OCR
     if (product_photos && product_photos.length > 0) {
@@ -348,7 +337,7 @@ export async function POST(request: Request) {
         if (photo) {
           const parsed = parseDataUrl(photo)
           if (parsed) {
-            parts.push({ inline_data: { mime_type: parsed.mimeType, data: parsed.data } })
+            images.push({ mimeType: parsed.mimeType, base64: parsed.data })
           }
         }
       }
@@ -373,7 +362,7 @@ export async function POST(request: Request) {
             const imgBase64 = Buffer.from(imgBuffer).toString('base64')
             const mimeType = imgResponse.headers.get('content-type') || 'image/png'
             const mappedCategory = CATEGORY_TO_KEY[banner.category] || banner.category
-            return { inline_data: { mime_type: mimeType, data: imgBase64 }, category: mappedCategory }
+            return { base64: imgBase64, mimeType, category: mappedCategory }
           } catch {
             return null
           }
@@ -381,8 +370,7 @@ export async function POST(request: Request) {
       )
       for (const imgResult of imageResults) {
         if (imgResult) {
-          parts.push({ inline_data: imgResult.inline_data })
-          parts.push({ text: `[Imagen: Banner existente de la seccion "${imgResult.category}"]` })
+          images.push({ mimeType: imgResult.mimeType, base64: imgResult.base64 })
           bannerCategories.push(imgResult.category)
         }
       }
@@ -410,57 +398,23 @@ export async function POST(request: Request) {
       promptLines.push('\nGenera los Controles Creativos optimizados para las 10 secciones de la galeria de banners, en JSON.')
     }
 
-    parts.push({ text: promptLines.join('\n') })
-
     console.log(`[CopyOptimizer] User: ${user.id.substring(0, 8)}..., Mode: ${mode}, Product: ${resolvedProductName}${bannerCategories.length > 0 ? `, Banners: ${bannerCategories.join(', ')}` : ''}`)
 
-    // Try Gemini 2.5 Pro first, fallback to 2.0 Flash
-    const models = [
-      'gemini-2.5-pro',
-      'gemini-2.5-flash',
-    ]
+    const responseText = await generateAIText(keys, {
+      systemPrompt: SYSTEM_PROMPT,
+      userMessage: promptLines.join('\n'),
+      images: images.length > 0 ? images : undefined,
+      temperature: 0.7,
+      jsonMode: true,
+      kieModel: 'gemini-2.5-pro',
+      googleModel: 'gemini-2.5-pro',
+    })
 
-    let lastError = ''
+    const parsed = JSON.parse(extractJSON(responseText))
 
-    for (const model of models) {
-      try {
-        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
+    console.log(`[CopyOptimizer] Success`)
 
-        const response = await fetch(`${endpoint}?key=${apiKey}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-            contents: [{ parts }],
-            generationConfig: {
-              responseMimeType: 'application/json',
-              temperature: 0.7,
-            },
-          }),
-        })
-
-        if (!response.ok) {
-          const errBody = await response.text()
-          console.error(`[CopyOptimizer] ${model} failed (${response.status}):`, errBody.substring(0, 300))
-          lastError = `${model}: ${response.status}`
-          continue
-        }
-
-        const data = await response.json()
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}'
-        const parsed = JSON.parse(text)
-
-        console.log(`[CopyOptimizer] Success with ${model}`)
-
-        return NextResponse.json(parsed)
-      } catch (modelError: any) {
-        console.error(`[CopyOptimizer] ${model} error:`, modelError.message)
-        lastError = modelError.message
-        continue
-      }
-    }
-
-    return NextResponse.json({ error: `Error al generar textos: ${lastError}` }, { status: 500 })
+    return NextResponse.json(parsed)
 
   } catch (error: any) {
     console.error('[CopyOptimizer] Error:', error.message)

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { decrypt } from '@/lib/services/encryption'
+import { getAIKeys, requireAIKeys } from '@/lib/services/ai-text'
 import { enhancePrompt, buildBasePrompt, generateImage } from '@/lib/services/google-ai'
 
 export async function POST(request: Request) {
@@ -22,7 +23,7 @@ export async function POST(request: Request) {
     // Get user's encrypted key
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('google_api_key, credits_used, credits_limit')
+      .select('google_api_key, kie_api_key, credits_used, credits_limit')
       .eq('id', user.id)
       .single()
 
@@ -35,23 +36,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Has alcanzado tu límite de generaciones' }, { status: 403 })
     }
 
-    // Check if user has Google API key
+    // Get AI keys for text enhancement
+    const aiKeys = await getAIKeys(supabase, user.id)
+    requireAIKeys(aiKeys)
+
+    // For image generation, we still need the raw Google API key
     if (!profile.google_api_key) {
       return NextResponse.json({ error: 'Configura tu API key de Google en Settings' }, { status: 400 })
     }
-
-    // Decrypt key
     const googleApiKey = decrypt(profile.google_api_key)
 
     // Build base prompt
     let originalPrompt = buildBasePrompt(productName, notes)
     let finalPrompt: string
 
-    // Try to enhance prompt with Gemini
+    // Try to enhance prompt with AI
     try {
-      finalPrompt = await enhancePrompt(googleApiKey, productName, notes)
+      finalPrompt = await enhancePrompt(aiKeys, productName, notes)
     } catch (error) {
-      console.error('Gemini enhancement error, using base prompt:', error)
+      console.error('AI enhancement error, using base prompt:', error)
       finalPrompt = originalPrompt
     }
 
@@ -81,7 +84,7 @@ export async function POST(request: Request) {
       // Update generation as failed
       await serviceClient
         .from('generations')
-        .update({ 
+        .update({
           status: 'failed',
           error_message: result.error || 'Error al generar imagen'
         })
@@ -93,9 +96,9 @@ export async function POST(request: Request) {
     // Update generation with result
     await serviceClient
       .from('generations')
-      .update({ 
+      .update({
         status: 'completed',
-        generated_image_url: result.imageUrl 
+        generated_image_url: result.imageUrl
       })
       .eq('id', generation.id)
 

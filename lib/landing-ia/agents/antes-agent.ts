@@ -1,4 +1,5 @@
 import type { ProductMetadata, CountryCode, AgentResult } from '../types'
+import { generateAIText, extractJSON, type AITextKeys } from '@/lib/services/ai-text'
 
 const SYSTEM_PROMPT = `Eres un experto copywriter especializado en ventas contraentrega (COD) en LATAM.
 Genera contenido persuasivo y emocional para el mercado latinoamericano.
@@ -7,7 +8,7 @@ Responde SOLO con JSON válido, sin markdown, sin texto adicional.`
 export async function antesAgent(
   metadata: ProductMetadata,
   country: CountryCode,
-  geminiKey: string
+  aiKeys: AITextKeys
 ): Promise<AgentResult> {
   const prompt = `
 Producto: ${metadata.title}
@@ -40,29 +41,15 @@ Schema esperado:
 `
 
   try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(30000),
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.7, maxOutputTokens: 1024 }
-        })
-      }
-    )
+    const raw = await generateAIText(aiKeys, {
+      systemPrompt: SYSTEM_PROMPT,
+      userMessage: prompt,
+      temperature: 0.7,
+      jsonMode: true,
+      signal: AbortSignal.timeout(30000),
+    })
 
-    if (!res.ok) {
-      const errText = await res.text()
-      throw new Error(`Gemini API error (${res.status}): ${errText.substring(0, 200)}`)
-    }
-
-    const data = await res.json()
-    const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
-    const clean = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
-    const parsed = JSON.parse(clean)
+    const parsed = JSON.parse(extractJSON(raw))
 
     return {
       agentName: 'transform',

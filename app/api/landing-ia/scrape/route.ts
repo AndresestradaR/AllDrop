@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { decrypt } from '@/lib/services/encryption'
+import { generateAIText, getAIKeys, requireAIKeys, extractJSON } from '@/lib/services/ai-text'
 
 export const maxDuration = 60
 
@@ -29,7 +29,7 @@ function extractImagesFromMarkdown(content: string): string[] {
     .slice(0, 8)
 }
 
-async function extractWithGemini(geminiKey: string, pageContent: string, imageUrls: string[]): Promise<any> {
+async function extractWithAI(keys: any, pageContent: string, imageUrls: string[]): Promise<any> {
   const sanitized = pageContent
     .replace(/https?:\/\/[^\s)]+/g, '')
     .replace(/[^\x20-\x7E\xA0-\xFF\n]/g, ' ')
@@ -60,46 +60,25 @@ Return a JSON object with these keys. Keep values SHORT:
 Do NOT include "images" in the JSON.
 Write all text in Spanish for Latin American audience (COD/cash-on-delivery market).`
 
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      signal: AbortSignal.timeout(25000),
-      body: JSON.stringify({
-        contents: [{ role: 'user', parts: [{ text: extractPrompt }] }],
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 2048,
-          responseMimeType: 'application/json',
-        }
-      })
-    }
-  )
+  const raw = await generateAIText(keys, {
+    userMessage: extractPrompt,
+    temperature: 0.7,
+    jsonMode: true,
+  })
 
-  if (!res.ok) {
-    const errText = await res.text()
-    console.error('[scrape] Gemini API error:', res.status, errText.substring(0, 500))
-    throw new Error(`Gemini API error (${res.status}): ${errText.substring(0, 200)}`)
-  }
-
-  const data = await res.json()
-
-  const raw = data.candidates?.[0]?.content?.parts?.[0]?.text
   if (!raw) {
-    console.error('[scrape] Gemini empty response:', JSON.stringify(data).slice(0, 500))
-    throw new Error('Gemini returned empty response')
+    throw new Error('AI returned empty response')
   }
 
-  const clean = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+  const clean = extractJSON(raw)
   let parsed = JSON.parse(clean)
 
-  // Gemini sometimes wraps in array
+  // AI sometimes wraps in array
   if (Array.isArray(parsed)) {
     parsed = parsed[0] || {}
   }
 
-  // Attach images extracted from markdown (more reliable than Gemini)
+  // Attach images extracted from markdown (more reliable than AI)
   parsed.images = imageUrls
 
   return parsed
@@ -120,17 +99,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'URL invalida' }, { status: 400 })
     }
 
-    // 3. Obtener google_api_key del usuario
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('google_api_key')
-      .eq('id', user.id)
-      .single()
-
-    if (!profile?.google_api_key) {
-      return NextResponse.json({ error: 'Configura tu API key de Google en Settings' }, { status: 400 })
-    }
-    const geminiKey = decrypt(profile.google_api_key)
+    // 3. Get AI keys
+    const keys = await getAIKeys(supabase, user.id)
+    requireAIKeys(keys)
 
     // 4. Scraping con Jina AI Reader
     let pageContent: string
@@ -175,14 +146,14 @@ export async function POST(request: Request) {
     const imageUrls = extractImagesFromMarkdown(pageContent)
     console.log('[scrape] Images found:', imageUrls.length)
 
-    // 6. Extract metadata with Gemini (retry once)
+    // 6. Extract metadata with AI (retry once)
     let metadata: any
     try {
-      metadata = await extractWithGemini(geminiKey, pageContent, imageUrls)
+      metadata = await extractWithAI(keys, pageContent, imageUrls)
     } catch (firstErr: any) {
       console.error('[scrape] First attempt failed:', firstErr.message)
       try {
-        metadata = await extractWithGemini(geminiKey, pageContent, imageUrls)
+        metadata = await extractWithAI(keys, pageContent, imageUrls)
       } catch (retryErr: any) {
         console.error('[scrape] Retry failed:', retryErr.message)
         return NextResponse.json({

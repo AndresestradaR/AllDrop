@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthContext } from '@/lib/auth/cron-auth'
-import { decrypt } from '@/lib/services/encryption'
+import { generateAIText, getAIKeys, requireAIKeys } from '@/lib/services/ai-text'
 
 export const maxDuration = 60
 
@@ -99,18 +99,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'influencerId es requerido' }, { status: 400 })
     }
 
-    // Get Google API key (Gemini only for analysis)
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('google_api_key')
-      .eq('id', userId)
-      .single()
-
-    if (!profile?.google_api_key) {
-      return NextResponse.json({ error: 'Configura tu API key de Google en Settings' }, { status: 400 })
-    }
-
-    const apiKey = decrypt(profile.google_api_key)
+    // Get AI keys
+    const keys = await getAIKeys(supabase, userId)
+    requireAIKeys(keys)
 
     // Video prompt optimization mode
     if (optimizeVideoPrompt && userIdea) {
@@ -183,22 +174,13 @@ RULES:
 
         userMessage += `\n\nGenerate the optimized video prompt:`
 
-        const endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent'
-        const response = await fetch(`${endpoint}?key=${apiKey}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            systemInstruction: { parts: [{ text: systemPrompt }] },
-            contents: [{ parts: [{ text: userMessage }] }],
-            generationConfig: { temperature: 0.7, maxOutputTokens: 1024 },
-          }),
+        const text = await generateAIText(keys, {
+          systemPrompt,
+          userMessage,
+          temperature: 0.7,
         })
 
-        if (response.ok) {
-          const data = await response.json()
-          const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
-          return NextResponse.json({ success: true, optimized_prompt: text.trim() })
-        }
+        return NextResponse.json({ success: true, optimized_prompt: text.trim() })
       } catch (err: any) {
         console.error('[Influencer/VideoPromptOptimizer] Error:', err.message)
       }
@@ -225,7 +207,7 @@ RULES:
     console.log(`[Influencer/VisualAnalysis] User: ${userId.substring(0, 8)}..., Influencer: ${influencerId.substring(0, 8)}...`)
 
     // Download images and convert to base64
-    const imageParts: any[] = []
+    const images: { mimeType: string; base64: string }[] = []
 
     // Realistic image
     const realisticRes = await fetch(realisticUrl)
@@ -233,9 +215,7 @@ RULES:
       const buffer = await realisticRes.arrayBuffer()
       const base64 = Buffer.from(buffer).toString('base64')
       const mimeType = realisticRes.headers.get('content-type') || 'image/jpeg'
-      imageParts.push({
-        inline_data: { mime_type: mimeType, data: base64 },
-      })
+      images.push({ mimeType, base64 })
     }
 
     // Angles grid image (if available)
@@ -245,9 +225,7 @@ RULES:
         const buffer = await anglesRes.arrayBuffer()
         const base64 = Buffer.from(buffer).toString('base64')
         const mimeType = anglesRes.headers.get('content-type') || 'image/jpeg'
-        imageParts.push({
-          inline_data: { mime_type: mimeType, data: base64 },
-        })
+        images.push({ mimeType, base64 })
       }
     }
 
@@ -258,136 +236,96 @@ RULES:
         const buffer = await bodyRes.arrayBuffer()
         const base64 = Buffer.from(buffer).toString('base64')
         const mimeType = bodyRes.headers.get('content-type') || 'image/jpeg'
-        imageParts.push({
-          inline_data: { mime_type: mimeType, data: base64 },
-        })
+        images.push({ mimeType, base64 })
       }
     }
 
-    if (imageParts.length === 0) {
+    if (images.length === 0) {
       return NextResponse.json({ error: 'No se pudieron descargar las imagenes' }, { status: 500 })
     }
 
-    // Call Gemini for visual analysis
-    const parts = [
-      ...imageParts,
-      { text: 'Analyze these reference images of the same person and generate an exhaustive visual analysis following the format specified in your instructions.' },
+    // Call AI for visual analysis
+    const text = await generateAIText(keys, {
+      systemPrompt: ANALYSIS_SYSTEM,
+      userMessage: 'Analyze these reference images of the same person and generate an exhaustive visual analysis following the format specified in your instructions.',
+      images,
+      temperature: 0.3,
+      kieModel: 'gemini-2.5-pro',
+      googleModel: 'gemini-2.5-pro',
+    })
+
+    if (!text) {
+      return NextResponse.json({ error: 'Error al analizar: empty response' }, { status: 500 })
+    }
+
+    // Extract PROMPT DESCRIPTOR section
+    let promptDescriptor = ''
+    const patterns = [
+      /PROMPT DESCRIPTOR[:\s]*\n+([\s\S]*?)(?:\n\n---|$)/i,
+      /PROMPT DESCRIPTOR[:\s]*\n+([\s\S]*?)$/i,
+      /prompt.descriptor[:\s]*\n+([\s\S]{100,})/i,
     ]
 
-    // Try Gemini 2.5 Pro first, then 2.0 Flash
-    const models = ['gemini-2.5-pro', 'gemini-2.5-flash']
-    let lastError = ''
-
-    for (const model of models) {
-      try {
-        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
-
-        const response = await fetch(`${endpoint}?key=${apiKey}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            systemInstruction: { parts: [{ text: ANALYSIS_SYSTEM }] },
-            contents: [{ parts }],
-            generationConfig: {
-              temperature: 0.3,
-              maxOutputTokens: 8192,
-            },
-          }),
-        })
-
-        if (!response.ok) {
-          const errBody = await response.text()
-          console.error(`[Influencer/VisualAnalysis] ${model} failed (${response.status}):`, errBody.substring(0, 300))
-          lastError = `${model}: ${response.status}`
-          continue
-        }
-
-        const data = await response.json()
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
-
-        if (!text) {
-          lastError = `${model}: empty response`
-          continue
-        }
-
-        // Extract PROMPT DESCRIPTOR section
-        let promptDescriptor = ''
-        // Intentar múltiples patrones para extraer el descriptor
-        const patterns = [
-          /PROMPT DESCRIPTOR[:\s]*\n+([\s\S]*?)(?:\n\n---|$)/i,
-          /PROMPT DESCRIPTOR[:\s]*\n+([\s\S]*?)$/i,
-          /prompt.descriptor[:\s]*\n+([\s\S]{100,})/i,
-        ]
-
-        for (const pattern of patterns) {
-          const match = text.match(pattern)
-          if (match && match[1].trim().length > 50) {
-            promptDescriptor = match[1].trim()
-            console.log('[VisualAnalysis] Descriptor extracted, length:', promptDescriptor.length)
-            break
-          }
-        }
-
-        // Si no se encontró con regex, intentar extraer el último párrafo largo (>100 chars)
-        if (!promptDescriptor) {
-          const paragraphs = text.split('\n\n').filter((p: string) => p.trim().length > 100)
-          if (paragraphs.length > 0) {
-            promptDescriptor = paragraphs[paragraphs.length - 1].trim()
-            console.log('[VisualAnalysis] Descriptor from last paragraph, length:', promptDescriptor.length)
-          }
-        }
-
-        if (!promptDescriptor) {
-          console.warn('[VisualAnalysis] WARNING: Could not extract prompt descriptor from analysis')
-        }
-
-        // Parse sections into structured character_profile
-        const characterProfile: Record<string, string> = {}
-        const sections = ['FACE', 'HAIR', 'EXPRESSION AND BODY LANGUAGE', 'CLOTHING', 'ACCESSORIES', 'IMMEDIATE VISUAL CONTEXT']
-        for (const section of sections) {
-          const regex = new RegExp(`(?:^|\\n)(?:#+\\s*)?(?:\\d+\\.\\s*)?${section}[:\\s]*\\n([\\s\\S]*?)(?=\\n(?:#+\\s*)?(?:\\d+\\.\\s*)?(?:${sections.join('|')}|PROMPT DESCRIPTOR)|$)`, 'i')
-          const match = text.match(regex)
-          if (match) {
-            characterProfile[section.toLowerCase().replace(/ /g, '_')] = match[1].trim()
-          }
-        }
-
-        // Update influencer with analysis results
-        const { error: updateError } = await supabase
-          .from('influencers')
-          .update({
-            visual_dna: text,
-            prompt_descriptor: promptDescriptor,
-            character_profile: characterProfile,
-            current_step: 6,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', influencerId)
-          .eq('user_id', userId)
-
-        if (updateError) {
-          console.error('[Influencer/VisualAnalysis] DB update FAILED:', updateError.message)
-        } else {
-          console.log(`[Influencer/VisualAnalysis] DB update OK, descriptor length: ${promptDescriptor.length}`)
-        }
-
-        console.log(`[Influencer/VisualAnalysis] Done with ${model}, visual_dna length: ${text.length}`)
-
-        return NextResponse.json({
-          success: true,
-          visual_dna: text,
-          prompt_descriptor: promptDescriptor,
-          character_profile: characterProfile,
-        })
-
-      } catch (modelError: any) {
-        console.error(`[Influencer/VisualAnalysis] ${model} error:`, modelError.message)
-        lastError = modelError.message
-        continue
+    for (const pattern of patterns) {
+      const match = text.match(pattern)
+      if (match && match[1].trim().length > 50) {
+        promptDescriptor = match[1].trim()
+        console.log('[VisualAnalysis] Descriptor extracted, length:', promptDescriptor.length)
+        break
       }
     }
 
-    return NextResponse.json({ error: `Error al analizar: ${lastError}` }, { status: 500 })
+    // Si no se encontro con regex, intentar extraer el ultimo parrafo largo (>100 chars)
+    if (!promptDescriptor) {
+      const paragraphs = text.split('\n\n').filter((p: string) => p.trim().length > 100)
+      if (paragraphs.length > 0) {
+        promptDescriptor = paragraphs[paragraphs.length - 1].trim()
+        console.log('[VisualAnalysis] Descriptor from last paragraph, length:', promptDescriptor.length)
+      }
+    }
+
+    if (!promptDescriptor) {
+      console.warn('[VisualAnalysis] WARNING: Could not extract prompt descriptor from analysis')
+    }
+
+    // Parse sections into structured character_profile
+    const characterProfile: Record<string, string> = {}
+    const sectionNames = ['FACE', 'HAIR', 'EXPRESSION AND BODY LANGUAGE', 'CLOTHING', 'ACCESSORIES', 'IMMEDIATE VISUAL CONTEXT']
+    for (const section of sectionNames) {
+      const regex = new RegExp(`(?:^|\\n)(?:#+\\s*)?(?:\\d+\\.\\s*)?${section}[:\\s]*\\n([\\s\\S]*?)(?=\\n(?:#+\\s*)?(?:\\d+\\.\\s*)?(?:${sectionNames.join('|')}|PROMPT DESCRIPTOR)|$)`, 'i')
+      const match = text.match(regex)
+      if (match) {
+        characterProfile[section.toLowerCase().replace(/ /g, '_')] = match[1].trim()
+      }
+    }
+
+    // Update influencer with analysis results
+    const { error: updateError } = await supabase
+      .from('influencers')
+      .update({
+        visual_dna: text,
+        prompt_descriptor: promptDescriptor,
+        character_profile: characterProfile,
+        current_step: 6,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', influencerId)
+      .eq('user_id', userId)
+
+    if (updateError) {
+      console.error('[Influencer/VisualAnalysis] DB update FAILED:', updateError.message)
+    } else {
+      console.log(`[Influencer/VisualAnalysis] DB update OK, descriptor length: ${promptDescriptor.length}`)
+    }
+
+    console.log(`[Influencer/VisualAnalysis] Done, visual_dna length: ${text.length}`)
+
+    return NextResponse.json({
+      success: true,
+      visual_dna: text,
+      prompt_descriptor: promptDescriptor,
+      character_profile: characterProfile,
+    })
 
   } catch (error: any) {
     console.error('[Influencer/VisualAnalysis] Error:', error.message)

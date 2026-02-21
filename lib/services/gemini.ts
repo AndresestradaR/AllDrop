@@ -1,7 +1,7 @@
-import { GoogleGenerativeAI } from '@google/generative-ai'
+import { generateAIText, type AITextKeys } from './ai-text'
 
 const SYSTEM_PROMPT = `Eres un experto en fotografía de producto para e-commerce y dropshipping.
-Tu tarea es crear prompts detallados para generar imágenes de producto verticales (9:16) 
+Tu tarea es crear prompts detallados para generar imágenes de producto verticales (9:16)
 optimizadas para landings móviles.
 
 El prompt debe describir:
@@ -15,18 +15,16 @@ Responde SOLO con el prompt optimizado en inglés, sin explicaciones ni texto ad
 El prompt debe ser específico y detallado para obtener la mejor imagen posible.`
 
 export async function enhancePrompt(
-  apiKey: string, 
-  productName: string, 
+  keys: AITextKeys,
+  productName: string,
   notes?: string
 ): Promise<string> {
-  const genAI = new GoogleGenerativeAI(apiKey)
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
-
   const userPrompt = `Producto: ${productName}${notes ? `\nNotas adicionales: ${notes}` : ''}`
 
-  const result = await model.generateContent([SYSTEM_PROMPT, userPrompt])
-  const response = result.response
-  const text = response.text()
+  const text = await generateAIText(keys, {
+    systemPrompt: SYSTEM_PROMPT,
+    userMessage: userPrompt,
+  })
 
   return text.trim()
 }

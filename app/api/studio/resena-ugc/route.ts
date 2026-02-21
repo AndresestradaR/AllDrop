@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { decrypt } from '@/lib/services/encryption'
 import { GoogleGenerativeAI } from '@google/generative-ai'
+import { generateAIText, getAIKeys, requireAIKeys } from '@/lib/services/ai-text'
 import { generateVideo, VIDEO_MODELS } from '@/lib/video-providers'
 
 // Extended timeout for video generation
@@ -101,21 +102,23 @@ export async function POST(request: Request) {
       .eq('id', user.id)
       .single()
 
-    if (!profile?.google_api_key) {
-      return NextResponse.json({
-        error: 'Configura tu API key de Google AI en Settings',
-      }, { status: 400 })
-    }
-
     if (!profile?.kie_api_key) {
       return NextResponse.json({
         error: 'Configura tu API key de KIE.ai en Settings para generar videos',
       }, { status: 400 })
     }
 
-    const googleApiKey = decrypt(profile.google_api_key)
+    // Get AI text keys (for text generation: character profiling & script)
+    const aiKeys = await getAIKeys(supabase, user.id)
+    requireAIKeys(aiKeys)
+
     const kieApiKey = decrypt(profile.kie_api_key)
-    const genAI = new GoogleGenerativeAI(googleApiKey)
+
+    // For image generation with Imagen 3, we still need the Google API key directly
+    let googleApiKey: string | undefined
+    if (profile?.google_api_key) {
+      googleApiKey = decrypt(profile.google_api_key)
+    }
 
     console.log(`[ResenaUGC] Starting - User: ${user.id.substring(0, 8)}...`)
     console.log(`[ResenaUGC] Product: ${productName}, Model: ${videoModel}, Duration: ${duration}s`)
@@ -129,7 +132,14 @@ export async function POST(request: Request) {
     if (imageSource === 'generate') {
       console.log(`[ResenaUGC] Step 1: Generating face with ${imageModel}...`)
 
+      if (!googleApiKey) {
+        return NextResponse.json({
+          error: 'Configura tu API key de Google AI en Settings para generar imagenes',
+        }, { status: 400 })
+      }
+
       const facePrompt = FACE_PROMPTS[persona] || FACE_PROMPTS['mujer-joven']
+      const genAI = new GoogleGenerativeAI(googleApiKey)
 
       if (imageModel === 'gemini' || imageModel === 'imagen3') {
         // Use Google's Imagen 3
@@ -203,21 +213,10 @@ export async function POST(request: Request) {
 
     let characterProfile = ''
     try {
-      const thinkingModel = genAI.getGenerativeModel({
-        model: 'gemini-2.5-flash'
+      characterProfile = await generateAIText(aiKeys, {
+        userMessage: CHARACTER_PROFILE_PROMPT,
+        images: [{ mimeType: 'image/png', base64: faceImageBase64 }],
       })
-
-      const profileResult = await thinkingModel.generateContent([
-        {
-          inlineData: {
-            mimeType: 'image/png',
-            data: faceImageBase64
-          }
-        },
-        { text: CHARACTER_PROFILE_PROMPT }
-      ])
-
-      characterProfile = profileResult.response.text() || ''
       console.log('[ResenaUGC] Character profile created:', characterProfile.substring(0, 200))
     } catch (error: any) {
       console.error('[ResenaUGC] Character profiling failed:', error.message)
@@ -234,11 +233,6 @@ export async function POST(request: Request) {
       console.log('[ResenaUGC] Step 3: Generating script...')
 
       try {
-        const scriptModel = genAI.getGenerativeModel({
-          model: 'gemini-2.5-flash',
-          systemInstruction: SCRIPT_SYSTEM_PROMPT
-        })
-
         const personaLabel = {
           'mujer-joven': 'Mujer joven (18-30)',
           'mujer-adulta': 'Mujer adulta (30-50)',
@@ -260,8 +254,11 @@ DURACION: ${duration} segundos
 
 Genera el guion de la resena UGC.`
 
-        const scriptResult = await scriptModel.generateContent(scriptPrompt)
-        script = scriptResult.response.text()?.trim() || ''
+        script = await generateAIText(aiKeys, {
+          systemPrompt: SCRIPT_SYSTEM_PROMPT,
+          userMessage: scriptPrompt,
+        })
+        script = script.trim()
 
         console.log('[ResenaUGC] Script generated:', script.substring(0, 100))
       } catch (error: any) {

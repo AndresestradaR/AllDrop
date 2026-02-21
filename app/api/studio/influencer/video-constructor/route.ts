@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthContext } from '@/lib/auth/cron-auth'
-import { decrypt } from '@/lib/services/encryption'
+import { generateAIText, getAIKeys, requireAIKeys, extractJSON } from '@/lib/services/ai-text'
 
 export const maxDuration = 60
 
@@ -64,18 +64,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'influencerId y productDescription son requeridos' }, { status: 400 })
     }
 
-    // Get Google API key
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('google_api_key')
-      .eq('id', userId)
-      .single()
-
-    if (!profile?.google_api_key) {
-      return NextResponse.json({ error: 'Configura tu API key de Google en Settings' }, { status: 400 })
-    }
-
-    const apiKey = decrypt(profile.google_api_key)
+    // Get AI keys
+    const keys = await getAIKeys(supabase, userId)
+    requireAIKeys(keys)
 
     const userMessage = `INFLUENCER VISUAL DESCRIPTOR:
 ${promptDescriptor || `A person called ${influencerName}`}
@@ -93,95 +84,55 @@ ${scenario || 'at home, casual setting'}
 
 Generate the structured multi-shot video script as JSON.`
 
-    // Try Gemini 2.5 Pro first, fallback to Flash
-    const models = ['gemini-2.5-pro', 'gemini-2.5-flash']
-    let lastError = ''
+    const responseText = await generateAIText(keys, {
+      systemPrompt: CONSTRUCTOR_SYSTEM,
+      userMessage,
+      temperature: 0.7,
+      jsonMode: true,
+      kieModel: 'gemini-2.5-pro',
+      googleModel: 'gemini-2.5-pro',
+    })
 
-    for (const model of models) {
-      try {
-        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
-
-        const response = await fetch(`${endpoint}?key=${apiKey}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            systemInstruction: { parts: [{ text: CONSTRUCTOR_SYSTEM }] },
-            contents: [{ parts: [{ text: userMessage }] }],
-            generationConfig: {
-              temperature: 0.7,
-              maxOutputTokens: 2048,
-              responseMimeType: 'application/json',
-            },
-          }),
-        })
-
-        if (!response.ok) {
-          const errBody = await response.text()
-          console.error(`[VideoConstructor] ${model} failed (${response.status}):`, errBody.substring(0, 300))
-          lastError = `${model}: ${response.status}`
-          continue
-        }
-
-        const data = await response.json()
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
-
-        if (!text) {
-          lastError = `${model}: empty response`
-          continue
-        }
-
-        // Parse JSON response
-        let result: any
-        try {
-          // Clean potential markdown code blocks
-          const cleaned = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim()
-          result = JSON.parse(cleaned)
-        } catch (parseErr) {
-          console.error(`[VideoConstructor] JSON parse error:`, parseErr, 'Raw:', text.substring(0, 200))
-          lastError = `${model}: invalid JSON`
-          continue
-        }
-
-        // Validate structure
-        if (!result.scenes || !Array.isArray(result.scenes) || result.scenes.length < 2) {
-          lastError = `${model}: invalid structure (no scenes)`
-          continue
-        }
-
-        // Enforce constraints
-        result.scenes = result.scenes.slice(0, 5).map((s: any) => ({
-          prompt: String(s.prompt || '').substring(0, 500),
-          duration: Math.max(1, Math.min(12, Math.round(Number(s.duration) || 4))),
-        }))
-
-        const totalDuration = result.scenes.reduce((sum: number, s: any) => sum + s.duration, 0)
-        if (totalDuration > 15) {
-          // Scale down durations proportionally
-          const scale = 15 / totalDuration
-          result.scenes = result.scenes.map((s: any) => ({
-            ...s,
-            duration: Math.max(1, Math.round(s.duration * scale)),
-          }))
-        }
-        if (totalDuration < 3 && result.scenes.length > 0) {
-          result.scenes[0].duration = Math.max(result.scenes[0].duration, 3)
-        }
-
-        result.startFramePrompt = String(result.startFramePrompt || '').substring(0, 500)
-        result.endFramePrompt = String(result.endFramePrompt || '').substring(0, 500)
-
-        console.log(`[VideoConstructor] Success with ${model}, ${result.scenes.length} scenes, total ${totalDuration}s`)
-
-        return NextResponse.json({ success: true, result })
-
-      } catch (modelError: any) {
-        console.error(`[VideoConstructor] ${model} error:`, modelError.message)
-        lastError = modelError.message
-        continue
-      }
+    // Parse JSON response
+    let result: any
+    try {
+      const cleaned = extractJSON(responseText)
+      result = JSON.parse(cleaned)
+    } catch (parseErr) {
+      console.error(`[VideoConstructor] JSON parse error:`, parseErr, 'Raw:', responseText.substring(0, 200))
+      return NextResponse.json({ error: 'Error al generar: invalid JSON' }, { status: 500 })
     }
 
-    return NextResponse.json({ error: `Error al generar: ${lastError}` }, { status: 500 })
+    // Validate structure
+    if (!result.scenes || !Array.isArray(result.scenes) || result.scenes.length < 2) {
+      return NextResponse.json({ error: 'Error al generar: invalid structure (no scenes)' }, { status: 500 })
+    }
+
+    // Enforce constraints
+    result.scenes = result.scenes.slice(0, 5).map((s: any) => ({
+      prompt: String(s.prompt || '').substring(0, 500),
+      duration: Math.max(1, Math.min(12, Math.round(Number(s.duration) || 4))),
+    }))
+
+    const totalDuration = result.scenes.reduce((sum: number, s: any) => sum + s.duration, 0)
+    if (totalDuration > 15) {
+      // Scale down durations proportionally
+      const scale = 15 / totalDuration
+      result.scenes = result.scenes.map((s: any) => ({
+        ...s,
+        duration: Math.max(1, Math.round(s.duration * scale)),
+      }))
+    }
+    if (totalDuration < 3 && result.scenes.length > 0) {
+      result.scenes[0].duration = Math.max(result.scenes[0].duration, 3)
+    }
+
+    result.startFramePrompt = String(result.startFramePrompt || '').substring(0, 500)
+    result.endFramePrompt = String(result.endFramePrompt || '').substring(0, 500)
+
+    console.log(`[VideoConstructor] Success, ${result.scenes.length} scenes, total ${totalDuration}s`)
+
+    return NextResponse.json({ success: true, result })
 
   } catch (error: any) {
     console.error('[VideoConstructor] Error:', error.message)
