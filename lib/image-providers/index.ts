@@ -41,14 +41,16 @@ export function getAllProviders() {
 }
 
 /**
- * Generate image with automatic provider routing and fallback cascade.
+ * Generate image with automatic provider routing.
  *
- * For Gemini models:
- *   1. Try KIE (Nano Banana Pro) first — cheaper and stable
- *   2. If KIE fails → fall back to direct Google API (if key exists)
- *   3. If both fail → return error with clear instructions
+ * KIE is the PRIMARY provider for everything. For Gemini models:
+ *   1. Try KIE nano-banana-pro (Gemini 3 Pro Image)
+ *   2. If fails → try KIE nano-banana (Gemini 2.5 Flash Image)
+ *   3. If fails → try KIE seedream/4.5 as ultimate fallback
+ *   4. Only if user has NO KIE key → try direct Google API
  *
- * For other providers: direct call, no fallback.
+ * For Seedream models: KIE direct (already works)
+ * For other providers: direct call
  */
 export async function generateImage(
   request: GenerateImageRequest,
@@ -69,58 +71,21 @@ export async function generateImage(
     }
   }
 
-  // ── Gemini: KIE first → Google fallback ──
+  // ── Gemini: ALL through KIE with internal fallback cascade ──
   if (request.provider === 'gemini') {
-    // Step 1: Try KIE (Nano Banana Pro)
     if (apiKeys.kie) {
-      console.log('[generateImage] Gemini: trying KIE (Nano Banana Pro)...')
-      const kieResult = await generateViaKie(request, apiKeys.kie)
-
-      if (kieResult.success) {
-        return kieResult
-      }
-
-      console.warn('[generateImage] KIE failed:', kieResult.error)
-
-      // Step 2: Fall back to direct Google API
-      if (apiKeys.gemini) {
-        console.log('[generateImage] Gemini: KIE failed, falling back to direct Google API...')
-        try {
-          return await provider.generate(request, apiKeys.gemini)
-        } catch (googleErr: any) {
-          console.error('[generateImage] Google fallback also failed:', googleErr.message)
-          // Return KIE error since it was the primary attempt
-          return {
-            success: false,
-            error: `KIE fallo (${kieResult.error}). Google tambien fallo (${googleErr.message}). Verifica tus API keys en Settings.`,
-            provider: 'gemini',
-          }
-        }
-      }
-
-      // No Google key — return KIE error with helpful message
-      const kieError = kieResult.error || 'Error desconocido'
-      if (kieError.includes('access permissions') || kieError.includes('permission')) {
-        return {
-          success: false,
-          error: 'Tu cuenta de KIE no tiene acceso al modelo Nano Banana Pro (Gemini imagen). Opciones:\n1. Activa el modelo en kie.ai/market\n2. Verifica que tienes creditos suficientes en KIE\n3. Configura tu API key de Google en Settings como alternativa',
-          provider: 'gemini',
-        }
-      }
-
-      return kieResult
+      return generateViaKieCascade(request, apiKeys.kie)
     }
 
-    // No KIE key — try direct Google API
+    // No KIE key — last resort: direct Google API
     if (apiKeys.gemini) {
       console.log('[generateImage] Gemini: no KIE key, using direct Google API')
       return provider.generate(request, apiKeys.gemini)
     }
 
-    // No keys at all
     return {
       success: false,
-      error: 'Configura tu API key de KIE.ai o Google (Gemini) en Settings',
+      error: 'Configura tu API key de KIE.ai en Settings',
       provider: 'gemini',
     }
   }
@@ -151,11 +116,19 @@ export async function generateImage(
 }
 
 /**
- * Generate image via KIE's Nano Banana Pro (Gemini 3 Pro Image).
- * Uses the same prompt style as the Gemini provider but routes through KIE's stable servers.
- * Handles the full async cycle: createTask → poll → return image.
+ * KIE model cascade for Gemini image generation.
+ * Tries multiple KIE models in order until one works:
+ *   1. nano-banana-pro  (Gemini 3 Pro Image — best quality)
+ *   2. nano-banana       (Gemini 2.5 Flash Image — fast)
+ *   3. seedream/4.5-text-to-image (Seedream — always works as ultimate fallback)
  */
-async function generateViaKie(
+const KIE_IMAGE_MODELS = [
+  { model: 'nano-banana-pro', name: 'Gemini 3 Pro Image', supportsImageInput: true },
+  { model: 'nano-banana', name: 'Gemini 2.5 Flash Image', supportsImageInput: true },
+  { model: 'seedream/4.5-text-to-image', name: 'Seedream 4.5', supportsImageInput: false },
+]
+
+async function generateViaKieCascade(
   request: GenerateImageRequest,
   kieApiKey: string
 ): Promise<GenerateImageResult> {
@@ -170,76 +143,131 @@ async function generateViaKie(
     imageUrls.push(...request.productImageUrls)
   }
 
-  console.log(`[KIE] Prompt length: ${prompt.length}, image URLs: ${imageUrls.length}`)
+  const errors: string[] = []
 
-  // Create task via KIE API with Nano Banana Pro (Gemini 3 Pro Image)
-  const createResponse = await fetch('https://api.kie.ai/api/v1/jobs/createTask', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${kieApiKey}`,
-    },
-    body: JSON.stringify({
-      model: 'nano-banana-pro',
-      input: {
-        prompt,
-        ...(imageUrls.length > 0 ? { image_input: imageUrls } : {}),
-        aspect_ratio: request.aspectRatio || '9:16',
-        resolution: '1K',
-        output_format: 'png',
-      },
-    }),
-  })
+  for (const kieModel of KIE_IMAGE_MODELS) {
+    console.log(`[KIE Cascade] Trying ${kieModel.model} (${kieModel.name})...`)
 
-  const responseText = await createResponse.text()
-  console.log(`[KIE] Create response: ${createResponse.status} - ${responseText.substring(0, 300)}`)
+    // Build input based on model capabilities
+    const input: any = {
+      prompt,
+      aspect_ratio: request.aspectRatio || '9:16',
+      output_format: 'png',
+    }
 
-  let createData: any
+    // Nano Banana models support resolution + image_input
+    if (kieModel.model.startsWith('nano-banana')) {
+      input.resolution = '1K'
+      if (imageUrls.length > 0 && kieModel.supportsImageInput) {
+        input.image_input = imageUrls
+      }
+    } else if (kieModel.model.startsWith('seedream')) {
+      // Seedream uses different params
+      input.quality = 'basic'
+      // Seedream edit mode needs image_urls (different field name)
+      if (imageUrls.length > 0) {
+        // Switch to edit model for image input
+        const editModel = kieModel.model.replace('text-to-image', 'edit')
+        console.log(`[KIE Cascade] Seedream with images, switching to edit model: ${editModel}`)
+        // Use edit model and image_urls field
+        const editResult = await callKieCreateTask(editModel, { ...input, image_urls: imageUrls }, kieApiKey)
+        if (editResult.success) return { ...editResult, provider: 'gemini' }
+        // If edit fails, try text-only
+        console.warn(`[KIE Cascade] Seedream edit failed, trying text-only`)
+      }
+    }
+
+    const result = await callKieCreateTask(kieModel.model, input, kieApiKey)
+
+    if (result.success) {
+      console.log(`[KIE Cascade] ${kieModel.model} succeeded!`)
+      return { ...result, provider: 'gemini' }
+    }
+
+    const errorMsg = result.error || 'Unknown error'
+    errors.push(`${kieModel.name}: ${errorMsg}`)
+    console.warn(`[KIE Cascade] ${kieModel.model} failed: ${errorMsg}`)
+
+    // If it's NOT a permissions/access error, don't try other models
+    // (e.g., if the prompt is bad, all models will fail the same way)
+    if (!errorMsg.includes('access') && !errorMsg.includes('permission') && !errorMsg.includes('not found') && !errorMsg.includes('404')) {
+      break
+    }
+  }
+
+  // All KIE models failed
+  return {
+    success: false,
+    error: `Todos los modelos de KIE fallaron. Verifica tu cuenta en kie.ai:\n1. Que tengas creditos suficientes\n2. Que los modelos esten activados en kie.ai/market\n\nDetalles: ${errors.join(' | ')}`,
+    provider: 'gemini',
+  }
+}
+
+/**
+ * Create a single KIE task, poll for result, return image.
+ */
+async function callKieCreateTask(
+  model: string,
+  input: any,
+  kieApiKey: string
+): Promise<GenerateImageResult> {
   try {
-    createData = JSON.parse(responseText)
-  } catch {
+    const createResponse = await fetch('https://api.kie.ai/api/v1/jobs/createTask', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${kieApiKey}`,
+      },
+      body: JSON.stringify({ model, input }),
+    })
+
+    const responseText = await createResponse.text()
+    console.log(`[KIE:${model}] Response: ${createResponse.status} - ${responseText.substring(0, 200)}`)
+
+    let createData: any
+    try {
+      createData = JSON.parse(responseText)
+    } catch {
+      return { success: false, error: 'KIE: respuesta invalida', provider: 'gemini' }
+    }
+
+    if (createData.code !== 200 && createData.code !== 0) {
+      return {
+        success: false,
+        error: `${createData.msg || JSON.stringify(createData).substring(0, 150)}`,
+        provider: 'gemini',
+      }
+    }
+
+    const taskId = createData.data?.taskId || createData.taskId
+    if (!taskId) {
+      return { success: false, error: 'KIE: no taskId', provider: 'gemini' }
+    }
+
+    console.log(`[KIE:${model}] Task: ${taskId}, polling...`)
+
+    const pollResult = await pollForResult('seedream', taskId, kieApiKey, {
+      maxAttempts: 120,
+      intervalMs: 2000,
+      timeoutMs: 270000,
+    })
+
+    if (!pollResult.success) {
+      return {
+        success: false,
+        error: pollResult.error || 'KIE: generacion fallida',
+        provider: 'gemini',
+      }
+    }
+
+    return pollResult
+  } catch (err: any) {
     return {
       success: false,
-      error: 'KIE: respuesta invalida del servidor',
+      error: err.message || 'KIE: error de conexion',
       provider: 'gemini',
     }
   }
-
-  if (createData.code !== 200 && createData.code !== 0) {
-    return {
-      success: false,
-      error: `KIE: ${createData.msg || JSON.stringify(createData).substring(0, 200)}`,
-      provider: 'gemini',
-    }
-  }
-
-  const taskId = createData.data?.taskId || createData.taskId
-  if (!taskId) {
-    return {
-      success: false,
-      error: 'KIE: no se recibio taskId',
-      provider: 'gemini',
-    }
-  }
-
-  console.log(`[KIE] Task created: ${taskId}, polling...`)
-
-  // With maxDuration=300 on the route, we have up to 5 min
-  const pollResult = await pollForResult('seedream', taskId, kieApiKey, {
-    maxAttempts: 120,
-    intervalMs: 2000,
-    timeoutMs: 270000,
-  })
-
-  if (!pollResult.success) {
-    return {
-      success: false,
-      error: pollResult.error || 'KIE no pudo generar la imagen. Intenta de nuevo en unos segundos.',
-      provider: 'gemini',
-    }
-  }
-
-  return { ...pollResult, provider: 'gemini' }
 }
 
 /**
