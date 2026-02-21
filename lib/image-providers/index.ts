@@ -165,8 +165,9 @@ async function generateViaKieCascade(
       break
     }
 
-    // Per-model timeout: use remaining time but cap at 70s per model
-    const modelTimeout = Math.min(remaining - 3000, 70000)
+    // Per-model timeout: use remaining time but cap at 150s per model
+    // KIE queues jobs, so later jobs in bulk generation need more time
+    const modelTimeout = Math.min(remaining - 3000, 150000)
     console.log(`[KIE Cascade] Trying ${kieModel.model} (${kieModel.name}), timeout: ${Math.round(modelTimeout / 1000)}s...`)
 
     // Build input based on model capabilities

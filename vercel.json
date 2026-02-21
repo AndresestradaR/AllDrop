@@ -19,7 +19,7 @@
       "maxDuration": 120
     },
     "app/api/generate-landing/route.ts": {
-      "maxDuration": 120
+      "maxDuration": 300
     },
     "app/api/generate/route.ts": {
       "maxDuration": 120
