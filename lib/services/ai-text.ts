@@ -61,8 +61,35 @@ export async function generateAIText(
 
 // ── KIE.ai Chat API (OpenAI-compatible) ────────────────────────
 
+// KIE text model cascade: try primary model, then fallbacks
+const KIE_TEXT_MODELS = ['gemini-2.5-flash', 'gemini-2.5-pro']
+
 async function callKIE(apiKey: string, options: AITextOptions): Promise<string> {
-  const model = options.kieModel || 'gemini-2.5-flash'
+  // If caller specified a model, use only that one; otherwise cascade
+  const models = options.kieModel
+    ? [options.kieModel]
+    : KIE_TEXT_MODELS
+
+  const errors: string[] = []
+
+  for (const model of models) {
+    try {
+      const result = await callKIESingleModel(apiKey, model, options)
+      return result
+    } catch (err: any) {
+      console.warn(`[AI Text] KIE model ${model} failed: ${err.message}`)
+      errors.push(`${model}: ${err.message}`)
+    }
+  }
+
+  throw new Error(`KIE: todos los modelos fallaron — ${errors.join('; ')}`)
+}
+
+async function callKIESingleModel(
+  apiKey: string,
+  model: string,
+  options: AITextOptions
+): Promise<string> {
   const url = `https://api.kie.ai/${model}/v1/chat/completions`
 
   const messages: any[] = []
@@ -90,33 +117,56 @@ async function callKIE(apiKey: string, options: AITextOptions): Promise<string> 
     body.temperature = options.temperature
   }
 
-  if (options.jsonMode) {
-    body.response_format = { type: 'json_object' }
+  // NOTE: Do NOT send response_format to KIE — it's not supported by all
+  // OpenAI-compatible providers. The system prompt already asks for JSON.
+
+  // Safety timeout: 90s max per model
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 90000)
+  const signal = options.signal
+    ? anySignal([options.signal, controller.signal])
+    : controller.signal
+
+  try {
+    console.log(`[AI Text] KIE: calling ${model}...`)
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(body),
+      signal,
+    })
+
+    if (!response.ok) {
+      const errText = await response.text()
+      throw new Error(`KIE API ${model} (${response.status}): ${errText.substring(0, 300)}`)
+    }
+
+    const data = await response.json()
+    const text = data.choices?.[0]?.message?.content
+
+    if (!text) {
+      throw new Error(`KIE ${model}: respuesta vacia`)
+    }
+
+    console.log(`[AI Text] KIE ${model} success (${text.length} chars)`)
+    return text
+  } finally {
+    clearTimeout(timeout)
   }
+}
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify(body),
-    signal: options.signal,
-  })
-
-  if (!response.ok) {
-    const errText = await response.text()
-    throw new Error(`KIE API (${response.status}): ${errText.substring(0, 300)}`)
+/** Combine multiple AbortSignals into one */
+function anySignal(signals: AbortSignal[]): AbortSignal {
+  const controller = new AbortController()
+  for (const s of signals) {
+    if (s.aborted) { controller.abort(s.reason); return controller.signal }
+    s.addEventListener('abort', () => controller.abort(s.reason), { once: true })
   }
-
-  const data = await response.json()
-  const text = data.choices?.[0]?.message?.content
-
-  if (!text) {
-    throw new Error('KIE returned empty response')
-  }
-
-  return text
+  return controller.signal
 }
 
 // ── Google Gemini API (direct) ─────────────────────────────────

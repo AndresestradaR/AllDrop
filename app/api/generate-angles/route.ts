@@ -3,6 +3,8 @@ import { createClient } from '@/lib/supabase/server'
 import { aiLimiter, getClientIp } from '@/lib/rate-limit'
 import { getAIKeys, requireAIKeys, generateAIText, extractJSON, type AIImageInput } from '@/lib/services/ai-text'
 
+export const maxDuration = 120
+
 function parseDataUrl(dataUrl: string): { data: string; mimeType: string } | null {
   if (!dataUrl.startsWith('data:')) return null
   const [header, data] = dataUrl.split(',')
