@@ -65,7 +65,7 @@ function getAspectRatioClass(ratio: AspectRatio): string {
 
 export function ImageGenerator() {
   // Model selection
-  const [selectedModel, setSelectedModel] = useState<ImageModelId>('gemini-2.5-flash')
+  const [selectedModel, setSelectedModel] = useState<ImageModelId>('seedream-4.5')
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false)
 
   // Generation mode (text-only or with image references)
