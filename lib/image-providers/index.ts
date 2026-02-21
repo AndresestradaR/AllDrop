@@ -246,10 +246,11 @@ async function callKieCreateTask(
 
     console.log(`[KIE:${model}] Task: ${taskId}, polling...`)
 
+    // 90s max polling — fits within 120s route maxDuration with buffer
     const pollResult = await pollForResult('seedream', taskId, kieApiKey, {
-      maxAttempts: 120,
+      maxAttempts: 45,
       intervalMs: 2000,
-      timeoutMs: 270000,
+      timeoutMs: 90000,
     })
 
     if (!pollResult.success) {
