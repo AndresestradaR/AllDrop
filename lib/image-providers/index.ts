@@ -184,13 +184,21 @@ async function generateViaKieCascade(
       return { ...result, provider: 'gemini' }
     }
 
-    const errorMsg = result.error || 'Unknown error'
-    errors.push(`${kieModel.name}: ${errorMsg}`)
-    console.warn(`[KIE Cascade] ${kieModel.model} failed: ${errorMsg}`)
+    const errorMsg = (result.error || 'Unknown error').toLowerCase()
+    errors.push(`${kieModel.name}: ${result.error || 'Unknown error'}`)
+    console.warn(`[KIE Cascade] ${kieModel.model} failed: ${result.error}`)
 
-    // If it's NOT a permissions/access error, don't try other models
-    // (e.g., if the prompt is bad, all models will fail the same way)
-    if (!errorMsg.includes('access') && !errorMsg.includes('permission') && !errorMsg.includes('not found') && !errorMsg.includes('404')) {
+    // Only BREAK if it's a prompt/content error (all models will fail the same way).
+    // CONTINUE cascade for transient errors (timeout, rate limit, server errors, access).
+    const isContentError =
+      errorMsg.includes('safety') ||
+      errorMsg.includes('blocked') ||
+      errorMsg.includes('harmful') ||
+      errorMsg.includes('inappropriate') ||
+      errorMsg.includes('invalid prompt')
+
+    if (isContentError) {
+      console.warn(`[KIE Cascade] Content/safety error, stopping cascade`)
       break
     }
   }

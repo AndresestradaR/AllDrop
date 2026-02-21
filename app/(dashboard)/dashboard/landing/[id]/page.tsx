@@ -522,7 +522,7 @@ export default function ProductGeneratePage() {
     let completed = 0
     let failed = 0
 
-    const CONCURRENT_LIMIT = 3
+    const CONCURRENT_LIMIT = 1 // Sequential: KIE rate limits concurrent requests
     const tasks: Array<{ angle: typeof selectedAngles[0]; sectionId: string }> = []
 
     for (const angle of selectedAngles) {
