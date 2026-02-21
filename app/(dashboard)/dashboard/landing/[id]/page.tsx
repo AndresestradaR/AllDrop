@@ -1286,7 +1286,10 @@ export default function ProductGeneratePage() {
                     className="w-full h-12 rounded-xl border-2 border-border hover:border-accent/50 transition-colors cursor-pointer flex items-center justify-center gap-2"
                     style={{ backgroundColor: colorPalette.primary }}
                   >
-                    <span className="text-xs font-mono text-white drop-shadow-md bg-black/30 px-2 py-0.5 rounded">
+                    <span
+                      className="relative z-10 text-xs font-mono text-white drop-shadow-md bg-black/30 px-2 py-0.5 rounded cursor-copy hover:bg-black/50 transition-colors"
+                      onClick={(e) => { e.stopPropagation(); e.preventDefault(); navigator.clipboard.writeText(colorPalette.primary.toUpperCase()); toast.success('Copiado ' + colorPalette.primary.toUpperCase()) }}
+                    >
                       {colorPalette.primary.toUpperCase()}
                     </span>
                   </div>
@@ -1307,7 +1310,10 @@ export default function ProductGeneratePage() {
                     className="w-full h-12 rounded-xl border-2 border-border hover:border-accent/50 transition-colors cursor-pointer flex items-center justify-center gap-2"
                     style={{ backgroundColor: colorPalette.secondary }}
                   >
-                    <span className="text-xs font-mono text-white drop-shadow-md bg-black/30 px-2 py-0.5 rounded">
+                    <span
+                      className="relative z-10 text-xs font-mono text-white drop-shadow-md bg-black/30 px-2 py-0.5 rounded cursor-copy hover:bg-black/50 transition-colors"
+                      onClick={(e) => { e.stopPropagation(); e.preventDefault(); navigator.clipboard.writeText(colorPalette.secondary.toUpperCase()); toast.success('Copiado ' + colorPalette.secondary.toUpperCase()) }}
+                    >
                       {colorPalette.secondary.toUpperCase()}
                     </span>
                   </div>
@@ -1328,7 +1334,10 @@ export default function ProductGeneratePage() {
                     className="w-full h-12 rounded-xl border-2 border-border hover:border-accent/50 transition-colors cursor-pointer flex items-center justify-center gap-2"
                     style={{ backgroundColor: colorPalette.accent }}
                   >
-                    <span className="text-xs font-mono text-white drop-shadow-md bg-black/30 px-2 py-0.5 rounded">
+                    <span
+                      className="relative z-10 text-xs font-mono text-white drop-shadow-md bg-black/30 px-2 py-0.5 rounded cursor-copy hover:bg-black/50 transition-colors"
+                      onClick={(e) => { e.stopPropagation(); e.preventDefault(); navigator.clipboard.writeText(colorPalette.accent.toUpperCase()); toast.success('Copiado ' + colorPalette.accent.toUpperCase()) }}
+                    >
                       {colorPalette.accent.toUpperCase()}
                     </span>
                   </div>
@@ -1350,7 +1359,10 @@ export default function ProductGeneratePage() {
                       className="w-full h-12 rounded-xl border-2 border-border hover:border-accent/50 transition-colors cursor-pointer flex items-center justify-center gap-2"
                       style={{ backgroundColor: colorPalette.extra }}
                     >
-                      <span className="text-xs font-mono text-white drop-shadow-md bg-black/30 px-2 py-0.5 rounded">
+                      <span
+                        className="relative z-10 text-xs font-mono text-white drop-shadow-md bg-black/30 px-2 py-0.5 rounded cursor-copy hover:bg-black/50 transition-colors"
+                        onClick={(e) => { e.stopPropagation(); e.preventDefault(); navigator.clipboard.writeText(colorPalette.extra.toUpperCase()); toast.success('Copiado ' + colorPalette.extra.toUpperCase()) }}
+                      >
                         {colorPalette.extra.toUpperCase()}
                       </span>
                     </div>
