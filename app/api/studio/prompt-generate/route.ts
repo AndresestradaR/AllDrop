@@ -81,7 +81,7 @@ export async function POST(request: Request) {
     const apiKey = decrypt(profile.google_api_key)
     const genAI = new GoogleGenerativeAI(apiKey)
     const aiModel = genAI.getGenerativeModel({
-      model: 'gemini-2.0-flash',
+      model: 'gemini-2.5-flash',
       systemInstruction: VIDEO_PROMPT_SYSTEM,
       generationConfig: {
         responseMimeType: 'application/json',

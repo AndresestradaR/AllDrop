@@ -183,7 +183,7 @@ RULES:
 
         userMessage += `\n\nGenerate the optimized video prompt:`
 
-        const endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent'
+        const endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent'
         const response = await fetch(`${endpoint}?key=${apiKey}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

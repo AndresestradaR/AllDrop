@@ -102,7 +102,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
         .replace('{influencer_descriptor}', influencer.prompt_descriptor || influencer.name)
         .replace('{scenarios_instruction}', `ESCENARIO A USAR: "${randomScenario}"`)
 
-      const aiRes = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent', {
+      const aiRes = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

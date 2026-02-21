@@ -20,7 +20,7 @@ export async function enhancePrompt(
   notes?: string
 ): Promise<string> {
   const genAI = new GoogleGenerativeAI(apiKey)
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
 
   const userPrompt = `Producto: ${productName}${notes ? `\nNotas adicionales: ${notes}` : ''}`
 

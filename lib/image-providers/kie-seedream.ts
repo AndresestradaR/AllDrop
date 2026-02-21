@@ -159,6 +159,12 @@ export const seedreamProvider: ImageProvider = {
         // Note: Seedream 3.0 (bytedance/seedream) doesn't support image input
       }
 
+      // Seedream has a prompt length limit (~2000 chars)
+      if (prompt.length > 2000) {
+        console.warn(`[Seedream] Prompt too long (${prompt.length} chars), truncating to 2000`)
+        prompt = prompt.substring(0, 2000)
+      }
+
       console.log('[Seedream] Creating task with model:', apiModelId)
       console.log('[Seedream] Has template URL:', hasTemplateUrl)
       console.log('[Seedream] Has product URLs:', hasProductUrls, request.productImageUrls?.length || 0)

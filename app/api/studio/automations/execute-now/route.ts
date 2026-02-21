@@ -208,7 +208,7 @@ PRESET: ${presetId}
 Generate an optimized video prompt.`
 
   // Use current Gemini models with strict 15s timeout each
-  const models = ['gemini-2.0-flash', 'gemini-2.0-flash-lite']
+  const models = ['gemini-2.5-flash', 'gemini-2.5-flash-lite']
   for (const model of models) {
     try {
       const controller = new AbortController()

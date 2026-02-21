@@ -77,12 +77,13 @@ Write all text in Spanish for Latin American audience (COD/cash-on-delivery mark
     }
   )
 
-  const data = await res.json()
-
   if (!res.ok) {
-    console.error('[scrape] Gemini API error:', JSON.stringify(data).slice(0, 500))
-    throw new Error(`Gemini API error: ${data.error?.message || res.status}`)
+    const errText = await res.text()
+    console.error('[scrape] Gemini API error:', res.status, errText.substring(0, 500))
+    throw new Error(`Gemini API error (${res.status}): ${errText.substring(0, 200)}`)
   }
+
+  const data = await res.json()
 
   const raw = data.candidates?.[0]?.content?.parts?.[0]?.text
   if (!raw) {

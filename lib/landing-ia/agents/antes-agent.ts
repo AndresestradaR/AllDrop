@@ -41,7 +41,7 @@ Schema esperado:
 
   try {
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${geminiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -53,6 +53,11 @@ Schema esperado:
         })
       }
     )
+
+    if (!res.ok) {
+      const errText = await res.text()
+      throw new Error(`Gemini API error (${res.status}): ${errText.substring(0, 200)}`)
+    }
 
     const data = await res.json()
     const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || ''

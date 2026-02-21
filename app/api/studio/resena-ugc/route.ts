@@ -204,7 +204,7 @@ export async function POST(request: Request) {
     let characterProfile = ''
     try {
       const thinkingModel = genAI.getGenerativeModel({
-        model: 'gemini-2.0-flash-thinking-exp-01-21'
+        model: 'gemini-2.5-flash'
       })
 
       const profileResult = await thinkingModel.generateContent([
@@ -235,7 +235,7 @@ export async function POST(request: Request) {
 
       try {
         const scriptModel = genAI.getGenerativeModel({
-          model: 'gemini-2.0-flash',
+          model: 'gemini-2.5-flash',
           systemInstruction: SCRIPT_SYSTEM_PROMPT
         })
 
