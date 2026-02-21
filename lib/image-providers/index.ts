@@ -41,10 +41,14 @@ export function getAllProviders() {
 }
 
 /**
- * Generate image with automatic provider routing.
+ * Generate image with automatic provider routing and fallback cascade.
  *
- * For Gemini: routes through KIE (Nano Banana Pro) as primary for stability.
- * Direct Google API is used as fallback only if KIE fails or is unavailable.
+ * For Gemini models:
+ *   1. Try KIE (Nano Banana Pro) first — cheaper and stable
+ *   2. If KIE fails → fall back to direct Google API (if key exists)
+ *   3. If both fail → return error with clear instructions
+ *
+ * For other providers: direct call, no fallback.
  */
 export async function generateImage(
   request: GenerateImageRequest,
@@ -65,18 +69,65 @@ export async function generateImage(
     }
   }
 
-  // ── Gemini: route through KIE (Nano Banana Pro) for stability ──
-  if (request.provider === 'gemini' && apiKeys.kie) {
-    console.log('[generateImage] Gemini via KIE (Nano Banana Pro)')
-    return generateViaKie(request, apiKeys.kie)
+  // ── Gemini: KIE first → Google fallback ──
+  if (request.provider === 'gemini') {
+    // Step 1: Try KIE (Nano Banana Pro)
+    if (apiKeys.kie) {
+      console.log('[generateImage] Gemini: trying KIE (Nano Banana Pro)...')
+      const kieResult = await generateViaKie(request, apiKeys.kie)
+
+      if (kieResult.success) {
+        return kieResult
+      }
+
+      console.warn('[generateImage] KIE failed:', kieResult.error)
+
+      // Step 2: Fall back to direct Google API
+      if (apiKeys.gemini) {
+        console.log('[generateImage] Gemini: KIE failed, falling back to direct Google API...')
+        try {
+          return await provider.generate(request, apiKeys.gemini)
+        } catch (googleErr: any) {
+          console.error('[generateImage] Google fallback also failed:', googleErr.message)
+          // Return KIE error since it was the primary attempt
+          return {
+            success: false,
+            error: `KIE fallo (${kieResult.error}). Google tambien fallo (${googleErr.message}). Verifica tus API keys en Settings.`,
+            provider: 'gemini',
+          }
+        }
+      }
+
+      // No Google key — return KIE error with helpful message
+      const kieError = kieResult.error || 'Error desconocido'
+      if (kieError.includes('access permissions') || kieError.includes('permission')) {
+        return {
+          success: false,
+          error: 'Tu cuenta de KIE no tiene acceso al modelo Nano Banana Pro (Gemini imagen). Opciones:\n1. Activa el modelo en kie.ai/market\n2. Verifica que tienes creditos suficientes en KIE\n3. Configura tu API key de Google en Settings como alternativa',
+          provider: 'gemini',
+        }
+      }
+
+      return kieResult
+    }
+
+    // No KIE key — try direct Google API
+    if (apiKeys.gemini) {
+      console.log('[generateImage] Gemini: no KIE key, using direct Google API')
+      return provider.generate(request, apiKeys.gemini)
+    }
+
+    // No keys at all
+    return {
+      success: false,
+      error: 'Configura tu API key de KIE.ai o Google (Gemini) en Settings',
+      provider: 'gemini',
+    }
   }
 
-  // ── Normal flow for all other providers (and Gemini without KIE key) ──
+  // ── Normal flow for all other providers ──
   let apiKey: string | undefined
   switch (request.provider) {
-    case 'gemini':
-      apiKey = apiKeys.gemini
-      break
     case 'openai':
       apiKey = apiKeys.openai
       break

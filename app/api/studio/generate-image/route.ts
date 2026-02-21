@@ -144,9 +144,14 @@ export async function POST(request: Request) {
     }
 
     const requiredKey = providerKeyMap[selectedProvider]
-    if (!apiKeys[requiredKey]) {
+    // For Gemini: accept either Google key OR KIE key (KIE provides Gemini models)
+    const hasRequiredKey = selectedProvider === 'gemini'
+      ? !!(apiKeys.gemini || apiKeys.kie)
+      : !!apiKeys[requiredKey]
+
+    if (!hasRequiredKey) {
       const keyNames: Record<ImageProviderType, string> = {
-        gemini: 'Google (Gemini)',
+        gemini: 'Google (Gemini) o KIE.ai',
         openai: 'OpenAI',
         seedream: 'KIE.ai',
         flux: 'Black Forest Labs',
@@ -172,11 +177,12 @@ export async function POST(request: Request) {
       console.log(`[Studio] Reference images: ${productImagesBase64.length}`)
     }
 
-    // For Seedream, we need to upload images to get public URLs
+    // Upload images to get public URLs (needed for KIE-based providers)
     // KIE.ai API requires public URLs, not base64
     let productImageUrls: string[] | undefined
-    if (selectedProvider === 'seedream' && productImagesBase64.length > 0) {
-      console.log(`[Studio] Uploading ${productImagesBase64.length} images to storage for Seedream...`)
+    const needsPublicUrls = selectedProvider === 'seedream' || (selectedProvider === 'gemini' && apiKeys.kie)
+    if (needsPublicUrls && productImagesBase64.length > 0) {
+      console.log(`[Studio] Uploading ${productImagesBase64.length} images to storage for KIE...`)
       const urls: string[] = []
       
       for (let i = 0; i < productImagesBase64.length; i++) {

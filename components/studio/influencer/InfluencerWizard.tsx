@@ -64,7 +64,7 @@ export function InfluencerWizard({ onBack }: { onBack: () => void }) {
   const [realisticImageMime, setRealisticImageMime] = useState<string>('image/png')
 
   // Model selection (persists across steps)
-  const [modelId, setModelId] = useState<ImageModelId>('seedream-4.5')
+  const [modelId, setModelId] = useState<ImageModelId>('gemini-3-pro-image')
 
   // Fetch influencers on mount
   useEffect(() => {

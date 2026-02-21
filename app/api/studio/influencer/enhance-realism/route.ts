@@ -76,9 +76,14 @@ export async function POST(request: Request) {
       gemini: 'gemini', openai: 'openai', seedream: 'kie', flux: 'bfl',
     }
 
-    if (!apiKeys[providerKeyMap[selectedProvider]]) {
+    // For Gemini: accept either Google key OR KIE key (KIE provides Gemini models)
+    const hasRequiredKey = selectedProvider === 'gemini'
+      ? !!(apiKeys.gemini || apiKeys.kie)
+      : !!apiKeys[providerKeyMap[selectedProvider]]
+
+    if (!hasRequiredKey) {
       const keyNames: Record<ImageProviderType, string> = {
-        gemini: 'Google (Gemini)', openai: 'OpenAI', seedream: 'KIE.ai', flux: 'Black Forest Labs',
+        gemini: 'Google (Gemini) o KIE.ai', openai: 'OpenAI', seedream: 'KIE.ai', flux: 'Black Forest Labs',
       }
       return NextResponse.json({
         error: `Configura tu API key de ${keyNames[selectedProvider]} en Settings`,
@@ -114,9 +119,10 @@ export async function POST(request: Request) {
 
     console.log(`[Influencer/EnhanceRealism] User: ${user.id.substring(0, 8)}..., Model: ${modelId}`)
 
-    // For Seedream, upload reference image to get public URL
+    // Upload reference image to get public URL (needed for KIE-based providers)
     let productImageUrls: string[] | undefined
-    if (selectedProvider === 'seedream') {
+    const needsPublicUrls = selectedProvider === 'seedream' || (selectedProvider === 'gemini' && apiKeys.kie)
+    if (needsPublicUrls) {
       const buffer = Buffer.from(refBase64, 'base64')
       const ext = refMime.includes('png') ? 'png' : 'jpg'
       const tmpPath = `influencers/${user.id}/tmp_realism_ref.${ext}`

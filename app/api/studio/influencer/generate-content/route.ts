@@ -112,9 +112,14 @@ export async function POST(request: Request) {
       gemini: 'gemini', openai: 'openai', seedream: 'kie', flux: 'bfl',
     }
 
-    if (!apiKeys[providerKeyMap[selectedProvider]]) {
+    // For Gemini: accept either Google key OR KIE key (KIE provides Gemini models)
+    const hasRequiredKey = selectedProvider === 'gemini'
+      ? !!(apiKeys.gemini || apiKeys.kie)
+      : !!apiKeys[providerKeyMap[selectedProvider]]
+
+    if (!hasRequiredKey) {
       const keyNames: Record<ImageProviderType, string> = {
-        gemini: 'Google (Gemini)', openai: 'OpenAI', seedream: 'KIE.ai', flux: 'Black Forest Labs',
+        gemini: 'Google (Gemini) o KIE.ai', openai: 'OpenAI', seedream: 'KIE.ai', flux: 'Black Forest Labs',
       }
       return NextResponse.json({
         error: `Configura tu API key de ${keyNames[selectedProvider]} en Settings`,
@@ -145,8 +150,9 @@ export async function POST(request: Request) {
         const mime = imgRes.headers.get('content-type') || 'image/jpeg'
         refImages.push({ data: base64, mimeType: mime })
 
-        // For Seedream, upload to get public URL
-        if (selectedProvider === 'seedream') {
+        // Upload to get public URL (needed for KIE-based providers)
+        const needsPublicUrls = selectedProvider === 'seedream' || (selectedProvider === 'gemini' && apiKeys.kie)
+        if (needsPublicUrls) {
           const buffer = Buffer.from(base64, 'base64')
           const ext = mime.includes('png') ? 'png' : 'jpg'
           const tmpPath = `influencers/${user.id}/tmp_content_ref.${ext}`
@@ -168,7 +174,8 @@ export async function POST(request: Request) {
     if (mode === 'with_product' && productImageBase64) {
       refImages.push({ data: productImageBase64, mimeType: productImageMimeType || 'image/jpeg' })
 
-      if (selectedProvider === 'seedream') {
+      const needsProductUrl = selectedProvider === 'seedream' || (selectedProvider === 'gemini' && apiKeys.kie)
+      if (needsProductUrl) {
         const buffer = Buffer.from(productImageBase64, 'base64')
         const ext = (productImageMimeType || '').includes('png') ? 'png' : 'jpg'
         const tmpPath = `influencers/${user.id}/tmp_product_ref.${ext}`
