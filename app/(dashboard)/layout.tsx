@@ -10,7 +10,7 @@ import {
   LayoutDashboard,
   ImageIcon,
   LayoutTemplate,
-  Images,
+  PlayCircle,
   Settings,
   LogOut,
   Menu,
@@ -41,7 +41,7 @@ const ADMIN_EMAIL = 'trucosecomydrop@gmail.com'
 
 const otherNavigation = [
   { name: 'Mi Tienda', href: '/constructor/', icon: Store, external: true },
-  { name: 'Galería', href: '/dashboard/gallery', icon: Images },
+  { name: 'Tutorial', href: '/dashboard/gallery', icon: PlayCircle },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
 ]
 
