@@ -1508,6 +1508,191 @@ export default function ProductGeneratePage() {
           </div>
         </div>
 
+
+        {/* AI Model Selection */}
+        <div className="mb-6">
+          <ModelSelector
+            value={selectedModel}
+            onChange={setSelectedModel}
+            disabled={isGenerating}
+            apiKeyStatus={apiKeyStatus}
+          />
+        </div>
+
+        {/* Country Selector */}
+        <div className="mb-6">
+          <CountrySelector
+            value={selectedCountry.code}
+            onChange={(country) => {
+              setSelectedCountry(country)
+              // Update currency symbol when country changes
+              setPricing(prev => ({ ...prev, currencySymbol: country.currencySymbol }))
+            }}
+            disabled={isGenerating}
+          />
+        </div>
+
+        {/* Settings Row */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          {/* Output Size */}
+          <div>
+            <label className="flex items-center gap-2 text-sm font-medium text-text-primary mb-2">
+              📐 Tamaño de Salida
+            </label>
+            <div className="relative">
+              <select
+                value={selectedSize.id}
+                onChange={(e) => setSelectedSize(OUTPUT_SIZES.find(s => s.id === e.target.value) || OUTPUT_SIZES[0])}
+                className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent"
+              >
+                {OUTPUT_SIZES.map((size) => (
+                  <option key={size.id} value={size.id}>
+                    {size.name}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-text-secondary pointer-events-none" />
+            </div>
+            <p className="text-xs text-text-secondary mt-1">{selectedSize.dimensions}</p>
+          </div>
+
+          {/* Language */}
+          <div>
+            <label className="flex items-center gap-2 text-sm font-medium text-text-primary mb-2">
+              🌐 Idioma de Salida
+            </label>
+            <div className="relative">
+              <select
+                className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent"
+                defaultValue="es"
+              >
+                <option value="es">Español</option>
+              </select>
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-text-secondary pointer-events-none" />
+            </div>
+          </div>
+        </div>
+
+        {/* Pricing Controls */}
+        <div className="border border-accent/30 bg-accent/5 rounded-xl p-4 mb-6">
+          <PricingControls
+            value={pricing}
+            onChange={setPricing}
+            disabled={isGenerating}
+          />
+        </div>
+
+        <h2 className="text-xl font-bold text-text-primary mb-2 mt-2">CREA TU LANDING BANNER A BANNER</h2>
+        <p className="text-sm text-text-secondary mb-4">Personaliza cada banner individualmente con controles creativos</p>
+
+        {/* Creative Controls */}
+        <div className="border border-border rounded-xl p-4 mb-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-accent" />
+              <span className="text-sm font-medium text-text-primary">
+                Controles Creativos <span className="text-text-secondary font-normal">(Opcional)</span>
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleEnhanceWithAI}
+                disabled={isEnhancing}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-accent/10 hover:bg-accent/20 text-accent rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+              >
+                {isEnhancing ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Sparkles className="w-4 h-4" />
+                )}
+                Mejorar con IA
+              </button>
+              <button
+                onClick={() => setShowCreativeControls(!showCreativeControls)}
+                className={`relative w-12 h-6 rounded-full transition-colors ${
+                  showCreativeControls ? 'bg-accent' : 'bg-border'
+                }`}
+              >
+                <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
+                  showCreativeControls ? 'left-7' : 'left-1'
+                }`} />
+              </button>
+            </div>
+          </div>
+
+          {showCreativeControls && (
+            <div className="mt-6 space-y-4">
+              {/* Product Details */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-sm font-medium text-text-primary flex items-center gap-2">
+                    📄 Detalles del Producto
+                  </label>
+                  <span className="text-xs text-text-secondary">Max. 1500 caracteres</span>
+                </div>
+                <textarea
+                  placeholder="Describe las características, beneficios y detalles importantes del producto..."
+                  value={creativeControls.productDetails}
+                  onChange={(e) => setCreativeControls({ ...creativeControls, productDetails: e.target.value.slice(0, 1500) })}
+                  className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent resize-none"
+                  rows={3}
+                />
+              </div>
+
+              {/* Sales Angle */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-sm font-medium text-text-primary flex items-center gap-2">
+                    📈 Ángulo de Venta
+                  </label>
+                </div>
+                <textarea
+                  placeholder="Ejemplo: Potenciador de testosterona para hombres fitness"
+                  value={creativeControls.salesAngle}
+                  onChange={(e) => setCreativeControls({ ...creativeControls, salesAngle: e.target.value.slice(0, 1500) })}
+                  className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent resize-none"
+                  rows={3}
+                />
+              </div>
+
+              {/* Target Avatar */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-sm font-medium text-text-primary flex items-center gap-2">
+                    🎯 Avatar de Cliente Ideal
+                  </label>
+                </div>
+                <textarea
+                  placeholder="Ejemplo: Hombres 25-45 años, van al gimnasio, quieren aumentar masa muscular"
+                  value={creativeControls.targetAvatar}
+                  onChange={(e) => setCreativeControls({ ...creativeControls, targetAvatar: e.target.value.slice(0, 1500) })}
+                  className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent resize-none"
+                  rows={3}
+                />
+              </div>
+
+              {/* Additional Instructions */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-sm font-medium text-text-primary flex items-center gap-2">
+                    💬 Instrucciones Adicionales
+                  </label>
+                </div>
+                <textarea
+                  placeholder="Cualquier instrucción específica para la generación..."
+                  value={creativeControls.additionalInstructions}
+                  onChange={(e) => setCreativeControls({ ...creativeControls, additionalInstructions: e.target.value.slice(0, 1500) })}
+                  className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent resize-none"
+                  rows={3}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
+        <h2 className="text-xl font-bold text-text-primary mb-2 mt-2">CREA TUS LANDINGS COMPLETAS A UNOS CLICKS</h2>
+        <p className="text-sm text-text-secondary mb-4">Define el contexto, genera angulos de venta y crea landing pages completas</p>
+
         {/* Product Context (Phase 2) */}
         <div className="border border-border rounded-xl p-4 mb-6">
           <div className="flex items-center justify-between">
@@ -1901,184 +2086,6 @@ export default function ProductGeneratePage() {
               )}
             </div>
           )}
-        </div>
-
-        {/* AI Model Selection */}
-        <div className="mb-6">
-          <ModelSelector
-            value={selectedModel}
-            onChange={setSelectedModel}
-            disabled={isGenerating}
-            apiKeyStatus={apiKeyStatus}
-          />
-        </div>
-
-        {/* Country Selector */}
-        <div className="mb-6">
-          <CountrySelector
-            value={selectedCountry.code}
-            onChange={(country) => {
-              setSelectedCountry(country)
-              // Update currency symbol when country changes
-              setPricing(prev => ({ ...prev, currencySymbol: country.currencySymbol }))
-            }}
-            disabled={isGenerating}
-          />
-        </div>
-
-        {/* Settings Row */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          {/* Output Size */}
-          <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-text-primary mb-2">
-              📐 Tamaño de Salida
-            </label>
-            <div className="relative">
-              <select
-                value={selectedSize.id}
-                onChange={(e) => setSelectedSize(OUTPUT_SIZES.find(s => s.id === e.target.value) || OUTPUT_SIZES[0])}
-                className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent"
-              >
-                {OUTPUT_SIZES.map((size) => (
-                  <option key={size.id} value={size.id}>
-                    {size.name}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-text-secondary pointer-events-none" />
-            </div>
-            <p className="text-xs text-text-secondary mt-1">{selectedSize.dimensions}</p>
-          </div>
-
-          {/* Language */}
-          <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-text-primary mb-2">
-              🌐 Idioma de Salida
-            </label>
-            <div className="relative">
-              <select
-                className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent"
-                defaultValue="es"
-              >
-                <option value="es">Español</option>
-              </select>
-              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-text-secondary pointer-events-none" />
-            </div>
-          </div>
-        </div>
-
-        {/* Creative Controls */}
-        <div className="border border-border rounded-xl p-4 mb-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-accent" />
-              <span className="text-sm font-medium text-text-primary">
-                Controles Creativos <span className="text-text-secondary font-normal">(Opcional)</span>
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleEnhanceWithAI}
-                disabled={isEnhancing}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-accent/10 hover:bg-accent/20 text-accent rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
-              >
-                {isEnhancing ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Sparkles className="w-4 h-4" />
-                )}
-                Mejorar con IA
-              </button>
-              <button
-                onClick={() => setShowCreativeControls(!showCreativeControls)}
-                className={`relative w-12 h-6 rounded-full transition-colors ${
-                  showCreativeControls ? 'bg-accent' : 'bg-border'
-                }`}
-              >
-                <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
-                  showCreativeControls ? 'left-7' : 'left-1'
-                }`} />
-              </button>
-            </div>
-          </div>
-
-          {showCreativeControls && (
-            <div className="mt-6 space-y-4">
-              {/* Product Details */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-sm font-medium text-text-primary flex items-center gap-2">
-                    📄 Detalles del Producto
-                  </label>
-                  <span className="text-xs text-text-secondary">Max. 1500 caracteres</span>
-                </div>
-                <textarea
-                  placeholder="Describe las características, beneficios y detalles importantes del producto..."
-                  value={creativeControls.productDetails}
-                  onChange={(e) => setCreativeControls({ ...creativeControls, productDetails: e.target.value.slice(0, 1500) })}
-                  className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent resize-none"
-                  rows={3}
-                />
-              </div>
-
-              {/* Sales Angle */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-sm font-medium text-text-primary flex items-center gap-2">
-                    📈 Ángulo de Venta
-                  </label>
-                </div>
-                <textarea
-                  placeholder="Ejemplo: Potenciador de testosterona para hombres fitness"
-                  value={creativeControls.salesAngle}
-                  onChange={(e) => setCreativeControls({ ...creativeControls, salesAngle: e.target.value.slice(0, 1500) })}
-                  className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent resize-none"
-                  rows={3}
-                />
-              </div>
-
-              {/* Target Avatar */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-sm font-medium text-text-primary flex items-center gap-2">
-                    🎯 Avatar de Cliente Ideal
-                  </label>
-                </div>
-                <textarea
-                  placeholder="Ejemplo: Hombres 25-45 años, van al gimnasio, quieren aumentar masa muscular"
-                  value={creativeControls.targetAvatar}
-                  onChange={(e) => setCreativeControls({ ...creativeControls, targetAvatar: e.target.value.slice(0, 1500) })}
-                  className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent resize-none"
-                  rows={3}
-                />
-              </div>
-
-              {/* Additional Instructions */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-sm font-medium text-text-primary flex items-center gap-2">
-                    💬 Instrucciones Adicionales
-                  </label>
-                </div>
-                <textarea
-                  placeholder="Cualquier instrucción específica para la generación..."
-                  value={creativeControls.additionalInstructions}
-                  onChange={(e) => setCreativeControls({ ...creativeControls, additionalInstructions: e.target.value.slice(0, 1500) })}
-                  className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent resize-none"
-                  rows={3}
-                />
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Pricing Controls */}
-        <div className="border border-accent/30 bg-accent/5 rounded-xl p-4 mb-6">
-          <PricingControls
-            value={pricing}
-            onChange={setPricing}
-            disabled={isGenerating}
-          />
         </div>
 
         {/* Generate Button */}
