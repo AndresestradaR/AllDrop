@@ -41,7 +41,7 @@ const ADMIN_EMAIL = 'trucosecomydrop@gmail.com'
 
 const otherNavigation = [
   { name: 'Mi Tienda', href: '/constructor/', icon: Store, external: true },
-  { name: 'Tutorial', href: '/dashboard/gallery', icon: PlayCircle },
+  { name: 'Tutorial Herramienta', href: '/dashboard/gallery', icon: PlayCircle },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
 ]
 
