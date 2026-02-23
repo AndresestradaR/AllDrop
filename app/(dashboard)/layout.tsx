@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils/cn'
 import {
   Sparkles,
   LayoutDashboard,
-  ImageIcon,
+  GraduationCap,
   LayoutTemplate,
   PlayCircle,
   Settings,
@@ -19,7 +19,8 @@ import {
   Wand2,
   Store,
   Upload,
-  Zap
+  Zap,
+  BookOpen
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -30,7 +31,7 @@ const mainNavigation = [
 ]
 
 const creatorNavigation = [
-  { name: 'Crea tu Banner', href: '/dashboard/banner', icon: ImageIcon, soon: true },
+  { name: 'Coaching', href: '/dashboard/coaching', icon: GraduationCap, isNew: true },
   { name: 'Crea tu Landing', href: '/dashboard/landing', icon: LayoutTemplate },
   { name: 'Landing Code', href: '/dashboard/landing-ia', icon: Zap, isNew: true },
   { name: 'Estudio IA', href: '/dashboard/studio', icon: Wand2, isNew: true },
@@ -47,6 +48,7 @@ const otherNavigation = [
 
 const adminNavigation = [
   { name: 'Admin Plantillas', href: '/dashboard/admin/templates', icon: Upload },
+  { name: 'Admin Coaching', href: '/dashboard/admin/coaching', icon: BookOpen },
 ]
 
 export default function DashboardLayout({
@@ -58,11 +60,24 @@ export default function DashboardLayout({
   const router = useRouter()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [userEmail, setUserEmail] = useState<string | null>(null)
+  const [isMentor, setIsMentor] = useState(false)
 
   useEffect(() => {
     const supabase = createClient()
     supabase.auth.getUser().then(({ data }) => {
-      setUserEmail(data.user?.email || null)
+      const email = data.user?.email || null
+      setUserEmail(email)
+      if (email) {
+        supabase
+          .from('coaching_mentors')
+          .select('id')
+          .eq('email', email)
+          .eq('is_active', true)
+          .maybeSingle()
+          .then(({ data: mentor }) => {
+            setIsMentor(!!mentor)
+          })
+      }
     })
   }, [])
 
@@ -187,6 +202,18 @@ export default function DashboardLayout({
                 ))}
               </div>
             </div>
+
+            {/* Mentor — only if user is a coaching mentor */}
+            {isMentor && (
+              <div>
+                <p className="px-3 mb-2 text-xs font-semibold text-text-secondary/70 uppercase tracking-wider">
+                  Mentor
+                </p>
+                <div className="space-y-1">
+                  <NavLink item={{ name: 'Panel Mentor', href: '/dashboard/coaching/mentor', icon: GraduationCap }} />
+                </div>
+              </div>
+            )}
 
             {/* Admin — only for admin email */}
             {isAdmin && (
