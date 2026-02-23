@@ -1,8 +1,16 @@
 import { NextResponse } from 'next/server'
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { sendBookingNotification } from '@/lib/email/send-booking-notification'
 
 const ADMIN_EMAIL = 'trucosecomydrop@gmail.com'
+
+function getAdminClient() {
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
 export async function GET() {
   try {
@@ -13,13 +21,13 @@ export async function GET() {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    const serviceClient = await createServiceClient()
+    const adminClient = getAdminClient()
 
     // Admin sees all bookings, normal user sees own
-    let query = serviceClient
+    let query = adminClient
       .from('coaching_bookings')
       .select(`
-        id, topic, slot_date, slot_hour, price_usd, status, notes, created_at,
+        id, user_id, topic, slot_date, slot_hour, price_usd, status, notes, created_at, mentor_id,
         coaching_mentors (name, email)
       `)
       .order('slot_date', { ascending: false })
@@ -58,10 +66,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'availabilityId y topic requeridos' }, { status: 400 })
     }
 
-    const serviceClient = await createServiceClient()
+    const adminClient = getAdminClient()
 
     // Get the availability slot
-    const { data: slot, error: slotError } = await serviceClient
+    const { data: slot, error: slotError } = await adminClient
       .from('coaching_availability')
       .select('id, mentor_id, slot_date, slot_hour, is_booked')
       .eq('id', availabilityId)
@@ -76,7 +84,7 @@ export async function POST(request: Request) {
     }
 
     // Get mentor details
-    const { data: mentor, error: mentorError } = await serviceClient
+    const { data: mentor, error: mentorError } = await adminClient
       .from('coaching_mentors')
       .select('id, name, email, price_usd')
       .eq('id', slot.mentor_id)
@@ -87,7 +95,7 @@ export async function POST(request: Request) {
     }
 
     // Mark slot as booked
-    const { error: updateError } = await serviceClient
+    const { error: updateError } = await adminClient
       .from('coaching_availability')
       .update({ is_booked: true })
       .eq('id', availabilityId)
@@ -98,7 +106,7 @@ export async function POST(request: Request) {
     }
 
     // Create booking
-    const { data: booking, error: bookingError } = await serviceClient
+    const { data: booking, error: bookingError } = await adminClient
       .from('coaching_bookings')
       .insert({
         user_id: user.id,
@@ -115,7 +123,7 @@ export async function POST(request: Request) {
 
     if (bookingError) {
       // Rollback slot
-      await serviceClient
+      await adminClient
         .from('coaching_availability')
         .update({ is_booked: false })
         .eq('id', availabilityId)

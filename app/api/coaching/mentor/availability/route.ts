@@ -1,5 +1,13 @@
 import { NextResponse } from 'next/server'
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
+
+function getAdminClient() {
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
 export async function GET(request: Request) {
   try {
@@ -10,10 +18,10 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    const serviceClient = await createServiceClient()
+    const adminClient = getAdminClient()
 
     // Verify user is a mentor
-    const { data: mentor, error: mentorError } = await serviceClient
+    const { data: mentor, error: mentorError } = await adminClient
       .from('coaching_mentors')
       .select('id')
       .eq('email', user.email)
@@ -35,7 +43,7 @@ export async function GET(request: Request) {
     end.setDate(end.getDate() + 6)
     const weekEnd = end.toISOString().split('T')[0]
 
-    const { data: slots, error } = await serviceClient
+    const { data: slots, error } = await adminClient
       .from('coaching_availability')
       .select('id, slot_date, slot_hour, is_booked')
       .eq('mentor_id', mentor.id)
@@ -65,9 +73,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    const serviceClient = await createServiceClient()
+    const adminClient = getAdminClient()
 
-    const { data: mentor, error: mentorError } = await serviceClient
+    const { data: mentor, error: mentorError } = await adminClient
       .from('coaching_mentors')
       .select('id')
       .eq('email', user.email)
@@ -92,7 +100,7 @@ export async function POST(request: Request) {
     }))
 
     // Upsert to avoid duplicates
-    const { data, error } = await serviceClient
+    const { data, error } = await adminClient
       .from('coaching_availability')
       .upsert(records, { onConflict: 'mentor_id,slot_date,slot_hour', ignoreDuplicates: true })
       .select()
@@ -118,9 +126,9 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    const serviceClient = await createServiceClient()
+    const adminClient = getAdminClient()
 
-    const { data: mentor, error: mentorError } = await serviceClient
+    const { data: mentor, error: mentorError } = await adminClient
       .from('coaching_mentors')
       .select('id')
       .eq('email', user.email)
@@ -138,7 +146,7 @@ export async function DELETE(request: Request) {
     }
 
     // Only delete if not booked and belongs to this mentor
-    const { error } = await serviceClient
+    const { error } = await adminClient
       .from('coaching_availability')
       .delete()
       .eq('id', slotId)

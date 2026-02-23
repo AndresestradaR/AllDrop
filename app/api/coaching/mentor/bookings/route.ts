@@ -1,5 +1,13 @@
 import { NextResponse } from 'next/server'
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
+
+function getAdminClient() {
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
 export async function GET() {
   try {
@@ -10,10 +18,10 @@ export async function GET() {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    const serviceClient = await createServiceClient()
+    const adminClient = getAdminClient()
 
     // Verify user is a mentor
-    const { data: mentor, error: mentorError } = await serviceClient
+    const { data: mentor, error: mentorError } = await adminClient
       .from('coaching_mentors')
       .select('id, mentor_share_usd')
       .eq('email', user.email)
@@ -24,7 +32,7 @@ export async function GET() {
     }
 
     // Get all bookings for this mentor
-    const { data: bookings, error } = await serviceClient
+    const { data: bookings, error } = await adminClient
       .from('coaching_bookings')
       .select('id, user_id, topic, slot_date, slot_hour, price_usd, status, notes, created_at')
       .eq('mentor_id', mentor.id)
@@ -40,9 +48,8 @@ export async function GET() {
     let userMap: Record<string, string> = {}
 
     if (userIds.length > 0) {
-      // Fetch emails from auth.users via admin API
       for (const uid of userIds) {
-        const { data: { user: u } } = await serviceClient.auth.admin.getUserById(uid)
+        const { data: { user: u } } = await adminClient.auth.admin.getUserById(uid)
         if (u?.email) userMap[uid] = u.email
       }
     }
