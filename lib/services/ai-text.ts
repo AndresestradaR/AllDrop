@@ -4,6 +4,7 @@ import { decrypt } from './encryption'
 
 export interface AITextKeys {
   kieApiKey?: string
+  openaiApiKey?: string
   googleApiKey?: string
 }
 
@@ -26,7 +27,7 @@ export interface AITextOptions {
 // ── Main entry point ───────────────────────────────────────────
 
 /**
- * Unified AI text generation. Tries KIE first, falls back to Google.
+ * Unified AI text generation. Cascade: KIE → OpenAI → Google Gemini.
  */
 export async function generateAIText(
   keys: AITextKeys,
@@ -43,6 +44,15 @@ export async function generateAIText(
     }
   }
 
+  if (keys.openaiApiKey) {
+    try {
+      return await callOpenAI(keys.openaiApiKey, options)
+    } catch (err: any) {
+      errors.push(`OpenAI: ${err.message}`)
+      console.error('[AI Text] OpenAI failed:', err.message)
+    }
+  }
+
   if (keys.googleApiKey) {
     try {
       return await callGoogle(keys.googleApiKey, options)
@@ -53,7 +63,7 @@ export async function generateAIText(
   }
 
   if (errors.length === 0) {
-    throw new Error('Configura tu API key de KIE o Google en Settings')
+    throw new Error('Configura tu API key de KIE, OpenAI o Google en Settings')
   }
 
   throw new Error(`Error en generación de texto: ${errors.join('; ')}`)
@@ -169,6 +179,82 @@ function anySignal(signals: AbortSignal[]): AbortSignal {
   return controller.signal
 }
 
+// ── OpenAI Chat Completions API ────────────────────────────────
+
+async function callOpenAI(apiKey: string, options: AITextOptions): Promise<string> {
+  const url = 'https://api.openai.com/v1/chat/completions'
+
+  const messages: any[] = []
+
+  if (options.systemPrompt) {
+    messages.push({ role: 'system', content: options.systemPrompt })
+  }
+
+  if (options.images?.length) {
+    const content: any[] = [{ type: 'text', text: options.userMessage }]
+    for (const img of options.images) {
+      content.push({
+        type: 'image_url',
+        image_url: { url: `data:${img.mimeType};base64,${img.base64}` },
+      })
+    }
+    messages.push({ role: 'user', content })
+  } else {
+    messages.push({ role: 'user', content: options.userMessage })
+  }
+
+  const body: any = {
+    model: 'gpt-4o-mini',
+    messages,
+  }
+
+  if (options.temperature !== undefined) {
+    body.temperature = options.temperature
+  }
+
+  if (options.jsonMode) {
+    body.response_format = { type: 'json_object' }
+  }
+
+  // Safety timeout: 90s
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 90000)
+  const signal = options.signal
+    ? anySignal([options.signal, controller.signal])
+    : controller.signal
+
+  try {
+    console.log('[AI Text] OpenAI: calling gpt-4o-mini...')
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(body),
+      signal,
+    })
+
+    if (!response.ok) {
+      const errText = await response.text()
+      throw new Error(`OpenAI API (${response.status}): ${errText.substring(0, 300)}`)
+    }
+
+    const data = await response.json()
+    const text = data.choices?.[0]?.message?.content
+
+    if (!text) {
+      throw new Error('OpenAI: respuesta vacia')
+    }
+
+    console.log(`[AI Text] OpenAI gpt-4o-mini success (${text.length} chars)`)
+    return text
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
 // ── Google Gemini API (direct) ─────────────────────────────────
 
 async function callGoogle(apiKey: string, options: AITextOptions): Promise<string> {
@@ -230,7 +316,7 @@ async function callGoogle(apiKey: string, options: AITextOptions): Promise<strin
 export async function getAIKeys(supabase: any, userId: string): Promise<AITextKeys> {
   const { data: profile } = await supabase
     .from('profiles')
-    .select('kie_api_key, google_api_key')
+    .select('kie_api_key, openai_api_key, google_api_key')
     .eq('id', userId)
     .single()
 
@@ -238,6 +324,9 @@ export async function getAIKeys(supabase: any, userId: string): Promise<AITextKe
 
   if (profile?.kie_api_key) {
     try { keys.kieApiKey = decrypt(profile.kie_api_key) } catch {}
+  }
+  if (profile?.openai_api_key) {
+    try { keys.openaiApiKey = decrypt(profile.openai_api_key) } catch {}
   }
   if (profile?.google_api_key) {
     try { keys.googleApiKey = decrypt(profile.google_api_key) } catch {}
@@ -250,8 +339,8 @@ export async function getAIKeys(supabase: any, userId: string): Promise<AITextKe
  * Throw if no AI key is configured at all.
  */
 export function requireAIKeys(keys: AITextKeys): void {
-  if (!keys.kieApiKey && !keys.googleApiKey) {
-    throw new Error('Configura tu API key de KIE o Google en Settings')
+  if (!keys.kieApiKey && !keys.openaiApiKey && !keys.googleApiKey) {
+    throw new Error('Configura tu API key de KIE, OpenAI o Google en Settings')
   }
 }
 
