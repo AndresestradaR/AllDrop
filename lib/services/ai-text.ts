@@ -127,6 +127,9 @@ async function callKIESingleModel(
     body.temperature = options.temperature
   }
 
+  // Disable thinking/reasoning to avoid slow 100s+ responses
+  body.reasoning_effort = 'none'
+
   // NOTE: Do NOT send response_format to KIE — it's not supported by all
   // OpenAI-compatible providers. The system prompt already asks for JSON.
 
@@ -275,6 +278,7 @@ async function callGoogle(apiKey: string, options: AITextOptions): Promise<strin
     contents: [{ parts }],
     generationConfig: {
       temperature: options.temperature ?? 0.7,
+      thinkingConfig: { thinkingBudget: 0 },
     },
   }
 
