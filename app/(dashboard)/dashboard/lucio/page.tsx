@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Send } from 'lucide-react'
 
 const LUCIO_URL = process.env.NEXT_PUBLIC_LUCIO_URL || ''
+const LUCIO_TOKEN = process.env.NEXT_PUBLIC_LUCIO_TOKEN || ''
 
 interface ChatMessage {
   id: string
@@ -166,15 +167,16 @@ export default function LucioPage() {
             minProtocol: 3,
             maxProtocol: 3,
             client: {
-              id: 'webchat',
+              id: 'webchat-ui',
               version: '1.0',
               platform: navigator.platform || 'web',
               mode: 'webchat',
               instanceId: instanceId.current
             },
             role: 'operator',
-            scopes: ['operator.admin'],
+            scopes: ['operator.admin', 'operator.approvals', 'operator.pairing'],
             caps: [],
+            ...(LUCIO_TOKEN ? { auth: { token: LUCIO_TOKEN } } : {}),
             userAgent: navigator.userAgent,
             locale: navigator.language
           })
