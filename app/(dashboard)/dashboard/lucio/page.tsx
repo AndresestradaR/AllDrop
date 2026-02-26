@@ -166,7 +166,7 @@ export default function LucioPage() {
             minProtocol: 3,
             maxProtocol: 3,
             client: {
-              id: 'estrategas-web',
+              id: 'webchat',
               version: '1.0',
               platform: navigator.platform || 'web',
               mode: 'webchat',
@@ -174,7 +174,6 @@ export default function LucioPage() {
             },
             role: 'operator',
             scopes: ['operator.admin'],
-            device: null,
             caps: [],
             userAgent: navigator.userAgent,
             locale: navigator.language
