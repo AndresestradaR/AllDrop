@@ -174,7 +174,7 @@ export default function LucioPage() {
               instanceId: instanceId.current
             },
             role: 'operator',
-            scopes: ['operator.admin', 'operator.approvals', 'operator.pairing'],
+            scopes: ['operator.read', 'operator.write', 'operator.admin', 'operator.approvals', 'operator.pairing'],
             caps: [],
             ...(LUCIO_TOKEN ? { auth: { token: LUCIO_TOKEN } } : {}),
             userAgent: navigator.userAgent,
