@@ -167,8 +167,8 @@ export default function LucioPage() {
             minProtocol: 3,
             maxProtocol: 3,
             client: {
-              id: 'webchat-ui',
-              version: '1.0',
+              id: 'openclaw-control-ui',
+              version: 'dev',
               platform: navigator.platform || 'web',
               mode: 'webchat',
               instanceId: instanceId.current
