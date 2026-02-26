@@ -295,8 +295,17 @@ export default function LucioPage() {
         idempotencyKey: runId,
         attachments: []
       })
-    } catch (err) {
+    } catch (err: any) {
       console.error('[Lucio] Send error:', err)
+      const errMsg = err?.message || 'Error al enviar el mensaje'
+      setMessages(prev => [...prev, {
+        id: uid(),
+        role: 'system',
+        content: errMsg.includes('scope')
+          ? 'Error de permisos: el token del gateway no está configurado correctamente.'
+          : errMsg,
+        timestamp: Date.now()
+      }])
       setSending(false)
       currentRunId.current = null
     }
