@@ -71,8 +71,8 @@ export async function generateAIText(
 
 // ── KIE.ai Chat API (OpenAI-compatible) ────────────────────────
 
-// KIE text model cascade: try primary model, then fallbacks
-const KIE_TEXT_MODELS = ['gemini-2.5-flash', 'gemini-2.5-pro']
+// KIE text model: only use flash (pro is slower and causes cascade timeouts)
+const KIE_TEXT_MODELS = ['gemini-2.5-flash']
 
 async function callKIE(apiKey: string, options: AITextOptions): Promise<string> {
   // If caller specified a model, use only that one; otherwise cascade
