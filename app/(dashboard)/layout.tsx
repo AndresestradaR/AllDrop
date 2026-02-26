@@ -37,7 +37,6 @@ const creatorNavigation = [
   { name: 'Landing Code', href: '/dashboard/landing-ia', icon: Zap, isNew: true },
   { name: 'Estudio IA', href: '/dashboard/studio', icon: Wand2, isNew: true },
   { name: 'Encuentra tu Producto Ganador', href: '/dashboard/product-research', icon: Target, isNew: true },
-  { name: 'Lucio', href: '/dashboard/lucio', icon: Bot, isNew: true },
 ]
 
 const ADMIN_EMAIL = 'trucosecomydrop@gmail.com'
@@ -49,6 +48,7 @@ const otherNavigation = [
 ]
 
 const adminNavigation = [
+  { name: 'Lucio', href: '/dashboard/lucio', icon: Bot, isNew: true },
   { name: 'Admin Plantillas', href: '/dashboard/admin/templates', icon: Upload },
   { name: 'Admin Coaching', href: '/dashboard/admin/coaching', icon: BookOpen },
 ]
