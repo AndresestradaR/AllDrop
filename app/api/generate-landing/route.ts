@@ -140,7 +140,7 @@ export async function POST(request: Request) {
     // Get API keys from profile
     const { data: profile } = await supabase
       .from('profiles')
-      .select('google_api_key, openai_api_key, kie_api_key, bfl_api_key')
+      .select('google_api_key, openai_api_key, kie_api_key, bfl_api_key, fal_api_key')
       .eq('id', user.id)
       .single()
 
@@ -150,6 +150,7 @@ export async function POST(request: Request) {
       openai?: string
       kie?: string
       bfl?: string
+      fal?: string
     } = {}
 
     if (profile?.google_api_key) {
@@ -164,6 +165,9 @@ export async function POST(request: Request) {
     if (profile?.bfl_api_key) {
       apiKeys.bfl = decrypt(profile.bfl_api_key)
     }
+    if (profile?.fal_api_key) {
+      apiKeys.fal = decrypt(profile.fal_api_key)
+    }
 
     // Also check environment variables as fallback
     if (!apiKeys.openai && process.env.OPENAI_API_KEY) {
@@ -175,6 +179,9 @@ export async function POST(request: Request) {
     if (!apiKeys.bfl && process.env.BFL_API_KEY) {
       apiKeys.bfl = process.env.BFL_API_KEY
     }
+    if (!apiKeys.fal && process.env.FAL_API_KEY) {
+      apiKeys.fal = process.env.FAL_API_KEY
+    }
 
     // Validate we have the required API key for the selected provider
     const selectedProvider = provider as ImageProviderType
@@ -183,6 +190,7 @@ export async function POST(request: Request) {
       openai: 'openai',
       seedream: 'kie',
       flux: 'bfl',
+      fal: 'fal',
     }
 
     const requiredKey = providerKeyMap[selectedProvider]
@@ -197,6 +205,7 @@ export async function POST(request: Request) {
         openai: 'OpenAI',
         seedream: 'KIE.ai',
         flux: 'Black Forest Labs',
+        fal: 'fal.ai',
       }
       return NextResponse.json({
         error: `Configura tu API key de ${keyNames[selectedProvider]} en Settings`,
@@ -423,7 +432,25 @@ export async function POST(request: Request) {
     })
   } catch (error: any) {
     console.error('Generate error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+
+    // Classify the error for user-friendly messages
+    let userMessage = 'Error interno del servidor'
+    if (error.message?.includes('timeout') || error.message?.includes('tardó demasiado')) {
+      userMessage = 'La generación tardó demasiado. Intenta de nuevo.'
+    } else if (error.message?.includes('API key') || error.message?.includes('Configura')) {
+      userMessage = error.message
+    } else if (error.message?.includes('SAFETY') || error.message?.includes('bloqueado')) {
+      userMessage = 'Contenido bloqueado por filtros de seguridad. Modifica el prompt.'
+    } else if (error.message?.includes('quota') || error.message?.includes('saldo')) {
+      userMessage = error.message
+    } else {
+      userMessage = error.message || 'Error interno del servidor'
+    }
+
+    return NextResponse.json({
+      success: false,
+      error: userMessage,
+    }, { status: 500 })
   }
 }
 
@@ -433,6 +460,7 @@ function getProviderTip(provider: ImageProviderType): string {
     openai: 'Para usar OpenAI necesitas:\n1. API key de OpenAI (platform.openai.com → API Keys)\n2. Creditos disponibles (platform.openai.com/account/billing)',
     seedream: 'Para usar Seedream necesitas:\n1. API key de KIE.ai\n2. Creditos disponibles en tu cuenta KIE',
     flux: 'Para usar FLUX necesitas:\n1. API key de Black Forest Labs\n2. Creditos disponibles',
+    fal: 'Para usar fal.ai necesitas:\n1. API key de fal.ai (fal.ai/dashboard/keys)\n2. Creditos disponibles en tu cuenta fal.ai',
   }
   return tips[provider]
 }

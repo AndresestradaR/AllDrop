@@ -2,3 +2,4 @@
 
 export * from './types'
 export * from './kie-video'
+export * from './fal-video'

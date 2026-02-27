@@ -8,6 +8,7 @@ import {
   VIDEO_MODELS,
   getVideoApiModelId,
 } from './types'
+import { generateVideoViaFal } from './fal-video'
 
 const KIE_API_BASE = 'https://api.kie.ai/api/v1'
 
@@ -53,7 +54,8 @@ function convertResolutionForHailuo(resolution: string | undefined): string {
  */
 export async function generateVideo(
   request: GenerateVideoRequest,
-  apiKey: string
+  apiKey: string,
+  falApiKey?: string
 ): Promise<GenerateVideoResult> {
   try {
     const modelConfig = VIDEO_MODELS[request.modelId]
@@ -74,7 +76,26 @@ export async function generateVideo(
     }
 
     // Standard models use createTask endpoint
-    return await generateStandardVideo(request, apiKey, apiModelId, modelConfig)
+    const kieResult = await generateStandardVideo(request, apiKey, apiModelId, modelConfig)
+
+    // If KIE succeeded, return
+    if (kieResult.success) return kieResult
+
+    // fal.ai fallback: only for models with a falModelId
+    if (falApiKey && modelConfig.falModelId) {
+      console.warn(`[Video] KIE failed (${kieResult.error}), trying fal.ai fallback: ${modelConfig.falModelId}`)
+      const falResult = await generateVideoViaFal(falApiKey, modelConfig.falModelId, {
+        prompt: request.prompt,
+        imageUrl: request.imageUrls?.[0],
+        aspectRatio: request.aspectRatio,
+        duration: request.duration,
+        timeoutMs: 100000, // 100s for video fallback
+      })
+      if (falResult.success) return falResult
+      console.warn(`[Video] fal.ai fallback also failed: ${falResult.error}`)
+    }
+
+    return kieResult
 
   } catch (error: any) {
     console.error('[Video] Error:', error.message)

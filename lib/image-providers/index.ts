@@ -5,14 +5,17 @@ import {
   GenerateImageRequest,
   GenerateImageResult,
   IMAGE_PROVIDERS,
+  IMAGE_MODELS,
 } from './types'
 import { geminiProvider, buildGeminiPrompt } from './gemini'
 import { openaiProvider } from './openai'
 import { seedreamProvider } from './kie-seedream'
 import { fluxProvider } from './bfl-flux'
+import { generateViaFal, falImageToBase64 } from './fal'
+import { classifyError, wrapError, formatCascadeError, type AIProviderError } from '../services/ai-errors'
 
-// Provider registry
-const providers: Record<ImageProviderType, ImageProvider> = {
+// Provider registry (fal not registered here — handled directly via generateViaFal)
+const providers: Record<string, ImageProvider> = {
   gemini: geminiProvider,
   openai: openaiProvider,
   seedream: seedreamProvider,
@@ -41,19 +44,18 @@ export function getAllProviders() {
 }
 
 /**
- * Generate image with automatic provider routing.
+ * Generate image with automatic provider routing + 3-level cascade.
  *
- * KIE is the PRIMARY provider for everything. For Gemini models:
- *   1. Try KIE nano-banana-pro (Gemini 3 Pro Image)
- *   2. If fails → try KIE nano-banana (Gemini 2.5 Flash Image)
- *   3. If fails → try KIE seedream/4.5 as ultimate fallback
- *   4. Only if user has NO KIE key → try direct Google API
+ * For Gemini models (cascade):
+ *   1. KIE (nano-banana-pro → nano-banana → seedream/4.5)
+ *   2. fal.ai (nano-banana-2 as fallback, if fal key available)
+ *   3. Direct Google API (if Gemini key available)
  *
- * For Seedream models: KIE direct (already works)
- * For other providers: direct call
+ * For fal.ai models: direct to fal.ai
+ * For Seedream models: KIE direct → fal.ai fallback
+ * For OpenAI/FLUX: direct call
  *
- * @param options.maxTotalMs - Max time budget for KIE cascade (default 80s).
- *   Routes with more time (e.g. landing = 300s) should pass a larger value.
+ * @param options.maxTotalMs - Max time budget for cascade (default 80s).
  */
 export async function generateImage(
   request: GenerateImageRequest,
@@ -62,11 +64,166 @@ export async function generateImage(
     openai?: string
     kie?: string
     bfl?: string
+    fal?: string
   },
   options?: { maxTotalMs?: number }
 ): Promise<GenerateImageResult> {
-  const provider = getProvider(request.provider)
+  // ── fal.ai models: direct to fal.ai ──
+  if (request.provider === 'fal') {
+    if (!apiKeys.fal) {
+      return {
+        success: false,
+        error: 'Configura tu API key de fal.ai en Settings',
+        provider: 'fal',
+      }
+    }
 
+    const modelConfig = IMAGE_MODELS[request.modelId]
+    const falModelId = modelConfig?.falModelId || request.modelId
+    const prompt = request.prompt?.trim() || buildGeminiPrompt(request)
+
+    const falResult = await generateViaFal(apiKeys.fal, falModelId, {
+      prompt,
+      imageUrls: request.productImageUrls,
+      aspectRatio: request.aspectRatio || '9:16',
+      timeoutMs: options?.maxTotalMs || 45000,
+    })
+
+    if (falResult.success && falResult.imageUrl) {
+      // Convert fal.ai URL to base64
+      const imageData = await falImageToBase64(falResult.imageUrl)
+      if (imageData) {
+        return {
+          success: true,
+          imageBase64: imageData.base64,
+          mimeType: imageData.mimeType,
+          provider: 'fal',
+        }
+      }
+      // If base64 conversion fails, return as task (caller handles URL)
+      return {
+        success: true,
+        imageBase64: undefined,
+        provider: 'fal',
+        status: 'completed',
+      }
+    }
+
+    return {
+      success: false,
+      error: falResult.error || 'fal.ai: error desconocido',
+      provider: 'fal',
+    }
+  }
+
+  // ── Gemini: 3-level cascade (KIE → fal.ai → Direct Google) ──
+  if (request.provider === 'gemini') {
+    const cascadeErrors: string[] = []
+
+    // Level 1: KIE cascade
+    if (apiKeys.kie) {
+      const kieResult = await generateViaKieCascade(request, apiKeys.kie, options?.maxTotalMs)
+      if (kieResult.success) return kieResult
+
+      cascadeErrors.push(`KIE: ${kieResult.error || 'fallido'}`)
+      console.warn(`[Cascade] KIE failed, trying fal.ai...`)
+    }
+
+    // Level 2: fal.ai fallback (nano-banana-2)
+    if (apiKeys.fal) {
+      const prompt = request.prompt?.trim() || buildGeminiPrompt(request)
+      const falResult = await generateViaFal(apiKeys.fal, 'nano-banana-2', {
+        prompt,
+        imageUrls: request.productImageUrls,
+        aspectRatio: request.aspectRatio || '9:16',
+        timeoutMs: 45000,
+      })
+
+      if (falResult.success && falResult.imageUrl) {
+        const imageData = await falImageToBase64(falResult.imageUrl)
+        if (imageData) {
+          console.log('[Cascade] fal.ai succeeded (fallback)')
+          return {
+            success: true,
+            imageBase64: imageData.base64,
+            mimeType: imageData.mimeType,
+            provider: 'gemini',
+          }
+        }
+      }
+
+      cascadeErrors.push(`fal.ai: ${falResult.error || 'fallido'}`)
+      console.warn(`[Cascade] fal.ai failed, trying direct Google...`)
+    }
+
+    // Level 3: Direct Google API
+    if (apiKeys.gemini) {
+      const provider = getProvider('gemini')
+      if (provider) {
+        console.log('[Cascade] Using direct Google API (final fallback)')
+        const result = await provider.generate(request, apiKeys.gemini)
+        if (result.success) return result
+        cascadeErrors.push(`Google Direct: ${result.error || 'fallido'}`)
+      }
+    }
+
+    // All failed
+    if (cascadeErrors.length === 0) {
+      return {
+        success: false,
+        error: 'Configura al menos una API key (KIE, fal.ai, o Google) en Settings',
+        provider: 'gemini',
+      }
+    }
+
+    return {
+      success: false,
+      error: `Todos los proveedores fallaron:\n${cascadeErrors.join('\n')}`,
+      provider: 'gemini',
+    }
+  }
+
+  // ── Seedream: KIE direct → fal.ai fallback ──
+  if (request.provider === 'seedream') {
+    if (apiKeys.kie) {
+      const provider = getProvider('seedream')
+      if (provider) {
+        const result = await provider.generate(request, apiKeys.kie)
+        if (result.success) return result
+        console.warn(`[Cascade] KIE/Seedream failed: ${result.error}`)
+      }
+    }
+
+    // fal.ai fallback for seedream (use seedream/5-lite)
+    if (apiKeys.fal) {
+      const prompt = request.prompt?.trim() || ''
+      const falResult = await generateViaFal(apiKeys.fal, 'seedream/5-lite', {
+        prompt,
+        aspectRatio: request.aspectRatio || '1:1',
+        timeoutMs: 45000,
+      })
+      if (falResult.success && falResult.imageUrl) {
+        const imageData = await falImageToBase64(falResult.imageUrl)
+        if (imageData) {
+          return {
+            success: true,
+            imageBase64: imageData.base64,
+            mimeType: imageData.mimeType,
+            provider: 'seedream',
+          }
+        }
+      }
+    }
+
+    return {
+      success: false,
+      error: 'No hay API key de KIE o fal.ai configurada para Seedream',
+      provider: 'seedream',
+    }
+  }
+
+  // ── Normal flow for OpenAI and FLUX ──
+  const provider = getProvider(request.provider)
   if (!provider) {
     return {
       success: false,
@@ -75,33 +232,10 @@ export async function generateImage(
     }
   }
 
-  // ── Gemini: ALL through KIE with internal fallback cascade ──
-  if (request.provider === 'gemini') {
-    if (apiKeys.kie) {
-      return generateViaKieCascade(request, apiKeys.kie, options?.maxTotalMs)
-    }
-
-    // No KIE key — last resort: direct Google API
-    if (apiKeys.gemini) {
-      console.log('[generateImage] Gemini: no KIE key, using direct Google API')
-      return provider.generate(request, apiKeys.gemini)
-    }
-
-    return {
-      success: false,
-      error: 'Configura tu API key de KIE.ai en Settings',
-      provider: 'gemini',
-    }
-  }
-
-  // ── Normal flow for all other providers ──
   let apiKey: string | undefined
   switch (request.provider) {
     case 'openai':
       apiKey = apiKeys.openai
-      break
-    case 'seedream':
-      apiKey = apiKeys.kie
       break
     case 'flux':
       apiKey = apiKeys.bfl

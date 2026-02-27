@@ -96,20 +96,21 @@ export async function POST(request: Request) {
     // Get API keys
     const { data: profile } = await supabase
       .from('profiles')
-      .select('google_api_key, openai_api_key, kie_api_key, bfl_api_key')
+      .select('google_api_key, openai_api_key, kie_api_key, bfl_api_key, fal_api_key')
       .eq('id', user.id)
       .single()
 
-    const apiKeys: { gemini?: string; openai?: string; kie?: string; bfl?: string } = {}
+    const apiKeys: { gemini?: string; openai?: string; kie?: string; bfl?: string; fal?: string } = {}
     if (profile?.google_api_key) apiKeys.gemini = decrypt(profile.google_api_key)
     if (profile?.openai_api_key) apiKeys.openai = decrypt(profile.openai_api_key)
     if (profile?.kie_api_key) apiKeys.kie = decrypt(profile.kie_api_key)
     if (profile?.bfl_api_key) apiKeys.bfl = decrypt(profile.bfl_api_key)
+    if (profile?.fal_api_key) apiKeys.fal = decrypt(profile.fal_api_key)
 
     const selectedProvider = modelIdToProviderType(modelId)
 
     const providerKeyMap: Record<ImageProviderType, keyof typeof apiKeys> = {
-      gemini: 'gemini', openai: 'openai', seedream: 'kie', flux: 'bfl',
+      gemini: 'gemini', openai: 'openai', seedream: 'kie', flux: 'bfl', fal: 'fal',
     }
 
     // For Gemini: accept either Google key OR KIE key (KIE provides Gemini models)
@@ -119,7 +120,7 @@ export async function POST(request: Request) {
 
     if (!hasRequiredKey) {
       const keyNames: Record<ImageProviderType, string> = {
-        gemini: 'Google (Gemini) o KIE.ai', openai: 'OpenAI', seedream: 'KIE.ai', flux: 'Black Forest Labs',
+        gemini: 'Google (Gemini) o KIE.ai', openai: 'OpenAI', seedream: 'KIE.ai', flux: 'Black Forest Labs', fal: 'fal.ai',
       }
       return NextResponse.json({
         error: `Configura tu API key de ${keyNames[selectedProvider]} en Settings`,

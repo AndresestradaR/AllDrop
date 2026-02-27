@@ -1,7 +1,7 @@
 // Types for multi-model image generation system
 
 // Provider types (companies)
-export type ImageProviderCompany = 'google' | 'openai' | 'bytedance' | 'bfl'
+export type ImageProviderCompany = 'google' | 'openai' | 'bytedance' | 'bfl' | 'fal'
 
 // Specific model IDs
 export type ImageModelId =
@@ -20,9 +20,13 @@ export type ImageModelId =
   | 'flux-2-klein'
   | 'flux-2-pro'
   | 'flux-2-flex'
+  // fal.ai models (used as fallback + standalone)
+  | 'nano-banana-2'
+  | 'seedream-5-lite'
+  | 'seedream-5'
 
 // Legacy type for backward compatibility
-export type ImageProviderType = 'gemini' | 'openai' | 'seedream' | 'flux'
+export type ImageProviderType = 'gemini' | 'openai' | 'seedream' | 'flux' | 'fal'
 
 export type ModelTag = 'NEW' | 'TRENDING' | 'FAST' | 'PREMIUM' | 'BEST_TEXT' | 'HD' | '4K' | 'RECOMENDADO' | 'TEXT_ONLY'
 
@@ -44,6 +48,8 @@ export interface ImageModelConfig {
   tags?: ModelTag[]
   // The actual API model ID to use when calling the provider
   apiModelId: string
+  // fal.ai model ID for fallback cascade (if available on fal.ai)
+  falModelId?: string
   // Where this model is available: 'landing', 'studio', or 'both'
   availableIn: ModelAvailability
 }
@@ -247,6 +253,59 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModelConfig> = {
     apiModelId: 'flux-2-flex',
     availableIn: 'studio',
   },
+
+  // ============================================
+  // FAL.AI (3 models — backup + standalone)
+  // ============================================
+  'nano-banana-2': {
+    id: 'nano-banana-2',
+    name: 'Gemini 3.1 Flash Image',
+    description: 'Rapido y economico via fal.ai — Ideal para landings',
+    company: 'fal',
+    companyName: 'fal.ai',
+    supportsImageInput: true,
+    supportsAspectRatio: true,
+    maxImages: 1,
+    requiresPolling: true,
+    pricePerImage: '~$0.03',
+    recommended: true,
+    tags: ['RECOMENDADO', 'FAST', 'NEW'],
+    apiModelId: 'fal-ai/nano-banana-2',
+    falModelId: 'nano-banana-2',
+    availableIn: 'both',
+  },
+  'seedream-5-lite': {
+    id: 'seedream-5-lite',
+    name: 'Seedream 5 Lite',
+    description: 'ByteDance Seedream 5 Lite via fal.ai — Rapido',
+    company: 'fal',
+    companyName: 'fal.ai',
+    supportsImageInput: false,
+    supportsAspectRatio: true,
+    maxImages: 1,
+    requiresPolling: true,
+    pricePerImage: '~$0.03',
+    tags: ['NEW', 'FAST'],
+    apiModelId: 'fal-ai/seedream-3.0',
+    falModelId: 'seedream/5-lite',
+    availableIn: 'both',
+  },
+  'seedream-5': {
+    id: 'seedream-5',
+    name: 'Seedream 5',
+    description: 'ByteDance Seedream 5 Pro via fal.ai — Mayor calidad',
+    company: 'fal',
+    companyName: 'fal.ai',
+    supportsImageInput: false,
+    supportsAspectRatio: true,
+    maxImages: 1,
+    requiresPolling: true,
+    pricePerImage: '~$0.05',
+    tags: ['NEW', 'PREMIUM'],
+    apiModelId: 'fal-ai/seedream-3.0/pro',
+    falModelId: 'seedream/5',
+    availableIn: 'studio',
+  },
 }
 
 // Helper to filter models by availability
@@ -256,6 +315,17 @@ function filterModelsByAvailability(models: ImageModelConfig[], target: ModelAva
 
 // Grouped by company for hierarchical selector - ALL models (for Studio IA)
 export const IMAGE_COMPANY_GROUPS: ImageCompanyGroup[] = [
+  {
+    id: 'fal',
+    name: 'fal.ai',
+    icon: 'Zap',
+    color: 'from-indigo-500 to-violet-500',
+    models: [
+      IMAGE_MODELS['nano-banana-2'],
+      IMAGE_MODELS['seedream-5-lite'],
+      IMAGE_MODELS['seedream-5'],
+    ],
+  },
   {
     id: 'google',
     name: 'Google',
@@ -305,6 +375,16 @@ export const IMAGE_COMPANY_GROUPS: ImageCompanyGroup[] = [
 // Only models that preserve product + template well
 export const LANDING_COMPANY_GROUPS: ImageCompanyGroup[] = [
   {
+    id: 'fal',
+    name: 'fal.ai',
+    icon: 'Zap',
+    color: 'from-indigo-500 to-violet-500',
+    models: filterModelsByAvailability([
+      IMAGE_MODELS['nano-banana-2'],
+      IMAGE_MODELS['seedream-5-lite'],
+    ], 'landing'),
+  },
+  {
     id: 'google',
     name: 'Google',
     icon: 'Sparkles',
@@ -323,8 +403,6 @@ export const LANDING_COMPANY_GROUPS: ImageCompanyGroup[] = [
       IMAGE_MODELS['gpt-image-1.5'],
     ], 'landing'),
   },
-  // No Seedream for landings — quality too low for banner generation
-  // No BFL/FLUX for landings - they don't preserve product
 ]
 
 // Models available for STUDIO IA (creative generation)
@@ -379,6 +457,15 @@ export const IMAGE_PROVIDERS: Record<ImageProviderType, ImageProviderConfig> = {
     maxImages: 1,
     requiresPolling: true,
   },
+  fal: {
+    id: 'fal',
+    name: 'fal.ai',
+    description: 'fal.ai - Modelos serverless rapidos',
+    supportsImageInput: true,
+    supportsAspectRatio: true,
+    maxImages: 1,
+    requiresPolling: true,
+  },
 }
 
 // Map model ID to legacy provider type
@@ -393,6 +480,8 @@ export function modelIdToProviderType(modelId: ImageModelId): ImageProviderType 
       return 'seedream'
     case 'bfl':
       return 'flux'
+    case 'fal':
+      return 'fal'
   }
 }
 
@@ -408,6 +497,8 @@ export function getApiKeyField(modelId: ImageModelId): string {
       return 'kie_api_key'
     case 'bfl':
       return 'bfl_api_key'
+    case 'fal':
+      return 'fal_api_key'
   }
 }
 

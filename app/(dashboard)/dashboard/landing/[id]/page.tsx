@@ -136,12 +136,13 @@ export default function ProductGeneratePage() {
   const [selectedSize, setSelectedSize] = useState(OUTPUT_SIZES[0])
 
   // AI Model selection
-  const [selectedModel, setSelectedModel] = useState<ImageModelId>('gemini-3-pro-image')
+  const [selectedModel, setSelectedModel] = useState<ImageModelId>('nano-banana-2')
   const [apiKeyStatus, setApiKeyStatus] = useState({
     google: false,
     openai: false,
     bytedance: false,
     bfl: false,
+    fal: false,
   })
 
   // Country selection
@@ -263,6 +264,7 @@ export default function ProductGeneratePage() {
         openai: data.hasOpenaiApiKey || false,
         bytedance: data.hasKieApiKey || false,
         bfl: data.hasBflApiKey || false,
+        fal: data.hasFalApiKey || false,
       })
     } catch (error) {
       console.error('Error fetching API key status:', error)

@@ -17,6 +17,7 @@ interface ApiKeyStatus {
   openai: boolean
   bytedance: boolean
   bfl: boolean
+  fal: boolean
 }
 
 interface ModelSelectorProps {

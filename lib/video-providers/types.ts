@@ -44,6 +44,7 @@ export interface VideoModelConfig {
   requiresImage?: boolean // True if model ONLY supports image-to-video (no text-to-video)
   noResolutionParam?: boolean // True if model doesn't accept resolution parameter
   useVeoEndpoint?: boolean // Special endpoint for Veo models
+  falModelId?: string // fal.ai model path (for cascade fallback)
   tags?: VideoModelTag[]
   recommended?: boolean
 }
@@ -254,6 +255,7 @@ export const VIDEO_MODELS: Record<VideoModelId, VideoModelConfig> = {
     supportsStartEndFrames: true,
     supportsMultiShots: true,
     requiresImage: true,
+    falModelId: 'fal-ai/seedance/1.0-pro',
     tags: ['IMG2VID', 'FAST', 'REFERENCES', 'MULTI_SHOTS'],
   },
 

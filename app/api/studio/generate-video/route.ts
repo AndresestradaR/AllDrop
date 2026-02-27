@@ -130,7 +130,7 @@ export async function POST(request: Request) {
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('kie_api_key')
+      .select('kie_api_key, fal_api_key')
       .eq('id', userId)
       .single()
 
@@ -141,6 +141,7 @@ export async function POST(request: Request) {
     }
 
     const kieApiKey = decrypt(profile.kie_api_key)
+    const falApiKey = profile?.fal_api_key ? decrypt(profile.fal_api_key) : undefined
 
     console.log(`[Video] Starting - Model: ${modelId}, User: ${userId.substring(0, 8)}...`)
     console.log(`[Video] Prompt: ${prompt.substring(0, 100)}...`)
@@ -228,7 +229,8 @@ export async function POST(request: Request) {
     }
 
     // Create video task (returns taskId for async processing)
-    const result = await generateVideo(generationParams, kieApiKey)
+    // Pass falApiKey for cascade fallback (KIE -> fal.ai)
+    const result = await generateVideo(generationParams, kieApiKey, falApiKey)
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
 
@@ -253,10 +255,21 @@ export async function POST(request: Request) {
   } catch (error: any) {
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
     console.error(`[Video] Error after ${elapsed}s:`, error.message)
-    
-    return NextResponse.json({ 
+
+    let userMessage = 'Error al generar video'
+    if (error.message?.includes('timeout') || error.message?.includes('tardó demasiado')) {
+      userMessage = 'La generación de video tardó demasiado. Intenta de nuevo.'
+    } else if (error.message?.includes('API key') || error.message?.includes('Configura')) {
+      userMessage = error.message
+    } else if (error.message?.includes('SAFETY') || error.message?.includes('bloqueado')) {
+      userMessage = 'Contenido bloqueado por filtros de seguridad. Modifica el prompt.'
+    } else if (error.message) {
+      userMessage = error.message
+    }
+
+    return NextResponse.json({
       success: false,
-      error: error.message || 'Error al generar video'
+      error: userMessage,
     }, { status: 500 })
   }
 }

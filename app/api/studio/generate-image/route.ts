@@ -107,7 +107,7 @@ export async function POST(request: Request) {
     // Get API keys from profile
     const { data: profile } = await supabase
       .from('profiles')
-      .select('google_api_key, openai_api_key, kie_api_key, bfl_api_key')
+      .select('google_api_key, openai_api_key, kie_api_key, bfl_api_key, fal_api_key')
       .eq('id', user.id)
       .single()
 
@@ -117,6 +117,7 @@ export async function POST(request: Request) {
       openai?: string
       kie?: string
       bfl?: string
+      fal?: string
     } = {}
 
     if (profile?.google_api_key) {
@@ -131,6 +132,9 @@ export async function POST(request: Request) {
     if (profile?.bfl_api_key) {
       apiKeys.bfl = decrypt(profile.bfl_api_key)
     }
+    if (profile?.fal_api_key) {
+      apiKeys.fal = decrypt(profile.fal_api_key)
+    }
 
     // Get provider from model
     const selectedProvider = modelIdToProviderType(modelId)
@@ -141,6 +145,7 @@ export async function POST(request: Request) {
       openai: 'openai',
       seedream: 'kie',
       flux: 'bfl',
+      fal: 'fal',
     }
 
     const requiredKey = providerKeyMap[selectedProvider]
@@ -155,6 +160,7 @@ export async function POST(request: Request) {
         openai: 'OpenAI',
         seedream: 'KIE.ai',
         flux: 'Black Forest Labs',
+        fal: 'fal.ai',
       }
       return NextResponse.json({
         error: `Configura tu API key de ${keyNames[selectedProvider]} en Settings`,
