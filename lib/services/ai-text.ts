@@ -284,7 +284,6 @@ async function callGoogle(apiKey: string, options: AITextOptions): Promise<strin
     contents: [{ parts }],
     generationConfig: {
       temperature: options.temperature ?? 0.7,
-      thinkingConfig: { thinkingBudget: options.reasoningEffort === 'none' || !options.reasoningEffort ? 0 : options.reasoningEffort === 'low' ? 1024 : 4096 },
     },
   }
 
