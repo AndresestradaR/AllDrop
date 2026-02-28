@@ -59,13 +59,18 @@ generateAIText(keys, options) -> string
 #### Image Generation — `lib/image-providers/index.ts`
 ```
 generateImage(model, params) -> ImageResult
-  Router dispatches to: gemini.ts | openai.ts | kie-seedream.ts | bfl-flux.ts | fal.ts
-  KIE cascade for Gemini models: nano-banana-pro -> nano-banana -> seedream/4.5
-  Full cascade: KIE -> fal.ai (if key) -> Google direct
+  UNIVERSAL IRON CASCADE — runs for ALL models, no exceptions:
+    If OpenAI/FLUX selected -> try that provider first, then cascade
+    1. KIE (nano-banana-pro -> nano-banana -> seedream/4.5)
+    2. fal.ai (nano-banana-2 or model's falModelId)
+    3. Google Gemini direct
+  The cascade NEVER breaks. If one level fails, the next picks up.
   15 models across 5 companies (Google, OpenAI, ByteDance/Seedream, BFL/FLUX, fal.ai)
-  fal.ai provider: lib/image-providers/fal.ts (Queue API with polling)
+  Default model: nano-banana-2 (goes through full KIE -> fal -> Google cascade)
+  Providers: gemini.ts | openai.ts | kie-seedream.ts | bfl-flux.ts | fal.ts
   Error classification: lib/services/ai-errors.ts (auth, quota, server, timeout — Spanish)
   Types defined in: lib/image-providers/types.ts
+  Monitoring: lib/services/ai-monitor.ts (fire-and-forget logAI() on every attempt)
 ```
 
 #### Video Generation — `lib/video-providers/kie-video.ts`

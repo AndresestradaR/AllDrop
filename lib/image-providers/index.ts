@@ -45,16 +45,16 @@ export function getAllProviders() {
 }
 
 /**
- * Generate image with automatic provider routing + 3-level cascade.
+ * Generate image with UNIVERSAL iron cascade.
  *
- * For Gemini models (cascade):
- *   1. KIE (nano-banana-pro → nano-banana → seedream/4.5)
- *   2. fal.ai (nano-banana-2 as fallback, if fal key available)
- *   3. Direct Google API (if Gemini key available)
+ * No matter what model the user selects, the cascade ALWAYS runs:
  *
- * For fal.ai models: direct to fal.ai
- * For Seedream models: KIE direct → fal.ai fallback
- * For OpenAI/FLUX: direct call
+ * If OpenAI/FLUX selected → try that provider first, then cascade
+ * ALWAYS: KIE (nano-banana-pro → nano-banana → seedream/4.5)
+ *       → fal.ai (nano-banana-2 or model's falModelId)
+ *       → Google direct
+ *
+ * NEVER breaks. If one level fails, the next one picks up.
  *
  * @param options.maxTotalMs - Max time budget for cascade (default 80s).
  */
@@ -69,221 +69,108 @@ export async function generateImage(
   },
   options?: { maxTotalMs?: number }
 ): Promise<GenerateImageResult> {
-  // ── fal.ai models: direct to fal.ai ──
-  if (request.provider === 'fal') {
-    if (!apiKeys.fal) {
-      return {
-        success: false,
-        error: 'Configura tu API key de fal.ai en Settings',
-        provider: 'fal',
-      }
+  const cascadeErrors: string[] = []
+  const modelConfig = IMAGE_MODELS[request.modelId]
+  const prompt = request.prompt?.trim() || buildGeminiPrompt(request)
+
+  // ── Step 1: If OpenAI or FLUX selected, try them first ──
+  if (request.provider === 'openai' && apiKeys.openai) {
+    const t0 = Date.now()
+    const result = await getProvider('openai')!.generate(request, apiKeys.openai)
+    if (result.success) {
+      logAI({ service: 'image', provider: 'openai', status: 'success', response_ms: Date.now() - t0, model: request.modelId })
+      return result
     }
+    logAI({ service: 'image', provider: 'openai', status: 'error', response_ms: Date.now() - t0, model: request.modelId, error_message: result.error })
+    cascadeErrors.push(`OpenAI: ${result.error || 'fallido'}`)
+    console.warn(`[Cascade] OpenAI failed, continuing cascade...`)
+  }
 
-    const modelConfig = IMAGE_MODELS[request.modelId]
-    const falModelId = modelConfig?.falModelId || request.modelId
-    const prompt = request.prompt?.trim() || buildGeminiPrompt(request)
+  if (request.provider === 'flux' && apiKeys.bfl) {
+    const t0 = Date.now()
+    const result = await getProvider('flux')!.generate(request, apiKeys.bfl)
+    if (result.success) {
+      logAI({ service: 'image', provider: 'bfl', status: 'success', response_ms: Date.now() - t0, model: request.modelId })
+      return result
+    }
+    logAI({ service: 'image', provider: 'bfl', status: 'error', response_ms: Date.now() - t0, model: request.modelId, error_message: result.error })
+    cascadeErrors.push(`FLUX: ${result.error || 'fallido'}`)
+    console.warn(`[Cascade] FLUX failed, continuing cascade...`)
+  }
 
+  // ── Step 2: KIE cascade (ALWAYS — iron rule) ──
+  if (apiKeys.kie) {
+    const t0 = Date.now()
+    const kieResult = await generateViaKieCascade(request, apiKeys.kie, options?.maxTotalMs)
+    if (kieResult.success) {
+      logAI({ service: 'image', provider: 'kie', status: 'success', response_ms: Date.now() - t0, model: 'kie-cascade', was_fallback: cascadeErrors.length > 0 })
+      return { ...kieResult, provider: request.provider }
+    }
+    logAI({ service: 'image', provider: 'kie', status: 'error', response_ms: Date.now() - t0, model: 'kie-cascade', error_message: kieResult.error, was_fallback: cascadeErrors.length > 0 })
+    cascadeErrors.push(`KIE: ${kieResult.error || 'fallido'}`)
+    console.warn(`[Cascade] KIE failed, trying fal.ai...`)
+  }
+
+  // ── Step 3: fal.ai (ALWAYS — iron rule) ──
+  if (apiKeys.fal) {
+    const falModelId = modelConfig?.falModelId || 'nano-banana-2'
     const t0 = Date.now()
     const falResult = await generateViaFal(apiKeys.fal, falModelId, {
       prompt,
       imageUrls: request.productImageUrls,
       aspectRatio: request.aspectRatio || '9:16',
-      timeoutMs: options?.maxTotalMs || 45000,
+      timeoutMs: 45000,
     })
 
     if (falResult.success && falResult.imageUrl) {
       const imageData = await falImageToBase64(falResult.imageUrl)
-      logAI({ service: 'image', provider: 'fal', status: 'success', response_ms: Date.now() - t0, model: falModelId })
       if (imageData) {
+        logAI({ service: 'image', provider: 'fal', status: 'success', response_ms: Date.now() - t0, model: falModelId, was_fallback: cascadeErrors.length > 0 })
+        console.log(`[Cascade] fal.ai succeeded${cascadeErrors.length > 0 ? ' (fallback)' : ''}`)
         return {
           success: true,
           imageBase64: imageData.base64,
           mimeType: imageData.mimeType,
-          provider: 'fal',
+          provider: request.provider,
         }
-      }
-      return {
-        success: true,
-        imageBase64: undefined,
-        provider: 'fal',
-        status: 'completed',
       }
     }
 
-    logAI({ service: 'image', provider: 'fal', status: 'error', response_ms: Date.now() - t0, model: falModelId, error_message: falResult.error })
-    return {
-      success: false,
-      error: falResult.error || 'fal.ai: error desconocido',
-      provider: 'fal',
+    logAI({ service: 'image', provider: 'fal', status: 'error', response_ms: Date.now() - t0, model: falModelId, error_message: falResult.error, was_fallback: cascadeErrors.length > 0 })
+    cascadeErrors.push(`fal.ai: ${falResult.error || 'fallido'}`)
+    console.warn(`[Cascade] fal.ai failed, trying Google direct...`)
+  }
+
+  // ── Step 4: Google direct (ALWAYS — last resort) ──
+  if (apiKeys.gemini) {
+    const geminiProvider = getProvider('gemini')
+    if (geminiProvider) {
+      console.log('[Cascade] Using direct Google API (final fallback)')
+      const t0 = Date.now()
+      const result = await geminiProvider.generate(request, apiKeys.gemini)
+      if (result.success) {
+        logAI({ service: 'image', provider: 'google', status: 'success', response_ms: Date.now() - t0, model: 'gemini-direct', was_fallback: true })
+        return { ...result, provider: request.provider }
+      }
+      logAI({ service: 'image', provider: 'google', status: 'error', response_ms: Date.now() - t0, model: 'gemini-direct', error_message: result.error, was_fallback: true })
+      cascadeErrors.push(`Google: ${result.error || 'fallido'}`)
     }
   }
 
-  // ── Gemini: 3-level cascade (KIE → fal.ai → Direct Google) ──
-  if (request.provider === 'gemini') {
-    const cascadeErrors: string[] = []
-
-    // Level 1: KIE cascade
-    if (apiKeys.kie) {
-      const t0Kie = Date.now()
-      const kieResult = await generateViaKieCascade(request, apiKeys.kie, options?.maxTotalMs)
-      if (kieResult.success) {
-        logAI({ service: 'image', provider: 'kie', status: 'success', response_ms: Date.now() - t0Kie, model: 'kie-cascade' })
-        return kieResult
-      }
-
-      logAI({ service: 'image', provider: 'kie', status: 'error', response_ms: Date.now() - t0Kie, model: 'kie-cascade', error_message: kieResult.error })
-      cascadeErrors.push(`KIE: ${kieResult.error || 'fallido'}`)
-      console.warn(`[Cascade] KIE failed, trying fal.ai...`)
-    }
-
-    // Level 2: fal.ai fallback (nano-banana-2)
-    if (apiKeys.fal) {
-      const prompt = request.prompt?.trim() || buildGeminiPrompt(request)
-      const t0Fal = Date.now()
-      const falResult = await generateViaFal(apiKeys.fal, 'nano-banana-2', {
-        prompt,
-        imageUrls: request.productImageUrls,
-        aspectRatio: request.aspectRatio || '9:16',
-        timeoutMs: 45000,
-      })
-
-      if (falResult.success && falResult.imageUrl) {
-        const imageData = await falImageToBase64(falResult.imageUrl)
-        if (imageData) {
-          logAI({ service: 'image', provider: 'fal', status: 'success', response_ms: Date.now() - t0Fal, model: 'nano-banana-2', was_fallback: true })
-          console.log('[Cascade] fal.ai succeeded (fallback)')
-          return {
-            success: true,
-            imageBase64: imageData.base64,
-            mimeType: imageData.mimeType,
-            provider: 'gemini',
-          }
-        }
-      }
-
-      logAI({ service: 'image', provider: 'fal', status: 'error', response_ms: Date.now() - t0Fal, model: 'nano-banana-2', error_message: falResult.error, was_fallback: true })
-      cascadeErrors.push(`fal.ai: ${falResult.error || 'fallido'}`)
-      console.warn(`[Cascade] fal.ai failed, trying direct Google...`)
-    }
-
-    // Level 3: Direct Google API
-    if (apiKeys.gemini) {
-      const provider = getProvider('gemini')
-      if (provider) {
-        console.log('[Cascade] Using direct Google API (final fallback)')
-        const t0Google = Date.now()
-        const result = await provider.generate(request, apiKeys.gemini)
-        if (result.success) {
-          logAI({ service: 'image', provider: 'google', status: 'success', response_ms: Date.now() - t0Google, model: 'gemini-direct', was_fallback: true })
-          return result
-        }
-        logAI({ service: 'image', provider: 'google', status: 'error', response_ms: Date.now() - t0Google, model: 'gemini-direct', error_message: result.error, was_fallback: true })
-        cascadeErrors.push(`Google Direct: ${result.error || 'fallido'}`)
-      }
-    }
-
-    // All failed
-    if (cascadeErrors.length === 0) {
-      return {
-        success: false,
-        error: 'Configura al menos una API key (KIE, fal.ai, o Google) en Settings',
-        provider: 'gemini',
-      }
-    }
-
+  // ── All failed ──
+  if (cascadeErrors.length === 0) {
     return {
       success: false,
-      error: `Todos los proveedores fallaron:\n${cascadeErrors.join('\n')}`,
-      provider: 'gemini',
-    }
-  }
-
-  // ── Seedream: KIE direct → fal.ai fallback ──
-  if (request.provider === 'seedream') {
-    if (apiKeys.kie) {
-      const provider = getProvider('seedream')
-      if (provider) {
-        const t0Sd = Date.now()
-        const result = await provider.generate(request, apiKeys.kie)
-        if (result.success) {
-          logAI({ service: 'image', provider: 'kie', status: 'success', response_ms: Date.now() - t0Sd, model: 'seedream' })
-          return result
-        }
-        logAI({ service: 'image', provider: 'kie', status: 'error', response_ms: Date.now() - t0Sd, model: 'seedream', error_message: result.error })
-        console.warn(`[Cascade] KIE/Seedream failed: ${result.error}`)
-      }
-    }
-
-    // fal.ai fallback for seedream (use seedream/5-lite)
-    if (apiKeys.fal) {
-      const prompt = request.prompt?.trim() || ''
-      const t0SdFal = Date.now()
-      const falResult = await generateViaFal(apiKeys.fal, 'seedream/5-lite', {
-        prompt,
-        aspectRatio: request.aspectRatio || '1:1',
-        timeoutMs: 45000,
-      })
-      if (falResult.success && falResult.imageUrl) {
-        const imageData = await falImageToBase64(falResult.imageUrl)
-        if (imageData) {
-          logAI({ service: 'image', provider: 'fal', status: 'success', response_ms: Date.now() - t0SdFal, model: 'seedream/5-lite', was_fallback: true })
-          return {
-            success: true,
-            imageBase64: imageData.base64,
-            mimeType: imageData.mimeType,
-            provider: 'seedream',
-          }
-        }
-      }
-      logAI({ service: 'image', provider: 'fal', status: 'error', response_ms: Date.now() - t0SdFal, model: 'seedream/5-lite', error_message: falResult.error, was_fallback: true })
-    }
-
-    return {
-      success: false,
-      error: 'No hay API key de KIE o fal.ai configurada para Seedream',
-      provider: 'seedream',
-    }
-  }
-
-  // ── Normal flow for OpenAI and FLUX ──
-  const provider = getProvider(request.provider)
-  if (!provider) {
-    return {
-      success: false,
-      error: `Provider "${request.provider}" not found`,
+      error: 'Configura al menos una API key (KIE, fal.ai, o Google) en Settings',
       provider: request.provider,
     }
   }
 
-  let apiKey: string | undefined
-  switch (request.provider) {
-    case 'openai':
-      apiKey = apiKeys.openai
-      break
-    case 'flux':
-      apiKey = apiKeys.bfl
-      break
+  return {
+    success: false,
+    error: `Todos los proveedores fallaron:\n${cascadeErrors.join('\n')}`,
+    provider: request.provider,
   }
-
-  if (!apiKey) {
-    return {
-      success: false,
-      error: `No API key configured for provider "${request.provider}"`,
-      provider: request.provider,
-    }
-  }
-
-  const t0Direct = Date.now()
-  const directResult = await provider.generate(request, apiKey)
-  logAI({
-    service: 'image',
-    provider: request.provider === 'openai' ? 'openai' : request.provider === 'flux' ? 'bfl' : request.provider,
-    status: directResult.success ? 'success' : 'error',
-    response_ms: Date.now() - t0Direct,
-    model: request.modelId,
-    error_message: directResult.success ? undefined : directResult.error,
-  })
-  return directResult
 }
 
 /**
