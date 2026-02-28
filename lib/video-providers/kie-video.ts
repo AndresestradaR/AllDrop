@@ -9,6 +9,7 @@ import {
   getVideoApiModelId,
 } from './types'
 import { generateVideoViaFal } from './fal-video'
+import { logAI } from '../services/ai-monitor'
 
 const KIE_API_BASE = 'https://api.kie.ai/api/v1'
 
@@ -57,6 +58,7 @@ export async function generateVideo(
   apiKey: string,
   falApiKey?: string
 ): Promise<GenerateVideoResult> {
+  const t0 = Date.now()
   try {
     const modelConfig = VIDEO_MODELS[request.modelId]
     if (!modelConfig) {
@@ -72,32 +74,45 @@ export async function generateVideo(
 
     // Veo models use different endpoint
     if (modelConfig.useVeoEndpoint) {
-      return await generateVeoVideo(request, apiKey, request.modelId)
+      const veoResult = await generateVeoVideo(request, apiKey, request.modelId)
+      logAI({ service: 'video', provider: 'kie', status: veoResult.success ? 'success' : 'error', response_ms: Date.now() - t0, model: request.modelId, error_message: veoResult.success ? undefined : veoResult.error })
+      return veoResult
     }
 
     // Standard models use createTask endpoint
     const kieResult = await generateStandardVideo(request, apiKey, apiModelId, modelConfig)
 
     // If KIE succeeded, return
-    if (kieResult.success) return kieResult
+    if (kieResult.success) {
+      logAI({ service: 'video', provider: 'kie', status: 'success', response_ms: Date.now() - t0, model: request.modelId })
+      return kieResult
+    }
+
+    logAI({ service: 'video', provider: 'kie', status: 'error', response_ms: Date.now() - t0, model: request.modelId, error_message: kieResult.error })
 
     // fal.ai fallback: only for models with a falModelId
     if (falApiKey && modelConfig.falModelId) {
       console.warn(`[Video] KIE failed (${kieResult.error}), trying fal.ai fallback: ${modelConfig.falModelId}`)
+      const t0Fal = Date.now()
       const falResult = await generateVideoViaFal(falApiKey, modelConfig.falModelId, {
         prompt: request.prompt,
         imageUrl: request.imageUrls?.[0],
         aspectRatio: request.aspectRatio,
         duration: request.duration,
-        timeoutMs: 100000, // 100s for video fallback
+        timeoutMs: 100000,
       })
-      if (falResult.success) return falResult
+      if (falResult.success) {
+        logAI({ service: 'video', provider: 'fal', status: 'success', response_ms: Date.now() - t0Fal, model: modelConfig.falModelId, was_fallback: true })
+        return falResult
+      }
+      logAI({ service: 'video', provider: 'fal', status: 'error', response_ms: Date.now() - t0Fal, model: modelConfig.falModelId, error_message: falResult.error, was_fallback: true })
       console.warn(`[Video] fal.ai fallback also failed: ${falResult.error}`)
     }
 
     return kieResult
 
   } catch (error: any) {
+    logAI({ service: 'video', provider: 'kie', status: 'error', response_ms: Date.now() - t0, model: request.modelId, error_message: error.message })
     console.error('[Video] Error:', error.message)
     return {
       success: false,

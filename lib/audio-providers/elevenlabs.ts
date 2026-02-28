@@ -5,6 +5,7 @@ import {
   GenerateAudioResult,
   ListVoicesResult,
 } from './types'
+import { logAI } from '../services/ai-monitor'
 
 const ELEVENLABS_API_BASE = 'https://api.elevenlabs.io/v1'
 
@@ -34,6 +35,7 @@ export async function generateSpeech(
   request: GenerateAudioRequest,
   apiKey: string
 ): Promise<GenerateAudioResult> {
+  const t0 = Date.now()
   try {
     const modelId = request.modelId || 'eleven_multilingual_v2'
     const body: Record<string, any> = { text: request.text, model_id: modelId }
@@ -77,8 +79,10 @@ export async function generateSpeech(
     const contentType = response.headers.get('content-type') || 'audio/mpeg'
     const charactersUsed = parseInt(response.headers.get('character-count') || String(request.text.length))
 
+    logAI({ service: 'audio', provider: 'elevenlabs', status: 'success', response_ms: Date.now() - t0, model: modelId })
     return { success: true, audioBase64, contentType, charactersUsed, provider: 'elevenlabs' }
   } catch (error: any) {
+    logAI({ service: 'audio', provider: 'elevenlabs', status: 'error', response_ms: Date.now() - t0, error_message: error.message })
     return { success: false, error: error.message || 'Speech generation failed', provider: 'elevenlabs' }
   }
 }

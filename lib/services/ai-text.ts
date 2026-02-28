@@ -1,4 +1,5 @@
 import { decrypt } from './encryption'
+import { logAI } from './ai-monitor'
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -44,11 +45,14 @@ export async function generateAIText(
 
   // Skip KIE when route needs strict JSON schema (KIE doesn't support responseMimeType)
   if (keys.kieApiKey && !options.skipKIE) {
+    const t0 = Date.now()
     try {
       const text = await callKIE(keys.kieApiKey, options)
+      logAI({ service: 'text', provider: 'kie', status: 'success', response_ms: Date.now() - t0, model: options.kieModel || 'gemini-2.5-flash', was_fallback: false })
       options.onSuccess?.({ provider: 'kie', fallbacks })
       return text
     } catch (err: any) {
+      logAI({ service: 'text', provider: 'kie', status: 'error', response_ms: Date.now() - t0, model: options.kieModel || 'gemini-2.5-flash', error_message: err.message, was_fallback: false })
       errors.push(`KIE: ${err.message}`)
       fallbacks.push(`KIE: ${err.message}`)
       console.error('[AI Text] KIE failed:', err.message)
@@ -56,11 +60,15 @@ export async function generateAIText(
   }
 
   if (keys.openaiApiKey) {
+    const t0 = Date.now()
+    const wasFallback = fallbacks.length > 0
     try {
       const text = await callOpenAI(keys.openaiApiKey, options)
+      logAI({ service: 'text', provider: 'openai', status: 'success', response_ms: Date.now() - t0, model: 'gpt-4o-mini', was_fallback: wasFallback })
       options.onSuccess?.({ provider: 'openai', fallbacks })
       return text
     } catch (err: any) {
+      logAI({ service: 'text', provider: 'openai', status: 'error', response_ms: Date.now() - t0, model: 'gpt-4o-mini', error_message: err.message, was_fallback: wasFallback })
       errors.push(`OpenAI: ${err.message}`)
       fallbacks.push(`OpenAI: ${err.message}`)
       console.error('[AI Text] OpenAI failed:', err.message)
@@ -68,11 +76,15 @@ export async function generateAIText(
   }
 
   if (keys.googleApiKey) {
+    const t0 = Date.now()
+    const wasFallback = fallbacks.length > 0
     try {
       const text = await callGoogle(keys.googleApiKey, options)
+      logAI({ service: 'text', provider: 'google', status: 'success', response_ms: Date.now() - t0, model: options.googleModel || 'gemini-2.5-flash', was_fallback: wasFallback })
       options.onSuccess?.({ provider: 'google', fallbacks })
       return text
     } catch (err: any) {
+      logAI({ service: 'text', provider: 'google', status: 'error', response_ms: Date.now() - t0, model: options.googleModel || 'gemini-2.5-flash', error_message: err.message, was_fallback: wasFallback })
       errors.push(`Google: ${err.message}`)
       fallbacks.push(`Google: ${err.message}`)
       console.error('[AI Text] Google failed:', err.message)

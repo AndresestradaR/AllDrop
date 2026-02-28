@@ -13,6 +13,7 @@ import { seedreamProvider } from './kie-seedream'
 import { fluxProvider } from './bfl-flux'
 import { generateViaFal, falImageToBase64 } from './fal'
 import { classifyError, wrapError, formatCascadeError, type AIProviderError } from '../services/ai-errors'
+import { logAI } from '../services/ai-monitor'
 
 // Provider registry (fal not registered here — handled directly via generateViaFal)
 const providers: Record<string, ImageProvider> = {
@@ -82,6 +83,7 @@ export async function generateImage(
     const falModelId = modelConfig?.falModelId || request.modelId
     const prompt = request.prompt?.trim() || buildGeminiPrompt(request)
 
+    const t0 = Date.now()
     const falResult = await generateViaFal(apiKeys.fal, falModelId, {
       prompt,
       imageUrls: request.productImageUrls,
@@ -90,8 +92,8 @@ export async function generateImage(
     })
 
     if (falResult.success && falResult.imageUrl) {
-      // Convert fal.ai URL to base64
       const imageData = await falImageToBase64(falResult.imageUrl)
+      logAI({ service: 'image', provider: 'fal', status: 'success', response_ms: Date.now() - t0, model: falModelId })
       if (imageData) {
         return {
           success: true,
@@ -100,7 +102,6 @@ export async function generateImage(
           provider: 'fal',
         }
       }
-      // If base64 conversion fails, return as task (caller handles URL)
       return {
         success: true,
         imageBase64: undefined,
@@ -109,6 +110,7 @@ export async function generateImage(
       }
     }
 
+    logAI({ service: 'image', provider: 'fal', status: 'error', response_ms: Date.now() - t0, model: falModelId, error_message: falResult.error })
     return {
       success: false,
       error: falResult.error || 'fal.ai: error desconocido',
@@ -122,9 +124,14 @@ export async function generateImage(
 
     // Level 1: KIE cascade
     if (apiKeys.kie) {
+      const t0Kie = Date.now()
       const kieResult = await generateViaKieCascade(request, apiKeys.kie, options?.maxTotalMs)
-      if (kieResult.success) return kieResult
+      if (kieResult.success) {
+        logAI({ service: 'image', provider: 'kie', status: 'success', response_ms: Date.now() - t0Kie, model: 'kie-cascade' })
+        return kieResult
+      }
 
+      logAI({ service: 'image', provider: 'kie', status: 'error', response_ms: Date.now() - t0Kie, model: 'kie-cascade', error_message: kieResult.error })
       cascadeErrors.push(`KIE: ${kieResult.error || 'fallido'}`)
       console.warn(`[Cascade] KIE failed, trying fal.ai...`)
     }
@@ -132,6 +139,7 @@ export async function generateImage(
     // Level 2: fal.ai fallback (nano-banana-2)
     if (apiKeys.fal) {
       const prompt = request.prompt?.trim() || buildGeminiPrompt(request)
+      const t0Fal = Date.now()
       const falResult = await generateViaFal(apiKeys.fal, 'nano-banana-2', {
         prompt,
         imageUrls: request.productImageUrls,
@@ -142,6 +150,7 @@ export async function generateImage(
       if (falResult.success && falResult.imageUrl) {
         const imageData = await falImageToBase64(falResult.imageUrl)
         if (imageData) {
+          logAI({ service: 'image', provider: 'fal', status: 'success', response_ms: Date.now() - t0Fal, model: 'nano-banana-2', was_fallback: true })
           console.log('[Cascade] fal.ai succeeded (fallback)')
           return {
             success: true,
@@ -152,6 +161,7 @@ export async function generateImage(
         }
       }
 
+      logAI({ service: 'image', provider: 'fal', status: 'error', response_ms: Date.now() - t0Fal, model: 'nano-banana-2', error_message: falResult.error, was_fallback: true })
       cascadeErrors.push(`fal.ai: ${falResult.error || 'fallido'}`)
       console.warn(`[Cascade] fal.ai failed, trying direct Google...`)
     }
@@ -161,8 +171,13 @@ export async function generateImage(
       const provider = getProvider('gemini')
       if (provider) {
         console.log('[Cascade] Using direct Google API (final fallback)')
+        const t0Google = Date.now()
         const result = await provider.generate(request, apiKeys.gemini)
-        if (result.success) return result
+        if (result.success) {
+          logAI({ service: 'image', provider: 'google', status: 'success', response_ms: Date.now() - t0Google, model: 'gemini-direct', was_fallback: true })
+          return result
+        }
+        logAI({ service: 'image', provider: 'google', status: 'error', response_ms: Date.now() - t0Google, model: 'gemini-direct', error_message: result.error, was_fallback: true })
         cascadeErrors.push(`Google Direct: ${result.error || 'fallido'}`)
       }
     }
@@ -188,8 +203,13 @@ export async function generateImage(
     if (apiKeys.kie) {
       const provider = getProvider('seedream')
       if (provider) {
+        const t0Sd = Date.now()
         const result = await provider.generate(request, apiKeys.kie)
-        if (result.success) return result
+        if (result.success) {
+          logAI({ service: 'image', provider: 'kie', status: 'success', response_ms: Date.now() - t0Sd, model: 'seedream' })
+          return result
+        }
+        logAI({ service: 'image', provider: 'kie', status: 'error', response_ms: Date.now() - t0Sd, model: 'seedream', error_message: result.error })
         console.warn(`[Cascade] KIE/Seedream failed: ${result.error}`)
       }
     }
@@ -197,6 +217,7 @@ export async function generateImage(
     // fal.ai fallback for seedream (use seedream/5-lite)
     if (apiKeys.fal) {
       const prompt = request.prompt?.trim() || ''
+      const t0SdFal = Date.now()
       const falResult = await generateViaFal(apiKeys.fal, 'seedream/5-lite', {
         prompt,
         aspectRatio: request.aspectRatio || '1:1',
@@ -205,6 +226,7 @@ export async function generateImage(
       if (falResult.success && falResult.imageUrl) {
         const imageData = await falImageToBase64(falResult.imageUrl)
         if (imageData) {
+          logAI({ service: 'image', provider: 'fal', status: 'success', response_ms: Date.now() - t0SdFal, model: 'seedream/5-lite', was_fallback: true })
           return {
             success: true,
             imageBase64: imageData.base64,
@@ -213,6 +235,7 @@ export async function generateImage(
           }
         }
       }
+      logAI({ service: 'image', provider: 'fal', status: 'error', response_ms: Date.now() - t0SdFal, model: 'seedream/5-lite', error_message: falResult.error, was_fallback: true })
     }
 
     return {
@@ -250,7 +273,17 @@ export async function generateImage(
     }
   }
 
-  return provider.generate(request, apiKey)
+  const t0Direct = Date.now()
+  const directResult = await provider.generate(request, apiKey)
+  logAI({
+    service: 'image',
+    provider: request.provider === 'openai' ? 'openai' : request.provider === 'flux' ? 'bfl' : request.provider,
+    status: directResult.success ? 'success' : 'error',
+    response_ms: Date.now() - t0Direct,
+    model: request.modelId,
+    error_message: directResult.success ? undefined : directResult.error,
+  })
+  return directResult
 }
 
 /**

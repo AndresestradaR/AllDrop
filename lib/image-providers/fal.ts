@@ -60,10 +60,15 @@ export async function generateViaFal(
     input.image_url = options.imageUrls[0]
   }
 
-  // Aspect ratio — fal.ai uses various formats depending on model
+  // Aspect ratio — fal.ai expects top-level aspect_ratio parameter
   if (options.aspectRatio) {
-    // Nano Banana and Seedream use image_size with aspect_ratio
-    input.image_size = { aspect_ratio: options.aspectRatio }
+    input.aspect_ratio = options.aspectRatio
+  }
+
+  // Resolution for nano-banana models
+  if (falModelId.includes('nano-banana')) {
+    input.resolution = '1K'
+    input.output_format = 'png'
   }
 
   try {

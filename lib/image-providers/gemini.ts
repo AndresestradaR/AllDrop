@@ -200,9 +200,19 @@ async function generateWithGemini(
     }
   }
 
-  const prompt = request.prompt && request.prompt.trim()
+  let prompt = request.prompt && request.prompt.trim()
     ? request.prompt
     : buildGeminiPrompt(request)
+
+  // Append explicit orientation instruction so the model doesn't follow the template's aspect ratio
+  const ar = request.aspectRatio || '9:16'
+  if (ar === '9:16') {
+    prompt += '\n\nIMPORTANTE: El banner debe ser VERTICAL (9:16, mas alto que ancho). NO generar horizontal.'
+  } else if (ar === '16:9') {
+    prompt += '\n\nIMPORTANTE: El banner debe ser HORIZONTAL (16:9, mas ancho que alto). NO generar vertical.'
+  } else if (ar === '1:1') {
+    prompt += '\n\nIMPORTANTE: El banner debe ser CUADRADO (1:1, misma altura y ancho).'
+  }
   parts.push({ text: prompt })
 
   console.log(`[Gemini] Starting generation with model: ${apiModelId}`)

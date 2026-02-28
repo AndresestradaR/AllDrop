@@ -3,6 +3,7 @@
 // Docs: https://ai.google.dev/gemini-api/docs/speech-generation
 
 import { Voice, GenerateAudioResult, ListVoicesResult } from './types'
+import { logAI } from '../services/ai-monitor'
 
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta'
 
@@ -63,6 +64,7 @@ export async function generateSpeech(
     languageCode?: string
   }
 ): Promise<GenerateAudioResult> {
+  const t0 = Date.now()
   try {
     // Use Gemini 2.5 Flash Preview TTS model
     // Docs: https://ai.google.dev/gemini-api/docs/speech-generation
@@ -110,10 +112,10 @@ export async function generateSpeech(
     }
 
     const data = await response.json()
-    
+
     // Extract audio from response
     const audioData = data.candidates?.[0]?.content?.parts?.[0]?.inlineData
-    
+
     if (!audioData?.data) {
       console.error('[Audio/GeminiTTS] No audio in response:', JSON.stringify(data).slice(0, 500))
       throw new Error('No audio content returned from Gemini')
@@ -126,6 +128,7 @@ export async function generateSpeech(
 
     console.log('[Audio/GeminiTTS] Success, converted to WAV')
 
+    logAI({ service: 'audio', provider: 'google-tts', status: 'success', response_ms: Date.now() - t0, model: 'gemini-2.5-flash-preview-tts' })
     return {
       success: true,
       audioBase64: wavBase64,
@@ -134,6 +137,7 @@ export async function generateSpeech(
       provider: 'google-tts',
     }
   } catch (error: any) {
+    logAI({ service: 'audio', provider: 'google-tts', status: 'error', response_ms: Date.now() - t0, model: 'gemini-2.5-flash-preview-tts', error_message: error.message })
     console.error('[Audio/GeminiTTS] Error:', error.message)
     return {
       success: false,

@@ -21,7 +21,8 @@ import {
   Upload,
   Zap,
   BookOpen,
-  Bot
+  Bot,
+  Activity,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -49,6 +50,7 @@ const otherNavigation = [
 
 const adminNavigation = [
   { name: 'Lucio', href: '/dashboard/lucio', icon: Bot, isNew: true },
+  { name: 'Monitoring IA', href: '/dashboard/admin/monitoring', icon: Activity },
   { name: 'Admin Plantillas', href: '/dashboard/admin/templates', icon: Upload },
   { name: 'Admin Coaching', href: '/dashboard/admin/coaching', icon: BookOpen },
 ]
@@ -63,6 +65,7 @@ export default function DashboardLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [isMentor, setIsMentor] = useState(false)
+  const [aiHealth, setAiHealth] = useState<'green' | 'yellow' | 'red' | null>(null)
 
   useEffect(() => {
     const supabase = createClient()
@@ -79,6 +82,13 @@ export default function DashboardLayout({
           .then(({ data: mentor }) => {
             setIsMentor(!!mentor)
           })
+        // Fetch AI health indicator for admin
+        if (email === ADMIN_EMAIL) {
+          fetch('/api/admin/monitoring?action=health')
+            .then(r => r.json())
+            .then(d => setAiHealth(d.health))
+            .catch(() => {})
+        }
       }
     })
   }, [])
@@ -93,7 +103,7 @@ export default function DashboardLayout({
     router.refresh()
   }
 
-  const NavLink = ({ item }: { item: typeof mainNavigation[0] & { soon?: boolean; isNew?: boolean; external?: boolean } }) => {
+  const NavLink = ({ item, healthDot }: { item: typeof mainNavigation[0] & { soon?: boolean; isNew?: boolean; external?: boolean }, healthDot?: 'green' | 'yellow' | 'red' | null }) => {
     const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
 
     if (item.soon) {
@@ -143,6 +153,14 @@ export default function DashboardLayout({
             <span className="animate-bounce-left">←</span>
             Nuevo
           </span>
+        )}
+        {healthDot && (
+          <span className={cn(
+            'w-2.5 h-2.5 rounded-full',
+            healthDot === 'green' && 'bg-emerald-500',
+            healthDot === 'yellow' && 'bg-amber-500 animate-pulse',
+            healthDot === 'red' && 'bg-red-500 animate-pulse',
+          )} />
         )}
       </Link>
     )
@@ -225,7 +243,11 @@ export default function DashboardLayout({
                 </p>
                 <div className="space-y-1">
                   {adminNavigation.map((item) => (
-                    <NavLink key={item.name} item={item} />
+                    <NavLink
+                      key={item.name}
+                      item={item}
+                      healthDot={item.href === '/dashboard/admin/monitoring' ? aiHealth : undefined}
+                    />
                   ))}
                 </div>
               </div>
