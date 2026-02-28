@@ -332,6 +332,7 @@ export async function getAIKeys(supabase: any, userId: string): Promise<AITextKe
 
   const keys: AITextKeys = {}
 
+  // User BYOK keys (primary)
   if (profile?.kie_api_key) {
     try { keys.kieApiKey = decrypt(profile.kie_api_key) } catch {}
   }
@@ -340,6 +341,17 @@ export async function getAIKeys(supabase: any, userId: string): Promise<AITextKe
   }
   if (profile?.google_api_key) {
     try { keys.googleApiKey = decrypt(profile.google_api_key) } catch {}
+  }
+
+  // Platform fallback keys (env vars) when user has no BYOK key
+  if (!keys.kieApiKey && process.env.KIE_API_KEY) {
+    keys.kieApiKey = process.env.KIE_API_KEY
+  }
+  if (!keys.openaiApiKey && process.env.OPENAI_API_KEY) {
+    keys.openaiApiKey = process.env.OPENAI_API_KEY
+  }
+  if (!keys.googleApiKey && process.env.GEMINI_API_KEY) {
+    keys.googleApiKey = process.env.GEMINI_API_KEY
   }
 
   return keys
