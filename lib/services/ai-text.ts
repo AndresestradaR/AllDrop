@@ -128,9 +128,11 @@ async function callKIESingleModel(
     body.temperature = options.temperature
   }
 
-  // Control thinking/reasoning: 'none' is fast but may not follow JSON schema,
-  // 'low' follows structured output better but takes ~30-60s
-  body.reasoning_effort = options.reasoningEffort || 'none'
+  // 'none' = fast but may ignore JSON schema. Omit entirely for structured output.
+  if (!options.reasoningEffort || options.reasoningEffort === 'none') {
+    body.reasoning_effort = 'none'
+  }
+  // 'low'/'medium': don't send the param — let model think naturally (KIE may not support it)
 
   // NOTE: Do NOT send response_format to KIE — it's not supported by all
   // OpenAI-compatible providers. The system prompt already asks for JSON.
