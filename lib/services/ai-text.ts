@@ -23,6 +23,7 @@ export interface AITextOptions {
   googleModel?: string // default: 'gemini-2.5-flash'
   signal?: AbortSignal
   reasoningEffort?: 'none' | 'low' | 'medium' // default: 'none'. Use 'low' for structured JSON output
+  skipKIE?: boolean    // true = skip KIE, go straight to OpenAI/Google (use for strict JSON schema)
 }
 
 // ── Main entry point ───────────────────────────────────────────
@@ -36,7 +37,8 @@ export async function generateAIText(
 ): Promise<string> {
   const errors: string[] = []
 
-  if (keys.kieApiKey) {
+  // Skip KIE when route needs strict JSON schema (KIE doesn't support responseMimeType)
+  if (keys.kieApiKey && !options.skipKIE) {
     try {
       return await callKIE(keys.kieApiKey, options)
     } catch (err: any) {

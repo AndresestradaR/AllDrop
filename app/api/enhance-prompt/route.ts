@@ -233,7 +233,7 @@ export async function POST(request: Request) {
       jsonMode: true,
       kieModel: 'gemini-2.5-pro',
       googleModel: 'gemini-2.5-pro',
-      reasoningEffort: 'low',
+      skipKIE: true, // KIE ignores JSON schema — go straight to OpenAI/Google
     })
 
     const cleaned = extractJSON(responseText)
