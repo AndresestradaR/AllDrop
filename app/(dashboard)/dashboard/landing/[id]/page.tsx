@@ -182,6 +182,7 @@ export default function ProductGeneratePage() {
     salesAngle: string
   }>>([])
   const [selectedAngleIds, setSelectedAngleIds] = useState<Set<string>>(new Set())
+  const [anglesAiMeta, setAnglesAiMeta] = useState<{ provider: string; fallbacks?: string[] } | null>(null)
 
   // Manual angle creation
   const [showAddAngleForm, setShowAddAngleForm] = useState(false)
@@ -643,6 +644,7 @@ export default function ProductGeneratePage() {
 
       setGeneratedAngles(data.angles)
       setSelectedAngleIds(new Set())
+      setAnglesAiMeta(data._ai || null)
       toast.success(`${data.angles.length} angulos generados!`)
     } catch (error: any) {
       toast.error(error.message || 'Error al generar angulos')
@@ -1825,6 +1827,15 @@ export default function ProductGeneratePage() {
                     <label className="text-sm font-medium text-text-primary flex items-center gap-2">
                       <Target className="w-4 h-4 text-amber-500" />
                       Angulos de Venta Generados
+                      {anglesAiMeta && (
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                          anglesAiMeta.fallbacks?.length
+                            ? 'bg-orange-500/20 text-orange-400'
+                            : 'bg-emerald-500/20 text-emerald-400'
+                        }`} title={anglesAiMeta.fallbacks?.join('\n') || 'Sin fallbacks'}>
+                          {anglesAiMeta.provider}{anglesAiMeta.fallbacks?.length ? ' (fallback)' : ''}
+                        </span>
+                      )}
                     </label>
                     <button
                       onClick={handleGenerateAngles}
