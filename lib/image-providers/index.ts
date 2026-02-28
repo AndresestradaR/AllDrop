@@ -182,8 +182,8 @@ export async function generateImage(
  *   3. seedream/4.5-text-to-image (Seedream — always works as ultimate fallback)
  */
 const KIE_IMAGE_MODELS = [
-  { model: 'nano-banana-pro', name: 'Gemini 3 Pro Image', supportsImageInput: true },
   { model: 'nano-banana', name: 'Gemini 2.5 Flash Image', supportsImageInput: true },
+  { model: 'nano-banana-pro', name: 'Gemini 3 Pro Image', supportsImageInput: true },
   { model: 'seedream/4.5-text-to-image', name: 'Seedream 4.5', supportsImageInput: false },
 ]
 
