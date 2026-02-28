@@ -22,6 +22,7 @@ export interface AITextOptions {
   kieModel?: string    // default: 'gemini-2.5-flash'
   googleModel?: string // default: 'gemini-2.5-flash'
   signal?: AbortSignal
+  reasoningEffort?: 'none' | 'low' | 'medium' // default: 'none'. Use 'low' for structured JSON output
 }
 
 // ── Main entry point ───────────────────────────────────────────
@@ -127,8 +128,9 @@ async function callKIESingleModel(
     body.temperature = options.temperature
   }
 
-  // Disable thinking/reasoning to avoid slow 100s+ responses
-  body.reasoning_effort = 'none'
+  // Control thinking/reasoning: 'none' is fast but may not follow JSON schema,
+  // 'low' follows structured output better but takes ~30-60s
+  body.reasoning_effort = options.reasoningEffort || 'none'
 
   // NOTE: Do NOT send response_format to KIE — it's not supported by all
   // OpenAI-compatible providers. The system prompt already asks for JSON.
@@ -278,7 +280,7 @@ async function callGoogle(apiKey: string, options: AITextOptions): Promise<strin
     contents: [{ parts }],
     generationConfig: {
       temperature: options.temperature ?? 0.7,
-      thinkingConfig: { thinkingBudget: 0 },
+      thinkingConfig: { thinkingBudget: options.reasoningEffort === 'none' || !options.reasoningEffort ? 0 : options.reasoningEffort === 'low' ? 1024 : 4096 },
     },
   }
 

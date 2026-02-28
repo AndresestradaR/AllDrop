@@ -233,6 +233,7 @@ export async function POST(request: Request) {
       jsonMode: true,
       kieModel: 'gemini-2.5-pro',
       googleModel: 'gemini-2.5-pro',
+      reasoningEffort: 'low',
     })
 
     const cleaned = extractJSON(responseText)

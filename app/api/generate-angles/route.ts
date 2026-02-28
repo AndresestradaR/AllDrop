@@ -176,6 +176,7 @@ export async function POST(request: Request) {
         images: images.length > 0 ? images : undefined,
         temperature: 0.9,
         jsonMode: true,
+        reasoningEffort: 'low',
       })
 
       const cleaned = extractJSON(raw)
