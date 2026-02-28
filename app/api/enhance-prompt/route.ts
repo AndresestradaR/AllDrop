@@ -235,9 +235,11 @@ export async function POST(request: Request) {
       googleModel: 'gemini-2.5-pro',
     })
 
-    const suggestions = JSON.parse(extractJSON(responseText))
+    const cleaned = extractJSON(responseText)
+    console.log(`[EnhancePrompt] Raw AI response (first 500 chars): ${cleaned.substring(0, 500)}`)
+    const suggestions = JSON.parse(cleaned)
 
-    console.log(`[EnhancePrompt] User: ${user.id.substring(0, 8)}..., Product: ${productName || 'images-only'}`)
+    console.log(`[EnhancePrompt] User: ${user.id.substring(0, 8)}..., Product: ${productName || 'images-only'}, Keys: ${Object.keys(suggestions).join(',')}`)
 
     return NextResponse.json({ success: true, suggestions })
 
