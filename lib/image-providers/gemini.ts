@@ -171,7 +171,7 @@ async function fetchWithTimeout(
   }
 }
 
-async function generateWithGemini(
+export async function generateWithGemini(
   request: GenerateImageRequest,
   apiKey: string,
   apiModelId: string

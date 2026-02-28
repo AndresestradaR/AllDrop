@@ -2,12 +2,13 @@
 import {
   ImageProvider,
   ImageProviderType,
+  ImageModelId,
   GenerateImageRequest,
   GenerateImageResult,
   IMAGE_PROVIDERS,
   IMAGE_MODELS,
 } from './types'
-import { geminiProvider, buildGeminiPrompt } from './gemini'
+import { geminiProvider, buildGeminiPrompt, generateWithGemini } from './gemini'
 import { openaiProvider } from './openai'
 import { seedreamProvider } from './kie-seedream'
 import { fluxProvider } from './bfl-flux'
@@ -50,11 +51,12 @@ export function getAllProviders() {
  * No matter what model the user selects, the cascade ALWAYS runs:
  *
  * If OpenAI/FLUX selected → try that provider first, then cascade
- * ALWAYS: KIE (nano-banana-pro → nano-banana → seedream/4.5)
- *       → fal.ai (nano-banana-2 or model's falModelId)
+ * ALWAYS: KIE (ONE model — the equivalent of what the user selected)
+ *       → fal.ai (model's falModelId or nano-banana-2)
  *       → Google direct
  *
- * NEVER breaks. If one level fails, the next one picks up.
+ * The cascade drops down PROVIDERS, not models within a provider.
+ * Each provider tries ONE model. NEVER breaks.
  *
  * @param options.maxTotalMs - Max time budget for cascade (default 80s).
  */
@@ -98,17 +100,18 @@ export async function generateImage(
     console.warn(`[Cascade] FLUX failed, continuing cascade...`)
   }
 
-  // ── Step 2: KIE cascade (ALWAYS — iron rule) ──
+  // ── Step 2: KIE — ONE model per user selection (ALWAYS — iron rule) ──
   if (apiKeys.kie) {
+    const kieModel = getKieModel(request.modelId)
     const t0 = Date.now()
-    const kieResult = await generateViaKieCascade(request, apiKeys.kie, options?.maxTotalMs)
+    const kieResult = await generateViaKie(request, apiKeys.kie, kieModel, options?.maxTotalMs || 80000)
     if (kieResult.success) {
-      logAI({ service: 'image', provider: 'kie', status: 'success', response_ms: Date.now() - t0, model: 'kie-cascade', was_fallback: cascadeErrors.length > 0 })
+      logAI({ service: 'image', provider: 'kie', status: 'success', response_ms: Date.now() - t0, model: kieModel.model, was_fallback: cascadeErrors.length > 0 })
       return { ...kieResult, provider: request.provider }
     }
-    logAI({ service: 'image', provider: 'kie', status: 'error', response_ms: Date.now() - t0, model: 'kie-cascade', error_message: kieResult.error, was_fallback: cascadeErrors.length > 0 })
-    cascadeErrors.push(`KIE: ${kieResult.error || 'fallido'}`)
-    console.warn(`[Cascade] KIE failed, trying fal.ai...`)
+    logAI({ service: 'image', provider: 'kie', status: 'error', response_ms: Date.now() - t0, model: kieModel.model, error_message: kieResult.error, was_fallback: cascadeErrors.length > 0 })
+    cascadeErrors.push(`KIE (${kieModel.model}): ${kieResult.error || 'fallido'}`)
+    console.warn(`[Cascade] KIE ${kieModel.model} failed, trying fal.ai...`)
   }
 
   // ── Step 3: fal.ai (ALWAYS — iron rule) ──
@@ -142,18 +145,22 @@ export async function generateImage(
   }
 
   // ── Step 4: Google direct (ALWAYS — last resort) ──
+  // Uses the mapped Google model for the user's selection
   if (apiKeys.gemini) {
-    const geminiProvider = getProvider('gemini')
-    if (geminiProvider) {
-      console.log('[Cascade] Using direct Google API (final fallback)')
-      const t0 = Date.now()
-      const result = await geminiProvider.generate(request, apiKeys.gemini)
+    const googleModelId = getGoogleDirectModelId(request.modelId)
+    console.log(`[Cascade] Google direct fallback with ${googleModelId}`)
+    const t0 = Date.now()
+    try {
+      const result = await generateWithGemini(request, apiKeys.gemini, googleModelId)
       if (result.success) {
-        logAI({ service: 'image', provider: 'google', status: 'success', response_ms: Date.now() - t0, model: 'gemini-direct', was_fallback: true })
+        logAI({ service: 'image', provider: 'google', status: 'success', response_ms: Date.now() - t0, model: googleModelId, was_fallback: true })
         return { ...result, provider: request.provider }
       }
-      logAI({ service: 'image', provider: 'google', status: 'error', response_ms: Date.now() - t0, model: 'gemini-direct', error_message: result.error, was_fallback: true })
-      cascadeErrors.push(`Google: ${result.error || 'fallido'}`)
+      logAI({ service: 'image', provider: 'google', status: 'error', response_ms: Date.now() - t0, model: googleModelId, error_message: result.error, was_fallback: true })
+      cascadeErrors.push(`Google (${googleModelId}): ${result.error || 'fallido'}`)
+    } catch (err: any) {
+      logAI({ service: 'image', provider: 'google', status: 'error', response_ms: Date.now() - t0, model: googleModelId, error_message: err.message, was_fallback: true })
+      cascadeErrors.push(`Google (${googleModelId}): ${err.message || 'fallido'}`)
     }
   }
 
@@ -174,113 +181,97 @@ export async function generateImage(
 }
 
 /**
- * KIE model cascade for Gemini image generation.
- * Time-aware: distributes available time across models.
- *
- *   1. nano-banana-pro  (Gemini 3 Pro Image — best quality)
- *   2. nano-banana       (Gemini 2.5 Flash Image — fast)
- *   3. seedream/4.5-text-to-image (Seedream — always works as ultimate fallback)
+ * Map user's selected model to its KIE equivalent.
+ * The cascade drops down PROVIDERS, not models.
+ * Each provider tries ONE model — the equivalent of what the user selected.
  */
-const KIE_IMAGE_MODELS = [
-  { model: 'nano-banana', name: 'Gemini 2.5 Flash Image', supportsImageInput: true },
-  { model: 'nano-banana-pro', name: 'Gemini 3 Pro Image', supportsImageInput: true },
-  { model: 'seedream/4.5-text-to-image', name: 'Seedream 4.5', supportsImageInput: false },
-]
+function getKieModel(modelId: ImageModelId): { model: string; supportsImageInput: boolean; isSeedream: boolean } {
+  const config = IMAGE_MODELS[modelId]
 
-async function generateViaKieCascade(
+  // Google Pro → nano-banana-pro (KIE's Gemini 3 Pro)
+  if (modelId === 'gemini-3-pro-image') {
+    return { model: 'nano-banana-pro', supportsImageInput: true, isSeedream: false }
+  }
+
+  // ALL seedream models (ByteDance + fal) → seedream/5 on KIE (never 4.5)
+  if (config?.company === 'bytedance' || modelId === 'seedream-5-lite' || modelId === 'seedream-5') {
+    return { model: 'seedream/5-text-to-image', supportsImageInput: config?.supportsImageInput ?? true, isSeedream: true }
+  }
+
+  // Everything else (Flash, nano-banana-2, OpenAI, FLUX, gemini-2.5-flash) → nano-banana
+  return { model: 'nano-banana', supportsImageInput: true, isSeedream: false }
+}
+
+/**
+ * Map user's selected model to its Google direct API model ID.
+ * Used as final fallback in the cascade.
+ */
+function getGoogleDirectModelId(modelId: ImageModelId): string {
+  // Google Pro → use its own model
+  if (modelId === 'gemini-3-pro-image') {
+    return 'gemini-3-pro-image-preview'
+  }
+  // gemini-2.5-flash → use its own model
+  if (modelId === 'gemini-2.5-flash') {
+    return 'gemini-2.5-flash-image'
+  }
+  // ALL other models → Gemini 3.1 Flash Image (nano-banana-2 equivalent on Google direct)
+  return 'gemini-3.1-flash-image-preview'
+}
+
+/**
+ * Try ONE model on KIE. No multi-model cascade within a provider.
+ */
+async function generateViaKie(
   request: GenerateImageRequest,
   kieApiKey: string,
-  maxTotalMs?: number
+  kieModel: { model: string; supportsImageInput: boolean; isSeedream: boolean },
+  timeoutMs: number = 80000
 ): Promise<GenerateImageResult> {
-  const cascadeStart = Date.now()
-  const totalBudget = maxTotalMs || 80000 // Default 80s (fits in 120s routes with prep buffer)
-
   const prompt = request.prompt?.trim() || buildGeminiPrompt(request)
 
   // Collect public image URLs for KIE (requires URLs, not base64)
   const imageUrls: string[] = []
-  if (request.templateUrl?.startsWith('http')) {
-    imageUrls.push(request.templateUrl)
+  if (request.templateUrl?.startsWith('http')) imageUrls.push(request.templateUrl)
+  if (request.productImageUrls?.length) imageUrls.push(...request.productImageUrls)
+
+  // Build input
+  const input: any = {
+    prompt,
+    aspect_ratio: request.aspectRatio || '9:16',
+    output_format: 'png',
   }
-  if (request.productImageUrls?.length) {
-    imageUrls.push(...request.productImageUrls)
-  }
 
-  const errors: string[] = []
-
-  for (const kieModel of KIE_IMAGE_MODELS) {
-    const elapsed = Date.now() - cascadeStart
-    const remaining = totalBudget - elapsed
-
-    // Need at least 15s to attempt a model
-    if (remaining < 15000) {
-      console.warn(`[KIE Cascade] Only ${Math.round(remaining / 1000)}s left, skipping ${kieModel.model}`)
-      errors.push(`${kieModel.name}: Tiempo insuficiente`)
-      break
+  if (kieModel.isSeedream) {
+    // Seedream models
+    input.quality = 'basic'
+    if (imageUrls.length > 0 && kieModel.supportsImageInput) {
+      // Try edit variant first
+      const editModel = kieModel.model.replace('text-to-image', 'edit')
+      console.log(`[KIE] Seedream with images, trying edit model: ${editModel}`)
+      const editResult = await callKieCreateTask(editModel, { ...input, image_urls: imageUrls }, kieApiKey, Math.min(timeoutMs - 3000, 70000))
+      if (editResult.success) return { ...editResult, provider: 'gemini' }
+      console.warn(`[KIE] Seedream edit failed, trying text-only`)
     }
-
-    // Per-model timeout: use remaining time but cap at 150s per model
-    // KIE queues jobs, so later jobs in bulk generation need more time
-    const modelTimeout = Math.min(remaining - 3000, 150000)
-    console.log(`[KIE Cascade] Trying ${kieModel.model} (${kieModel.name}), timeout: ${Math.round(modelTimeout / 1000)}s...`)
-
-    // Build input based on model capabilities
-    const input: any = {
-      prompt,
-      aspect_ratio: request.aspectRatio || '9:16',
-      output_format: 'png',
-    }
-
-    // Nano Banana models support resolution + image_input
-    if (kieModel.model.startsWith('nano-banana')) {
-      input.resolution = '1K'
-      if (imageUrls.length > 0 && kieModel.supportsImageInput) {
-        input.image_input = imageUrls
-      }
-    } else if (kieModel.model.startsWith('seedream')) {
-      // Seedream uses different params
-      input.quality = 'basic'
-      // Seedream edit mode needs image_urls (different field name)
-      if (imageUrls.length > 0) {
-        const editModel = kieModel.model.replace('text-to-image', 'edit')
-        console.log(`[KIE Cascade] Seedream with images, switching to edit model: ${editModel}`)
-        const editTimeout = Math.min(remaining - 3000, 70000)
-        const editResult = await callKieCreateTask(editModel, { ...input, image_urls: imageUrls }, kieApiKey, editTimeout)
-        if (editResult.success) return { ...editResult, provider: 'gemini' }
-        console.warn(`[KIE Cascade] Seedream edit failed, trying text-only`)
-      }
-    }
-
-    const result = await callKieCreateTask(kieModel.model, input, kieApiKey, modelTimeout)
-
-    if (result.success) {
-      console.log(`[KIE Cascade] ${kieModel.model} succeeded!`)
-      return { ...result, provider: 'gemini' }
-    }
-
-    const errorMsg = (result.error || 'Unknown error').toLowerCase()
-    errors.push(`${kieModel.name}: ${result.error || 'Unknown error'}`)
-    console.warn(`[KIE Cascade] ${kieModel.model} failed: ${result.error}`)
-
-    // Only BREAK on content/safety errors (all models will fail the same way).
-    // CONTINUE for transient errors (timeout, rate limit, server, access).
-    const isContentError =
-      errorMsg.includes('safety') ||
-      errorMsg.includes('blocked') ||
-      errorMsg.includes('harmful') ||
-      errorMsg.includes('inappropriate') ||
-      errorMsg.includes('invalid prompt')
-
-    if (isContentError) {
-      console.warn(`[KIE Cascade] Content/safety error, stopping cascade`)
-      break
+  } else {
+    // Nano Banana models (Flash/Pro)
+    input.resolution = '1K'
+    if (imageUrls.length > 0 && kieModel.supportsImageInput) {
+      input.image_input = imageUrls
     }
   }
 
-  // All KIE models failed
+  console.log(`[KIE] Trying ${kieModel.model}, timeout: ${Math.round(timeoutMs / 1000)}s...`)
+  const result = await callKieCreateTask(kieModel.model, input, kieApiKey, timeoutMs)
+
+  if (result.success) {
+    console.log(`[KIE] ${kieModel.model} succeeded!`)
+    return { ...result, provider: 'gemini' }
+  }
+
   return {
     success: false,
-    error: `Todos los modelos de KIE fallaron. Verifica tu cuenta en kie.ai:\n1. Que tengas creditos suficientes\n2. Que los modelos esten activados en kie.ai/market\n\nDetalles: ${errors.join(' | ')}`,
+    error: result.error || 'KIE: generacion fallida',
     provider: 'gemini',
   }
 }

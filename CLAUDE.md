@@ -59,11 +59,15 @@ generateAIText(keys, options) -> string
 #### Image Generation — `lib/image-providers/index.ts`
 ```
 generateImage(model, params) -> ImageResult
-  UNIVERSAL IRON CASCADE — runs for ALL models, no exceptions:
+  UNIVERSAL IRON CASCADE — drops down PROVIDERS, not models within a provider.
+  Each provider tries ONE model (the equivalent of what the user selected).
     If OpenAI/FLUX selected -> try that provider first, then cascade
-    1. KIE (nano-banana-pro -> nano-banana -> seedream/4.5)
-    2. fal.ai (nano-banana-2 or model's falModelId)
-    3. Google Gemini direct
+    1. KIE — ONE model mapped from user selection:
+       nano-banana-2/gemini-2.5-flash → nano-banana
+       gemini-3-pro-image → nano-banana-pro
+       seedream models → seedream/5-text-to-image (never 4.5)
+    2. fal.ai — model's falModelId (or nano-banana-2 default)
+    3. Google direct — gemini-3.1-flash-image-preview (or model's own Google ID)
   The cascade NEVER breaks. If one level fails, the next picks up.
   15 models across 5 companies (Google, OpenAI, ByteDance/Seedream, BFL/FLUX, fal.ai)
   Default model: nano-banana-2 (goes through full KIE -> fal -> Google cascade)
