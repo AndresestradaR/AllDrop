@@ -24,43 +24,57 @@ export interface AITextOptions {
   signal?: AbortSignal
   reasoningEffort?: 'none' | 'low' | 'medium' // default: 'none'. Use 'low' for structured JSON output
   skipKIE?: boolean    // true = skip KIE, go straight to OpenAI/Google (use for strict JSON schema)
+  onSuccess?: (meta: { provider: AIProvider; fallbacks: string[] }) => void
 }
 
 // ── Main entry point ───────────────────────────────────────────
 
+export type AIProvider = 'kie' | 'openai' | 'google'
+
 /**
  * Unified AI text generation. Cascade: KIE → OpenAI → Google Gemini.
+ * Returns the raw text string. Use onSuccess callback to get provider metadata.
  */
 export async function generateAIText(
   keys: AITextKeys,
   options: AITextOptions
 ): Promise<string> {
   const errors: string[] = []
+  const fallbacks: string[] = []
 
   // Skip KIE when route needs strict JSON schema (KIE doesn't support responseMimeType)
   if (keys.kieApiKey && !options.skipKIE) {
     try {
-      return await callKIE(keys.kieApiKey, options)
+      const text = await callKIE(keys.kieApiKey, options)
+      options.onSuccess?.({ provider: 'kie', fallbacks })
+      return text
     } catch (err: any) {
       errors.push(`KIE: ${err.message}`)
+      fallbacks.push(`KIE: ${err.message}`)
       console.error('[AI Text] KIE failed:', err.message)
     }
   }
 
   if (keys.openaiApiKey) {
     try {
-      return await callOpenAI(keys.openaiApiKey, options)
+      const text = await callOpenAI(keys.openaiApiKey, options)
+      options.onSuccess?.({ provider: 'openai', fallbacks })
+      return text
     } catch (err: any) {
       errors.push(`OpenAI: ${err.message}`)
+      fallbacks.push(`OpenAI: ${err.message}`)
       console.error('[AI Text] OpenAI failed:', err.message)
     }
   }
 
   if (keys.googleApiKey) {
     try {
-      return await callGoogle(keys.googleApiKey, options)
+      const text = await callGoogle(keys.googleApiKey, options)
+      options.onSuccess?.({ provider: 'google', fallbacks })
+      return text
     } catch (err: any) {
       errors.push(`Google: ${err.message}`)
+      fallbacks.push(`Google: ${err.message}`)
       console.error('[AI Text] Google failed:', err.message)
     }
   }

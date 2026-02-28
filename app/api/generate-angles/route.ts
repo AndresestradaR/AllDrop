@@ -170,6 +170,9 @@ export async function POST(request: Request) {
     promptLines.push('\nGenera 6 angulos de venta diversificados en JSON.')
 
     try {
+      let aiProvider = 'unknown'
+      let aiFallbacks: string[] = []
+
       const raw = await generateAIText(aiKeys, {
         systemPrompt: ANGLES_SYSTEM_PROMPT,
         userMessage: promptLines.join('\n'),
@@ -177,23 +180,27 @@ export async function POST(request: Request) {
         temperature: 0.9,
         jsonMode: true,
         skipKIE: true, // KIE ignores JSON schema — go straight to OpenAI/Google
+        onSuccess: (meta) => { aiProvider = meta.provider; aiFallbacks = meta.fallbacks },
       })
 
       const cleaned = extractJSON(raw)
-      console.log(`[GenerateAngles] Raw AI response (first 500 chars): ${cleaned.substring(0, 500)}`)
       const result = JSON.parse(cleaned)
 
       // Robust: accept "angles", "angulos", or a top-level array
       const angles = result.angles || result.angulos || (Array.isArray(result) ? result : null)
 
-      console.log(`[GenerateAngles] User: ${user.id.substring(0, 8)}..., Product: ${productName}, Angles: ${angles?.length || 0}, Keys: ${Object.keys(result).join(',')}`)
+      console.log(`[GenerateAngles] User: ${user.id.substring(0, 8)}..., Provider: ${aiProvider}, Fallbacks: ${aiFallbacks.length}, Product: ${productName}, Angles: ${angles?.length || 0}`)
 
       if (!angles || angles.length === 0) {
-        console.error(`[GenerateAngles] No angles found. Full response: ${cleaned.substring(0, 1000)}`)
+        console.error(`[GenerateAngles] No angles found. Response: ${cleaned.substring(0, 500)}`)
         return NextResponse.json({ error: 'No se generaron ángulos. Intenta de nuevo.' }, { status: 500 })
       }
 
-      return NextResponse.json({ success: true, angles })
+      return NextResponse.json({
+        success: true,
+        angles,
+        _ai: { provider: aiProvider, fallbacks: aiFallbacks.length > 0 ? aiFallbacks : undefined },
+      })
     } catch (aiError: any) {
       return NextResponse.json({ error: `Error al generar angulos: ${aiError.message}` }, { status: 500 })
     }

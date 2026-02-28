@@ -225,6 +225,9 @@ export async function POST(request: Request) {
     promptLines.push('')
     promptLines.push('Genera los 4 Controles Creativos optimizados para VENTA + 2 variantes alternativas por campo, en JSON.')
 
+    let aiProvider = 'unknown'
+    let aiFallbacks: string[] = []
+
     const responseText = await generateAIText(keys, {
       systemPrompt: ENHANCE_SYSTEM_PROMPT,
       userMessage: promptLines.join('\n'),
@@ -234,15 +237,18 @@ export async function POST(request: Request) {
       kieModel: 'gemini-2.5-pro',
       googleModel: 'gemini-2.5-pro',
       skipKIE: true, // KIE ignores JSON schema — go straight to OpenAI/Google
+      onSuccess: (meta) => { aiProvider = meta.provider; aiFallbacks = meta.fallbacks },
     })
 
-    const cleaned = extractJSON(responseText)
-    console.log(`[EnhancePrompt] Raw AI response (first 500 chars): ${cleaned.substring(0, 500)}`)
-    const suggestions = JSON.parse(cleaned)
+    const suggestions = JSON.parse(extractJSON(responseText))
 
-    console.log(`[EnhancePrompt] User: ${user.id.substring(0, 8)}..., Product: ${productName || 'images-only'}, Keys: ${Object.keys(suggestions).join(',')}`)
+    console.log(`[EnhancePrompt] User: ${user.id.substring(0, 8)}..., Provider: ${aiProvider}, Product: ${productName || 'images-only'}`)
 
-    return NextResponse.json({ success: true, suggestions })
+    return NextResponse.json({
+      success: true,
+      suggestions,
+      _ai: { provider: aiProvider, fallbacks: aiFallbacks.length > 0 ? aiFallbacks : undefined },
+    })
 
   } catch (error: any) {
     console.error('[EnhancePrompt] Error:', error.message)
