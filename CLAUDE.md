@@ -92,10 +92,12 @@ generateImage(model, params) -> ImageResult
     | flux-2-flex      | flux-2/flex-t2i / flex-i2i             | fal-ai/flux-2-flex / edit              | bfl    |
 
   Flujo de ejecucion:
-    1. OpenAI directo PRIMERO (solo si cascade.directApi === 'openai')
-    2. KIE (si cascade.kie existe y hay key) — elige T2I o I2I segun hasImages
-    3. fal.ai (si cascade.fal existe y hay key) — elige T2I o I2I segun hasImages
-    4. Direct API fallback (gemini o bfl, segun cascade.directApi)
+    1. Direct API PRIMERO (mejor calidad — su propia API maneja mejor sus modelos):
+       - OpenAI directo para modelos GPT Image
+       - Google Gemini directo para modelos Gemini/NanoBanana (base64 inline = mejor fidelidad producto)
+    2. KIE fallback #1 (si cascade.kie existe y hay key) — elige T2I o I2I segun hasImages
+    3. fal.ai fallback #2 (si cascade.fal existe y hay key) — elige T2I o I2I segun hasImages
+    4. BFL directo fallback final (solo modelos FLUX)
 
   Input de imagenes en KIE (segun cascade.kie.mode):
     nano-banana (Flash/Pro): image_input + resolution:'1K'

@@ -136,7 +136,8 @@ export async function generateImage(
   const cascade = modelConfig?.cascade
   const hasImages = !!(request.productImageUrls?.length || request.templateUrl)
 
-  // ── Step 1: OpenAI direct FIRST (before cascade) ──
+  // ── Step 1: Direct API FIRST (best quality — their own API handles their models best) ──
+  // OpenAI direct for GPT Image models
   if (cascade?.directApi === 'openai' && apiKeys.openai) {
     const t0 = Date.now()
     const result = await getProvider('openai')!.generate(request, apiKeys.openai)
@@ -149,7 +150,28 @@ export async function generateImage(
     console.warn(`[Cascade] OpenAI direct failed, continuing cascade...`)
   }
 
-  // ── Step 2: KIE — mode-aware model selection ──
+  // Google Gemini direct for Gemini/NanoBanana models (base64 inline = best product fidelity)
+  if (cascade?.directApi === 'gemini' && apiKeys.gemini) {
+    const googleModelId = modelConfig.apiModelId || 'gemini-3.1-flash-image-preview'
+    console.log(`[Cascade] Google direct FIRST with ${googleModelId}`)
+    const t0 = Date.now()
+    try {
+      const result = await generateWithGemini(request, apiKeys.gemini, googleModelId)
+      if (result.success) {
+        logAI({ service: 'image', provider: 'google', status: 'success', response_ms: Date.now() - t0, model: googleModelId })
+        return { ...result, provider: request.provider }
+      }
+      logAI({ service: 'image', provider: 'google', status: 'error', response_ms: Date.now() - t0, model: googleModelId, error_message: result.error })
+      cascadeErrors.push(result.error || 'Google fallo')
+      console.warn(`[Cascade] Google direct failed, trying KIE...`)
+    } catch (err: any) {
+      logAI({ service: 'image', provider: 'google', status: 'error', response_ms: Date.now() - t0, model: googleModelId, error_message: err.message })
+      cascadeErrors.push(err.message || 'Google fallo')
+      console.warn(`[Cascade] Google direct error: ${err.message}, trying KIE...`)
+    }
+  }
+
+  // ── Step 2: KIE — mode-aware model selection (fallback #1) ──
   if (cascade?.kie && apiKeys.kie) {
     const kieModelId = hasImages && cascade.kie.i2i ? cascade.kie.i2i : cascade.kie.t2i
     const t0 = Date.now()
@@ -167,7 +189,7 @@ export async function generateImage(
     console.warn(`[Cascade] KIE ${kieModelId} failed, trying fal.ai...`)
   }
 
-  // ── Step 3: fal.ai — mode-aware path selection ──
+  // ── Step 3: fal.ai — mode-aware path selection (fallback #2) ──
   if (cascade?.fal && apiKeys.fal) {
     const falPath = hasImages && cascade.fal.i2i ? cascade.fal.i2i : cascade.fal.t2i
     const t0 = Date.now()
@@ -197,25 +219,7 @@ export async function generateImage(
     console.warn(`[Cascade] fal.ai ${falPath} failed`)
   }
 
-  // ── Step 4: Direct API fallback (gemini or bfl) ──
-  if (cascade?.directApi === 'gemini' && apiKeys.gemini) {
-    const googleModelId = modelConfig.apiModelId || 'gemini-3.1-flash-image-preview'
-    console.log(`[Cascade] Google direct fallback with ${googleModelId}`)
-    const t0 = Date.now()
-    try {
-      const result = await generateWithGemini(request, apiKeys.gemini, googleModelId)
-      if (result.success) {
-        logAI({ service: 'image', provider: 'google', status: 'success', response_ms: Date.now() - t0, model: googleModelId, was_fallback: true })
-        return { ...result, provider: request.provider }
-      }
-      logAI({ service: 'image', provider: 'google', status: 'error', response_ms: Date.now() - t0, model: googleModelId, error_message: result.error, was_fallback: true })
-      cascadeErrors.push(result.error || 'Google fallo')
-    } catch (err: any) {
-      logAI({ service: 'image', provider: 'google', status: 'error', response_ms: Date.now() - t0, model: googleModelId, error_message: err.message, was_fallback: true })
-      cascadeErrors.push(err.message || 'Google fallo')
-    }
-  }
-
+  // ── Step 4: BFL direct fallback (FLUX models only) ──
   if (cascade?.directApi === 'bfl' && apiKeys.bfl) {
     const t0 = Date.now()
     const result = await getProvider('flux')!.generate(request, apiKeys.bfl)
