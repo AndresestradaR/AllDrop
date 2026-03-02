@@ -246,6 +246,39 @@ export default function ProductGeneratePage() {
     fetchApiKeyStatus()
   }, [productId])
 
+  // Retry Canva upload after OAuth callback
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('canva_success') !== 'true') return
+
+    const pendingUrl = sessionStorage.getItem('canva_pending_url')
+    const pendingSectionId = sessionStorage.getItem('canva_pending_section')
+
+    // Clean up URL param
+    const newUrl = new URL(window.location.href)
+    newUrl.searchParams.delete('canva_success')
+    window.history.replaceState({}, '', newUrl.toString())
+
+    if (pendingUrl && pendingSectionId) {
+      sessionStorage.removeItem('canva_pending_url')
+      sessionStorage.removeItem('canva_pending_section')
+
+      toast.loading('Subiendo imagen a Canva...', { id: 'canva' })
+      uploadToCanva(pendingUrl, pendingSectionId, product?.name)
+        .then((editUrl) => {
+          if (editUrl) {
+            toast.success('Abriendo Canva!', { id: 'canva' })
+            window.open(editUrl, '_blank')
+          }
+        })
+        .catch(() => {
+          toast.error('No se pudo subir a Canva. Intenta de nuevo.', { id: 'canva' })
+        })
+    } else {
+      toast.success('Canva conectado. Haz clic en "Editar en Canva" de nuevo.', { id: 'canva', duration: 4000 })
+    }
+  }, [])
+
   // Load Google Fonts for typography preview
   useEffect(() => {
     const fontFamilies = FONT_CATALOG.map(f => f.name.replace(/ /g, '+')).join('&family=')
@@ -857,57 +890,52 @@ export default function ProductGeneratePage() {
     }
   }
 
+  const uploadToCanva = async (imageUrl: string, sectionId: string, name?: string) => {
+    const response = await fetch('/api/canva/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        imageUrl,
+        sectionId,
+        productName: name,
+      }),
+    })
+
+    const data = await response.json()
+
+    if (data.needsAuth) {
+      // Store pending data for retry after OAuth
+      sessionStorage.setItem('canva_pending_url', imageUrl)
+      sessionStorage.setItem('canva_pending_section', sectionId)
+
+      // Redirect to OAuth with return URL
+      toast.loading('Autenticando con Canva...', { id: 'canva' })
+      window.location.href = `/api/canva/auth?returnUrl=${encodeURIComponent(window.location.pathname)}`
+      return null
+    }
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Error al conectar con Canva')
+    }
+
+    return data.editUrl as string
+  }
+
   const handleOpenInCanva = async (section: GeneratedSection) => {
     setIsOpeningCanva(true)
     toast.loading('Conectando con Canva...', { id: 'canva' })
 
     try {
-      // If generated_image_url is a URL (not base64), fetch and convert to base64
-      let imageData = section.generated_image_url
-      if (imageData.startsWith('http')) {
-        toast.loading('Preparando imagen para Canva...', { id: 'canva' })
-        const imgResponse = await fetch(imageData)
-        const blob = await imgResponse.blob()
-        imageData = await new Promise<string>((resolve) => {
-          const reader = new FileReader()
-          reader.onloadend = () => resolve(reader.result as string)
-          reader.readAsDataURL(blob)
-        })
+      const editUrl = await uploadToCanva(
+        section.generated_image_url,
+        section.id,
+        product?.name
+      )
+
+      if (editUrl) {
+        toast.success('Abriendo Canva!', { id: 'canva' })
+        window.open(editUrl, '_blank')
       }
-
-      // Try to upload directly if we have a token
-      const response = await fetch('/api/canva/upload', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          imageBase64: imageData,
-          sectionId: section.id,
-          productName: product?.name,
-        }),
-      })
-
-      const data = await response.json()
-
-      if (data.needsAuth) {
-        // Need to authenticate - redirect to OAuth flow
-        toast.loading('Autenticando con Canva...', { id: 'canva' })
-
-        // Store image data in sessionStorage for after OAuth (use converted base64)
-        sessionStorage.setItem('canva_pending_image', imageData)
-        sessionStorage.setItem('canva_pending_section', section.id)
-
-        // Redirect to OAuth
-        window.location.href = '/api/canva/auth'
-        return
-      }
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Error al conectar con Canva')
-      }
-
-      // Success - open Canva editor
-      toast.success('¡Abriendo Canva!', { id: 'canva' })
-      window.open(data.editUrl, '_blank')
     } catch (error: any) {
       console.error('Canva error:', error)
       toast.error('Error con Canva. Descargando imagen...', { id: 'canva' })
@@ -924,7 +952,6 @@ export default function ProductGeneratePage() {
 
       toast.success('Imagen descargada. Sube la imagen en Canva.', {
         duration: 5000,
-        icon: '🎨'
       })
     } finally {
       setIsOpeningCanva(false)

@@ -61,14 +61,25 @@ async function refreshAccessToken(refreshToken: string): Promise<{
   return response.json()
 }
 
+async function resolveImageBuffer(imageBase64?: string, imageUrl?: string): Promise<Buffer> {
+  if (imageUrl) {
+    const res = await fetch(imageUrl)
+    if (!res.ok) throw new Error(`Failed to fetch image: ${res.status}`)
+    const arrayBuf = await res.arrayBuffer()
+    return Buffer.from(arrayBuf)
+  }
+  if (imageBase64) {
+    const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '')
+    return Buffer.from(base64Data, 'base64')
+  }
+  throw new Error('No image data provided')
+}
+
 async function uploadAsset(
   accessToken: string,
-  imageBase64: string,
+  imageBuffer: Buffer,
   filename: string
 ): Promise<string> {
-  // Convert base64 to buffer
-  const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '')
-  const imageBuffer = Buffer.from(base64Data, 'base64')
 
   // Start asset upload
   const uploadResponse = await fetch(CANVA_CONFIG.assetUploadEndpoint, {
@@ -80,7 +91,7 @@ async function uploadAsset(
         name_base64: Buffer.from(filename).toString('base64'),
       }),
     },
-    body: imageBuffer,
+    body: new Uint8Array(imageBuffer),
   })
 
   if (!uploadResponse.ok) {
@@ -161,9 +172,9 @@ async function createDesignWithAsset(
 
 export async function POST(request: Request) {
   try {
-    const { imageBase64, sectionId, productName } = await request.json()
+    const { imageBase64, imageUrl, sectionId, productName } = await request.json()
 
-    if (!imageBase64) {
+    if (!imageBase64 && !imageUrl) {
       return NextResponse.json(
         { error: 'No image data provided' },
         { status: 400 }
@@ -213,9 +224,12 @@ export async function POST(request: Request) {
       )
     }
 
+    // Resolve image to Buffer (server-side fetch avoids CORS issues)
+    const imageBuffer = await resolveImageBuffer(imageBase64, imageUrl)
+
     // Upload asset
     const filename = `${productName || 'banner'}-${sectionId || Date.now()}.png`
-    const assetId = await uploadAsset(accessToken, imageBase64, filename)
+    const assetId = await uploadAsset(accessToken, imageBuffer, filename)
 
     // Create design with correct format
     const title = `Banner ${productName || 'Estrategas'}`

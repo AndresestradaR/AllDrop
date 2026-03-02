@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { generateCodeVerifier, generateCodeChallenge, generateState, CANVA_CONFIG } from '@/lib/canva/pkce'
 
-export async function GET() {
+export async function GET(request: Request) {
   // Check for Canva credentials
   const clientId = process.env.CANVA_CLIENT_ID
   if (!clientId) {
@@ -12,29 +12,14 @@ export async function GET() {
     )
   }
 
+  // Read optional returnUrl so we can redirect back after OAuth
+  const { searchParams } = new URL(request.url)
+  const returnUrl = searchParams.get('returnUrl')
+
   // Generate PKCE parameters
   const codeVerifier = generateCodeVerifier()
   const codeChallenge = generateCodeChallenge(codeVerifier)
   const state = generateState()
-
-  // Store PKCE verifier and state in cookies (httpOnly for security)
-  const cookieStore = await cookies()
-
-  cookieStore.set('canva_code_verifier', codeVerifier, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    maxAge: 60 * 10, // 10 minutes
-    path: '/',
-  })
-
-  cookieStore.set('canva_state', state, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    maxAge: 60 * 10,
-    path: '/',
-  })
 
   // Build authorization URL
   const redirectUri = process.env.CANVA_REDIRECT_URI || 'https://estrategas-landing-generator.vercel.app/api/canva/callback'
@@ -48,5 +33,22 @@ export async function GET() {
   authUrl.searchParams.set('code_challenge', codeChallenge)
   authUrl.searchParams.set('code_challenge_method', 'S256')
 
-  return NextResponse.redirect(authUrl.toString())
+  // Use NextResponse.redirect so we can set cookies on the response
+  const response = NextResponse.redirect(authUrl.toString())
+
+  const cookieOpts = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax' as const,
+    maxAge: 60 * 10, // 10 minutes
+    path: '/',
+  }
+
+  response.cookies.set('canva_code_verifier', codeVerifier, cookieOpts)
+  response.cookies.set('canva_state', state, cookieOpts)
+  if (returnUrl) {
+    response.cookies.set('canva_return_url', returnUrl, cookieOpts)
+  }
+
+  return response
 }

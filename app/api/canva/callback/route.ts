@@ -85,31 +85,39 @@ export async function GET(request: Request) {
     // Exchange code for tokens
     const tokens = await exchangeCodeForTokens(code, codeVerifier, redirectUri)
 
+    // Read return URL before clearing cookies
+    const returnUrl = cookieStore.get('canva_return_url')?.value || '/dashboard'
+
+    // Build redirect response so we can set cookies on it
+    const redirectResponse = NextResponse.redirect(
+      `${origin}${returnUrl}${returnUrl.includes('?') ? '&' : '?'}canva_success=true`
+    )
+
+    const secureCookie = process.env.NODE_ENV === 'production'
+
     // Clear PKCE cookies
-    cookieStore.delete('canva_code_verifier')
-    cookieStore.delete('canva_state')
+    redirectResponse.cookies.delete('canva_code_verifier')
+    redirectResponse.cookies.delete('canva_state')
+    redirectResponse.cookies.delete('canva_return_url')
 
     // Store tokens in cookies for future use
-    cookieStore.set('canva_access_token', tokens.access_token, {
+    redirectResponse.cookies.set('canva_access_token', tokens.access_token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: secureCookie,
       sameSite: 'lax',
       maxAge: tokens.expires_in,
       path: '/',
     })
 
-    cookieStore.set('canva_refresh_token', tokens.refresh_token, {
+    redirectResponse.cookies.set('canva_refresh_token', tokens.refresh_token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: secureCookie,
       sameSite: 'lax',
       maxAge: 60 * 60 * 24 * 30, // 30 days
       path: '/',
     })
 
-    // Redirect to success - now user can upload images via the upload endpoint
-    return NextResponse.redirect(
-      `${origin}/dashboard?canva_success=true`
-    )
+    return redirectResponse
   } catch (err: any) {
     console.error('Canva callback error:', err)
     return NextResponse.redirect(
