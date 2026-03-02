@@ -545,6 +545,8 @@ export interface GenerateImageResult {
   mimeType?: string
   error?: string
   provider: ImageProviderType
+  // Which cascade step actually generated the image
+  usedProvider?: string
   // For async providers
   taskId?: string
   status?: 'pending' | 'processing' | 'completed' | 'failed'

@@ -142,7 +142,7 @@ export async function generateImage(
     const result = await getProvider('openai')!.generate(request, apiKeys.openai)
     if (result.success) {
       logAI({ service: 'image', provider: 'openai', status: 'success', response_ms: Date.now() - t0, model: request.modelId })
-      return result
+      return { ...result, usedProvider: 'openai-direct' }
     }
     logAI({ service: 'image', provider: 'openai', status: 'error', response_ms: Date.now() - t0, model: request.modelId, error_message: result.error })
     cascadeErrors.push(result.error || 'OpenAI fallo')
@@ -160,7 +160,7 @@ export async function generateImage(
     )
     if (kieResult.success) {
       logAI({ service: 'image', provider: 'kie', status: 'success', response_ms: Date.now() - t0, model: kieModelId, was_fallback: cascadeErrors.length > 0 })
-      return { ...kieResult, provider: request.provider }
+      return { ...kieResult, provider: request.provider, usedProvider: `kie:${kieModelId}` }
     }
     logAI({ service: 'image', provider: 'kie', status: 'error', response_ms: Date.now() - t0, model: kieModelId, error_message: kieResult.error, was_fallback: cascadeErrors.length > 0 })
     cascadeErrors.push(kieResult.error || 'KIE fallo')
@@ -196,6 +196,7 @@ export async function generateImage(
           imageBase64: imageData.base64,
           mimeType: imageData.mimeType,
           provider: request.provider,
+          usedProvider: `fal:${falPath}`,
         }
       }
       // fal.ai generated the image but we couldn't download it
@@ -217,7 +218,7 @@ export async function generateImage(
       const result = await generateWithGemini(request, apiKeys.gemini, googleModelId)
       if (result.success) {
         logAI({ service: 'image', provider: 'google', status: 'success', response_ms: Date.now() - t0, model: googleModelId, was_fallback: true })
-        return { ...result, provider: request.provider }
+        return { ...result, provider: request.provider, usedProvider: `google:${googleModelId}` }
       }
       logAI({ service: 'image', provider: 'google', status: 'error', response_ms: Date.now() - t0, model: googleModelId, error_message: result.error, was_fallback: true })
       cascadeErrors.push(result.error || 'Google fallo')
@@ -232,7 +233,7 @@ export async function generateImage(
     const result = await getProvider('flux')!.generate(request, apiKeys.bfl)
     if (result.success) {
       logAI({ service: 'image', provider: 'bfl', status: 'success', response_ms: Date.now() - t0, model: request.modelId, was_fallback: cascadeErrors.length > 0 })
-      return result
+      return { ...result, usedProvider: `bfl:${request.modelId}` }
     }
     logAI({ service: 'image', provider: 'bfl', status: 'error', response_ms: Date.now() - t0, model: request.modelId, error_message: result.error, was_fallback: cascadeErrors.length > 0 })
     cascadeErrors.push(result.error || 'BFL fallo')

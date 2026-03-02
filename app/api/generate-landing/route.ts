@@ -372,7 +372,7 @@ export async function POST(request: Request) {
       0
     )
     const generatedImageUrl = storageUrl || `data:${result.mimeType};base64,${result.imageBase64}`
-    console.log(`Banner generated successfully with ${selectedProvider}, storage: ${!!storageUrl}`)
+    console.log(`Banner generated successfully via ${result.usedProvider || selectedProvider}, storage: ${!!storageUrl}`)
 
     // Save to database (use service client for bypassing RLS)
     const serviceClient = await createServiceClient()
@@ -442,6 +442,7 @@ export async function POST(request: Request) {
       imageUrl: generatedImageUrl,
       sectionId: insertedSection?.id,
       provider: selectedProvider,
+      usedProvider: result.usedProvider || selectedProvider,
     })
   } catch (error: any) {
     console.error('Generate error:', error)
