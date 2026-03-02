@@ -18,6 +18,7 @@ export const FAL_MODEL_PATHS: Record<string, string> = {
   'seedream/5-lite': 'fal-ai/seedream-3.0',
   'seedream/5': 'fal-ai/seedream-3.0/pro',
   'flux-pro-ultra': 'fal-ai/flux-pro/v1.1-ultra',
+  'gpt-image-1.5': 'fal-ai/gpt-image-1.5',
 }
 
 export interface FalGenerateOptions {

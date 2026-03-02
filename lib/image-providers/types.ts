@@ -5,9 +5,8 @@ export type ImageProviderCompany = 'google' | 'openai' | 'bytedance' | 'bfl' | '
 
 // Specific model IDs
 export type ImageModelId =
-  // Google (2 models only)
+  // Google (1 model)
   | 'gemini-3-pro-image'
-  | 'gemini-2.5-flash'
   // OpenAI (1 model only - GPT Image 1.5)
   | 'gpt-image-1.5'
   // ByteDance via KIE.ai (4 models)
@@ -84,23 +83,6 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModelConfig> = {
     falModelId: 'nano-banana-pro',
     availableIn: 'both',
   },
-  'gemini-2.5-flash': {
-    id: 'gemini-2.5-flash',
-    name: 'Gemini 2.5 Flash Image',
-    description: 'Rapido y economico - $0.039/imagen',
-    company: 'google',
-    companyName: 'Google',
-    supportsImageInput: true,
-    supportsAspectRatio: true,
-    maxImages: 1,
-    requiresPolling: false,
-    pricePerImage: '~$0.039',
-    recommended: false,
-    tags: ['FAST'],
-    apiModelId: 'gemini-2.5-flash-image',
-    availableIn: 'both',
-  },
-
   // ============================================
   // OPENAI (1 model) - Supports image input
   // ============================================
@@ -118,6 +100,7 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModelConfig> = {
     recommended: true,
     tags: ['RECOMENDADO', 'NEW', 'TRENDING'],
     apiModelId: 'gpt-image-1.5',
+    falModelId: 'gpt-image-1.5',
     availableIn: 'both',
   },
 
@@ -334,7 +317,6 @@ export const IMAGE_COMPANY_GROUPS: ImageCompanyGroup[] = [
     color: 'from-blue-500 to-purple-500',
     models: [
       IMAGE_MODELS['gemini-3-pro-image'],
-      IMAGE_MODELS['gemini-2.5-flash'],
     ],
   },
   {
@@ -392,7 +374,6 @@ export const LANDING_COMPANY_GROUPS: ImageCompanyGroup[] = [
     color: 'from-blue-500 to-purple-500',
     models: filterModelsByAvailability([
       IMAGE_MODELS['gemini-3-pro-image'],
-      IMAGE_MODELS['gemini-2.5-flash'],
     ], 'landing'),
   },
   {

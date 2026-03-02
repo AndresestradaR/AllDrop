@@ -69,7 +69,7 @@ function humanizeOne(raw: string): string {
 function humanizeErrors(rawErrors: string[]): string {
   const friendly = rawErrors.map(humanizeOne)
   // Deduplicate
-  const unique = [...new Set(friendly)]
+  const unique = Array.from(new Set(friendly))
 
   if (unique.length === 1) {
     return unique[0]
@@ -110,17 +110,13 @@ export function getAllProviders() {
 /**
  * Generate image with UNIVERSAL iron cascade.
  *
- * No matter what model the user selects, the cascade ALWAYS runs:
+ * FLUX: directo BFL — sin cascada. Si falla → error.
+ * OpenAI: OpenAI directo → KIE → fal.ai → STOP (sin Google directo)
+ * Seedream: KIE → fal.ai → STOP (sin Google directo)
+ * Gemini (nano-banana, Pro): KIE → fal.ai → Google directo
  *
- * If OpenAI/FLUX selected → try that provider first, then cascade
- * ALWAYS: KIE (ONE model — the equivalent of what the user selected)
- *       → fal.ai (model's falModelId or nano-banana-2)
- *       → Google direct
- *
- * The cascade drops down PROVIDERS, not models within a provider.
- * Each provider tries ONE model. NEVER breaks.
- *
- * @param options.maxTotalMs - Max time budget for cascade (default 80s).
+ * La cascada baja de PROVEEDORES, no de modelos dentro de un proveedor.
+ * Cada proveedor intenta UN modelo (el equivalente de lo que eligió el usuario).
  */
 export async function generateImage(
   request: GenerateImageRequest,
@@ -137,7 +133,30 @@ export async function generateImage(
   const modelConfig = IMAGE_MODELS[request.modelId]
   const prompt = request.prompt?.trim() || buildGeminiPrompt(request)
 
-  // ── Step 1: If OpenAI or FLUX selected, try them first ──
+  // ── FLUX: DIRECTO — sin cascada. Si falla → error amigable ──
+  if (request.provider === 'flux') {
+    if (!apiKeys.bfl) {
+      return {
+        success: false,
+        error: 'No tienes API key de Black Forest Labs (FLUX). Agregala en Settings.',
+        provider: request.provider,
+      }
+    }
+    const t0 = Date.now()
+    const result = await getProvider('flux')!.generate(request, apiKeys.bfl)
+    if (result.success) {
+      logAI({ service: 'image', provider: 'bfl', status: 'success', response_ms: Date.now() - t0, model: request.modelId })
+      return result
+    }
+    logAI({ service: 'image', provider: 'bfl', status: 'error', response_ms: Date.now() - t0, model: request.modelId, error_message: result.error })
+    return {
+      success: false,
+      error: humanizeErrors([result.error || 'FLUX fallo']),
+      provider: request.provider,
+    }
+  }
+
+  // ── Step 1: Si OpenAI seleccionado, probar directo primero, luego cascada ──
   if (request.provider === 'openai' && apiKeys.openai) {
     const t0 = Date.now()
     const result = await getProvider('openai')!.generate(request, apiKeys.openai)
@@ -148,18 +167,6 @@ export async function generateImage(
     logAI({ service: 'image', provider: 'openai', status: 'error', response_ms: Date.now() - t0, model: request.modelId, error_message: result.error })
     cascadeErrors.push(result.error || 'OpenAI fallo')
     console.warn(`[Cascade] OpenAI failed, continuing cascade...`)
-  }
-
-  if (request.provider === 'flux' && apiKeys.bfl) {
-    const t0 = Date.now()
-    const result = await getProvider('flux')!.generate(request, apiKeys.bfl)
-    if (result.success) {
-      logAI({ service: 'image', provider: 'bfl', status: 'success', response_ms: Date.now() - t0, model: request.modelId })
-      return result
-    }
-    logAI({ service: 'image', provider: 'bfl', status: 'error', response_ms: Date.now() - t0, model: request.modelId, error_message: result.error })
-    cascadeErrors.push(result.error || 'FLUX fallo')
-    console.warn(`[Cascade] FLUX failed, continuing cascade...`)
   }
 
   // ── Step 2: KIE — ONE model per user selection (ALWAYS — iron rule) ──
@@ -206,9 +213,12 @@ export async function generateImage(
     console.warn(`[Cascade] fal.ai failed`)
   }
 
-  // ── Step 4: Google direct (last resort — NOT for seedream models) ──
-  const isSeedream = modelConfig?.company === 'bytedance' || request.modelId === 'seedream-5-lite' || request.modelId === 'seedream-5'
-  if (!isSeedream && apiKeys.gemini) {
+  // ── Step 4: Google directo (SOLO modelos Gemini — NO seedream ni OpenAI) ──
+  const skipGoogleDirect =
+    modelConfig?.company === 'bytedance' || modelConfig?.company === 'openai' ||
+    request.modelId === 'seedream-5-lite' || request.modelId === 'seedream-5' ||
+    request.modelId === 'gpt-image-1.5'
+  if (!skipGoogleDirect && apiKeys.gemini) {
     const googleModelId = getGoogleDirectModelId(request.modelId)
     console.log(`[Cascade] Google direct fallback with ${googleModelId}`)
     const t0 = Date.now()
@@ -247,26 +257,26 @@ export async function generateImage(
  * The cascade drops down PROVIDERS, not models.
  * Each provider tries ONE model — the equivalent of what the user selected.
  */
-function getKieModel(modelId: ImageModelId): { model: string; supportsImageInput: boolean; isSeedream: boolean } {
+function getKieModel(modelId: ImageModelId): { model: string; mode: 'nano-banana' | 'seedream' | 'gpt-image' } {
   const config = IMAGE_MODELS[modelId]
 
-  // Google Pro → nano-banana-pro (KIE's Gemini 3 Pro)
+  // Google Pro → nano-banana-pro (equivalente Pro en KIE)
   if (modelId === 'gemini-3-pro-image') {
-    return { model: 'nano-banana-pro', supportsImageInput: true, isSeedream: false }
+    return { model: 'nano-banana-pro', mode: 'nano-banana' }
   }
 
-  // ALL seedream models (ByteDance + fal) → seedream/5 on KIE (never 4.5)
+  // OpenAI → gpt-image/1.5-image-to-image (variante image-to-image en KIE)
+  if (config?.company === 'openai' || modelId === 'gpt-image-1.5') {
+    return { model: 'gpt-image/1.5-image-to-image', mode: 'gpt-image' }
+  }
+
+  // ALL seedream → seedream/5-lite-image-to-image (SIEMPRE image-to-image, las referencias son imagenes)
   if (config?.company === 'bytedance' || modelId === 'seedream-5-lite' || modelId === 'seedream-5') {
-    return { model: 'seedream/5-text-to-image', supportsImageInput: config?.supportsImageInput ?? true, isSeedream: true }
+    return { model: 'seedream/5-lite-image-to-image', mode: 'seedream' }
   }
 
-  // gemini-2.5-flash → nano-banana (old Flash on KIE)
-  if (modelId === 'gemini-2.5-flash') {
-    return { model: 'nano-banana', supportsImageInput: true, isSeedream: false }
-  }
-
-  // Everything else (nano-banana-2, OpenAI, FLUX, etc.) → gemini-3.1-flash-image-preview
-  return { model: 'gemini-3.1-flash-image-preview', supportsImageInput: true, isSeedream: false }
+  // Todo lo demas (nano-banana-2, etc.) → gemini-3.1-flash-image-preview
+  return { model: 'gemini-3.1-flash-image-preview', mode: 'nano-banana' }
 }
 
 /**
@@ -274,15 +284,11 @@ function getKieModel(modelId: ImageModelId): { model: string; supportsImageInput
  * Used as final fallback in the cascade.
  */
 function getGoogleDirectModelId(modelId: ImageModelId): string {
-  // Google Pro → use its own model
+  // Google Pro → usa su propio modelo
   if (modelId === 'gemini-3-pro-image') {
     return 'gemini-3-pro-image-preview'
   }
-  // gemini-2.5-flash → use its own model
-  if (modelId === 'gemini-2.5-flash') {
-    return 'gemini-2.5-flash-image'
-  }
-  // ALL other models → Gemini 3.1 Flash Image (nano-banana-2 equivalent on Google direct)
+  // Todo lo demas → Gemini 3.1 Flash Image (equivalente nano-banana-2 en Google directo)
   return 'gemini-3.1-flash-image-preview'
 }
 
@@ -292,7 +298,7 @@ function getGoogleDirectModelId(modelId: ImageModelId): string {
 async function generateViaKie(
   request: GenerateImageRequest,
   kieApiKey: string,
-  kieModel: { model: string; supportsImageInput: boolean; isSeedream: boolean },
+  kieModel: { model: string; mode: 'nano-banana' | 'seedream' | 'gpt-image' },
   timeoutMs: number = 80000
 ): Promise<GenerateImageResult> {
   const prompt = request.prompt?.trim() || buildGeminiPrompt(request)
@@ -309,21 +315,21 @@ async function generateViaKie(
     output_format: 'png',
   }
 
-  if (kieModel.isSeedream) {
-    // Seedream models
+  if (kieModel.mode === 'seedream') {
+    // Seedream image-to-image: imagenes via image_urls
     input.quality = 'basic'
-    if (imageUrls.length > 0 && kieModel.supportsImageInput) {
-      // Try edit variant first
-      const editModel = kieModel.model.replace('text-to-image', 'edit')
-      console.log(`[KIE] Seedream with images, trying edit model: ${editModel}`)
-      const editResult = await callKieCreateTask(editModel, { ...input, image_urls: imageUrls }, kieApiKey, Math.min(timeoutMs - 3000, 70000))
-      if (editResult.success) return { ...editResult, provider: 'gemini' }
-      console.warn(`[KIE] Seedream edit failed, trying text-only`)
+    if (imageUrls.length > 0) {
+      input.image_urls = imageUrls
+    }
+  } else if (kieModel.mode === 'gpt-image') {
+    // GPT Image image-to-image: imagenes via image_input
+    if (imageUrls.length > 0) {
+      input.image_input = imageUrls
     }
   } else {
-    // Nano Banana models (Flash/Pro)
+    // Nano Banana models (Flash/Pro): imagenes via image_input
     input.resolution = '1K'
-    if (imageUrls.length > 0 && kieModel.supportsImageInput) {
+    if (imageUrls.length > 0) {
       input.image_input = imageUrls
     }
   }
@@ -333,13 +339,13 @@ async function generateViaKie(
 
   if (result.success) {
     console.log(`[KIE] ${kieModel.model} succeeded!`)
-    return { ...result, provider: 'gemini' }
+    return { ...result, provider: request.provider }
   }
 
   return {
     success: false,
     error: result.error || 'KIE: generacion fallida',
-    provider: 'gemini',
+    provider: request.provider,
   }
 }
 

@@ -59,23 +59,46 @@ generateAIText(keys, options) -> string
 #### Image Generation — `lib/image-providers/index.ts`
 ```
 generateImage(model, params) -> ImageResult
-  UNIVERSAL IRON CASCADE — drops down PROVIDERS, not models within a provider.
-  Each provider tries ONE model (the equivalent of what the user selected).
-    If OpenAI/FLUX selected -> try that provider first, then cascade
-    1. KIE — ONE model mapped from user selection:
-       nano-banana-2 (default) → gemini-3.1-flash-image-preview
-       gemini-2.5-flash → nano-banana (old Flash)
-       gemini-3-pro-image → nano-banana-pro
-       seedream models → seedream/5-text-to-image (never 4.5)
-    2. fal.ai — model's falModelId (or nano-banana-2 default)
-    3. Google direct — gemini-3.1-flash-image-preview (or model's own Google ID)
-  The cascade NEVER breaks. If one level fails, the next picks up.
-  15 models across 5 companies (Google, OpenAI, ByteDance/Seedream, BFL/FLUX, fal.ai)
-  Default model: nano-banana-2 (goes through full KIE -> fal -> Google cascade)
+  CASCADA DE HIERRO — baja de PROVEEDORES, no de modelos.
+  Cada proveedor intenta UN solo modelo (el equivalente de lo que eligio el usuario).
+
+  LANDING GENERATOR (4 modelos disponibles):
+    nano-banana-2 (default):
+      1. KIE → gemini-3.1-flash-image-preview
+      2. fal.ai → fal-ai/nano-banana-2
+      3. Google directo → gemini-3.1-flash-image-preview
+
+    gemini-3-pro-image:
+      1. KIE → nano-banana-pro
+      2. fal.ai → fal-ai/nano-banana-pro
+      3. Google directo → gemini-3-pro-image-preview
+
+    seedream (cualquier version):
+      1. KIE → seedream/5-lite-image-to-image (SIEMPRE image-to-image)
+      2. fal.ai → fal-ai/seedream-3.0
+      SIN paso 3 — si ambos fallan → error amigable
+
+    gpt-image-1.5 (OpenAI):
+      0. OpenAI directo → gpt-image-1.5
+      1. KIE → gpt-image/1.5-image-to-image
+      2. fal.ai → fal-ai/gpt-image-1.5
+      SIN paso 3 — si todos fallan → error amigable
+
+  STUDIO IA (14 modelos, incluye FLUX):
+    FLUX (flux-2-*): BFL directo, SIN cascada. Si falla → error.
+    Resto: misma cascada que Landing Generator.
+
+  Input de imagenes en KIE:
+    nano-banana (Flash/Pro): image_input + resolution:'1K'
+    seedream: image_urls + quality:'basic'
+    gpt-image: image_input
+
+  Errores: siempre en espanol simple (humanizeErrors), sin JSON ni IDs de modelo.
+  14 modelos, 5 companias (Google, OpenAI, ByteDance, BFL, fal.ai)
   Providers: gemini.ts | openai.ts | kie-seedream.ts | bfl-flux.ts | fal.ts
-  Error classification: lib/services/ai-errors.ts (auth, quota, server, timeout — Spanish)
-  Types defined in: lib/image-providers/types.ts
-  Monitoring: lib/services/ai-monitor.ts (fire-and-forget logAI() on every attempt)
+  Clasificacion errores: lib/services/ai-errors.ts (auth, quota, server, timeout)
+  Tipos: lib/image-providers/types.ts
+  Monitoreo: lib/services/ai-monitor.ts (fire-and-forget logAI() en cada intento)
 ```
 
 #### Video Generation — `lib/video-providers/kie-video.ts`
