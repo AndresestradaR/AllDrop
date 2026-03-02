@@ -154,6 +154,28 @@ Google Gemini TTS: google-tts.ts (gemini-2.5-flash-preview-tts, 5 voices)
 No cascade — user selects provider. Types: lib/audio-providers/types.ts
 ```
 
+#### Herramientas IA — `app/api/studio/tools/route.ts`
+```
+9 herramientas en la pestaña Herramientas del Studio.
+Todas tienen cascade: user BYOK key → platform env key.
+Gemini image calls tienen timeout 90s.
+
+  | Herramienta      | Provider         | Modelo                        | Backup           |
+  | Variaciones      | Google Gemini    | gemini-2.5-flash-image        | platform key     |
+  | Mejorar Imagen   | Google Gemini    | gemini-2.5-flash-image        | platform key     |
+  | Quitar Fondo     | BFL              | flux-kontext-pro              | platform key     |
+  | Cambiar Angulo   | Google Gemini    | gemini-2.5-flash-image        | platform key     |
+  | Mockup Generator | Google Gemini    | gemini-2.5-flash-image        | platform key     |
+  | Lip Sync         | KIE              | kling/ai-avatar + infinitalk  | platform key     |
+  | Deep Face        | KIE              | kling-2.6/motion-control      | platform key     |
+  | Prompt Video     | ai-text cascade  | gemini-2.5-flash              | KIE→OpenAI→Google (ADMIN ONLY) |
+  | Prompt Bot       | ai-text cascade  | gemini-2.5-flash              | KIE→OpenAI→Google (ADMIN ONLY) |
+  | Descriptor       | ai-text cascade  | gemini-2.5-pro (x2 paralelo) | KIE→OpenAI→Google |
+
+  Prompt Video y Prompt Bot: bloqueados con "Próximamente" para usuarios.
+  Solo trucosecomydrop@gmail.com puede usarlos (check en UI + API route).
+```
+
 #### Landing IA Multi-Agent — `lib/landing-ia/`
 ```
 4 parallel agents via SSE streaming (/api/landing-ia/stream):

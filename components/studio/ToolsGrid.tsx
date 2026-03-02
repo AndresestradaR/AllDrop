@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
+import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils/cn'
 import {
   Layers,
@@ -49,6 +50,8 @@ const LIP_SYNC_MODELS = [
   },
 ]
 
+const ADMIN_EMAIL = 'trucosecomydrop@gmail.com'
+
 interface Tool {
   id: string
   name: string
@@ -56,6 +59,7 @@ interface Tool {
   icon: React.ElementType
   color: string
   soon?: boolean
+  adminOnly?: boolean // visible but locked for non-admin users
   requiresAudio?: boolean
   outputsVideo?: boolean
 }
@@ -111,6 +115,8 @@ const TOOLS: Tool[] = [
     description: 'Genera prompts cinematicos para video IA',
     icon: Video,
     color: 'from-violet-500 to-purple-500',
+    soon: true,
+    adminOnly: true,
   },
   {
     id: 'prompt-bot',
@@ -118,6 +124,8 @@ const TOOLS: Tool[] = [
     description: 'Genera system prompts para bots de ventas',
     icon: MessageSquare,
     color: 'from-green-500 to-emerald-500',
+    soon: true,
+    adminOnly: true,
   },
   {
     id: 'person-descriptor',
@@ -145,9 +153,11 @@ export function ToolsGrid() {
     url?: string
     type: 'photo' | 'video'
   } | null>(null)
+  const [userEmail, setUserEmail] = useState<string | null>(null)
   const audioPreviewRef = useRef<HTMLAudioElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const pollingRef = useRef<NodeJS.Timeout | null>(null)
+  const isAdmin = userEmail === ADMIN_EMAIL
 
   // Lip Sync specific state
   const [lipSyncModel, setLipSyncModel] = useState<LipSyncModel>('kling')
@@ -156,6 +166,14 @@ export function ToolsGrid() {
   const [infinitalkSeed, setInfinitalkSeed] = useState<number>(Math.floor(Math.random() * (1000000 - 10000 + 1)) + 10000)
 
   const currentTool = TOOLS.find((t) => t.id === activeTool)
+
+  // Fetch user email for admin check
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data }) => {
+      setUserEmail(data.user?.email || null)
+    })
+  }, [])
 
   // Cleanup polling on unmount
   useEffect(() => {
@@ -336,6 +354,14 @@ export function ToolsGrid() {
   const generateNewSeed = () => {
     setInfinitalkSeed(Math.floor(Math.random() * (1000000 - 10000 + 1)) + 10000)
   }
+
+  // Filter tools: adminOnly tools hidden for non-admin, admin bypasses soon
+  const visibleTools = useMemo(() =>
+    TOOLS.filter(t => !t.adminOnly || isAdmin).map(t =>
+      isAdmin && t.adminOnly ? { ...t, soon: false } : t
+    ),
+    [isAdmin]
+  )
 
   // Prompt Generator tools (separate full-screen components)
   if (activeTool === 'prompt-video') {
@@ -751,7 +777,7 @@ export function ToolsGrid() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-        {TOOLS.map((tool) => (
+        {visibleTools.map((tool) => (
           <button
             key={tool.id}
             onClick={() => !tool.soon && setActiveTool(tool.id)}
@@ -765,7 +791,7 @@ export function ToolsGrid() {
           >
             {tool.soon && (
               <span className="absolute top-3 right-3 px-2 py-0.5 text-xs font-medium bg-border text-text-secondary rounded">
-                Pronto
+                Próximamente
               </span>
             )}
             {tool.outputsVideo && !tool.soon && (

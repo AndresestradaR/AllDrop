@@ -49,6 +49,10 @@ async function generateWithGemini(
 
   console.log(`[Tools/Gemini] Starting ${toolType} with model: ${apiModelId}`)
 
+  // Safety timeout: 90s
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 90000)
+
   try {
     const response = await fetch(`${endpoint}?key=${apiKey}`, {
       method: 'POST',
@@ -59,6 +63,7 @@ async function generateWithGemini(
           responseModalities: ['IMAGE'],
         },
       }),
+      signal: controller.signal,
     })
 
     if (!response.ok) {
@@ -102,8 +107,14 @@ async function generateWithGemini(
     return { success: false, error: 'No se genero imagen. Intenta de nuevo.' }
 
   } catch (error: any) {
+    if (error.name === 'AbortError') {
+      console.error(`[Tools/Gemini] ${toolType} timeout after 90s`)
+      return { success: false, error: 'Tiempo agotado. Intenta de nuevo.' }
+    }
     console.error('[Tools/Gemini] Error:', error.message)
     return { success: false, error: error.message || 'Error en la generacion' }
+  } finally {
+    clearTimeout(timeout)
   }
 }
 
@@ -657,95 +668,137 @@ export async function POST(request: Request) {
     switch (tool) {
       // ========================================
       // GEMINI-based tools (variations, upscale, camera-angle, mockup)
+      // Cascade: user Google key → platform GEMINI_API_KEY
       // ========================================
       case 'variations':
       case 'upscale':
       case 'camera-angle':
       case 'mockup': {
-        if (!profile.google_api_key) {
+        const geminiKeys: string[] = []
+        if (profile.google_api_key) {
+          try { geminiKeys.push(decrypt(profile.google_api_key)) } catch {}
+        }
+        if (process.env.GEMINI_API_KEY) {
+          const platformKey = process.env.GEMINI_API_KEY
+          if (!geminiKeys.includes(platformKey)) geminiKeys.push(platformKey)
+        }
+
+        if (geminiKeys.length === 0) {
           return NextResponse.json(
             { error: 'Necesitas configurar tu API key de Google para esta herramienta' },
             { status: 400 }
           )
         }
 
-        const apiKey = decrypt(profile.google_api_key)
-        const result = await generateWithGemini(imageBase64, mimeType, tool, apiKey)
+        const geminiErrors: string[] = []
+        for (const gKey of geminiKeys) {
+          const keyLabel = gKey === process.env.GEMINI_API_KEY ? 'platform' : 'user'
+          const result = await generateWithGemini(imageBase64, mimeType, tool, gKey)
 
-        if (result.success && result.imageBase64) {
-          // Try R2 upload
-          const r2Url = await tryUploadToR2(
-            user.id,
-            Buffer.from(result.imageBase64, 'base64'),
-            `tools/${tool}/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.png`,
-            'image/png'
-          )
-          if (r2Url) console.log(`[Tools] ✓ ${tool} saved to R2: ${r2Url}`)
+          if (result.success && result.imageBase64) {
+            if (keyLabel === 'platform') console.log(`[Tools] ${tool} succeeded via platform key (fallback)`)
+            // Try R2 upload
+            const r2Url = await tryUploadToR2(
+              user.id,
+              Buffer.from(result.imageBase64, 'base64'),
+              `tools/${tool}/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.png`,
+              'image/png'
+            )
+            if (r2Url) console.log(`[Tools] ✓ ${tool} saved to R2: ${r2Url}`)
 
-          return NextResponse.json({
-            success: true,
-            imageBase64: result.imageBase64,
-            mimeType: 'image/png',
-            r2Url,
-          })
+            return NextResponse.json({
+              success: true,
+              imageBase64: result.imageBase64,
+              mimeType: 'image/png',
+              r2Url,
+            })
+          }
+
+          geminiErrors.push(`Google (${keyLabel}): ${result.error}`)
+          console.error(`[Tools] ${tool} failed with ${keyLabel} key: ${result.error}`)
         }
 
         return NextResponse.json(
-          { error: result.error || `Error al procesar ${tool}` },
+          { error: geminiErrors[geminiErrors.length - 1] || `Error al procesar ${tool}` },
           { status: 500 }
         )
       }
 
       // ========================================
       // BFL FLUX - Background removal
+      // Cascade: user BFL key → platform BFL_API_KEY
       // ========================================
       case 'remove-bg': {
-        if (!profile.bfl_api_key) {
+        const bflKeys: string[] = []
+        if (profile.bfl_api_key) {
+          try { bflKeys.push(decrypt(profile.bfl_api_key)) } catch {}
+        }
+        if (process.env.BFL_API_KEY) {
+          const platformKey = process.env.BFL_API_KEY
+          if (!bflKeys.includes(platformKey)) bflKeys.push(platformKey)
+        }
+
+        if (bflKeys.length === 0) {
           return NextResponse.json(
             { error: 'Necesitas configurar tu API key de Black Forest Labs para esta herramienta' },
             { status: 400 }
           )
         }
 
-        const apiKey = decrypt(profile.bfl_api_key)
-        const result = await removeBackground(imageBase64, apiKey)
+        const bflErrors: string[] = []
+        for (const bKey of bflKeys) {
+          const keyLabel = bKey === process.env.BFL_API_KEY ? 'platform' : 'user'
+          const result = await removeBackground(imageBase64, bKey)
 
-        if (result.success && result.imageBase64) {
-          // Try R2 upload
-          const r2Url = await tryUploadToR2(
-            user.id,
-            Buffer.from(result.imageBase64, 'base64'),
-            `tools/remove-bg/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.png`,
-            'image/png'
-          )
-          if (r2Url) console.log(`[Tools] ✓ remove-bg saved to R2: ${r2Url}`)
+          if (result.success && result.imageBase64) {
+            if (keyLabel === 'platform') console.log('[Tools] remove-bg succeeded via platform key (fallback)')
+            // Try R2 upload
+            const r2Url = await tryUploadToR2(
+              user.id,
+              Buffer.from(result.imageBase64, 'base64'),
+              `tools/remove-bg/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.png`,
+              'image/png'
+            )
+            if (r2Url) console.log(`[Tools] ✓ remove-bg saved to R2: ${r2Url}`)
 
-          return NextResponse.json({
-            success: true,
-            imageBase64: result.imageBase64,
-            mimeType: 'image/png',
-            r2Url,
-          })
+            return NextResponse.json({
+              success: true,
+              imageBase64: result.imageBase64,
+              mimeType: 'image/png',
+              r2Url,
+            })
+          }
+
+          bflErrors.push(`BFL (${keyLabel}): ${result.error}`)
+          console.error(`[Tools] remove-bg failed with ${keyLabel} key: ${result.error}`)
         }
 
         return NextResponse.json(
-          { error: result.error || 'Error al quitar fondo' },
+          { error: bflErrors[bflErrors.length - 1] || 'Error al quitar fondo' },
           { status: 500 }
         )
       }
 
       // ========================================
       // KIE.ai - Lip Sync (Kling AI Avatar / Infinitalk)
+      // Cascade: user KIE key → platform KIE_API_KEY
       // ========================================
       case 'lip-sync': {
-        if (!profile.kie_api_key) {
+        const kieKeys: string[] = []
+        if (profile.kie_api_key) {
+          try { kieKeys.push(decrypt(profile.kie_api_key)) } catch {}
+        }
+        if (process.env.KIE_API_KEY) {
+          const platformKey = process.env.KIE_API_KEY
+          if (!kieKeys.includes(platformKey)) kieKeys.push(platformKey)
+        }
+
+        if (kieKeys.length === 0) {
           return NextResponse.json(
             { error: 'Necesitas configurar tu API key de KIE.ai para esta herramienta' },
             { status: 400 }
           )
         }
-
-        const apiKey = decrypt(profile.kie_api_key)
 
         // Use lip sync specific fields extracted earlier
         console.log(`[Tools/LipSync] Model: ${lipSyncModel}, Resolution: ${lipSyncResolution}, Seed: ${lipSyncSeed}`)
@@ -774,44 +827,45 @@ export async function POST(request: Request) {
           )
         }
 
-        const result = await generateLipSync(
-          {
-            imageUrl,
-            audioUrl,
-            model: lipSyncModel,
-            prompt: lipSyncPrompt || undefined,
-            resolution: lipSyncResolution,
-            seed: lipSyncSeed,
-          },
-          apiKey
-        )
+        const lipSyncErrors: string[] = []
+        for (const kKey of kieKeys) {
+          const keyLabel = kKey === process.env.KIE_API_KEY ? 'platform' : 'user'
+          const result = await generateLipSync(
+            {
+              imageUrl,
+              audioUrl,
+              model: lipSyncModel,
+              prompt: lipSyncPrompt || undefined,
+              resolution: lipSyncResolution,
+              seed: lipSyncSeed,
+            },
+            kKey
+          )
 
-        if (result.success && result.taskId) {
-          return NextResponse.json({
-            success: true,
-            taskId: result.taskId,
-            status: 'processing',
-          })
+          if (result.success && result.taskId) {
+            if (keyLabel === 'platform') console.log('[Tools] lip-sync succeeded via platform key (fallback)')
+            return NextResponse.json({
+              success: true,
+              taskId: result.taskId,
+              status: 'processing',
+            })
+          }
+
+          lipSyncErrors.push(`KIE (${keyLabel}): ${result.error}`)
+          console.error(`[Tools] lip-sync failed with ${keyLabel} key: ${result.error}`)
         }
 
         return NextResponse.json(
-          { error: result.error || 'Error al iniciar lip sync' },
+          { error: lipSyncErrors[lipSyncErrors.length - 1] || 'Error al iniciar lip sync' },
           { status: 500 }
         )
       }
 
       // ========================================
       // KIE.ai - Deep Face (Kling 2.6 Motion Control)
-      // URLs are pre-uploaded from frontend to Supabase (bypasses Vercel limit)
+      // Cascade: user KIE key → platform KIE_API_KEY
       // ========================================
       case 'deep-face': {
-        if (!profile.kie_api_key) {
-          return NextResponse.json(
-            { error: 'Necesitas configurar tu API key de KIE.ai para esta herramienta' },
-            { status: 400 }
-          )
-        }
-
         // Deep face expects JSON with pre-uploaded URLs
         if (!jsonBody || !jsonBody.videoUrl || !jsonBody.imageUrl) {
           return NextResponse.json(
@@ -820,7 +874,21 @@ export async function POST(request: Request) {
           )
         }
 
-        const apiKey = decrypt(profile.kie_api_key)
+        const dfKieKeys: string[] = []
+        if (profile.kie_api_key) {
+          try { dfKieKeys.push(decrypt(profile.kie_api_key)) } catch {}
+        }
+        if (process.env.KIE_API_KEY) {
+          const platformKey = process.env.KIE_API_KEY
+          if (!dfKieKeys.includes(platformKey)) dfKieKeys.push(platformKey)
+        }
+
+        if (dfKieKeys.length === 0) {
+          return NextResponse.json(
+            { error: 'Necesitas configurar tu API key de KIE.ai para esta herramienta' },
+            { status: 400 }
+          )
+        }
 
         // Extract deep face specific fields from JSON body
         const { videoUrl, imageUrl, prompt, orientation = 'video', mode = '1080p' } = jsonBody
@@ -829,27 +897,35 @@ export async function POST(request: Request) {
         console.log(`[Tools/DeepFace] Video URL: ${videoUrl}`)
         console.log(`[Tools/DeepFace] Image URL: ${imageUrl}`)
 
-        const result = await generateDeepFace(
-          {
-            videoUrl,
-            faceUrl: imageUrl,
-            prompt: prompt || undefined,
-            orientation,
-            mode,
-          },
-          apiKey
-        )
+        const dfErrors: string[] = []
+        for (const kKey of dfKieKeys) {
+          const keyLabel = kKey === process.env.KIE_API_KEY ? 'platform' : 'user'
+          const result = await generateDeepFace(
+            {
+              videoUrl,
+              faceUrl: imageUrl,
+              prompt: prompt || undefined,
+              orientation,
+              mode,
+            },
+            kKey
+          )
 
-        if (result.success && result.taskId) {
-          return NextResponse.json({
-            success: true,
-            taskId: result.taskId,
-            status: 'processing',
-          })
+          if (result.success && result.taskId) {
+            if (keyLabel === 'platform') console.log('[Tools] deep-face succeeded via platform key (fallback)')
+            return NextResponse.json({
+              success: true,
+              taskId: result.taskId,
+              status: 'processing',
+            })
+          }
+
+          dfErrors.push(`KIE (${keyLabel}): ${result.error}`)
+          console.error(`[Tools] deep-face failed with ${keyLabel} key: ${result.error}`)
         }
 
         return NextResponse.json(
-          { error: result.error || 'Error al iniciar deep face' },
+          { error: dfErrors[dfErrors.length - 1] || 'Error al iniciar deep face' },
           { status: 500 }
         )
       }
@@ -885,23 +961,29 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'taskId es requerido' }, { status: 400 })
     }
 
-    // Get user's KIE API key
+    // Get user's KIE API key (cascade: user key → platform key)
     const { data: profile } = await supabase
       .from('profiles')
       .select('kie_api_key')
       .eq('id', user.id)
       .single()
 
-    if (!profile?.kie_api_key) {
+    let kieKey: string | null = null
+    if (profile?.kie_api_key) {
+      try { kieKey = decrypt(profile.kie_api_key) } catch {}
+    }
+    if (!kieKey && process.env.KIE_API_KEY) {
+      kieKey = process.env.KIE_API_KEY
+    }
+
+    if (!kieKey) {
       return NextResponse.json({ error: 'KIE API key no configurada' }, { status: 400 })
     }
 
-    const apiKey = decrypt(profile.kie_api_key)
-
     // Both use the same endpoint, but use appropriate function for logging
     const result = type === 'deep-face'
-      ? await checkDeepFaceStatus(taskId, apiKey)
-      : await checkLipSyncStatus(taskId, apiKey)
+      ? await checkDeepFaceStatus(taskId, kieKey)
+      : await checkLipSyncStatus(taskId, kieKey)
 
     // If completed with video URL, try R2 upload
     if (result.status === 'completed' && result.videoUrl) {
