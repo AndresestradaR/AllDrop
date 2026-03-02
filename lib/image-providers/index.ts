@@ -136,6 +136,9 @@ export async function generateImage(
   const cascade = modelConfig?.cascade
   const hasImages = !!(request.productImageUrls?.length || request.templateUrl)
 
+  console.log(`[Cascade] START model=${request.modelId}, hasImages=${hasImages}, keys: kie=${!!apiKeys.kie} fal=${!!apiKeys.fal} gemini=${!!apiKeys.gemini} openai=${!!apiKeys.openai} bfl=${!!apiKeys.bfl}`)
+  console.log(`[Cascade] cascade config: kie=${!!cascade?.kie} fal=${!!cascade?.fal} directApi=${cascade?.directApi || 'none'}`)
+
   // ── Step 1: OpenAI direct FIRST (solo para modelos GPT Image) ──
   if (cascade?.directApi === 'openai' && apiKeys.openai) {
     const t0 = Date.now()
