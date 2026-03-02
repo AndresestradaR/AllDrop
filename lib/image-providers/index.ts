@@ -171,12 +171,10 @@ export async function generateImage(
   if (cascade?.fal && apiKeys.fal) {
     const falPath = hasImages && cascade.fal.i2i ? cascade.fal.i2i : cascade.fal.t2i
     const t0 = Date.now()
-    // Collect image URLs: product FIRST (more important for visual reference),
-    // then template (layout info is already in the prompt).
-    // Non-/edit fal.ai models only accept 1 image — the first one must be the product.
+    // Collect all image URLs (template + product) — same order as KIE
     const falImageUrls: string[] = []
-    if (request.productImageUrls?.length) falImageUrls.push(...request.productImageUrls)
     if (request.templateUrl?.startsWith('http')) falImageUrls.push(request.templateUrl)
+    if (request.productImageUrls?.length) falImageUrls.push(...request.productImageUrls)
 
     const falResult = await generateViaFal(apiKeys.fal, falPath, {
       prompt,

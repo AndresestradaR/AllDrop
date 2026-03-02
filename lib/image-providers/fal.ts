@@ -68,14 +68,9 @@ export async function generateViaFal(
     prompt: options.prompt,
   }
 
-  // Image input (reference images) — /edit endpoints accept array, others single URL
+  // Image input — all fal.ai models accept image_urls array
   if (options.imageUrls?.length) {
-    const isEditEndpoint = modelPath.includes('/edit')
-    if (isEditEndpoint) {
-      input.image_urls = options.imageUrls  // Array completo (hasta 10)
-    } else {
-      input.image_url = options.imageUrls[0]  // Solo primera imagen
-    }
+    input.image_urls = options.imageUrls
   }
 
   // Aspect ratio — seedream models use image_size enum, others use aspect_ratio
