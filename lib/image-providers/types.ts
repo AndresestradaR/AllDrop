@@ -456,6 +456,23 @@ export function getApiKeyField(modelId: ImageModelId): string {
   }
 }
 
+/** Check if at least one API key exists for any step in the model's cascade */
+export function hasCascadeKey(
+  modelId: ImageModelId,
+  keys: { gemini?: string; openai?: string; kie?: string; bfl?: string; fal?: string }
+): boolean {
+  const model = IMAGE_MODELS[modelId]
+  const c = model.cascade
+  if (!c) return false
+  return !!(
+    (c.kie && keys.kie) ||
+    (c.fal && keys.fal) ||
+    (c.directApi === 'gemini' && keys.gemini) ||
+    (c.directApi === 'openai' && keys.openai) ||
+    (c.directApi === 'bfl' && keys.bfl)
+  )
+}
+
 // Get the API model ID for a given model
 export function getApiModelId(modelId: ImageModelId): string {
   return IMAGE_MODELS[modelId].apiModelId

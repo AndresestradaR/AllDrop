@@ -8,6 +8,9 @@ import {
   pollForResult,
   ImageProviderType,
   GenerateImageRequest,
+  IMAGE_MODELS,
+  hasCascadeKey,
+  type ImageModelId,
 } from '@/lib/image-providers'
 
 // Allow up to 5 minutes for image generation (KIE polling can take time)
@@ -182,33 +185,16 @@ export async function POST(request: Request) {
     if (!apiKeys.fal && process.env.FAL_API_KEY) {
       apiKeys.fal = process.env.FAL_API_KEY
     }
-
-    // Validate we have the required API key for the selected provider
-    const selectedProvider = provider as ImageProviderType
-    const providerKeyMap: Record<ImageProviderType, keyof typeof apiKeys> = {
-      gemini: 'gemini',
-      openai: 'openai',
-      seedream: 'kie',
-      flux: 'bfl',
-      fal: 'fal',
+    if (!apiKeys.gemini && process.env.GEMINI_API_KEY) {
+      apiKeys.gemini = process.env.GEMINI_API_KEY
     }
 
-    const requiredKey = providerKeyMap[selectedProvider]
-    // For Gemini: accept either Google key OR KIE key (KIE routes Gemini via Nano Banana Pro)
-    const hasValidKey = selectedProvider === 'gemini'
-      ? !!(apiKeys.gemini || apiKeys.kie)
-      : !!apiKeys[requiredKey]
+    // Validate we have at least one usable API key for the model's cascade
+    const selectedProvider = provider as ImageProviderType
 
-    if (!hasValidKey) {
-      const keyNames: Record<ImageProviderType, string> = {
-        gemini: 'Google (Gemini) o KIE.ai',
-        openai: 'OpenAI',
-        seedream: 'KIE.ai',
-        flux: 'Black Forest Labs',
-        fal: 'fal.ai',
-      }
+    if (modelId && !hasCascadeKey(modelId as ImageModelId, apiKeys)) {
       return NextResponse.json({
-        error: `Configura tu API key de ${keyNames[selectedProvider]} en Settings`,
+        error: 'Configura al menos una API key compatible (KIE, fal.ai, Google, OpenAI o BFL) en Settings',
       }, { status: 400 })
     }
 
@@ -346,7 +332,10 @@ export async function POST(request: Request) {
     if (result.success && result.status === 'processing' && result.taskId) {
       console.log(`Task created: ${result.taskId}, polling for result...`)
 
-      const apiKey = apiKeys[requiredKey]!
+      const providerKeyMap: Record<ImageProviderType, keyof typeof apiKeys> = {
+        gemini: 'gemini', openai: 'openai', seedream: 'kie', flux: 'bfl', fal: 'fal',
+      }
+      const apiKey = apiKeys[providerKeyMap[selectedProvider]]!
       const pollElapsed = Date.now() - startTime
       const pollTimeout = Math.max(250000 - pollElapsed, 60000) // use remaining time, min 60s
       console.log(`[Poll] timeout: ${Math.round(pollTimeout / 1000)}s (elapsed: ${Math.round(pollElapsed / 1000)}s)`)
