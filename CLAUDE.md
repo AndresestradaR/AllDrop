@@ -63,7 +63,8 @@ generateImage(model, params) -> ImageResult
   Each provider tries ONE model (the equivalent of what the user selected).
     If OpenAI/FLUX selected -> try that provider first, then cascade
     1. KIE — ONE model mapped from user selection:
-       nano-banana-2/gemini-2.5-flash → nano-banana
+       nano-banana-2 (default) → gemini-3.1-flash-image-preview
+       gemini-2.5-flash → nano-banana (old Flash)
        gemini-3-pro-image → nano-banana-pro
        seedream models → seedream/5-text-to-image (never 4.5)
     2. fal.ai — model's falModelId (or nano-banana-2 default)

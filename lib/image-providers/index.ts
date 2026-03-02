@@ -198,8 +198,13 @@ function getKieModel(modelId: ImageModelId): { model: string; supportsImageInput
     return { model: 'seedream/5-text-to-image', supportsImageInput: config?.supportsImageInput ?? true, isSeedream: true }
   }
 
-  // Everything else (Flash, nano-banana-2, OpenAI, FLUX, gemini-2.5-flash) → nano-banana
-  return { model: 'nano-banana', supportsImageInput: true, isSeedream: false }
+  // gemini-2.5-flash → nano-banana (old Flash on KIE)
+  if (modelId === 'gemini-2.5-flash') {
+    return { model: 'nano-banana', supportsImageInput: true, isSeedream: false }
+  }
+
+  // Everything else (nano-banana-2, OpenAI, FLUX, etc.) → gemini-3.1-flash-image-preview
+  return { model: 'gemini-3.1-flash-image-preview', supportsImageInput: true, isSeedream: false }
 }
 
 /**
