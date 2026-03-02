@@ -210,11 +210,7 @@ export async function generateImage(
 
   // ── Step 4: Direct API ultimo fallback (Gemini o BFL — mas caro) ──
   if (cascade?.directApi === 'gemini' && apiKeys.gemini) {
-    // For Gemini direct fallback, always use a valid Google model ID
-    // modelConfig.apiModelId may be a fal.ai or KIE path — NOT a Google model
-    const googleModelId = modelConfig.company === 'google'
-      ? modelConfig.apiModelId
-      : 'gemini-2.5-flash-image'
+    const googleModelId = cascade.directModelId || modelConfig.apiModelId
     console.log(`[Cascade] Google direct fallback with ${googleModelId}`)
     const t0 = Date.now()
     try {

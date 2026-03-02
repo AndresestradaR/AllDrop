@@ -59,6 +59,7 @@ export interface ImageModelConfig {
       i2i?: string    // fal.ai /edit path for I2I (REQUIRED for image input — T2I ignores images)
     }
     directApi?: 'gemini' | 'openai' | 'bfl'  // step 3: direct API fallback (undefined = STOP)
+    directModelId?: string  // exact model ID for direct API (e.g. 'gemini-3.1-flash-image-preview')
   }
 }
 
@@ -95,6 +96,7 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModelConfig> = {
       kie: { t2i: 'nano-banana-pro', i2i: 'nano-banana-pro', mode: 'nano-banana' },
       fal: { t2i: 'fal-ai/nano-banana-pro', i2i: 'fal-ai/nano-banana-pro/edit' },
       directApi: 'gemini',
+      directModelId: 'gemini-3-pro-image-preview',
     },
   },
   // ============================================
@@ -237,6 +239,7 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModelConfig> = {
       kie: { t2i: 'nano-banana-2', i2i: 'nano-banana-2', mode: 'nano-banana' },
       fal: { t2i: 'fal-ai/nano-banana-2', i2i: 'fal-ai/nano-banana-2/edit' },
       directApi: 'gemini',
+      directModelId: 'gemini-3.1-flash-image-preview',
     },
   },
   'seedream-5-lite': {
