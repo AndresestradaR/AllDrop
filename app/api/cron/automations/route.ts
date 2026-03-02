@@ -409,9 +409,9 @@ async function executeFlow(supabase: any, appUrl: string, flow: any) {
 function getModelIdFromPreset(preset: string): string {
   switch (preset) {
     case 'producto': return 'sora-2'
-    case 'rapido': return 'veo-3-fast'
+    case 'rapido': return 'veo-3.1-fast'
     case 'premium': return 'kling-3.0'
-    default: return 'veo-3-fast'
+    default: return 'veo-3.1-fast'
   }
 }
 

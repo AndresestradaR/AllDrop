@@ -72,10 +72,36 @@ export async function generateVideo(
     console.log(`[Video] Has image: ${hasImage}`)
     console.log(`[Video] Request imageUrls:`, request.imageUrls)
 
-    // Veo models use different endpoint
+    // Veo models use different endpoint, with fal.ai fallback
     if (modelConfig.useVeoEndpoint) {
       const veoResult = await generateVeoVideo(request, apiKey, request.modelId)
       logAI({ service: 'video', provider: 'kie', status: veoResult.success ? 'success' : 'error', response_ms: Date.now() - t0, model: request.modelId, error_message: veoResult.success ? undefined : veoResult.error })
+
+      if (veoResult.success) return veoResult
+
+      // fal.ai fallback for Veo
+      const falConfig = modelConfig.fal
+      if (falApiKey && falConfig) {
+        const hasImage = !!(request.imageUrls && request.imageUrls.length > 0)
+        const falPath = hasImage ? (falConfig.i2v || falConfig.t2v) : falConfig.t2v
+        if (falPath) {
+          console.warn(`[Video/Veo] KIE failed (${veoResult.error}), trying fal.ai: ${falPath}`)
+          const t0Fal = Date.now()
+          const falResult = await generateVideoViaFal(falApiKey, falPath, {
+            prompt: request.prompt,
+            imageUrl: hasImage ? request.imageUrls?.[0] : undefined,
+            aspectRatio: request.aspectRatio,
+            duration: request.duration,
+            timeoutMs: 120000,
+          })
+          if (falResult.success) {
+            logAI({ service: 'video', provider: 'fal', status: 'success', response_ms: Date.now() - t0Fal, model: falPath, was_fallback: true })
+            return falResult
+          }
+          logAI({ service: 'video', provider: 'fal', status: 'error', response_ms: Date.now() - t0Fal, model: falPath, error_message: falResult.error, was_fallback: true })
+        }
+      }
+
       return veoResult
     }
 
@@ -90,23 +116,38 @@ export async function generateVideo(
 
     logAI({ service: 'video', provider: 'kie', status: 'error', response_ms: Date.now() - t0, model: request.modelId, error_message: kieResult.error })
 
-    // fal.ai fallback: only for models with a falModelId
-    if (falApiKey && modelConfig.falModelId) {
-      console.warn(`[Video] KIE failed (${kieResult.error}), trying fal.ai fallback: ${modelConfig.falModelId}`)
-      const t0Fal = Date.now()
-      const falResult = await generateVideoViaFal(falApiKey, modelConfig.falModelId, {
-        prompt: request.prompt,
-        imageUrl: request.imageUrls?.[0],
-        aspectRatio: request.aspectRatio,
-        duration: request.duration,
-        timeoutMs: 100000,
-      })
-      if (falResult.success) {
-        logAI({ service: 'video', provider: 'fal', status: 'success', response_ms: Date.now() - t0Fal, model: modelConfig.falModelId, was_fallback: true })
-        return falResult
+    // fal.ai fallback: mode-aware — pick T2V or I2V path from model config
+    const falConfig = modelConfig.fal
+    if (falApiKey && (falConfig || modelConfig.falModelId)) {
+      // Determine fal.ai path based on mode (text-to-video vs image-to-video)
+      let falPath: string | undefined
+      if (falConfig) {
+        falPath = hasImage
+          ? (falConfig.i2v || falConfig.t2v)  // I2V preferred, fallback to T2V
+          : falConfig.t2v                       // Text-to-video
       }
-      logAI({ service: 'video', provider: 'fal', status: 'error', response_ms: Date.now() - t0Fal, model: modelConfig.falModelId, error_message: falResult.error, was_fallback: true })
-      console.warn(`[Video] fal.ai fallback also failed: ${falResult.error}`)
+      // Legacy fallback: single falModelId
+      if (!falPath && modelConfig.falModelId) {
+        falPath = modelConfig.falModelId
+      }
+
+      if (falPath) {
+        console.warn(`[Video] KIE failed (${kieResult.error}), trying fal.ai fallback: ${falPath} (hasImage=${hasImage})`)
+        const t0Fal = Date.now()
+        const falResult = await generateVideoViaFal(falApiKey, falPath, {
+          prompt: request.prompt,
+          imageUrl: hasImage ? request.imageUrls?.[0] : undefined,
+          aspectRatio: request.aspectRatio,
+          duration: request.duration,
+          timeoutMs: 100000,
+        })
+        if (falResult.success) {
+          logAI({ service: 'video', provider: 'fal', status: 'success', response_ms: Date.now() - t0Fal, model: falPath, was_fallback: true })
+          return falResult
+        }
+        logAI({ service: 'video', provider: 'fal', status: 'error', response_ms: Date.now() - t0Fal, model: falPath, error_message: falResult.error, was_fallback: true })
+        console.warn(`[Video] fal.ai fallback also failed: ${falResult.error}`)
+      }
     }
 
     return kieResult
@@ -146,7 +187,7 @@ async function generateVeoVideo(
 ): Promise<GenerateVideoResult> {
   // Map our model IDs to KIE's expected values
   // veo-3.1 -> "veo3" (Quality, 250 credits)
-  // veo-3-fast -> "veo3_fast" (Fast, 60 credits)
+  // veo-3.1-fast -> "veo3_fast" (Fast, 60 credits)
   const kieModel = modelId === 'veo-3.1' ? 'veo3' : 'veo3_fast'
 
   const body: Record<string, any> = {
@@ -243,6 +284,7 @@ async function generateVeoVideo(
  * - Kling 2.6: image_urls (array)
  * - Sora 2: image_urls (array)
  * - Wan 2.6: image_urls (array)
+ * - Seedance 2.0: image_urls (array)
  * - Wan 2.5: image_url (singular string) ← DIFFERENT!
  * - Seedance 1.5 Pro: input_urls (array)
  * - Seedance 1.0 Fast: image_url (singular string)
@@ -251,6 +293,7 @@ async function generateVeoVideo(
  * 
  * ASPECT RATIO:
  * - Sora 2: "landscape" / "portrait" (NOT "16:9" / "9:16"!)
+ * - Seedance 2.0: "16:9", "9:16", "1:1" (REQUIRED)
  * - Seedance 1.5 Pro: "16:9", "9:16", "1:1" (REQUIRED)
  * - Others: "16:9", "9:16", "1:1"
  * 
@@ -258,6 +301,7 @@ async function generateVeoVideo(
  * - Kling: duration as STRING ("5" or "10")
  * - Sora: n_frames as STRING ("10" or "15")
  * - Hailuo: duration as STRING ("6" or "10")
+ * - Seedance 2.0: duration as STRING ("4"-"15") - REQUIRED
  * - Seedance 1.5 Pro: duration as STRING ("4", "8", "12") - REQUIRED
  * - Seedance 1.0 Fast: duration as STRING ("5" or "10")
  * - Wan: duration as STRING ("5", "10", "15")
@@ -269,6 +313,7 @@ async function generateVeoVideo(
  * 
  * AUDIO:
  * - Kling 2.6: sound (boolean) - REQUIRED
+ * - Seedance 2.0: generate_audio (boolean)
  * - Seedance 1.5 Pro: generate_audio (boolean)
  * - Wan: NO audio param in image-to-video
  * - Kling v2.5/Hailuo/Seedance 1.0: no audio support
@@ -294,16 +339,17 @@ async function generateStandardVideo(
   const isWan25 = request.modelId === 'wan-2.5'
   const isWan = isWan26 || isWan25
   const isHailuo = request.modelId.startsWith('hailuo')
+  const isSeedance2 = request.modelId === 'seedance-2'
   const isSeedance15 = request.modelId === 'seedance-1.5-pro'
   const isSeedance10 = request.modelId === 'seedance-1.0-fast'
-  const isSeedance = isSeedance15 || isSeedance10
+  const isSeedance = isSeedance2 || isSeedance15 || isSeedance10
 
-  console.log(`[Video] Model detection: isKling30=${isKling30}, isWan26=${isWan26}, isWan25=${isWan25}, isKling26=${isKling26}, isSora=${isSora}, isHailuo=${isHailuo}, isSeedance15=${isSeedance15}, isSeedance10=${isSeedance10}`)
+  console.log(`[Video] Model detection: isKling30=${isKling30}, isWan26=${isWan26}, isWan25=${isWan25}, isKling26=${isKling26}, isSora=${isSora}, isHailuo=${isHailuo}, isSeedance2=${isSeedance2}, isSeedance15=${isSeedance15}, isSeedance10=${isSeedance10}`)
 
   // Image URLs - DIFFERENT MODELS USE DIFFERENT FIELD NAMES!
   if (request.imageUrls && request.imageUrls.length > 0) {
-    if (isKling30 || isKling26 || isSora || isWan26) {
-      // Kling 3.0, Kling 2.6, Sora 2, and Wan 2.6 use image_urls (plural array)
+    if (isKling30 || isKling26 || isSora || isWan26 || isSeedance2) {
+      // Kling 3.0, Kling 2.6, Sora 2, Wan 2.6, and Seedance 2 use image_urls (plural array)
       input.image_urls = request.imageUrls
       console.log(`[Video] Using image_urls (array) for ${request.modelId}`)
     } else if (isWan25) {
@@ -345,8 +391,8 @@ async function generateStandardVideo(
     } else {
       input.aspect_ratio = request.aspectRatio
     }
-  } else if (isSeedance15) {
-    // Seedance 1.5 Pro requires aspect_ratio, default to 16:9
+  } else if (isSeedance2 || isSeedance15) {
+    // Seedance 2.0 and 1.5 Pro require aspect_ratio, default to 16:9
     input.aspect_ratio = '16:9'
   }
 
@@ -363,8 +409,8 @@ async function generateStandardVideo(
       // Fallback - use as provided
       input.duration = request.duration
     }
-  } else if (isSeedance15) {
-    // Seedance 1.5 Pro requires duration, default to 8s
+  } else if (isSeedance2 || isSeedance15) {
+    // Seedance 2.0 and 1.5 Pro require duration, default to 8s
     input.duration = '8'
   } else if (isSeedance10) {
     // Seedance 1.0 Fast - duration is optional but use 5s as default
@@ -375,8 +421,8 @@ async function generateStandardVideo(
   if (isKling30 || isKling26) {
     // Kling 3.0 and 2.6 use "sound" (boolean) - THIS IS REQUIRED!
     input.sound = request.enableAudio ?? false
-  } else if (isSeedance15) {
-    // Only Seedance 1.5 Pro supports generate_audio
+  } else if (isSeedance2 || isSeedance15) {
+    // Seedance 2.0 and 1.5 Pro support generate_audio
     if (modelConfig.supportsAudio) {
       input.generate_audio = request.enableAudio ?? false
     }
@@ -384,8 +430,8 @@ async function generateStandardVideo(
   // Note: Wan image-to-video doesn't have audio param
   // Note: Kling v2.5, Hailuo, Sora, and Seedance 1.0 don't support audio
 
-  // Wan 2.6 specific: multi_shots option
-  if (isWan26 && modelConfig.supportsMultiShots) {
+  // Wan 2.6 and Seedance 2 specific: multi_shots option
+  if ((isWan26 || isSeedance2) && modelConfig.supportsMultiShots) {
     input.multi_shots = false // default to single shot
   }
 
@@ -594,6 +640,91 @@ export async function checkVideoStatus(
       success: false,
       error: error.message || 'Status check failed',
       provider: 'kie',
+    }
+  }
+}
+
+/**
+ * Extend a Veo 3.1 video via KIE.ai
+ * Endpoint: POST /api/v1/veo/extend
+ *
+ * Requirements:
+ * - The original video MUST have been generated via KIE's /api/v1/veo/generate
+ * - You need the original taskId from that generation
+ * - Only works with Veo 3.1 models (veo3 / veo3_fast)
+ *
+ * Parameters:
+ * - taskId: original video generation task ID
+ * - prompt: continuation prompt for the extended segment
+ * - model: "veo3" (quality) or "veo3_fast" (fast)
+ */
+export async function extendVeoVideo(
+  taskId: string,
+  prompt: string,
+  apiKey: string,
+  options: {
+    model?: 'veo3' | 'veo3_fast'
+  } = {}
+): Promise<GenerateVideoResult> {
+  const t0 = Date.now()
+  try {
+    const model = options.model || 'veo3_fast'
+
+    const body = {
+      taskId,
+      prompt,
+      model,
+    }
+
+    console.log('[Video/Veo] Extend request:', JSON.stringify({
+      taskId,
+      prompt: prompt.substring(0, 50) + '...',
+      model,
+    }))
+
+    const response = await fetch(`${KIE_API_BASE}/veo/extend`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(body),
+    })
+
+    const responseText = await response.text()
+    console.log('[Video/Veo] Extend response:', response.status, responseText.substring(0, 500))
+
+    let data: any
+    try {
+      data = JSON.parse(responseText)
+    } catch (e) {
+      throw new Error(`Invalid JSON response: ${responseText.substring(0, 200)}`)
+    }
+
+    if (data.code !== 200) {
+      throw new Error(`Veo Extend error: ${data.msg || data.message || JSON.stringify(data)}`)
+    }
+
+    const newTaskId = data.data?.taskId
+    if (!newTaskId) {
+      throw new Error('No taskId in Veo extend response')
+    }
+
+    logAI({ service: 'video', provider: 'kie', status: 'success', response_ms: Date.now() - t0, model: `veo-extend-${model}` })
+
+    return {
+      success: true,
+      taskId: newTaskId,
+      status: 'processing',
+      provider: 'kie-veo',
+    }
+  } catch (error: any) {
+    logAI({ service: 'video', provider: 'kie', status: 'error', response_ms: Date.now() - t0, model: 'veo-extend', error_message: error.message })
+    console.error('[Video/Veo] Extend error:', error.message)
+    return {
+      success: false,
+      error: error.message || 'Video extend failed',
+      provider: 'kie-veo',
     }
   }
 }

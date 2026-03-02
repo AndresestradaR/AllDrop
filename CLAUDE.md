@@ -107,12 +107,35 @@ generateImage(model, params) -> ImageResult
 
 #### Video Generation — `lib/video-providers/kie-video.ts`
 ```
-ALL video models route through KIE.ai
-  Veo endpoint: /api/v1/veo/generate (Google Veo models)
+ALL video models route through KIE.ai with fal.ai cascade fallback.
+  Veo endpoint: /api/v1/veo/generate (Google Veo 3.1 models)
+  Extend endpoint: /api/v1/veo/extend (extend Veo videos, requires original taskId)
   Standard: /api/v1/jobs/createTask (Kling, Sora, Hailuo, Seedance, Wan)
-  Fallback: fal.ai for Seedance 1.0 Fast (lib/video-providers/fal-video.ts)
-  12 models across 6 companies
+  Cascade: KIE -> fal.ai (mode-aware: T2V vs I2V from model.fal config)
+  13 models across 6 companies
+
+  Models and fal.ai cascade:
+    | Model           | KIE T2V / I2V                              | fal T2V / I2V                                  |
+    | veo-3.1         | veo3 (special /veo/generate)                | fal-ai/veo3.1 / first-last-frame-to-video      |
+    | veo-3.1-fast    | veo3_fast (special /veo/generate)            | fal-ai/veo3.1/fast / image-to-video             |
+    | kling-3.0       | kling-3.0/video                              | — / fal-ai/kling-video/v3/pro/image-to-video   |
+    | kling-2.6       | kling-2.6/text-to-video / image-to-video     | (no fal)                                        |
+    | kling-v25-turbo | kling/v2-5-turbo-*-pro                       | fal-ai/kling-video/v2.5-turbo/pro/*            |
+    | sora-2          | sora-2-text/image-to-video                   | fal-ai/sora-2/* + v2v remix                    |
+    | hailuo-2.3-pro  | hailuo/2-3-image-to-video-pro                | — / fal-ai/minimax/hailuo-02/pro/i2v           |
+    | hailuo-2.3-std  | hailuo/2-3-image-to-video-standard           | — / fal-ai/minimax/hailuo-02/standard/i2v      |
+    | seedance-2      | bytedance/seedance-2-text/image-to-video     | (no fal)                                        |
+    | seedance-1.5-pro| bytedance/seedance-1.5-pro                   | fal-ai/bytedance/seedance/v1.5/pro/t2v         |
+    | seedance-1.0-fast| bytedance/v1-pro-fast-image-to-video        | fal-ai/bytedance/seedance/v1/pro/i2v           |
+    | wan-2.6         | wan/2-6-text/image-to-video                  | (no fal)                                        |
+    | wan-2.5         | wan/2-5-text/image-to-video                  | (no fal)                                        |
+
+  Veo Extend: only veo-3.1 and veo-3.1-fast (supportsExtend: true)
+    Requires original taskId from KIE generation
+    API route: /api/studio/extend-video
+
   Types: lib/video-providers/types.ts
+  fal fallback: lib/video-providers/fal-video.ts
 ```
 
 #### Audio Generation — `lib/audio-providers/`
@@ -286,8 +309,8 @@ Individual provider change: only that provider's models affected
 
 ### 6.3 Video Providers (`lib/video-providers/`)
 ```
-kie-video.ts BREAKS: studio/generate-video, studio/video-status
-types.ts BREAKS: studio video UI model selector
+kie-video.ts BREAKS: studio/generate-video, studio/video-status, studio/extend-video
+types.ts BREAKS: studio video UI model selector, automation presets
 ```
 
 ### 6.4 Audio Providers (`lib/audio-providers/`)

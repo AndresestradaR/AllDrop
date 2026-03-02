@@ -171,7 +171,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     // ===== STEP 2: Determine model and trigger video generation =====
     const presetModelMap: Record<string, { modelId: string; videoMode: string }> = {
       producto: { modelId: 'sora-2', videoMode: 'text' },
-      rapido: { modelId: 'veo-3-fast', videoMode: 'image' },
+      rapido: { modelId: 'veo-3.1-fast', videoMode: 'image' },
       premium: { modelId: 'kling-3.0', videoMode: 'image' },
     }
 

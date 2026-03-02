@@ -4,9 +4,9 @@
 export type VideoProviderCompany = 'google' | 'kuaishou' | 'openai' | 'minimax' | 'seedance' | 'wan'
 
 export type VideoModelId =
-  // Google Veo (special endpoint)
+  // Google Veo 3.1 (special endpoint)
   | 'veo-3.1'
-  | 'veo-3-fast'
+  | 'veo-3.1-fast'
   // Kling (Kuaishou)
   | 'kling-3.0'
   | 'kling-2.6'
@@ -17,6 +17,7 @@ export type VideoModelId =
   | 'hailuo-2.3-pro'
   | 'hailuo-2.3-standard'
   // Seedance (ByteDance)
+  | 'seedance-2'
   | 'seedance-1.5-pro'
   | 'seedance-1.0-fast'
   // Wan
@@ -44,7 +45,14 @@ export interface VideoModelConfig {
   requiresImage?: boolean // True if model ONLY supports image-to-video (no text-to-video)
   noResolutionParam?: boolean // True if model doesn't accept resolution parameter
   useVeoEndpoint?: boolean // Special endpoint for Veo models
-  falModelId?: string // fal.ai model path (for cascade fallback)
+  falModelId?: string // fal.ai model path (legacy single path fallback)
+  // fal.ai cascade — mode-aware fallback paths
+  fal?: {
+    t2v?: string    // fal.ai path for text-to-video
+    i2v?: string    // fal.ai path for image-to-video
+    v2v?: string    // fal.ai path for video-to-video/remix
+  }
+  supportsExtend?: boolean // Veo only — can extend via /veo/extend
   tags?: VideoModelTag[]
   recommended?: boolean
 }
@@ -63,7 +71,7 @@ export const VIDEO_MODELS: Record<VideoModelId, VideoModelConfig> = {
   'veo-3.1': {
     id: 'veo-3.1',
     apiModelId: 'veo3', // Special: uses /api/v1/veo/generate
-    name: 'Google Veo 3.1',
+    name: 'Google Veo 3.1 Pro',
     description: 'Flagship con audio y 4K',
     company: 'google',
     companyName: 'Google',
@@ -76,13 +84,15 @@ export const VIDEO_MODELS: Record<VideoModelId, VideoModelConfig> = {
     supportsStartEndFrames: true,
     supportsMultiShots: false,
     useVeoEndpoint: true,
+    supportsExtend: true,
+    fal: { t2v: 'fal-ai/veo3.1', i2v: 'fal-ai/veo3.1/first-last-frame-to-video' },
     tags: ['PREMIUM', 'AUDIO', 'REFERENCES'],
     recommended: true,
   },
-  'veo-3-fast': {
-    id: 'veo-3-fast',
+  'veo-3.1-fast': {
+    id: 'veo-3.1-fast',
     apiModelId: 'veo3_fast', // Special: uses /api/v1/veo/generate
-    name: 'Veo 3 Fast',
+    name: 'Veo 3.1 Fast',
     description: 'Rápido y económico con audio',
     company: 'google',
     companyName: 'Google',
@@ -95,6 +105,8 @@ export const VIDEO_MODELS: Record<VideoModelId, VideoModelConfig> = {
     supportsStartEndFrames: true,
     supportsMultiShots: false,
     useVeoEndpoint: true,
+    supportsExtend: true,
+    fal: { t2v: 'fal-ai/veo3.1/fast', i2v: 'fal-ai/veo3.1/image-to-video' },
     tags: ['FAST', 'AUDIO', 'RECOMENDADO'],
     recommended: true,
   },
@@ -116,6 +128,7 @@ export const VIDEO_MODELS: Record<VideoModelId, VideoModelConfig> = {
     supportsReferences: true,
     supportsStartEndFrames: true,
     supportsMultiShots: true,
+    fal: { i2v: 'fal-ai/kling-video/v3/pro/image-to-video' },
     tags: ['NEW', 'PREMIUM', 'AUDIO', 'REFERENCES', 'MULTI_SHOTS'],
     recommended: true,
   },
@@ -148,13 +161,14 @@ export const VIDEO_MODELS: Record<VideoModelId, VideoModelConfig> = {
     companyName: 'Kling',
     priceRange: '$0.21-0.42',
     durationRange: '5-10s',
-    resolutions: ['1080p'], // Fixed resolution, don't send as param
+    resolutions: ['1080p'],
     defaultResolution: '1080p',
     supportsAudio: false,
     supportsReferences: false,
-    supportsStartEndFrames: true, // supports tail_image_url
+    supportsStartEndFrames: true,
     supportsMultiShots: false,
-    noResolutionParam: true, // IMPORTANT: Don't send resolution to API
+    noResolutionParam: true,
+    fal: { t2v: 'fal-ai/kling-video/v2.5-turbo/pro/text-to-video', i2v: 'fal-ai/kling-video/v2.5-turbo/pro/image-to-video' },
     tags: ['FAST'],
   },
 
@@ -175,6 +189,7 @@ export const VIDEO_MODELS: Record<VideoModelId, VideoModelConfig> = {
     supportsReferences: false,
     supportsStartEndFrames: true,
     supportsMultiShots: false,
+    fal: { t2v: 'fal-ai/sora-2/text-to-video', i2v: 'fal-ai/sora-2/image-to-video', v2v: 'fal-ai/sora-2/video-to-video/remix' },
     tags: ['AUDIO', 'RECOMENDADO'],
     recommended: true,
   },
@@ -183,9 +198,9 @@ export const VIDEO_MODELS: Record<VideoModelId, VideoModelConfig> = {
   'hailuo-2.3-pro': {
     id: 'hailuo-2.3-pro',
     apiModelId: 'hailuo/2-3-image-to-video-pro',
-    // NO apiModelIdText - image-to-video only
+    apiModelIdText: 'hailuo/02-text-to-video-pro',
     name: 'Hailuo 2.3 Pro',
-    description: 'Solo image-to-video, requiere imagen',
+    description: 'Alta calidad, soporta texto e imagen',
     company: 'minimax',
     companyName: 'MiniMax',
     priceRange: '$0.22-0.45',
@@ -196,16 +211,16 @@ export const VIDEO_MODELS: Record<VideoModelId, VideoModelConfig> = {
     supportsReferences: false,
     supportsStartEndFrames: true,
     supportsMultiShots: false,
-    requiresImage: true,
-    tags: ['IMG2VID', 'RECOMENDADO'],
+    fal: { i2v: 'fal-ai/minimax/hailuo-02/pro/image-to-video' },
+    tags: ['RECOMENDADO'],
     recommended: true,
   },
   'hailuo-2.3-standard': {
     id: 'hailuo-2.3-standard',
     apiModelId: 'hailuo/2-3-image-to-video-standard',
-    // NO apiModelIdText - image-to-video only
+    apiModelIdText: 'hailuo/02-text-to-video-standard',
     name: 'Hailuo 2.3 Standard',
-    description: 'Solo image-to-video, económico',
+    description: 'Económico, soporta texto e imagen',
     company: 'minimax',
     companyName: 'MiniMax',
     priceRange: '$0.15-0.26',
@@ -216,11 +231,30 @@ export const VIDEO_MODELS: Record<VideoModelId, VideoModelConfig> = {
     supportsReferences: false,
     supportsStartEndFrames: true,
     supportsMultiShots: false,
-    requiresImage: true,
-    tags: ['IMG2VID', 'FAST'],
+    fal: { i2v: 'fal-ai/minimax/hailuo-02/standard/image-to-video' },
+    tags: ['FAST'],
   },
 
   // ============ SEEDANCE (BYTEDANCE) ============
+  'seedance-2': {
+    id: 'seedance-2',
+    apiModelId: 'bytedance/seedance-2-image-to-video',
+    apiModelIdText: 'bytedance/seedance-2-text-to-video',
+    name: 'Seedance 2.0',
+    description: 'Multimodal: texto, imagen, video, audio. Cinematico con audio nativo.',
+    company: 'seedance',
+    companyName: 'Seedance',
+    priceRange: '$0.50-1.00',
+    durationRange: '4-15s',
+    resolutions: ['1080p'],
+    defaultResolution: '1080p',
+    supportsAudio: true,
+    supportsReferences: true,
+    supportsStartEndFrames: true,
+    supportsMultiShots: true,
+    tags: ['NEW', 'PREMIUM', 'AUDIO', 'REFERENCES', 'MULTI_SHOTS'],
+    recommended: true,
+  },
   'seedance-1.5-pro': {
     id: 'seedance-1.5-pro',
     apiModelId: 'bytedance/seedance-1.5-pro',
@@ -236,12 +270,12 @@ export const VIDEO_MODELS: Record<VideoModelId, VideoModelConfig> = {
     supportsReferences: false,
     supportsStartEndFrames: true,
     supportsMultiShots: true,
+    fal: { t2v: 'fal-ai/bytedance/seedance/v1.5/pro/text-to-video' },
     tags: ['AUDIO', 'MULTI_SHOTS'],
   },
   'seedance-1.0-fast': {
     id: 'seedance-1.0-fast',
     apiModelId: 'bytedance/v1-pro-fast-image-to-video',
-    // NO apiModelIdText - image-to-video only
     name: 'Seedance 1.0 Fast',
     description: 'Solo image-to-video, económico',
     company: 'seedance',
@@ -256,6 +290,7 @@ export const VIDEO_MODELS: Record<VideoModelId, VideoModelConfig> = {
     supportsMultiShots: true,
     requiresImage: true,
     falModelId: 'fal-ai/seedance/1.0-pro',
+    fal: { i2v: 'fal-ai/bytedance/seedance/v1/pro/image-to-video' },
     tags: ['IMG2VID', 'FAST', 'REFERENCES', 'MULTI_SHOTS'],
   },
 
@@ -307,7 +342,7 @@ export const VIDEO_COMPANY_GROUPS: VideoCompanyGroup[] = [
     color: 'from-blue-500 to-blue-600',
     models: [
       VIDEO_MODELS['veo-3.1'],
-      VIDEO_MODELS['veo-3-fast'],
+      VIDEO_MODELS['veo-3.1-fast'],
     ],
   },
   {
@@ -346,6 +381,7 @@ export const VIDEO_COMPANY_GROUPS: VideoCompanyGroup[] = [
     icon: 'Film',
     color: 'from-cyan-500 to-cyan-600',
     models: [
+      VIDEO_MODELS['seedance-2'],
       VIDEO_MODELS['seedance-1.5-pro'],
       VIDEO_MODELS['seedance-1.0-fast'],
     ],

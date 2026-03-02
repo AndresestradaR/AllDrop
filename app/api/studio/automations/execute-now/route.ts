@@ -22,9 +22,9 @@ const VOICE_INSTRUCTIONS: Record<string, string> = {
 function getModelIdFromPreset(preset: string): VideoModelId {
   switch (preset) {
     case 'producto': return 'sora-2' as VideoModelId
-    case 'rapido': return 'veo-3-fast' as VideoModelId
+    case 'rapido': return 'veo-3.1-fast' as VideoModelId
     case 'premium': return 'kling-3.0' as VideoModelId
-    default: return 'veo-3-fast' as VideoModelId
+    default: return 'veo-3.1-fast' as VideoModelId
   }
 }
 
