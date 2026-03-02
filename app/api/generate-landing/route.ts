@@ -358,6 +358,14 @@ export async function POST(request: Request) {
     }
 
     if (!result.success || !result.imageBase64) {
+      // Cleanup temp product images on failure too
+      if (productImageUrls.length > 0) {
+        const svc = await createServiceClient()
+        const paths = productImageUrls
+          .map(u => u.split('/landing-images/')[1])
+          .filter(p => p?.startsWith('temp-products/')) as string[]
+        if (paths.length) svc.storage.from('landing-images').remove(paths).catch(() => {})
+      }
       return NextResponse.json({
         success: false,
         error: result.error || 'No se pudo generar la imagen',
@@ -422,6 +430,22 @@ export async function POST(request: Request) {
         error: `Error guardando: ${insertError.message}`,
         imageUrl: generatedImageUrl,
       }, { status: 200 })
+    }
+
+    // Cleanup temp product images from Storage (fire-and-forget)
+    if (productImageUrls.length > 0) {
+      const serviceForCleanup = await createServiceClient()
+      const tempPaths = productImageUrls
+        .map(url => {
+          const match = url.split('/landing-images/')[1]
+          return match?.startsWith('temp-products/') ? match : null
+        })
+        .filter(Boolean) as string[]
+      if (tempPaths.length > 0) {
+        serviceForCleanup.storage.from('landing-images').remove(tempPaths)
+          .then(({ error }) => { if (error) console.warn('[Cleanup] temp delete error:', error.message) })
+          .catch(() => {})
+      }
     }
 
     return NextResponse.json({
