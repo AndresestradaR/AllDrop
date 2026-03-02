@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { generateAIText, getAIKeys, requireAIKeys, extractJSON } from '@/lib/services/ai-text'
 
-export const maxDuration = 60
+export const maxDuration = 120
 
 // ---------------------------------------------------------------------------
 // SYSTEM PROMPT — Controles Creativos para generador de banners

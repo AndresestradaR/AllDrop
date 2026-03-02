@@ -310,6 +310,8 @@ async function callGoogle(apiKey: string, options: AITextOptions): Promise<strin
     contents: [{ parts }],
     generationConfig: {
       temperature: options.temperature ?? 0.7,
+      // Disable thinking mode to prevent 100s+ responses (Gemini has thinking ON by default)
+      thinkingConfig: { thinkingBudget: 0 },
     },
   }
 
@@ -321,26 +323,40 @@ async function callGoogle(apiKey: string, options: AITextOptions): Promise<strin
     body.generationConfig.responseMimeType = 'application/json'
   }
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-    signal: options.signal,
-  })
+  // Safety timeout: 90s (matches KIE/OpenAI timeouts)
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 90000)
+  const signal = options.signal
+    ? anySignal([options.signal, controller.signal])
+    : controller.signal
 
-  if (!response.ok) {
-    const errText = await response.text()
-    throw new Error(`Google API (${response.status}): ${errText.substring(0, 300)}`)
+  try {
+    console.log(`[AI Text] Google: calling ${model}...`)
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal,
+    })
+
+    if (!response.ok) {
+      const errText = await response.text()
+      throw new Error(`Google API (${response.status}): ${errText.substring(0, 300)}`)
+    }
+
+    const data = await response.json()
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text
+
+    if (!text) {
+      throw new Error('Google returned empty response')
+    }
+
+    console.log(`[AI Text] Google ${model} success (${text.length} chars)`)
+    return text
+  } finally {
+    clearTimeout(timeout)
   }
-
-  const data = await response.json()
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text
-
-  if (!text) {
-    throw new Error('Google returned empty response')
-  }
-
-  return text
 }
 
 // ── Helpers ────────────────────────────────────────────────────

@@ -50,9 +50,18 @@ estrategas-landing-generator (Supabase Auth + profiles table)
 ```
 generateAIText(keys, options) -> string
   Cascade: KIE (gemini-2.5-flash, 90s timeout, reasoning_effort:'none')
-        -> OpenAI (gpt-4o-mini, 90s timeout)
-        -> Google Gemini direct (gemini-2.5-flash, thinkingBudget:0)
-  Key source: per-user from profiles table (encrypted)
+        -> OpenAI (gpt-4o-mini, 90s timeout, response_format:json_object)
+        -> Google Gemini direct (gemini-2.5-flash, 90s timeout, thinkingBudget:0)
+  Key source: per-user from profiles table (encrypted) + env var fallbacks
+  Caller puede override modelo: kieModel, googleModel (ej: gemini-2.5-pro)
+  Todos los pasos tienen timeout 90s para que la cascada complete dentro de maxDuration.
+  Google direct SIEMPRE usa thinkingBudget:0 para evitar thinking mode (100s+).
+
+  Consumidores principales en Studio:
+    copy-optimize (Textos IA): kieModel='gemini-2.5-pro', maxDuration=120
+    prompt-generate (Prompt Video): default flash, maxDuration=30
+    prompt-bot (Prompt Bot): default flash, maxDuration=30
+    resena-ugc (Resena UGC): default flash, maxDuration=120
 ```
 **15+ API routes depend on this service.** Change = test everything.
 
