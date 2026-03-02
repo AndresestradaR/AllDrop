@@ -171,9 +171,14 @@ export async function generateImage(
   if (cascade?.fal && apiKeys.fal) {
     const falPath = hasImages && cascade.fal.i2i ? cascade.fal.i2i : cascade.fal.t2i
     const t0 = Date.now()
+    // Collect all image URLs (template + product) same as KIE
+    const falImageUrls: string[] = []
+    if (request.templateUrl?.startsWith('http')) falImageUrls.push(request.templateUrl)
+    if (request.productImageUrls?.length) falImageUrls.push(...request.productImageUrls)
+
     const falResult = await generateViaFal(apiKeys.fal, falPath, {
       prompt,
-      imageUrls: request.productImageUrls,
+      imageUrls: falImageUrls.length > 0 ? falImageUrls : undefined,
       aspectRatio: request.aspectRatio || '9:16',
       timeoutMs: 45000,
     })
