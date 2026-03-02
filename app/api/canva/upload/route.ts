@@ -227,8 +227,9 @@ export async function POST(request: Request) {
     // Resolve image to Buffer (server-side fetch avoids CORS issues)
     const imageBuffer = await resolveImageBuffer(imageBase64, imageUrl)
 
-    // Upload asset
-    const filename = `${productName || 'banner'}-${sectionId || Date.now()}.png`
+    // Upload asset — Canva limits name to 50 chars (unencoded)
+    const rawName = `${productName || 'banner'}-${Date.now()}`
+    const filename = rawName.length > 46 ? rawName.slice(0, 46) + '.png' : rawName + '.png'
     const assetId = await uploadAsset(accessToken, imageBuffer, filename)
 
     // Create design with correct format
