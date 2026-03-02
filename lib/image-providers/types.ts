@@ -3,20 +3,16 @@
 // Provider types (companies)
 export type ImageProviderCompany = 'google' | 'openai' | 'bytedance' | 'bfl' | 'fal'
 
-// Specific model IDs
+// Specific model IDs (10 models — removed seedream-3, seedream-4, seedream-4-4k, flux-2-klein)
 export type ImageModelId =
   // Google (1 model)
   | 'gemini-3-pro-image'
   // OpenAI (1 model only - GPT Image 1.5)
   | 'gpt-image-1.5'
-  // ByteDance via KIE.ai (4 models)
+  // ByteDance via KIE.ai (1 model)
   | 'seedream-4.5'
-  | 'seedream-4'
-  | 'seedream-4-4k'
-  | 'seedream-3'
-  // Black Forest Labs FLUX 2 (4 models - removed FLUX 1.x obsolete)
+  // Black Forest Labs FLUX 2 (3 models)
   | 'flux-2-max'
-  | 'flux-2-klein'
   | 'flux-2-pro'
   | 'flux-2-flex'
   // fal.ai models (used as fallback + standalone)
@@ -51,6 +47,19 @@ export interface ImageModelConfig {
   falModelId?: string
   // Where this model is available: 'landing', 'studio', or 'both'
   availableIn: ModelAvailability
+  // Cascade configuration: defines provider endpoints for T2I vs I2I
+  cascade?: {
+    kie?: {
+      t2i: string     // KIE model ID for text-to-image
+      i2i?: string    // KIE model ID for image-to-image (undefined = no I2I on KIE)
+      mode: 'nano-banana' | 'seedream' | 'gpt-image'  // controls how images are passed
+    }
+    fal: {
+      t2i: string     // fal.ai full path for T2I
+      i2i?: string    // fal.ai path for I2I (undefined = same T2I with image_url)
+    }
+    directApi?: 'gemini' | 'openai' | 'bfl'  // step 3: direct API fallback (undefined = STOP)
+  }
 }
 
 export interface ImageCompanyGroup {
@@ -82,6 +91,11 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModelConfig> = {
     apiModelId: 'gemini-3-pro-image-preview',
     falModelId: 'nano-banana-pro',
     availableIn: 'both',
+    cascade: {
+      kie: { t2i: 'nano-banana-pro', i2i: 'nano-banana-pro', mode: 'nano-banana' },
+      fal: { t2i: 'fal-ai/nano-banana-pro' },
+      directApi: 'gemini',
+    },
   },
   // ============================================
   // OPENAI (1 model) - Supports image input
@@ -102,6 +116,11 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModelConfig> = {
     apiModelId: 'gpt-image-1.5',
     falModelId: 'gpt-image-1.5',
     availableIn: 'both',
+    cascade: {
+      kie: { t2i: 'gpt-image/1.5-text-to-image', i2i: 'gpt-image/1.5-image-to-image', mode: 'gpt-image' },
+      fal: { t2i: 'fal-ai/gpt-image-1.5' },
+      directApi: 'openai',
+    },
   },
 
   // ============================================
@@ -124,58 +143,16 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModelConfig> = {
     tags: ['RECOMENDADO', 'TRENDING'],
     apiModelId: 'seedream/4.5-text-to-image',
     availableIn: 'both',
-  },
-  'seedream-4': {
-    id: 'seedream-4',
-    name: 'Seedream 4',
-    description: 'Generacion y edicion multi-imagen',
-    company: 'bytedance',
-    companyName: 'ByteDance',
-    supportsImageInput: true,
-    supportsAspectRatio: true,
-    maxImages: 6,
-    requiresPolling: true,
-    pricePerImage: '~$0.03',
-    tags: [],
-    apiModelId: 'bytedance/seedream-v4-text-to-image',
-    availableIn: 'studio',
-  },
-  'seedream-4-4k': {
-    id: 'seedream-4-4k',
-    name: 'Seedream 4 4K',
-    description: '4K con imagenes de referencia',
-    company: 'bytedance',
-    companyName: 'ByteDance',
-    supportsImageInput: true,
-    supportsAspectRatio: true,
-    maxImages: 4,
-    requiresPolling: true,
-    pricePerImage: '~$0.04',
-    tags: ['4K'],
-    apiModelId: 'bytedance/seedream-v4-text-to-image',
-    availableIn: 'studio',
-  },
-  'seedream-3': {
-    id: 'seedream-3',
-    name: 'Seedream 3',
-    description: 'Solo texto a imagen - Creatividad excepcional',
-    company: 'bytedance',
-    companyName: 'ByteDance',
-    supportsImageInput: false,
-    supportsAspectRatio: true,
-    maxImages: 1,
-    requiresPolling: true,
-    pricePerImage: '~$0.02',
-    tags: ['TEXT_ONLY'],
-    apiModelId: 'bytedance/seedream',
-    availableIn: 'studio',
+    cascade: {
+      kie: { t2i: 'seedream/4.5-text-to-image', i2i: 'seedream/4.5-edit', mode: 'seedream' },
+      fal: { t2i: 'fal-ai/bytedance/seedream/v4.5/text-to-image', i2i: 'fal-ai/bytedance/seedream/v4.5/edit' },
+    },
   },
 
   // ============================================
-  // BLACK FOREST LABS FLUX 2 (4 models)
-  // Removed FLUX 1.x obsolete models
-  // flux-2-klein: TEXT ONLY
-  // flux-2-max, pro, flex: Support image input
+  // BLACK FOREST LABS FLUX 2 (3 models)
+  // flux-2-max: no KIE, fal.ai → BFL direct
+  // flux-2-pro, flex: KIE → fal.ai → BFL direct
   // ============================================
   'flux-2-max': {
     id: 'flux-2-max',
@@ -191,21 +168,10 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModelConfig> = {
     tags: ['PREMIUM'],
     apiModelId: 'flux-2-max',
     availableIn: 'studio',
-  },
-  'flux-2-klein': {
-    id: 'flux-2-klein',
-    name: 'Flux 2 Klein',
-    description: 'Solo texto a imagen - Rapido y alta calidad',
-    company: 'bfl',
-    companyName: 'Black Forest Labs',
-    supportsImageInput: false,
-    supportsAspectRatio: true,
-    maxImages: 1,
-    requiresPolling: true,
-    pricePerImage: '~$0.02',
-    tags: ['NEW', 'FAST', 'TEXT_ONLY'],
-    apiModelId: 'flux-2-klein-4b',
-    availableIn: 'studio',
+    cascade: {
+      fal: { t2i: 'fal-ai/flux-2-max', i2i: 'fal-ai/flux-2-max/edit' },
+      directApi: 'bfl',
+    },
   },
   'flux-2-pro': {
     id: 'flux-2-pro',
@@ -221,6 +187,11 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModelConfig> = {
     tags: ['NEW'],
     apiModelId: 'flux-2-pro',
     availableIn: 'studio',
+    cascade: {
+      kie: { t2i: 'flux-2/pro-text-to-image', i2i: 'flux-2/pro-image-to-image', mode: 'nano-banana' },
+      fal: { t2i: 'fal-ai/flux-2-pro', i2i: 'fal-ai/flux-2-pro/edit' },
+      directApi: 'bfl',
+    },
   },
   'flux-2-flex': {
     id: 'flux-2-flex',
@@ -236,6 +207,11 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModelConfig> = {
     tags: ['NEW'],
     apiModelId: 'flux-2-flex',
     availableIn: 'studio',
+    cascade: {
+      kie: { t2i: 'flux-2/flex-text-to-image', i2i: 'flux-2/flex-image-to-image', mode: 'nano-banana' },
+      fal: { t2i: 'fal-ai/flux-2-flex', i2i: 'fal-ai/flux-2-flex/edit' },
+      directApi: 'bfl',
+    },
   },
 
   // ============================================
@@ -257,6 +233,11 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModelConfig> = {
     apiModelId: 'fal-ai/nano-banana-2',
     falModelId: 'nano-banana-2',
     availableIn: 'both',
+    cascade: {
+      kie: { t2i: 'nano-banana-2', i2i: 'nano-banana-2', mode: 'nano-banana' },
+      fal: { t2i: 'fal-ai/nano-banana-2' },
+      directApi: 'gemini',
+    },
   },
   'seedream-5-lite': {
     id: 'seedream-5-lite',
@@ -264,7 +245,7 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModelConfig> = {
     description: 'ByteDance Seedream 5 Lite via fal.ai — Rapido',
     company: 'fal',
     companyName: 'fal.ai',
-    supportsImageInput: false,
+    supportsImageInput: true,
     supportsAspectRatio: true,
     maxImages: 1,
     requiresPolling: true,
@@ -273,6 +254,10 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModelConfig> = {
     apiModelId: 'fal-ai/seedream-3.0',
     falModelId: 'seedream/5-lite',
     availableIn: 'both',
+    cascade: {
+      kie: { t2i: 'seedream/5-lite-text-to-image', i2i: 'seedream/5-lite-image-to-image', mode: 'seedream' },
+      fal: { t2i: 'fal-ai/bytedance/seedream/v5/lite/text-to-image', i2i: 'fal-ai/bytedance/seedream/v5/lite/edit' },
+    },
   },
   'seedream-5': {
     id: 'seedream-5',
@@ -280,7 +265,7 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModelConfig> = {
     description: 'ByteDance Seedream 5 Pro via fal.ai — Mayor calidad',
     company: 'fal',
     companyName: 'fal.ai',
-    supportsImageInput: false,
+    supportsImageInput: true,
     supportsAspectRatio: true,
     maxImages: 1,
     requiresPolling: true,
@@ -289,6 +274,10 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModelConfig> = {
     apiModelId: 'fal-ai/seedream-3.0/pro',
     falModelId: 'seedream/5',
     availableIn: 'studio',
+    cascade: {
+      kie: { t2i: 'seedream/5-lite-text-to-image', i2i: 'seedream/5-lite-image-to-image', mode: 'seedream' },
+      fal: { t2i: 'fal-ai/seedream-3.0/pro' },
+    },
   },
 }
 
@@ -335,9 +324,6 @@ export const IMAGE_COMPANY_GROUPS: ImageCompanyGroup[] = [
     color: 'from-orange-500 to-red-500',
     models: [
       IMAGE_MODELS['seedream-4.5'],
-      IMAGE_MODELS['seedream-4'],
-      IMAGE_MODELS['seedream-4-4k'],
-      IMAGE_MODELS['seedream-3'],
     ],
   },
   {
@@ -349,7 +335,6 @@ export const IMAGE_COMPANY_GROUPS: ImageCompanyGroup[] = [
       IMAGE_MODELS['flux-2-max'],
       IMAGE_MODELS['flux-2-pro'],
       IMAGE_MODELS['flux-2-flex'],
-      IMAGE_MODELS['flux-2-klein'],
     ],
   },
 ]

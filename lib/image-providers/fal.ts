@@ -11,14 +11,25 @@
 
 import { classifyError, wrapError, type AIProviderError } from '../services/ai-errors'
 
-// fal.ai model path mapping
+// fal.ai model path mapping (legacy lookups + new cascade full paths)
 export const FAL_MODEL_PATHS: Record<string, string> = {
   'nano-banana-2': 'fal-ai/nano-banana-2',
   'nano-banana-pro': 'fal-ai/nano-banana-pro',
   'seedream/5-lite': 'fal-ai/seedream-3.0',
   'seedream/5': 'fal-ai/seedream-3.0/pro',
-  'flux-pro-ultra': 'fal-ai/flux-pro/v1.1-ultra',
   'gpt-image-1.5': 'fal-ai/gpt-image-1.5',
+  // Seedream via fal.ai (new cascade paths)
+  'bytedance/seedream/v4.5/text-to-image': 'fal-ai/bytedance/seedream/v4.5/text-to-image',
+  'bytedance/seedream/v4.5/edit': 'fal-ai/bytedance/seedream/v4.5/edit',
+  'bytedance/seedream/v5/lite/text-to-image': 'fal-ai/bytedance/seedream/v5/lite/text-to-image',
+  'bytedance/seedream/v5/lite/edit': 'fal-ai/bytedance/seedream/v5/lite/edit',
+  // FLUX via fal.ai
+  'flux-2-max': 'fal-ai/flux-2-max',
+  'flux-2-max/edit': 'fal-ai/flux-2-max/edit',
+  'flux-2-pro': 'fal-ai/flux-2-pro',
+  'flux-2-pro/edit': 'fal-ai/flux-2-pro/edit',
+  'flux-2-flex': 'fal-ai/flux-2-flex',
+  'flux-2-flex/edit': 'fal-ai/flux-2-flex/edit',
 }
 
 export interface FalGenerateOptions {
@@ -57,18 +68,37 @@ export async function generateViaFal(
     prompt: options.prompt,
   }
 
-  // Image input (reference images)
+  // Image input (reference images) — /edit endpoints accept array, others single URL
   if (options.imageUrls?.length) {
-    input.image_url = options.imageUrls[0]
+    const isEditEndpoint = modelPath.includes('/edit')
+    if (isEditEndpoint) {
+      input.image_urls = options.imageUrls  // Array completo (hasta 10)
+    } else {
+      input.image_url = options.imageUrls[0]  // Solo primera imagen
+    }
   }
 
-  // Aspect ratio — fal.ai expects top-level aspect_ratio parameter
+  // Aspect ratio — seedream models use image_size enum, others use aspect_ratio
   if (options.aspectRatio) {
-    input.aspect_ratio = options.aspectRatio
+    if (modelPath.includes('seedream')) {
+      const sizeMap: Record<string, string> = {
+        '1:1': 'square_hd',
+        '9:16': 'portrait_16_9',
+        '16:9': 'landscape_16_9',
+        '4:5': 'portrait_4_3',
+        '4:3': 'landscape_4_3',
+        '3:4': 'portrait_4_3',
+        '3:2': 'landscape_16_9',
+        '2:3': 'portrait_16_9',
+      }
+      input.image_size = sizeMap[options.aspectRatio] || 'auto_2K'
+    } else {
+      input.aspect_ratio = options.aspectRatio
+    }
   }
 
   // Resolution for nano-banana models
-  if (falModelId.includes('nano-banana')) {
+  if (modelPath.includes('nano-banana')) {
     input.resolution = '1K'
     input.output_format = 'png'
   }

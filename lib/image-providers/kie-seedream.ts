@@ -173,7 +173,6 @@ export const seedreamProvider: ImageProvider = {
       const is45 = apiModelId.startsWith('seedream/')
       const is40 = apiModelId.includes('seedream-v4')
       const is30 = apiModelId === 'bytedance/seedream'
-      const is4K = request.modelId === 'seedream-4-4k'
 
       // Build the input object based on model version
       let input: any
@@ -183,7 +182,7 @@ export const seedreamProvider: ImageProvider = {
         input = {
           prompt: prompt,
           aspect_ratio: request.aspectRatio || '9:16',
-          quality: is4K ? 'high' : 'basic',
+          quality: 'basic',
         }
         // Add image_urls for edit mode
         if (hasReferenceImages) {
@@ -239,7 +238,7 @@ export const seedreamProvider: ImageProvider = {
           '2:3': 'portrait_3_2',
         }
         const imageSize = imageSizeMap[request.aspectRatio || '9:16'] || 'portrait_16_9'
-        const resolution = is4K ? '4K' : (request.quality === '4k' ? '4K' : request.quality === 'hd' ? '2K' : '1K')
+        const resolution = request.quality === '4k' ? '4K' : request.quality === 'hd' ? '2K' : '1K'
 
         input = {
           prompt: prompt,

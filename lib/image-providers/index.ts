@@ -108,15 +108,16 @@ export function getAllProviders() {
 }
 
 /**
- * Generate image with UNIVERSAL iron cascade.
+ * Generate image with UNIVERSAL cascade driven by model config.
  *
- * FLUX: directo BFL — sin cascada. Si falla → error.
- * OpenAI: OpenAI directo → KIE → fal.ai → STOP (sin Google directo)
- * Seedream: KIE → fal.ai → STOP (sin Google directo)
- * Gemini (nano-banana, Pro): KIE → fal.ai → Google directo
+ * Each model defines its own `cascade` config in types.ts:
+ *   cascade.kie   → KIE model IDs for T2I and I2I
+ *   cascade.fal   → fal.ai paths for T2I and I2I
+ *   cascade.directApi → final fallback ('gemini' | 'openai' | 'bfl')
  *
- * La cascada baja de PROVEEDORES, no de modelos dentro de un proveedor.
- * Cada proveedor intenta UN modelo (el equivalente de lo que eligió el usuario).
+ * Mode detection: hasImages → I2I path, else → T2I path.
+ * OpenAI: tries direct API FIRST, then cascade.
+ * FLUX: same flow (flux-2-max has no KIE, skips to fal.ai → BFL direct).
  */
 export async function generateImage(
   request: GenerateImageRequest,
@@ -132,32 +133,11 @@ export async function generateImage(
   const cascadeErrors: string[] = []
   const modelConfig = IMAGE_MODELS[request.modelId]
   const prompt = request.prompt?.trim() || buildGeminiPrompt(request)
+  const cascade = modelConfig?.cascade
+  const hasImages = !!(request.productImageUrls?.length || request.templateUrl)
 
-  // ── FLUX: DIRECTO — sin cascada. Si falla → error amigable ──
-  if (request.provider === 'flux') {
-    if (!apiKeys.bfl) {
-      return {
-        success: false,
-        error: 'No tienes API key de Black Forest Labs (FLUX). Agregala en Settings.',
-        provider: request.provider,
-      }
-    }
-    const t0 = Date.now()
-    const result = await getProvider('flux')!.generate(request, apiKeys.bfl)
-    if (result.success) {
-      logAI({ service: 'image', provider: 'bfl', status: 'success', response_ms: Date.now() - t0, model: request.modelId })
-      return result
-    }
-    logAI({ service: 'image', provider: 'bfl', status: 'error', response_ms: Date.now() - t0, model: request.modelId, error_message: result.error })
-    return {
-      success: false,
-      error: humanizeErrors([result.error || 'FLUX fallo']),
-      provider: request.provider,
-    }
-  }
-
-  // ── Step 1: Si OpenAI seleccionado, probar directo primero, luego cascada ──
-  if (request.provider === 'openai' && apiKeys.openai) {
+  // ── Step 1: OpenAI direct FIRST (before cascade) ──
+  if (cascade?.directApi === 'openai' && apiKeys.openai) {
     const t0 = Date.now()
     const result = await getProvider('openai')!.generate(request, apiKeys.openai)
     if (result.success) {
@@ -166,28 +146,32 @@ export async function generateImage(
     }
     logAI({ service: 'image', provider: 'openai', status: 'error', response_ms: Date.now() - t0, model: request.modelId, error_message: result.error })
     cascadeErrors.push(result.error || 'OpenAI fallo')
-    console.warn(`[Cascade] OpenAI failed, continuing cascade...`)
+    console.warn(`[Cascade] OpenAI direct failed, continuing cascade...`)
   }
 
-  // ── Step 2: KIE — ONE model per user selection (ALWAYS — iron rule) ──
-  if (apiKeys.kie) {
-    const kieModel = getKieModel(request.modelId)
+  // ── Step 2: KIE — mode-aware model selection ──
+  if (cascade?.kie && apiKeys.kie) {
+    const kieModelId = hasImages && cascade.kie.i2i ? cascade.kie.i2i : cascade.kie.t2i
     const t0 = Date.now()
-    const kieResult = await generateViaKie(request, apiKeys.kie, kieModel, options?.maxTotalMs || 80000)
+    const kieResult = await generateViaKie(
+      request, apiKeys.kie,
+      { model: kieModelId, mode: cascade.kie.mode },
+      options?.maxTotalMs || 80000
+    )
     if (kieResult.success) {
-      logAI({ service: 'image', provider: 'kie', status: 'success', response_ms: Date.now() - t0, model: kieModel.model, was_fallback: cascadeErrors.length > 0 })
+      logAI({ service: 'image', provider: 'kie', status: 'success', response_ms: Date.now() - t0, model: kieModelId, was_fallback: cascadeErrors.length > 0 })
       return { ...kieResult, provider: request.provider }
     }
-    logAI({ service: 'image', provider: 'kie', status: 'error', response_ms: Date.now() - t0, model: kieModel.model, error_message: kieResult.error, was_fallback: cascadeErrors.length > 0 })
+    logAI({ service: 'image', provider: 'kie', status: 'error', response_ms: Date.now() - t0, model: kieModelId, error_message: kieResult.error, was_fallback: cascadeErrors.length > 0 })
     cascadeErrors.push(kieResult.error || 'KIE fallo')
-    console.warn(`[Cascade] KIE ${kieModel.model} failed, trying fal.ai...`)
+    console.warn(`[Cascade] KIE ${kieModelId} failed, trying fal.ai...`)
   }
 
-  // ── Step 3: fal.ai (ALWAYS — iron rule) ──
-  if (apiKeys.fal) {
-    const falModelId = modelConfig?.falModelId || 'nano-banana-2'
+  // ── Step 3: fal.ai — mode-aware path selection ──
+  if (cascade?.fal && apiKeys.fal) {
+    const falPath = hasImages && cascade.fal.i2i ? cascade.fal.i2i : cascade.fal.t2i
     const t0 = Date.now()
-    const falResult = await generateViaFal(apiKeys.fal, falModelId, {
+    const falResult = await generateViaFal(apiKeys.fal, falPath, {
       prompt,
       imageUrls: request.productImageUrls,
       aspectRatio: request.aspectRatio || '9:16',
@@ -197,7 +181,7 @@ export async function generateImage(
     if (falResult.success && falResult.imageUrl) {
       const imageData = await falImageToBase64(falResult.imageUrl)
       if (imageData) {
-        logAI({ service: 'image', provider: 'fal', status: 'success', response_ms: Date.now() - t0, model: falModelId, was_fallback: cascadeErrors.length > 0 })
+        logAI({ service: 'image', provider: 'fal', status: 'success', response_ms: Date.now() - t0, model: falPath, was_fallback: cascadeErrors.length > 0 })
         console.log(`[Cascade] fal.ai succeeded${cascadeErrors.length > 0 ? ' (fallback)' : ''}`)
         return {
           success: true,
@@ -208,18 +192,14 @@ export async function generateImage(
       }
     }
 
-    logAI({ service: 'image', provider: 'fal', status: 'error', response_ms: Date.now() - t0, model: falModelId, error_message: falResult.error, was_fallback: cascadeErrors.length > 0 })
+    logAI({ service: 'image', provider: 'fal', status: 'error', response_ms: Date.now() - t0, model: falPath, error_message: falResult.error, was_fallback: cascadeErrors.length > 0 })
     cascadeErrors.push(falResult.error || 'fal.ai fallo')
-    console.warn(`[Cascade] fal.ai failed`)
+    console.warn(`[Cascade] fal.ai ${falPath} failed`)
   }
 
-  // ── Step 4: Google directo (SOLO modelos Gemini — NO seedream ni OpenAI) ──
-  const skipGoogleDirect =
-    modelConfig?.company === 'bytedance' || modelConfig?.company === 'openai' ||
-    request.modelId === 'seedream-5-lite' || request.modelId === 'seedream-5' ||
-    request.modelId === 'gpt-image-1.5'
-  if (!skipGoogleDirect && apiKeys.gemini) {
-    const googleModelId = getGoogleDirectModelId(request.modelId)
+  // ── Step 4: Direct API fallback (gemini or bfl) ──
+  if (cascade?.directApi === 'gemini' && apiKeys.gemini) {
+    const googleModelId = modelConfig.apiModelId || 'gemini-3.1-flash-image-preview'
     console.log(`[Cascade] Google direct fallback with ${googleModelId}`)
     const t0 = Date.now()
     try {
@@ -236,6 +216,18 @@ export async function generateImage(
     }
   }
 
+  if (cascade?.directApi === 'bfl' && apiKeys.bfl) {
+    const t0 = Date.now()
+    const result = await getProvider('flux')!.generate(request, apiKeys.bfl)
+    if (result.success) {
+      logAI({ service: 'image', provider: 'bfl', status: 'success', response_ms: Date.now() - t0, model: request.modelId, was_fallback: cascadeErrors.length > 0 })
+      return result
+    }
+    logAI({ service: 'image', provider: 'bfl', status: 'error', response_ms: Date.now() - t0, model: request.modelId, error_message: result.error, was_fallback: cascadeErrors.length > 0 })
+    cascadeErrors.push(result.error || 'BFL fallo')
+    console.warn(`[Cascade] BFL direct failed`)
+  }
+
   // ── All failed — show FRIENDLY error to user ──
   if (cascadeErrors.length === 0) {
     return {
@@ -250,46 +242,6 @@ export async function generateImage(
     error: humanizeErrors(cascadeErrors),
     provider: request.provider,
   }
-}
-
-/**
- * Map user's selected model to its KIE equivalent.
- * The cascade drops down PROVIDERS, not models.
- * Each provider tries ONE model — the equivalent of what the user selected.
- */
-function getKieModel(modelId: ImageModelId): { model: string; mode: 'nano-banana' | 'seedream' | 'gpt-image' } {
-  const config = IMAGE_MODELS[modelId]
-
-  // Google Pro → nano-banana-pro (equivalente Pro en KIE)
-  if (modelId === 'gemini-3-pro-image') {
-    return { model: 'nano-banana-pro', mode: 'nano-banana' }
-  }
-
-  // OpenAI → gpt-image/1.5-image-to-image (variante image-to-image en KIE)
-  if (config?.company === 'openai' || modelId === 'gpt-image-1.5') {
-    return { model: 'gpt-image/1.5-image-to-image', mode: 'gpt-image' }
-  }
-
-  // ALL seedream → seedream/5-lite-image-to-image (SIEMPRE image-to-image, las referencias son imagenes)
-  if (config?.company === 'bytedance' || modelId === 'seedream-5-lite' || modelId === 'seedream-5') {
-    return { model: 'seedream/5-lite-image-to-image', mode: 'seedream' }
-  }
-
-  // Todo lo demas (nano-banana-2, etc.) → gemini-3.1-flash-image-preview
-  return { model: 'gemini-3.1-flash-image-preview', mode: 'nano-banana' }
-}
-
-/**
- * Map user's selected model to its Google direct API model ID.
- * Used as final fallback in the cascade.
- */
-function getGoogleDirectModelId(modelId: ImageModelId): string {
-  // Google Pro → usa su propio modelo
-  if (modelId === 'gemini-3-pro-image') {
-    return 'gemini-3-pro-image-preview'
-  }
-  // Todo lo demas → Gemini 3.1 Flash Image (equivalente nano-banana-2 en Google directo)
-  return 'gemini-3.1-flash-image-preview'
 }
 
 /**

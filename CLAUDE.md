@@ -59,42 +59,46 @@ generateAIText(keys, options) -> string
 #### Image Generation — `lib/image-providers/index.ts`
 ```
 generateImage(model, params) -> ImageResult
-  CASCADA DE HIERRO — baja de PROVEEDORES, no de modelos.
-  Cada proveedor intenta UN solo modelo (el equivalente de lo que eligio el usuario).
+  CASCADA MODO-AWARE — detecta T2I vs I2I segun presencia de imagenes de referencia.
+  Cada modelo define su propio `cascade` config en types.ts con endpoints T2I e I2I.
 
-  LANDING GENERATOR (4 modelos disponibles):
-    nano-banana-2 (default):
-      1. KIE → gemini-3.1-flash-image-preview
-      2. fal.ai → fal-ai/nano-banana-2
-      3. Google directo → gemini-3.1-flash-image-preview
+  9 modelos, 5 companias (Google, OpenAI, ByteDance, BFL, fal.ai)
+  Modelos eliminados: seedream-3, seedream-4, seedream-4-4k, flux-2-klein
 
-    gemini-3-pro-image:
-      1. KIE → nano-banana-pro
-      2. fal.ai → fal-ai/nano-banana-pro
-      3. Google directo → gemini-3-pro-image-preview
+  Cascade config por modelo (en ImageModelConfig.cascade):
+    cascade.kie   → { t2i, i2i?, mode } — KIE model IDs
+    cascade.fal   → { t2i, i2i? }       — fal.ai full paths
+    cascade.directApi → 'gemini' | 'openai' | 'bfl' — fallback final
 
-    seedream (cualquier version):
-      1. KIE → seedream/5-lite-image-to-image (SIEMPRE image-to-image)
-      2. fal.ai → fal-ai/seedream-3.0
-      SIN paso 3 — si ambos fallan → error amigable
+  Tabla de cascada:
+    | Modelo           | KIE T2I / I2I                          | fal T2I / I2I                          | Direct |
+    | gemini-3-pro     | nano-banana-pro / (mismo)              | fal-ai/nano-banana-pro                 | gemini |
+    | nano-banana-2    | nano-banana-2 / (mismo)                | fal-ai/nano-banana-2                   | gemini |
+    | gpt-image-1.5    | gpt-image/1.5-t2i / 1.5-i2i           | fal-ai/gpt-image-1.5                   | openai |
+    | seedream-4.5     | seedream/4.5-t2i / 4.5-edit            | bytedance/seedream/v4.5/t2i / edit     | —      |
+    | seedream-5-lite  | seedream/5-lite-t2i / 5-lite-i2i       | bytedance/seedream/v5/lite/t2i / edit  | —      |
+    | seedream-5       | seedream/5-lite-t2i / 5-lite-i2i       | fal-ai/seedream-3.0/pro                | —      |
+    | flux-2-max       | (sin KIE)                              | fal-ai/flux-2-max / edit               | bfl    |
+    | flux-2-pro       | flux-2/pro-t2i / pro-i2i               | fal-ai/flux-2-pro / edit               | bfl    |
+    | flux-2-flex      | flux-2/flex-t2i / flex-i2i             | fal-ai/flux-2-flex / edit              | bfl    |
 
-    gpt-image-1.5 (OpenAI):
-      0. OpenAI directo → gpt-image-1.5
-      1. KIE → gpt-image/1.5-image-to-image
-      2. fal.ai → fal-ai/gpt-image-1.5
-      SIN paso 3 — si todos fallan → error amigable
+  Flujo de ejecucion:
+    1. OpenAI directo PRIMERO (solo si cascade.directApi === 'openai')
+    2. KIE (si cascade.kie existe y hay key) — elige T2I o I2I segun hasImages
+    3. fal.ai (si cascade.fal existe y hay key) — elige T2I o I2I segun hasImages
+    4. Direct API fallback (gemini o bfl, segun cascade.directApi)
 
-  STUDIO IA (14 modelos, incluye FLUX):
-    FLUX (flux-2-*): BFL directo, SIN cascada. Si falla → error.
-    Resto: misma cascada que Landing Generator.
-
-  Input de imagenes en KIE:
+  Input de imagenes en KIE (segun cascade.kie.mode):
     nano-banana (Flash/Pro): image_input + resolution:'1K'
     seedream: image_urls + quality:'basic'
     gpt-image: image_input
 
+  Studio IA temp images:
+    Siempre sube imagenes a Supabase Storage (temp/{userId}/...)
+    Genera URLs publicas para KIE/fal.ai
+    Limpieza fire-and-forget al final
+
   Errores: siempre en espanol simple (humanizeErrors), sin JSON ni IDs de modelo.
-  14 modelos, 5 companias (Google, OpenAI, ByteDance, BFL, fal.ai)
   Providers: gemini.ts | openai.ts | kie-seedream.ts | bfl-flux.ts | fal.ts
   Clasificacion errores: lib/services/ai-errors.ts (auth, quota, server, timeout)
   Tipos: lib/image-providers/types.ts

@@ -31,8 +31,8 @@ async function uploadImageToStorage(
     const ext = mimeType.includes('png') ? 'png' : 
                 mimeType.includes('webp') ? 'webp' : 'jpg'
     
-    // Generate unique filename
-    const filename = `studio/${userId}/${Date.now()}-${index}.${ext}`
+    // Generate unique filename (temp/ prefix for automatic cleanup)
+    const filename = `temp/${userId}/${Date.now()}-${index}.${ext}`
     
     // Upload to Supabase Storage (landing-images bucket)
     const { data, error } = await supabase.storage
@@ -183,14 +183,13 @@ export async function POST(request: Request) {
       console.log(`[Studio] Reference images: ${productImagesBase64.length}`)
     }
 
-    // Upload images to get public URLs (needed for KIE-based providers)
-    // KIE.ai API requires public URLs, not base64
+    // Upload images to get public URLs (needed for KIE + fal.ai cascade)
+    // All cascade providers require public URLs, not base64
     let productImageUrls: string[] | undefined
-    const needsPublicUrls = selectedProvider === 'seedream' || (selectedProvider === 'gemini' && apiKeys.kie)
-    if (needsPublicUrls && productImagesBase64.length > 0) {
-      console.log(`[Studio] Uploading ${productImagesBase64.length} images to storage for KIE...`)
+    if (productImagesBase64.length > 0) {
+      console.log(`[Studio] Uploading ${productImagesBase64.length} images to temp storage...`)
       const urls: string[] = []
-      
+
       for (let i = 0; i < productImagesBase64.length; i++) {
         const img = productImagesBase64[i]
         const url = await uploadImageToStorage(supabase, img.data, img.mimeType, user.id, i)
@@ -198,10 +197,10 @@ export async function POST(request: Request) {
           urls.push(url)
         }
       }
-      
+
       if (urls.length > 0) {
         productImageUrls = urls
-        console.log(`[Studio] Successfully uploaded ${urls.length} images for Seedream`)
+        console.log(`[Studio] Successfully uploaded ${urls.length} temp images`)
       }
     }
 
@@ -260,6 +259,18 @@ export async function POST(request: Request) {
       resultMime
     )
     if (r2Url) console.log(`[Studio] ✓ Image saved to R2: ${r2Url}`)
+
+    // Cleanup temp images from storage (fire-and-forget)
+    if (productImageUrls?.length) {
+      Promise.all(
+        productImageUrls.map(url => {
+          const path = url.split('/landing-images/')[1]
+          return path?.startsWith('temp/')
+            ? supabase.storage.from('landing-images').remove([path])
+            : Promise.resolve()
+        })
+      ).catch(() => {})
+    }
 
     return NextResponse.json({
       success: true,

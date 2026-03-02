@@ -76,9 +76,6 @@ function getFluxEndpoint(apiModelId: string): string {
 
 // Check which models support image input
 function supportsImageInput(apiModelId: string): boolean {
-  if (apiModelId === 'flux-2-klein-4b' || apiModelId === 'flux-2-klein-9b') {
-    return false
-  }
   if (apiModelId.startsWith('flux-2-')) {
     return true
   }
