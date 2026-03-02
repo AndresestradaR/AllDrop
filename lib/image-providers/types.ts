@@ -77,7 +77,7 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModelConfig> = {
   // ============================================
   'gemini-3-pro-image': {
     id: 'gemini-3-pro-image',
-    name: 'Gemini 3 Pro Image',
+    name: 'Nano Banana Pro',
     description: 'Mejor calidad, texto perfecto, resolucion 4K',
     company: 'google',
     companyName: 'Google',
@@ -87,7 +87,7 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModelConfig> = {
     requiresPolling: false,
     pricePerImage: '~$0.04',
     recommended: true,
-    tags: ['RECOMENDADO', 'BEST_TEXT', 'PREMIUM', 'NEW'],
+    tags: ['RECOMENDADO', 'BEST_TEXT'],
     apiModelId: 'gemini-3-pro-image-preview',
     falModelId: 'nano-banana-pro',
     availableIn: 'both',
@@ -102,7 +102,7 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModelConfig> = {
   // ============================================
   'gpt-image-1.5': {
     id: 'gpt-image-1.5',
-    name: 'GPT Image 1.5',
+    name: 'ChatGPT Imagenes',
     description: 'Ultima version - Mejor calidad general',
     company: 'openai',
     companyName: 'OpenAI',
@@ -112,7 +112,7 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModelConfig> = {
     requiresPolling: false,
     pricePerImage: '~$0.04',
     recommended: true,
-    tags: ['RECOMENDADO', 'NEW', 'TRENDING'],
+    tags: ['RECOMENDADO', 'TRENDING'],
     apiModelId: 'gpt-image-1.5',
     falModelId: 'gpt-image-1.5',
     availableIn: 'both',
@@ -219,8 +219,8 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModelConfig> = {
   // ============================================
   'nano-banana-2': {
     id: 'nano-banana-2',
-    name: 'Gemini 3.1 Flash Image',
-    description: 'Rapido y economico via fal.ai — Ideal para landings',
+    name: 'Nano Banana 2',
+    description: 'Rapido y economico — Ideal para landings',
     company: 'fal',
     companyName: 'fal.ai',
     supportsImageInput: true,
@@ -229,7 +229,7 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModelConfig> = {
     requiresPolling: true,
     pricePerImage: '~$0.03',
     recommended: true,
-    tags: ['RECOMENDADO', 'FAST', 'NEW'],
+    tags: ['RECOMENDADO', 'FAST'],
     apiModelId: 'fal-ai/nano-banana-2',
     falModelId: 'nano-banana-2',
     availableIn: 'both',
@@ -241,8 +241,8 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModelConfig> = {
   },
   'seedream-5-lite': {
     id: 'seedream-5-lite',
-    name: 'Seedream 5 Lite',
-    description: 'ByteDance Seedream 5 Lite via fal.ai — Rapido',
+    name: 'Seedream 5',
+    description: 'ByteDance Seedream 5 — Rapido y creativo',
     company: 'fal',
     companyName: 'fal.ai',
     supportsImageInput: true,
@@ -250,7 +250,7 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModelConfig> = {
     maxImages: 1,
     requiresPolling: true,
     pricePerImage: '~$0.03',
-    tags: ['NEW', 'FAST'],
+    tags: ['FAST'],
     apiModelId: 'fal-ai/seedream-3.0',
     falModelId: 'seedream/5-lite',
     availableIn: 'both',
@@ -261,7 +261,7 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModelConfig> = {
   },
   'seedream-5': {
     id: 'seedream-5',
-    name: 'Seedream 5',
+    name: 'Seedream 5 Pro',
     description: 'ByteDance Seedream 5 Pro via fal.ai — Mayor calidad',
     company: 'fal',
     companyName: 'fal.ai',
@@ -339,36 +339,23 @@ export const IMAGE_COMPANY_GROUPS: ImageCompanyGroup[] = [
   },
 ]
 
-// Models available for LANDING page generation
-// Only models that preserve product + template well
+// Models available for LANDING page generation — flat list, no company grouping
+// Order: Nano Banana 2 (default), Nano Banana Pro, ChatGPT Imagenes, Seedream 5
+export const LANDING_MODELS: ImageModelConfig[] = filterModelsByAvailability([
+  IMAGE_MODELS['nano-banana-2'],
+  IMAGE_MODELS['gemini-3-pro-image'],
+  IMAGE_MODELS['gpt-image-1.5'],
+  IMAGE_MODELS['seedream-5-lite'],
+], 'landing')
+
+// Legacy grouped format (kept for backward compat, single group)
 export const LANDING_COMPANY_GROUPS: ImageCompanyGroup[] = [
   {
     id: 'fal',
-    name: 'fal.ai',
+    name: 'Modelos',
     icon: 'Zap',
     color: 'from-indigo-500 to-violet-500',
-    models: filterModelsByAvailability([
-      IMAGE_MODELS['nano-banana-2'],
-      IMAGE_MODELS['seedream-5-lite'],
-    ], 'landing'),
-  },
-  {
-    id: 'google',
-    name: 'Google',
-    icon: 'Sparkles',
-    color: 'from-blue-500 to-purple-500',
-    models: filterModelsByAvailability([
-      IMAGE_MODELS['gemini-3-pro-image'],
-    ], 'landing'),
-  },
-  {
-    id: 'openai',
-    name: 'OpenAI',
-    icon: 'Zap',
-    color: 'from-green-500 to-emerald-500',
-    models: filterModelsByAvailability([
-      IMAGE_MODELS['gpt-image-1.5'],
-    ], 'landing'),
+    models: LANDING_MODELS,
   },
 ]
 

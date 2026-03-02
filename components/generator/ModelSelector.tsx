@@ -8,6 +8,7 @@ import {
   IMAGE_MODELS,
   IMAGE_COMPANY_GROUPS,
   LANDING_COMPANY_GROUPS,
+  LANDING_MODELS,
   STUDIO_COMPANY_GROUPS,
   ModelTag,
 } from '@/lib/image-providers/types'
@@ -116,7 +117,7 @@ export default function ModelSelector({
               {selectedModel.recommended && (
                 <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
               )}
-              {selectedModel.tags?.map((tag) => (
+              {context === 'studio' && selectedModel.tags?.map((tag) => (
                 <span
                   key={tag}
                   className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[9px] font-bold rounded border ${TAG_CONFIG[tag].color}`}
@@ -127,7 +128,7 @@ export default function ModelSelector({
               ))}
             </div>
             <p className="text-xs text-text-secondary">
-              {selectedModel.companyName} · {selectedModel.pricePerImage}
+              {selectedModel.pricePerImage}
             </p>
           </div>
         </div>
@@ -136,80 +137,113 @@ export default function ModelSelector({
         />
       </button>
 
-      {/* Hierarchical Dropdown - All Models Visible */}
+      {/* Dropdown */}
       {isOpen && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
           <div className="absolute z-50 w-full mt-2 bg-surface border border-border rounded-xl shadow-xl overflow-hidden max-h-[500px] overflow-y-auto">
-            {filteredGroups.map((group) => {
-              const companyHasKey = hasApiKey(group.id)
+            {context === 'landing' ? (
+              /* Landing: flat list, no company headers */
+              <div className="bg-surface py-1">
+                {LANDING_MODELS.map((model) => {
+                  const isSelected = value === model.id
+                  return (
+                    <button
+                      key={model.id}
+                      type="button"
+                      onClick={() => handleModelSelect(model.id)}
+                      className={`
+                        w-full px-4 py-3 flex items-center gap-3 transition-colors
+                        ${isSelected ? 'bg-accent/10' : 'hover:bg-background/50'}
+                      `}
+                    >
+                      <div className="text-left flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-sm text-text-primary">{model.name}</p>
+                          {model.recommended && (
+                            <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
+                          )}
+                        </div>
+                        <p className="text-xs text-text-secondary">{model.description}</p>
+                      </div>
+                      <span className="text-xs text-text-secondary whitespace-nowrap">{model.pricePerImage}</span>
+                      {isSelected && <div className="w-2 h-2 rounded-full bg-accent flex-shrink-0" />}
+                    </button>
+                  )
+                })}
+              </div>
+            ) : (
+              /* Studio: grouped by company with headers */
+              filteredGroups.map((group) => {
+                const companyHasKey = hasApiKey(group.id)
 
-              return (
-                <div key={group.id} className="border-b border-border/50 last:border-b-0">
-                  {/* Company Header */}
-                  <div className="px-4 py-2.5 bg-background/50 flex items-center gap-3">
-                    <div className={`p-1.5 rounded-lg bg-gradient-to-br ${group.color} text-white`}>
-                      {COMPANY_ICONS[group.icon]}
+                return (
+                  <div key={group.id} className="border-b border-border/50 last:border-b-0">
+                    {/* Company Header */}
+                    <div className="px-4 py-2.5 bg-background/50 flex items-center gap-3">
+                      <div className={`p-1.5 rounded-lg bg-gradient-to-br ${group.color} text-white`}>
+                        {COMPANY_ICONS[group.icon]}
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-text-primary font-semibold text-sm">{group.name}</p>
+                      </div>
+                      {!companyHasKey && (
+                        <span className="flex items-center gap-1 px-2 py-1 bg-amber-500/10 text-amber-500 text-[10px] font-medium rounded-full border border-amber-500/20">
+                          <Lock className="w-3 h-3" />
+                          API Key requerida
+                        </span>
+                      )}
                     </div>
-                    <div className="flex-1">
-                      <p className="text-text-primary font-semibold text-sm">{group.name}</p>
-                    </div>
-                    {!companyHasKey && (
-                      <span className="flex items-center gap-1 px-2 py-1 bg-amber-500/10 text-amber-500 text-[10px] font-medium rounded-full border border-amber-500/20">
-                        <Lock className="w-3 h-3" />
-                        API Key requerida
-                      </span>
-                    )}
-                  </div>
 
-                  {/* Models List - Always visible */}
-                  <div className="bg-surface">
-                    {group.models.map((model) => {
-                      const isSelected = value === model.id
-                      const isDisabled = !companyHasKey
+                    {/* Models List */}
+                    <div className="bg-surface">
+                      {group.models.map((model) => {
+                        const isSelected = value === model.id
+                        const isDisabled = !companyHasKey
 
-                      return (
-                        <button
-                          key={model.id}
-                          type="button"
-                          onClick={() => !isDisabled && handleModelSelect(model.id)}
-                          disabled={isDisabled}
-                          className={`
-                            w-full px-4 py-2.5 pl-12 flex items-center gap-3 transition-colors
-                            ${isSelected ? 'bg-accent/10' : isDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-background/50'}
-                          `}
-                        >
-                          <div className="text-left flex-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <p className={`font-medium text-sm ${isDisabled ? 'text-text-secondary' : 'text-text-primary'}`}>
-                                {model.name}
-                              </p>
-                              {model.recommended && (
-                                <span className="px-1.5 py-0.5 bg-yellow-500/20 text-yellow-500 text-[9px] font-bold rounded border border-yellow-500/30">
-                                  RECOMENDADO
-                                </span>
-                              )}
-                              {model.tags?.map((tag) => (
-                                <span
-                                  key={tag}
-                                  className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[9px] font-bold rounded border ${TAG_CONFIG[tag].color}`}
-                                >
-                                  {TAG_CONFIG[tag].icon}
-                                  {TAG_CONFIG[tag].label}
-                                </span>
-                              ))}
+                        return (
+                          <button
+                            key={model.id}
+                            type="button"
+                            onClick={() => !isDisabled && handleModelSelect(model.id)}
+                            disabled={isDisabled}
+                            className={`
+                              w-full px-4 py-2.5 pl-12 flex items-center gap-3 transition-colors
+                              ${isSelected ? 'bg-accent/10' : isDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-background/50'}
+                            `}
+                          >
+                            <div className="text-left flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className={`font-medium text-sm ${isDisabled ? 'text-text-secondary' : 'text-text-primary'}`}>
+                                  {model.name}
+                                </p>
+                                {model.recommended && (
+                                  <span className="px-1.5 py-0.5 bg-yellow-500/20 text-yellow-500 text-[9px] font-bold rounded border border-yellow-500/30">
+                                    RECOMENDADO
+                                  </span>
+                                )}
+                                {model.tags?.map((tag) => (
+                                  <span
+                                    key={tag}
+                                    className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[9px] font-bold rounded border ${TAG_CONFIG[tag].color}`}
+                                  >
+                                    {TAG_CONFIG[tag].icon}
+                                    {TAG_CONFIG[tag].label}
+                                  </span>
+                                ))}
+                              </div>
+                              <p className="text-xs text-text-secondary">{model.description}</p>
                             </div>
-                            <p className="text-xs text-text-secondary">{model.description}</p>
-                          </div>
-                          <span className="text-xs text-text-secondary whitespace-nowrap">{model.pricePerImage}</span>
-                          {isSelected && <div className="w-2 h-2 rounded-full bg-accent flex-shrink-0" />}
-                        </button>
-                      )
-                    })}
+                            <span className="text-xs text-text-secondary whitespace-nowrap">{model.pricePerImage}</span>
+                            {isSelected && <div className="w-2 h-2 rounded-full bg-accent flex-shrink-0" />}
+                          </button>
+                        )
+                      })}
+                    </div>
                   </div>
-                </div>
-              )
-            })}
+                )
+              })
+            )}
           </div>
         </>
       )}
