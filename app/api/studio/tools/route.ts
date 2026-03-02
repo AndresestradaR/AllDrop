@@ -119,6 +119,313 @@ async function generateWithGemini(
 }
 
 /**
+ * Upload image to Supabase temp storage and get a public URL.
+ * Needed for KIE and fal.ai which require public URLs (not base64).
+ */
+async function uploadTempForCascade(
+  supabase: any,
+  userId: string,
+  imageBase64: string,
+  mimeType: string
+): Promise<string | null> {
+  const ext = mimeType.includes('png') ? 'png' : mimeType.includes('webp') ? 'webp' : 'jpg'
+  const path = `temp/${userId}/${Date.now()}-tool.${ext}`
+
+  try {
+    const buffer = Buffer.from(imageBase64, 'base64')
+    const { error } = await supabase.storage
+      .from('landing-images')
+      .upload(path, buffer, { contentType: mimeType, upsert: true })
+
+    if (error) {
+      console.error('[Tools/Upload] Error:', error.message)
+      return null
+    }
+
+    const { data } = supabase.storage.from('landing-images').getPublicUrl(path)
+    console.log(`[Tools/Upload] Temp image: ${data?.publicUrl?.substring(0, 80)}...`)
+    return data?.publicUrl || null
+  } catch (err: any) {
+    console.error('[Tools/Upload] Exception:', err.message)
+    return null
+  }
+}
+
+/**
+ * Cleanup temp files from Supabase Storage (fire-and-forget).
+ */
+function cleanupTempImage(supabase: any, publicUrl: string) {
+  try {
+    const path = publicUrl.split('/landing-images/')[1]
+    if (path?.startsWith('temp/')) {
+      supabase.storage.from('landing-images').remove([path]).catch(() => {})
+    }
+  } catch {}
+}
+
+/**
+ * Generate image via KIE.ai (nano-banana-pro) with polling.
+ * Used as 2nd step in cascade for image editing tools.
+ */
+async function generateWithKIE(
+  imageUrl: string,
+  prompt: string,
+  apiKey: string,
+  timeoutMs: number = 60000
+): Promise<{ success: boolean; imageBase64?: string; error?: string }> {
+  console.log('[Tools/KIE] Starting with nano-banana-pro...')
+
+  try {
+    // Create task
+    const createRes = await fetch(`${KIE_API_BASE}/jobs/createTask`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'nano-banana-pro',
+        input: {
+          prompt,
+          image_input: [imageUrl],
+          resolution: '1K',
+          output_format: 'png',
+          aspect_ratio: '1:1',
+        },
+      }),
+    })
+
+    const createText = await createRes.text()
+    let createData: any
+    try { createData = JSON.parse(createText) } catch {
+      return { success: false, error: `KIE: respuesta invalida` }
+    }
+
+    if (createData.code !== 200 && createData.code !== 0) {
+      return { success: false, error: `KIE: ${createData.msg || 'error'}` }
+    }
+
+    const taskId = createData.data?.taskId || createData.taskId
+    if (!taskId) return { success: false, error: 'KIE: no taskId' }
+
+    console.log(`[Tools/KIE] Task: ${taskId}, polling...`)
+
+    // Poll for result
+    const start = Date.now()
+    while (Date.now() - start < timeoutMs) {
+      await new Promise(r => setTimeout(r, 2000))
+
+      const statusRes = await fetch(`${KIE_API_BASE}/jobs/recordInfo?taskId=${taskId}`, {
+        headers: { Authorization: `Bearer ${apiKey}` },
+      })
+
+      if (!statusRes.ok) continue
+
+      const statusData = await statusRes.json()
+      const taskData = statusData.data || statusData
+      const state = taskData.state || ''
+
+      if (state === 'success' || state === 'completed') {
+        let resultUrls: string[] = []
+        if (taskData.resultJson) {
+          try {
+            const r = typeof taskData.resultJson === 'string' ? JSON.parse(taskData.resultJson) : taskData.resultJson
+            resultUrls = r.resultUrls || r.images || []
+          } catch {}
+        }
+
+        if (resultUrls.length > 0) {
+          // Download and convert to base64
+          const imgRes = await fetch(resultUrls[0])
+          const buf = await imgRes.arrayBuffer()
+          const base64 = Buffer.from(buf).toString('base64')
+          console.log(`[Tools/KIE] Success! (${base64.length} chars)`)
+          return { success: true, imageBase64: base64 }
+        }
+        return { success: false, error: 'KIE: imagen no encontrada en resultado' }
+      }
+
+      if (state === 'fail' || state === 'failed' || state === 'error') {
+        return { success: false, error: `KIE: ${taskData.failMsg || 'generacion fallida'}` }
+      }
+    }
+
+    return { success: false, error: 'KIE: tiempo agotado' }
+  } catch (err: any) {
+    console.error('[Tools/KIE] Error:', err.message)
+    return { success: false, error: err.message || 'KIE: error' }
+  }
+}
+
+/**
+ * Generate image via fal.ai (nano-banana-pro) with polling.
+ * Used as 3rd step in cascade for image editing tools.
+ */
+async function generateWithFalTool(
+  imageUrl: string,
+  prompt: string,
+  apiKey: string,
+  timeoutMs: number = 45000
+): Promise<{ success: boolean; imageBase64?: string; error?: string }> {
+  const modelPath = 'fal-ai/nano-banana-pro'
+  console.log(`[Tools/fal] Starting with ${modelPath}...`)
+
+  const headers = {
+    'Authorization': `Key ${apiKey}`,
+    'Content-Type': 'application/json',
+  }
+
+  try {
+    // Submit to queue
+    const submitRes = await fetch(`https://queue.fal.run/${modelPath}`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        prompt,
+        image_url: imageUrl,
+        resolution: '1K',
+        output_format: 'png',
+      }),
+    })
+
+    if (!submitRes.ok) {
+      const errText = await submitRes.text()
+      return { success: false, error: `fal.ai: ${errText.substring(0, 200)}` }
+    }
+
+    const submitData = await submitRes.json()
+    const { request_id, status_url, response_url } = submitData
+    if (!request_id) return { success: false, error: 'fal.ai: no request_id' }
+
+    console.log(`[Tools/fal] Queued: ${request_id}, polling...`)
+
+    // Poll for completion
+    const start = Date.now()
+    const statusEndpoint = status_url || `https://queue.fal.run/${modelPath}/requests/${request_id}/status`
+    const resultEndpoint = response_url || `https://queue.fal.run/${modelPath}/requests/${request_id}`
+
+    while (Date.now() - start < timeoutMs) {
+      await new Promise(r => setTimeout(r, 2000))
+
+      try {
+        const statusRes = await fetch(statusEndpoint, { headers })
+        if (!statusRes.ok) continue
+
+        const statusData = await statusRes.json()
+
+        if (statusData.status === 'COMPLETED') {
+          const resultRes = await fetch(resultEndpoint, { headers })
+          if (!resultRes.ok) return { success: false, error: 'fal.ai: error al obtener resultado' }
+
+          const resultData = await resultRes.json()
+          const imgUrl = resultData.images?.[0]?.url || resultData.image?.url
+
+          if (!imgUrl) return { success: false, error: 'fal.ai: no image URL' }
+
+          // Download and convert to base64
+          const imgRes = await fetch(imgUrl)
+          const buf = await imgRes.arrayBuffer()
+          const base64 = Buffer.from(buf).toString('base64')
+          console.log(`[Tools/fal] Success! (${base64.length} chars)`)
+          return { success: true, imageBase64: base64 }
+        }
+
+        if (statusData.status === 'FAILED') {
+          return { success: false, error: `fal.ai: ${statusData.error || 'generacion fallida'}` }
+        }
+      } catch {}
+    }
+
+    return { success: false, error: 'fal.ai: tiempo agotado' }
+  } catch (err: any) {
+    console.error('[Tools/fal] Error:', err.message)
+    return { success: false, error: err.message || 'fal.ai: error' }
+  }
+}
+
+/**
+ * Remove background using fal.ai birefnet.
+ * Used as 2nd step in cascade for remove-bg tool.
+ */
+async function removeBackgroundFal(
+  imageUrl: string,
+  apiKey: string,
+  timeoutMs: number = 45000
+): Promise<{ success: boolean; imageBase64?: string; error?: string }> {
+  const modelPath = 'fal-ai/birefnet/v2'
+  console.log(`[Tools/fal-bg] Starting with ${modelPath}...`)
+
+  const headers = {
+    'Authorization': `Key ${apiKey}`,
+    'Content-Type': 'application/json',
+  }
+
+  try {
+    const submitRes = await fetch(`https://queue.fal.run/${modelPath}`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        image_url: imageUrl,
+        model: 'General Use (Heavy)',
+        operating_resolution: '1024x1024',
+        output_format: 'png',
+      }),
+    })
+
+    if (!submitRes.ok) {
+      const errText = await submitRes.text()
+      return { success: false, error: `fal.ai bg: ${errText.substring(0, 200)}` }
+    }
+
+    const submitData = await submitRes.json()
+    const { request_id, status_url, response_url } = submitData
+    if (!request_id) return { success: false, error: 'fal.ai bg: no request_id' }
+
+    console.log(`[Tools/fal-bg] Queued: ${request_id}, polling...`)
+
+    const start = Date.now()
+    const statusEndpoint = status_url || `https://queue.fal.run/${modelPath}/requests/${request_id}/status`
+    const resultEndpoint = response_url || `https://queue.fal.run/${modelPath}/requests/${request_id}`
+
+    while (Date.now() - start < timeoutMs) {
+      await new Promise(r => setTimeout(r, 2000))
+
+      try {
+        const statusRes = await fetch(statusEndpoint, { headers })
+        if (!statusRes.ok) continue
+
+        const statusData = await statusRes.json()
+
+        if (statusData.status === 'COMPLETED') {
+          const resultRes = await fetch(resultEndpoint, { headers })
+          if (!resultRes.ok) return { success: false, error: 'fal.ai bg: error al obtener resultado' }
+
+          const resultData = await resultRes.json()
+          const imgUrl = resultData.image?.url || resultData.images?.[0]?.url
+
+          if (!imgUrl) return { success: false, error: 'fal.ai bg: no image URL' }
+
+          const imgRes = await fetch(imgUrl)
+          const buf = await imgRes.arrayBuffer()
+          const base64 = Buffer.from(buf).toString('base64')
+          console.log(`[Tools/fal-bg] Success! (${base64.length} chars)`)
+          return { success: true, imageBase64: base64 }
+        }
+
+        if (statusData.status === 'FAILED') {
+          return { success: false, error: `fal.ai bg: ${statusData.error || 'fallo'}` }
+        }
+      } catch {}
+    }
+
+    return { success: false, error: 'fal.ai bg: tiempo agotado' }
+  } catch (err: any) {
+    console.error('[Tools/fal-bg] Error:', err.message)
+    return { success: false, error: err.message || 'fal.ai bg: error' }
+  }
+}
+
+/**
  * Remove background using BFL FLUX Kontext Pro
  * Uses polling to wait for the result
  */
@@ -648,7 +955,7 @@ export async function POST(request: Request) {
     // Get user's API keys
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('google_api_key, openai_api_key, kie_api_key, bfl_api_key')
+      .select('google_api_key, openai_api_key, kie_api_key, bfl_api_key, fal_api_key')
       .eq('id', user.id)
       .single()
 
@@ -668,115 +975,137 @@ export async function POST(request: Request) {
     switch (tool) {
       // ========================================
       // GEMINI-based tools (variations, upscale, camera-angle, mockup)
-      // Cascade: user Google key → platform GEMINI_API_KEY
+      // Cascade: Google Gemini → KIE nano-banana-pro → fal.ai nano-banana-pro
       // ========================================
       case 'variations':
       case 'upscale':
       case 'camera-angle':
       case 'mockup': {
-        const geminiKeys: string[] = []
-        if (profile.google_api_key) {
-          try { geminiKeys.push(decrypt(profile.google_api_key)) } catch {}
-        }
-        if (process.env.GEMINI_API_KEY) {
-          const platformKey = process.env.GEMINI_API_KEY
-          if (!geminiKeys.includes(platformKey)) geminiKeys.push(platformKey)
-        }
+        const cascadeErrors: string[] = []
+        const prompt = TOOL_PROMPTS[tool] || ''
 
-        if (geminiKeys.length === 0) {
-          return NextResponse.json(
-            { error: 'Necesitas configurar tu API key de Google para esta herramienta' },
-            { status: 400 }
-          )
-        }
+        // ── Step 1: Google Gemini (sync, base64 — fastest) ──
+        const googleKey = profile.google_api_key
+          ? (() => { try { return decrypt(profile.google_api_key) } catch { return null } })()
+          : null
+        const geminiKey = googleKey || process.env.GEMINI_API_KEY
 
-        const geminiErrors: string[] = []
-        for (const gKey of geminiKeys) {
-          const keyLabel = gKey === process.env.GEMINI_API_KEY ? 'platform' : 'user'
-          const result = await generateWithGemini(imageBase64, mimeType, tool, gKey)
-
+        if (geminiKey) {
+          const result = await generateWithGemini(imageBase64, mimeType, tool, geminiKey)
           if (result.success && result.imageBase64) {
-            if (keyLabel === 'platform') console.log(`[Tools] ${tool} succeeded via platform key (fallback)`)
-            // Try R2 upload
-            const r2Url = await tryUploadToR2(
-              user.id,
-              Buffer.from(result.imageBase64, 'base64'),
-              `tools/${tool}/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.png`,
-              'image/png'
-            )
+            console.log(`[Tools] ${tool} succeeded via Google Gemini`)
+            const r2Url = await tryUploadToR2(user.id, Buffer.from(result.imageBase64, 'base64'), `tools/${tool}/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.png`, 'image/png')
             if (r2Url) console.log(`[Tools] ✓ ${tool} saved to R2: ${r2Url}`)
-
-            return NextResponse.json({
-              success: true,
-              imageBase64: result.imageBase64,
-              mimeType: 'image/png',
-              r2Url,
-            })
+            return NextResponse.json({ success: true, imageBase64: result.imageBase64, mimeType: 'image/png', r2Url })
           }
-
-          geminiErrors.push(`Google (${keyLabel}): ${result.error}`)
-          console.error(`[Tools] ${tool} failed with ${keyLabel} key: ${result.error}`)
+          cascadeErrors.push(`Google: ${result.error}`)
+          console.error(`[Tools] ${tool} Gemini failed: ${result.error}`)
         }
 
-        return NextResponse.json(
-          { error: geminiErrors[geminiErrors.length - 1] || `Error al procesar ${tool}` },
-          { status: 500 }
-        )
+        // ── Upload to Storage for KIE/fal.ai (only if Gemini failed) ──
+        const tempUrl = await uploadTempForCascade(supabase, user.id, imageBase64, mimeType)
+        if (!tempUrl) {
+          return NextResponse.json({ error: cascadeErrors[0] || 'Error al procesar imagen' }, { status: 500 })
+        }
+
+        // ── Step 2: KIE nano-banana-pro (async+poll) ──
+        const kieKey = profile.kie_api_key
+          ? (() => { try { return decrypt(profile.kie_api_key) } catch { return null } })()
+          : null
+        const kieApiKey = kieKey || process.env.KIE_API_KEY
+
+        if (kieApiKey) {
+          const result = await generateWithKIE(tempUrl, prompt, kieApiKey, 60000)
+          if (result.success && result.imageBase64) {
+            console.log(`[Tools] ${tool} succeeded via KIE nano-banana-pro`)
+            cleanupTempImage(supabase, tempUrl)
+            const r2Url = await tryUploadToR2(user.id, Buffer.from(result.imageBase64, 'base64'), `tools/${tool}/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.png`, 'image/png')
+            if (r2Url) console.log(`[Tools] ✓ ${tool} saved to R2: ${r2Url}`)
+            return NextResponse.json({ success: true, imageBase64: result.imageBase64, mimeType: 'image/png', r2Url })
+          }
+          cascadeErrors.push(`KIE: ${result.error}`)
+          console.error(`[Tools] ${tool} KIE failed: ${result.error}`)
+        }
+
+        // ── Step 3: fal.ai nano-banana-pro (async+poll) ──
+        const falKey = profile.fal_api_key
+          ? (() => { try { return decrypt(profile.fal_api_key) } catch { return null } })()
+          : null
+        const falApiKey = falKey || process.env.FAL_API_KEY
+
+        if (falApiKey) {
+          const result = await generateWithFalTool(tempUrl, prompt, falApiKey, 45000)
+          if (result.success && result.imageBase64) {
+            console.log(`[Tools] ${tool} succeeded via fal.ai nano-banana-pro`)
+            cleanupTempImage(supabase, tempUrl)
+            const r2Url = await tryUploadToR2(user.id, Buffer.from(result.imageBase64, 'base64'), `tools/${tool}/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.png`, 'image/png')
+            if (r2Url) console.log(`[Tools] ✓ ${tool} saved to R2: ${r2Url}`)
+            return NextResponse.json({ success: true, imageBase64: result.imageBase64, mimeType: 'image/png', r2Url })
+          }
+          cascadeErrors.push(`fal.ai: ${result.error}`)
+          console.error(`[Tools] ${tool} fal.ai failed: ${result.error}`)
+        }
+
+        // Cleanup temp
+        cleanupTempImage(supabase, tempUrl)
+
+        if (cascadeErrors.length === 0) {
+          return NextResponse.json({ error: 'Configura tu API key de Google, KIE o fal.ai en Settings' }, { status: 400 })
+        }
+        return NextResponse.json({ error: cascadeErrors[cascadeErrors.length - 1] || `Error al procesar ${tool}` }, { status: 500 })
       }
 
       // ========================================
-      // BFL FLUX - Background removal
-      // Cascade: user BFL key → platform BFL_API_KEY
+      // Background removal
+      // Cascade: BFL flux-kontext-pro → fal.ai birefnet
       // ========================================
       case 'remove-bg': {
-        const bflKeys: string[] = []
-        if (profile.bfl_api_key) {
-          try { bflKeys.push(decrypt(profile.bfl_api_key)) } catch {}
-        }
-        if (process.env.BFL_API_KEY) {
-          const platformKey = process.env.BFL_API_KEY
-          if (!bflKeys.includes(platformKey)) bflKeys.push(platformKey)
-        }
+        const bgErrors: string[] = []
 
-        if (bflKeys.length === 0) {
-          return NextResponse.json(
-            { error: 'Necesitas configurar tu API key de Black Forest Labs para esta herramienta' },
-            { status: 400 }
-          )
-        }
+        // ── Step 1: BFL flux-kontext-pro (accepts base64 directly) ──
+        const bflKey = profile.bfl_api_key
+          ? (() => { try { return decrypt(profile.bfl_api_key) } catch { return null } })()
+          : null
+        const bflApiKey = bflKey || process.env.BFL_API_KEY
 
-        const bflErrors: string[] = []
-        for (const bKey of bflKeys) {
-          const keyLabel = bKey === process.env.BFL_API_KEY ? 'platform' : 'user'
-          const result = await removeBackground(imageBase64, bKey)
-
+        if (bflApiKey) {
+          const result = await removeBackground(imageBase64, bflApiKey)
           if (result.success && result.imageBase64) {
-            if (keyLabel === 'platform') console.log('[Tools] remove-bg succeeded via platform key (fallback)')
-            // Try R2 upload
-            const r2Url = await tryUploadToR2(
-              user.id,
-              Buffer.from(result.imageBase64, 'base64'),
-              `tools/remove-bg/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.png`,
-              'image/png'
-            )
-            if (r2Url) console.log(`[Tools] ✓ remove-bg saved to R2: ${r2Url}`)
-
-            return NextResponse.json({
-              success: true,
-              imageBase64: result.imageBase64,
-              mimeType: 'image/png',
-              r2Url,
-            })
+            console.log('[Tools] remove-bg succeeded via BFL')
+            const r2Url = await tryUploadToR2(user.id, Buffer.from(result.imageBase64, 'base64'), `tools/remove-bg/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.png`, 'image/png')
+            if (r2Url) console.log('[Tools] ✓ remove-bg saved to R2:', r2Url)
+            return NextResponse.json({ success: true, imageBase64: result.imageBase64, mimeType: 'image/png', r2Url })
           }
-
-          bflErrors.push(`BFL (${keyLabel}): ${result.error}`)
-          console.error(`[Tools] remove-bg failed with ${keyLabel} key: ${result.error}`)
+          bgErrors.push(`BFL: ${result.error}`)
+          console.error('[Tools] remove-bg BFL failed:', result.error)
         }
 
-        return NextResponse.json(
-          { error: bflErrors[bflErrors.length - 1] || 'Error al quitar fondo' },
-          { status: 500 }
-        )
+        // ── Step 2: fal.ai birefnet (needs URL) ──
+        const bgFalKey = profile.fal_api_key
+          ? (() => { try { return decrypt(profile.fal_api_key) } catch { return null } })()
+          : null
+        const bgFalApiKey = bgFalKey || process.env.FAL_API_KEY
+
+        if (bgFalApiKey) {
+          const tempUrl = await uploadTempForCascade(supabase, user.id, imageBase64, mimeType)
+          if (tempUrl) {
+            const result = await removeBackgroundFal(tempUrl, bgFalApiKey, 45000)
+            cleanupTempImage(supabase, tempUrl)
+            if (result.success && result.imageBase64) {
+              console.log('[Tools] remove-bg succeeded via fal.ai birefnet')
+              const r2Url = await tryUploadToR2(user.id, Buffer.from(result.imageBase64, 'base64'), `tools/remove-bg/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.png`, 'image/png')
+              if (r2Url) console.log('[Tools] ✓ remove-bg saved to R2:', r2Url)
+              return NextResponse.json({ success: true, imageBase64: result.imageBase64, mimeType: 'image/png', r2Url })
+            }
+            bgErrors.push(`fal.ai: ${result.error}`)
+            console.error('[Tools] remove-bg fal.ai failed:', result.error)
+          }
+        }
+
+        if (bgErrors.length === 0) {
+          return NextResponse.json({ error: 'Configura tu API key de BFL o fal.ai en Settings' }, { status: 400 })
+        }
+        return NextResponse.json({ error: bgErrors[bgErrors.length - 1] || 'Error al quitar fondo' }, { status: 500 })
       }
 
       // ========================================
