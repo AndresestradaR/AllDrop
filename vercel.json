@@ -1,4 +1,6 @@
 {
+  "buildCommand": "next build",
+  "regions": ["sfo1"],
   "crons": [
     {
       "path": "/api/cron/automations",
