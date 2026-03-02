@@ -56,7 +56,7 @@ export interface ImageModelConfig {
     }
     fal: {
       t2i: string     // fal.ai full path for T2I
-      i2i?: string    // fal.ai path for I2I (undefined = same T2I with image_url)
+      i2i?: string    // fal.ai /edit path for I2I (REQUIRED for image input — T2I ignores images)
     }
     directApi?: 'gemini' | 'openai' | 'bfl'  // step 3: direct API fallback (undefined = STOP)
   }
@@ -93,7 +93,7 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModelConfig> = {
     availableIn: 'both',
     cascade: {
       kie: { t2i: 'nano-banana-pro', i2i: 'nano-banana-pro', mode: 'nano-banana' },
-      fal: { t2i: 'fal-ai/nano-banana-pro' },
+      fal: { t2i: 'fal-ai/nano-banana-pro', i2i: 'fal-ai/nano-banana-pro/edit' },
       directApi: 'gemini',
     },
   },
@@ -118,7 +118,7 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModelConfig> = {
     availableIn: 'both',
     cascade: {
       kie: { t2i: 'gpt-image/1.5-text-to-image', i2i: 'gpt-image/1.5-image-to-image', mode: 'gpt-image' },
-      fal: { t2i: 'fal-ai/gpt-image-1.5' },
+      fal: { t2i: 'fal-ai/gpt-image-1.5', i2i: 'fal-ai/gpt-image-1.5/edit' },
       directApi: 'openai',
     },
   },
@@ -235,7 +235,7 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModelConfig> = {
     availableIn: 'both',
     cascade: {
       kie: { t2i: 'nano-banana-2', i2i: 'nano-banana-2', mode: 'nano-banana' },
-      fal: { t2i: 'fal-ai/nano-banana-2' },
+      fal: { t2i: 'fal-ai/nano-banana-2', i2i: 'fal-ai/nano-banana-2/edit' },
       directApi: 'gemini',
     },
   },
@@ -276,7 +276,7 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModelConfig> = {
     availableIn: 'studio',
     cascade: {
       kie: { t2i: 'seedream/5-lite-text-to-image', i2i: 'seedream/5-lite-image-to-image', mode: 'seedream' },
-      fal: { t2i: 'fal-ai/seedream-3.0/pro' },
+      fal: { t2i: 'fal-ai/seedream-3.0/pro', i2i: 'fal-ai/seedream-3.0/pro/edit' },
     },
   },
 }
