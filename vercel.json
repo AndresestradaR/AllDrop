@@ -1,5 +1,5 @@
 {
-  "regions": ["cdg1"],
+  "regions": ["hnd1"],
   "crons": [
     {
       "path": "/api/cron/automations",
