@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
-import { CANVA_CONFIG } from '@/lib/canva/pkce'
+import { decryptState, CANVA_CONFIG } from '@/lib/canva/pkce'
 
 interface TokenResponse {
   access_token: string
@@ -47,7 +46,7 @@ export async function GET(request: Request) {
   const error = searchParams.get('error')
   const errorDescription = searchParams.get('error_description')
 
-  // Handle OAuth errors
+  // Handle OAuth errors from Canva
   if (error) {
     console.error('Canva OAuth error:', error, errorDescription)
     return NextResponse.redirect(
@@ -61,29 +60,16 @@ export async function GET(request: Request) {
     )
   }
 
-  const cookieStore = await cookies()
-
-  // State format: "csrfToken" or "csrfToken:base64url(returnUrl)"
-  const [csrfPart, returnUrlPart] = state.split(':')
-  const returnUrl = returnUrlPart
-    ? Buffer.from(returnUrlPart, 'base64url').toString()
-    : '/dashboard'
-
-  // Verify CSRF token
-  const storedState = cookieStore.get('canva_state')?.value
-  if (!storedState || storedState !== csrfPart) {
+  // Decrypt the state to recover code_verifier + returnUrl (no cookies needed)
+  const stateData = decryptState(state)
+  if (!stateData) {
+    console.error('Canva callback: failed to decrypt state (expired or tampered)')
     return NextResponse.redirect(
       `${origin}/dashboard?canva_error=invalid_state`
     )
   }
 
-  // Get code verifier
-  const codeVerifier = cookieStore.get('canva_code_verifier')?.value
-  if (!codeVerifier) {
-    return NextResponse.redirect(
-      `${origin}/dashboard?canva_error=missing_verifier`
-    )
-  }
+  const { codeVerifier, returnUrl } = stateData
 
   try {
     const redirectUri = process.env.CANVA_REDIRECT_URI || 'https://estrategas-landing-generator.vercel.app/api/canva/callback'
@@ -91,18 +77,14 @@ export async function GET(request: Request) {
     // Exchange code for tokens
     const tokens = await exchangeCodeForTokens(code, codeVerifier, redirectUri)
 
-    // Build redirect response — go back to the page the user was on
+    // Build redirect — go back to the page the user was on
     const redirectResponse = NextResponse.redirect(
       `${origin}${returnUrl}${returnUrl.includes('?') ? '&' : '?'}canva_success=true`
     )
 
     const secureCookie = process.env.NODE_ENV === 'production'
 
-    // Clear PKCE cookies
-    redirectResponse.cookies.delete('canva_code_verifier')
-    redirectResponse.cookies.delete('canva_state')
-
-    // Store tokens in cookies for future use
+    // Store tokens in cookies for future API calls
     redirectResponse.cookies.set('canva_access_token', tokens.access_token, {
       httpOnly: true,
       secure: secureCookie,
