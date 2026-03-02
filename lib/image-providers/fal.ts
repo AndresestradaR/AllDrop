@@ -101,6 +101,13 @@ export async function generateViaFal(
   try {
     // Step 1: Submit to queue
     console.log(`[fal.ai] Submitting to ${modelPath}...`)
+    console.log(`[fal.ai] Input keys: ${Object.keys(input).join(', ')}`)
+    if (input.image_urls) {
+      console.log(`[fal.ai] image_urls count: ${input.image_urls.length}`)
+      input.image_urls.forEach((u: string, i: number) => console.log(`[fal.ai]   image[${i}]: ${u.substring(0, 80)}...`))
+    } else {
+      console.log(`[fal.ai] NO image_urls in input`)
+    }
     const submitRes = await fetch(`https://queue.fal.run/${modelPath}`, {
       method: 'POST',
       headers,

@@ -175,6 +175,9 @@ export async function generateImage(
     const falImageUrls: string[] = []
     if (request.templateUrl?.startsWith('http')) falImageUrls.push(request.templateUrl)
     if (request.productImageUrls?.length) falImageUrls.push(...request.productImageUrls)
+    console.log(`[Cascade:fal] templateUrl: ${request.templateUrl?.substring(0, 60) || 'NONE'}`)
+    console.log(`[Cascade:fal] productImageUrls: ${request.productImageUrls?.length || 0}`)
+    console.log(`[Cascade:fal] falImageUrls total: ${falImageUrls.length}`)
 
     const falResult = await generateViaFal(apiKeys.fal, falPath, {
       prompt,
