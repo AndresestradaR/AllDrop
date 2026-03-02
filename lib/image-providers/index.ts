@@ -182,11 +182,17 @@ export async function generateImage(
     console.log(`[Cascade:fal] productImageUrls: ${request.productImageUrls?.length || 0}`)
     console.log(`[Cascade:fal] falImageUrls total: ${falImageUrls.length}`)
 
+    // Seedream /edit endpoints are slower — give them 90s, others 45s
+    const falTimeout = falPath.includes('seedream') ? 90000 : 45000
+    // Seedream on fal.ai also has text length limits — truncate
+    const falPrompt = falPath.includes('seedream') && prompt.length > 800
+      ? prompt.substring(0, 800)
+      : prompt
     const falResult = await generateViaFal(apiKeys.fal, falPath, {
-      prompt,
+      prompt: falPrompt,
       imageUrls: falImageUrls.length > 0 ? falImageUrls : undefined,
       aspectRatio: request.aspectRatio || '9:16',
-      timeoutMs: 45000,
+      timeoutMs: falTimeout,
     })
 
     if (falResult.success && falResult.imageUrl) {
@@ -268,7 +274,13 @@ async function generateViaKie(
   kieModel: { model: string; mode: 'nano-banana' | 'seedream' | 'gpt-image' },
   timeoutMs: number = 80000
 ): Promise<GenerateImageResult> {
-  const prompt = request.prompt?.trim() || buildGeminiPrompt(request)
+  let prompt = request.prompt?.trim() || buildGeminiPrompt(request)
+
+  // Seedream on KIE has a strict text length limit — truncate prompt
+  if (kieModel.mode === 'seedream' && prompt.length > 800) {
+    console.log(`[KIE] Seedream prompt too long (${prompt.length} chars), truncating to 800`)
+    prompt = prompt.substring(0, 800)
+  }
 
   // Collect public image URLs for KIE (requires URLs, not base64)
   const imageUrls: string[] = []
