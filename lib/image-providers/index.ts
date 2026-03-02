@@ -198,6 +198,9 @@ export async function generateImage(
           provider: request.provider,
         }
       }
+      // fal.ai generated the image but we couldn't download it
+      console.error(`[Cascade] fal.ai generated image but download failed: ${falResult.imageUrl.substring(0, 80)}`)
+      cascadeErrors.push('fal.ai: imagen generada pero no se pudo descargar')
     }
 
     logAI({ service: 'image', provider: 'fal', status: 'error', response_ms: Date.now() - t0, model: falPath, error_message: falResult.error, was_fallback: cascadeErrors.length > 0 })

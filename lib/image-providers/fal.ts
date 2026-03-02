@@ -240,18 +240,38 @@ export async function generateViaFal(
 
 /**
  * Fetch image from fal.ai URL and convert to base64.
+ * Retries up to 3 times with backoff — fal.ai CDN sometimes needs a moment.
  */
 export async function falImageToBase64(imageUrl: string): Promise<{ base64: string; mimeType: string } | null> {
-  try {
-    const res = await fetch(imageUrl)
-    if (!res.ok) return null
+  const maxRetries = 3
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const res = await fetch(imageUrl)
+      if (!res.ok) {
+        console.warn(`[fal.ai] Image download attempt ${attempt}/${maxRetries} failed: HTTP ${res.status}`)
+        if (attempt < maxRetries) {
+          await new Promise(r => setTimeout(r, 1500 * attempt))
+          continue
+        }
+        return null
+      }
 
-    const buffer = await res.arrayBuffer()
-    const base64 = Buffer.from(buffer).toString('base64')
-    const mimeType = res.headers.get('content-type') || 'image/png'
+      const buffer = await res.arrayBuffer()
+      const base64 = Buffer.from(buffer).toString('base64')
+      const mimeType = res.headers.get('content-type') || 'image/png'
 
-    return { base64, mimeType }
-  } catch {
-    return null
+      if (attempt > 1) {
+        console.log(`[fal.ai] Image download succeeded on attempt ${attempt}`)
+      }
+      return { base64, mimeType }
+    } catch (err: any) {
+      console.warn(`[fal.ai] Image download attempt ${attempt}/${maxRetries} error: ${err.message}`)
+      if (attempt < maxRetries) {
+        await new Promise(r => setTimeout(r, 1500 * attempt))
+        continue
+      }
+      return null
+    }
   }
+  return null
 }
