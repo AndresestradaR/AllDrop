@@ -862,12 +862,25 @@ export default function ProductGeneratePage() {
     toast.loading('Conectando con Canva...', { id: 'canva' })
 
     try {
+      // If generated_image_url is a URL (not base64), fetch and convert to base64
+      let imageData = section.generated_image_url
+      if (imageData.startsWith('http')) {
+        toast.loading('Preparando imagen para Canva...', { id: 'canva' })
+        const imgResponse = await fetch(imageData)
+        const blob = await imgResponse.blob()
+        imageData = await new Promise<string>((resolve) => {
+          const reader = new FileReader()
+          reader.onloadend = () => resolve(reader.result as string)
+          reader.readAsDataURL(blob)
+        })
+      }
+
       // Try to upload directly if we have a token
       const response = await fetch('/api/canva/upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          imageBase64: section.generated_image_url,
+          imageBase64: imageData,
           sectionId: section.id,
           productName: product?.name,
         }),
@@ -879,8 +892,8 @@ export default function ProductGeneratePage() {
         // Need to authenticate - redirect to OAuth flow
         toast.loading('Autenticando con Canva...', { id: 'canva' })
 
-        // Store image data in sessionStorage for after OAuth
-        sessionStorage.setItem('canva_pending_image', section.generated_image_url)
+        // Store image data in sessionStorage for after OAuth (use converted base64)
+        sessionStorage.setItem('canva_pending_image', imageData)
         sessionStorage.setItem('canva_pending_section', section.id)
 
         // Redirect to OAuth
