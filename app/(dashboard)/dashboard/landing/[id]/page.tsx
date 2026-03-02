@@ -267,8 +267,9 @@ export default function ProductGeneratePage() {
       uploadToCanva(pendingUrl, pendingSectionId, product?.name)
         .then((editUrl) => {
           if (editUrl) {
-            toast.success('Abriendo Canva!', { id: 'canva' })
-            window.open(editUrl, '_blank')
+            // Can't window.open here (popup blocker), so copy to clipboard
+            navigator.clipboard?.writeText(editUrl).catch(() => {})
+            toast.success('Canva listo! Haz clic en "Editar en Canva" de nuevo.', { id: 'canva', duration: 5000 })
           }
         })
         .catch(() => {
@@ -923,7 +924,10 @@ export default function ProductGeneratePage() {
 
   const handleOpenInCanva = async (section: GeneratedSection) => {
     setIsOpeningCanva(true)
-    toast.loading('Conectando con Canva...', { id: 'canva' })
+    toast.loading('Subiendo imagen a Canva...', { id: 'canva' })
+
+    // Open window NOW (synchronous with user click) to avoid popup blocker
+    const canvaWindow = window.open('about:blank', '_blank')
 
     try {
       const editUrl = await uploadToCanva(
@@ -934,10 +938,18 @@ export default function ProductGeneratePage() {
 
       if (editUrl) {
         toast.success('Abriendo Canva!', { id: 'canva' })
-        window.open(editUrl, '_blank')
+        if (canvaWindow) {
+          canvaWindow.location.href = editUrl
+        } else {
+          window.open(editUrl, '_blank')
+        }
+      } else {
+        // OAuth redirect in progress, close blank tab
+        canvaWindow?.close()
       }
     } catch (error: any) {
       console.error('Canva error:', error)
+      canvaWindow?.close()
       toast.error('Error con Canva. Descargando imagen...', { id: 'canva' })
 
       // Fallback: Download image and open Canva manually

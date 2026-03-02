@@ -63,9 +63,15 @@ export async function GET(request: Request) {
 
   const cookieStore = await cookies()
 
-  // Verify state to prevent CSRF
+  // State format: "csrfToken" or "csrfToken:base64url(returnUrl)"
+  const [csrfPart, returnUrlPart] = state.split(':')
+  const returnUrl = returnUrlPart
+    ? Buffer.from(returnUrlPart, 'base64url').toString()
+    : '/dashboard'
+
+  // Verify CSRF token
   const storedState = cookieStore.get('canva_state')?.value
-  if (!storedState || storedState !== state) {
+  if (!storedState || storedState !== csrfPart) {
     return NextResponse.redirect(
       `${origin}/dashboard?canva_error=invalid_state`
     )
@@ -85,10 +91,7 @@ export async function GET(request: Request) {
     // Exchange code for tokens
     const tokens = await exchangeCodeForTokens(code, codeVerifier, redirectUri)
 
-    // Read return URL before clearing cookies
-    const returnUrl = cookieStore.get('canva_return_url')?.value || '/dashboard'
-
-    // Build redirect response so we can set cookies on it
+    // Build redirect response — go back to the page the user was on
     const redirectResponse = NextResponse.redirect(
       `${origin}${returnUrl}${returnUrl.includes('?') ? '&' : '?'}canva_success=true`
     )
@@ -98,7 +101,6 @@ export async function GET(request: Request) {
     // Clear PKCE cookies
     redirectResponse.cookies.delete('canva_code_verifier')
     redirectResponse.cookies.delete('canva_state')
-    redirectResponse.cookies.delete('canva_return_url')
 
     // Store tokens in cookies for future use
     redirectResponse.cookies.set('canva_access_token', tokens.access_token, {

@@ -19,7 +19,12 @@ export async function GET(request: Request) {
   // Generate PKCE parameters
   const codeVerifier = generateCodeVerifier()
   const codeChallenge = generateCodeChallenge(codeVerifier)
-  const state = generateState()
+  const csrfToken = generateState()
+
+  // Encode returnUrl inside the OAuth state parameter (survives the full OAuth round-trip)
+  const statePayload = returnUrl
+    ? `${csrfToken}:${Buffer.from(returnUrl).toString('base64url')}`
+    : csrfToken
 
   // Build authorization URL
   const redirectUri = process.env.CANVA_REDIRECT_URI || 'https://estrategas-landing-generator.vercel.app/api/canva/callback'
@@ -29,7 +34,7 @@ export async function GET(request: Request) {
   authUrl.searchParams.set('client_id', clientId)
   authUrl.searchParams.set('redirect_uri', redirectUri)
   authUrl.searchParams.set('scope', CANVA_CONFIG.scopes)
-  authUrl.searchParams.set('state', state)
+  authUrl.searchParams.set('state', statePayload)
   authUrl.searchParams.set('code_challenge', codeChallenge)
   authUrl.searchParams.set('code_challenge_method', 'S256')
 
@@ -45,10 +50,8 @@ export async function GET(request: Request) {
   }
 
   response.cookies.set('canva_code_verifier', codeVerifier, cookieOpts)
-  response.cookies.set('canva_state', state, cookieOpts)
-  if (returnUrl) {
-    response.cookies.set('canva_return_url', returnUrl, cookieOpts)
-  }
+  // Store only the CSRF token for verification
+  response.cookies.set('canva_state', csrfToken, cookieOpts)
 
   return response
 }
