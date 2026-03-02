@@ -14,6 +14,7 @@ import { classifyError, wrapError, type AIProviderError } from '../services/ai-e
 // fal.ai model path mapping
 export const FAL_MODEL_PATHS: Record<string, string> = {
   'nano-banana-2': 'fal-ai/nano-banana-2',
+  'nano-banana-pro': 'fal-ai/nano-banana-pro',
   'seedream/5-lite': 'fal-ai/seedream-3.0',
   'seedream/5': 'fal-ai/seedream-3.0/pro',
   'flux-pro-ultra': 'fal-ai/flux-pro/v1.1-ultra',

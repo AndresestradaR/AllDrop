@@ -81,6 +81,7 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModelConfig> = {
     recommended: true,
     tags: ['RECOMENDADO', 'BEST_TEXT', 'PREMIUM', 'NEW'],
     apiModelId: 'gemini-3-pro-image-preview',
+    falModelId: 'nano-banana-pro',
     availableIn: 'both',
   },
   'gemini-2.5-flash': {
