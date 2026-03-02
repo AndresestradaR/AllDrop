@@ -13,8 +13,70 @@ import { openaiProvider } from './openai'
 import { seedreamProvider } from './kie-seedream'
 import { fluxProvider } from './bfl-flux'
 import { generateViaFal, falImageToBase64 } from './fal'
-import { classifyError, wrapError, formatCascadeError, type AIProviderError } from '../services/ai-errors'
 import { logAI } from '../services/ai-monitor'
+
+/**
+ * Convert raw error messages to friendly Spanish that anyone can understand.
+ * No JSON, no technical jargon, no model IDs — just plain language.
+ */
+function humanizeOne(raw: string): string {
+  const l = raw.toLowerCase()
+
+  // No credits / quota / billing
+  if (l.includes('quota') || l.includes('credit') || l.includes('saldo') || l.includes('billing') ||
+      l.includes('payment') || l.includes('resource_exhausted') || l.includes('insufficient'))
+    return 'No tienes saldo suficiente. Recarga tu cuenta en el proveedor de IA.'
+
+  // Timeout
+  if (l.includes('timeout') || l.includes('tiempo') || l.includes('timed out') || l.includes('agotado'))
+    return 'El servicio esta tardando demasiado. Intenta de nuevo en unos minutos.'
+
+  // Rate limit
+  if (l.includes('rate limit') || l.includes('too many') || l.includes('429'))
+    return 'Muchas solicitudes seguidas. Espera 30 segundos e intenta de nuevo.'
+
+  // API key invalid
+  if (l.includes('unauthorized') || l.includes('invalid') && l.includes('key') || l.includes('401'))
+    return 'Tu API key no es valida. Revisala en Settings.'
+
+  // Access denied
+  if (l.includes('forbidden') || l.includes('403') || l.includes('permission') || l.includes('access'))
+    return 'Tu cuenta no tiene permisos. Verifica la configuracion en el proveedor.'
+
+  // Safety block
+  if (l.includes('safety') || l.includes('blocked') || l.includes('harmful') || l.includes('inappropriate'))
+    return 'La imagen fue bloqueada por filtros de seguridad. Prueba con otra plantilla o texto diferente.'
+
+  // Server down
+  if (l.includes('500') || l.includes('502') || l.includes('503') || l.includes('server') || l.includes('unavailable'))
+    return 'El servicio esta caido temporalmente. Intenta de nuevo en unos minutos.'
+
+  // Connection
+  if (l.includes('connection') || l.includes('network') || l.includes('fetch') || l.includes('econnrefused'))
+    return 'Error de conexion. Verifica tu internet e intenta de nuevo.'
+
+  // Model not found
+  if (l.includes('not found') || l.includes('404') || l.includes('activad'))
+    return 'El modelo no esta disponible. Activa el modelo en tu cuenta del proveedor (kie.ai/market).'
+
+  // Generic fallback — still friendly
+  return 'Hubo un problema generando la imagen. Intenta de nuevo.'
+}
+
+/**
+ * Take all cascade errors and produce ONE friendly message for the user.
+ */
+function humanizeErrors(rawErrors: string[]): string {
+  const friendly = rawErrors.map(humanizeOne)
+  // Deduplicate
+  const unique = [...new Set(friendly)]
+
+  if (unique.length === 1) {
+    return unique[0]
+  }
+
+  return `No pudimos generar tu imagen.\n\n${unique.map(e => `• ${e}`).join('\n')}\n\nSi el problema sigue, prueba con otro modelo en Settings.`
+}
 
 // Provider registry (fal not registered here — handled directly via generateViaFal)
 const providers: Record<string, ImageProvider> = {
@@ -84,7 +146,7 @@ export async function generateImage(
       return result
     }
     logAI({ service: 'image', provider: 'openai', status: 'error', response_ms: Date.now() - t0, model: request.modelId, error_message: result.error })
-    cascadeErrors.push(`OpenAI: ${result.error || 'fallido'}`)
+    cascadeErrors.push(result.error || 'OpenAI fallo')
     console.warn(`[Cascade] OpenAI failed, continuing cascade...`)
   }
 
@@ -96,7 +158,7 @@ export async function generateImage(
       return result
     }
     logAI({ service: 'image', provider: 'bfl', status: 'error', response_ms: Date.now() - t0, model: request.modelId, error_message: result.error })
-    cascadeErrors.push(`FLUX: ${result.error || 'fallido'}`)
+    cascadeErrors.push(result.error || 'FLUX fallo')
     console.warn(`[Cascade] FLUX failed, continuing cascade...`)
   }
 
@@ -110,7 +172,7 @@ export async function generateImage(
       return { ...kieResult, provider: request.provider }
     }
     logAI({ service: 'image', provider: 'kie', status: 'error', response_ms: Date.now() - t0, model: kieModel.model, error_message: kieResult.error, was_fallback: cascadeErrors.length > 0 })
-    cascadeErrors.push(`KIE (${kieModel.model}): ${kieResult.error || 'fallido'}`)
+    cascadeErrors.push(kieResult.error || 'KIE fallo')
     console.warn(`[Cascade] KIE ${kieModel.model} failed, trying fal.ai...`)
   }
 
@@ -140,13 +202,13 @@ export async function generateImage(
     }
 
     logAI({ service: 'image', provider: 'fal', status: 'error', response_ms: Date.now() - t0, model: falModelId, error_message: falResult.error, was_fallback: cascadeErrors.length > 0 })
-    cascadeErrors.push(`fal.ai: ${falResult.error || 'fallido'}`)
-    console.warn(`[Cascade] fal.ai failed, trying Google direct...`)
+    cascadeErrors.push(falResult.error || 'fal.ai fallo')
+    console.warn(`[Cascade] fal.ai failed`)
   }
 
-  // ── Step 4: Google direct (ALWAYS — last resort) ──
-  // Uses the mapped Google model for the user's selection
-  if (apiKeys.gemini) {
+  // ── Step 4: Google direct (last resort — NOT for seedream models) ──
+  const isSeedream = modelConfig?.company === 'bytedance' || request.modelId === 'seedream-5-lite' || request.modelId === 'seedream-5'
+  if (!isSeedream && apiKeys.gemini) {
     const googleModelId = getGoogleDirectModelId(request.modelId)
     console.log(`[Cascade] Google direct fallback with ${googleModelId}`)
     const t0 = Date.now()
@@ -157,25 +219,25 @@ export async function generateImage(
         return { ...result, provider: request.provider }
       }
       logAI({ service: 'image', provider: 'google', status: 'error', response_ms: Date.now() - t0, model: googleModelId, error_message: result.error, was_fallback: true })
-      cascadeErrors.push(`Google (${googleModelId}): ${result.error || 'fallido'}`)
+      cascadeErrors.push(result.error || 'Google fallo')
     } catch (err: any) {
       logAI({ service: 'image', provider: 'google', status: 'error', response_ms: Date.now() - t0, model: googleModelId, error_message: err.message, was_fallback: true })
-      cascadeErrors.push(`Google (${googleModelId}): ${err.message || 'fallido'}`)
+      cascadeErrors.push(err.message || 'Google fallo')
     }
   }
 
-  // ── All failed ──
+  // ── All failed — show FRIENDLY error to user ──
   if (cascadeErrors.length === 0) {
     return {
       success: false,
-      error: 'Configura al menos una API key (KIE, fal.ai, o Google) en Settings',
+      error: 'No tienes ninguna API configurada. Ve a Settings y agrega al menos una (KIE, fal.ai o Google).',
       provider: request.provider,
     }
   }
 
   return {
     success: false,
-    error: `Todos los proveedores fallaron:\n${cascadeErrors.join('\n')}`,
+    error: humanizeErrors(cascadeErrors),
     provider: request.provider,
   }
 }
