@@ -231,10 +231,10 @@ export async function POST(request: Request) {
       templateMimeType = response.headers.get('content-type') || 'image/jpeg'
     }
 
-    // Determine if this provider needs public URLs
-    // KIE.ai (Seedream) and BFL (FLUX) require public URLs for images
-    // Also upload if user has KIE key (for Gemini → KIE fallback)
-    const needsPublicUrls = selectedProvider === 'seedream' || selectedProvider === 'flux' || (selectedProvider === 'gemini' && !!apiKeys.kie)
+    // ALWAYS upload product images to Storage for public URLs.
+    // The cascade may try KIE or fal.ai regardless of selected provider,
+    // and both need public URLs (not base64).
+    const needsPublicUrls = productPhotos.length > 0
 
     console.log(`[Generate] Provider: ${selectedProvider}, needs public URLs: ${needsPublicUrls}`)
 
