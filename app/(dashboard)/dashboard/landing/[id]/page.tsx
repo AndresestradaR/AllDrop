@@ -892,17 +892,24 @@ export default function ProductGeneratePage() {
   }
 
   const uploadToCanva = async (imageUrl: string, sectionId: string, name?: string) => {
-    const response = await fetch('/api/canva/upload', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        imageUrl,
-        sectionId,
-        productName: name,
-      }),
-    })
+    let data: any
+    try {
+      const response = await fetch('/api/canva/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageUrl,
+          sectionId,
+          productName: name,
+        }),
+      })
 
-    const data = await response.json()
+      data = await response.json()
+      console.log('[Canva] upload response:', response.status, data)
+    } catch (fetchErr) {
+      console.error('[Canva] fetch failed:', fetchErr)
+      throw new Error('No se pudo conectar con el servidor de Canva')
+    }
 
     if (data.needsAuth) {
       // Store pending data for retry after OAuth
@@ -912,10 +919,11 @@ export default function ProductGeneratePage() {
       // Redirect to OAuth with return URL
       toast.loading('Autenticando con Canva...', { id: 'canva' })
       window.location.href = `/api/canva/auth?returnUrl=${encodeURIComponent(window.location.pathname)}`
-      return null
+      // Wait for navigation to complete so caller doesn't proceed
+      await new Promise(() => {})
     }
 
-    if (!response.ok) {
+    if (!data.success) {
       throw new Error(data.error || 'Error al conectar con Canva')
     }
 
@@ -948,23 +956,9 @@ export default function ProductGeneratePage() {
         canvaWindow?.close()
       }
     } catch (error: any) {
-      console.error('Canva error:', error)
+      console.error('Canva upload error:', error?.message || error)
       canvaWindow?.close()
-      toast.error('Error con Canva. Descargando imagen...', { id: 'canva' })
-
-      // Fallback: Download image and open Canva manually
-      const link = document.createElement('a')
-      link.href = section.generated_image_url
-      link.download = `${product?.name || 'banner'}-canva-${Date.now()}.png`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-
-      window.open('https://www.canva.com/create/custom-size', '_blank')
-
-      toast.success('Imagen descargada. Sube la imagen en Canva.', {
-        duration: 5000,
-      })
+      toast.error(`Error con Canva: ${error?.message || 'Intenta de nuevo'}`, { id: 'canva', duration: 5000 })
     } finally {
       setIsOpeningCanva(false)
     }
