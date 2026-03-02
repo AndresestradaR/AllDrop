@@ -73,29 +73,47 @@ export async function generateViaFal(
     input.image_urls = options.imageUrls
   }
 
-  // Aspect ratio — seedream models use image_size enum, others use aspect_ratio
-  if (options.aspectRatio) {
-    if (modelPath.includes('seedream')) {
-      const sizeMap: Record<string, string> = {
-        '1:1': 'square_hd',
-        '9:16': 'portrait_16_9',
-        '16:9': 'landscape_16_9',
-        '4:5': 'portrait_4_3',
-        '4:3': 'landscape_4_3',
-        '3:4': 'portrait_4_3',
-        '3:2': 'landscape_16_9',
-        '2:3': 'portrait_16_9',
-      }
-      input.image_size = sizeMap[options.aspectRatio] || 'auto_2K'
-    } else {
+  // Model-specific parameters — each fal.ai model has its own schema
+  if (modelPath.includes('gpt-image')) {
+    // GPT Image 1.5: uses image_size (pixel dims), quality, output_format
+    const gptSizeMap: Record<string, string> = {
+      '1:1': '1024x1024',
+      '9:16': '1024x1536',
+      '16:9': '1536x1024',
+      '4:5': '1024x1536',
+      '3:4': '1024x1536',
+      '2:3': '1024x1536',
+      '4:3': '1536x1024',
+      '3:2': '1536x1024',
+    }
+    input.image_size = gptSizeMap[options.aspectRatio || '9:16'] || 'auto'
+    input.quality = 'high'
+    input.output_format = 'png'
+  } else if (modelPath.includes('seedream')) {
+    // Seedream: uses image_size enum names
+    const seedreamSizeMap: Record<string, string> = {
+      '1:1': 'square_hd',
+      '9:16': 'portrait_16_9',
+      '16:9': 'landscape_16_9',
+      '4:5': 'portrait_4_3',
+      '4:3': 'landscape_4_3',
+      '3:4': 'portrait_4_3',
+      '3:2': 'landscape_16_9',
+      '2:3': 'portrait_16_9',
+    }
+    input.image_size = seedreamSizeMap[options.aspectRatio || '9:16'] || 'auto_2K'
+  } else if (modelPath.includes('nano-banana')) {
+    // Nano Banana (2 & Pro): uses aspect_ratio string + resolution
+    if (options.aspectRatio) {
       input.aspect_ratio = options.aspectRatio
     }
-  }
-
-  // Resolution for nano-banana models
-  if (modelPath.includes('nano-banana')) {
     input.resolution = '1K'
     input.output_format = 'png'
+  } else {
+    // FLUX and other models: use aspect_ratio string
+    if (options.aspectRatio) {
+      input.aspect_ratio = options.aspectRatio
+    }
   }
 
   try {
