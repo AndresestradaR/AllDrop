@@ -112,6 +112,26 @@ generateImage(model, params) -> ImageResult
   Clasificacion errores: lib/services/ai-errors.ts (auth, quota, server, timeout)
   Tipos: lib/image-providers/types.ts
   Monitoreo: lib/services/ai-monitor.ts (fire-and-forget logAI() en cada intento)
+
+  Direct API fallback — campo `directModelId` en cascade config:
+    Cada modelo especifica el ID exacto para su API directa (Google/OpenAI/BFL).
+    nano-banana-2 → directModelId: 'gemini-3.1-flash-image-preview'
+    gemini-3-pro-image → directModelId: 'gemini-3-pro-image-preview'
+    PROHIBIDO: gemini-2.5-flash-image — NO USAR NUNCA en esta herramienta.
+
+  usedProvider tracking:
+    Cada paso de la cascada retorna `usedProvider` (ej: 'kie:nano-banana-2', 'fal:fal-ai/nano-banana-2', 'google:gemini-3.1-flash-image-preview').
+    Se devuelve en la respuesta API para debugging.
+
+  Seedream text length limit:
+    KIE rechaza prompts >800 chars para seedream con "The text length cannot exceed the maximum limit".
+    Se trunca a 800 chars automaticamente en generateViaKie() y en fal.ai para paths seedream.
+    fal.ai timeout para seedream: 90s (en vez de 45s default) — /edit endpoints son lentos.
+
+  Env var fallbacks (platform keys):
+    Ambas rutas (generate-landing + studio/generate-image) tienen fallback a env vars:
+    GEMINI_API_KEY, OPENAI_API_KEY, KIE_API_KEY, BFL_API_KEY, FAL_API_KEY
+    hasCascadeKey() valida si AL MENOS UNA key existe en toda la cadena del modelo.
 ```
 
 #### Video Generation — `lib/video-providers/kie-video.ts`
@@ -249,6 +269,58 @@ Donde es posible, cascade completa multi-proveedor via servicios centralizados.
 All use generateAIText() internally
 ```
 
+#### Canva Connect Integration — `lib/canva/` + `app/api/canva/`
+```
+Permite editar banners generados directamente en Canva.
+Boton "Editar en Canva" en el editor de landing (/dashboard/landing/[id]).
+
+Archivos:
+  lib/canva/pkce.ts          — PKCE helpers + encryptState/decryptState (AES-256-GCM)
+  app/api/canva/auth/route.ts    — Inicia OAuth: genera PKCE, encripta state, redirige a Canva
+  app/api/canva/callback/route.ts — Callback: descifra state, intercambia code por tokens
+  app/api/canva/upload/route.ts  — Sube imagen + crea diseño en Canva, retorna editUrl
+
+OAuth Flow (stateless — SIN cookies para PKCE):
+  1. Frontend llama GET /api/canva/auth?returnUrl=/dashboard/landing/[id]
+  2. Auth route genera code_verifier + code_challenge (PKCE S256)
+  3. Encripta {code_verifier, returnUrl, timestamp} con AES-256-GCM (key = sha256(CANVA_CLIENT_SECRET))
+  4. El blob encriptado ES el parametro `state` de OAuth — no se usan cookies
+  5. Redirige a canva.com/api/oauth/authorize
+  6. Usuario autoriza → Canva redirige a /api/canva/callback?code=...&state=...
+  7. Callback descifra state → recupera code_verifier + returnUrl
+  8. Intercambia code por tokens (access_token + refresh_token)
+  9. Guarda tokens en cookies httpOnly, redirige a returnUrl?canva_success=true
+  10. Frontend detecta canva_success, reintenta upload pendiente
+
+POR QUE stateless (no cookies para PKCE):
+  Cookies en redirect responses se pierden en Vercel/cross-site OAuth.
+  El state encriptado viaja con el flujo OAuth y se descifra al volver.
+  La encripcion AES-256-GCM sirve como CSRF protection (solo nuestro server puede crearlo).
+
+Upload Flow:
+  1. Frontend POST /api/canva/upload con {imageUrl, sectionId, productName}
+  2. Server fetch imagen desde Supabase Storage → Buffer
+  3. POST a Canva Asset Upload API (octet-stream + Asset-Upload-Metadata header)
+  4. Poll job hasta completar → obtiene assetId
+  5. POST a Canva Design API → crea diseño 1080x1920 con el asset
+  6. Retorna editUrl → frontend abre en nueva pestaña
+
+Limites Canva API:
+  - Asset name: max 50 chars (unencoded) en Asset-Upload-Metadata.name_base64
+  - Rate limit: 30 requests/min por usuario
+  - Scopes requeridos: asset:read, asset:write, design:content:read, design:content:write
+
+Env vars requeridas:
+  CANVA_CLIENT_ID — OAuth client ID (registrado en canva.dev)
+  CANVA_CLIENT_SECRET — OAuth secret (tambien se usa como key de encripcion del state)
+  CANVA_REDIRECT_URI — Debe ser https://estrategasia.com/api/canva/callback
+
+Tokens:
+  canva_access_token — cookie httpOnly, expira segun Canva (tipicamente 4h)
+  canva_refresh_token — cookie httpOnly, 30 dias, se usa para renovar access_token
+  Si ambos expiran → redirige a OAuth de nuevo automaticamente
+```
+
 ### Banner Generator Flow — `/dashboard/landing/[id]`
 
 Three interconnected routes — two for TEXT, one for IMAGE:
@@ -313,7 +385,9 @@ profiles, templates, products, landing_sections, generations, allowed_emails, la
 | `NEXT_PUBLIC_LUCIO_URL` + `NEXT_PUBLIC_LUCIO_TOKEN` | Lucio chatbot | Lucio page won't connect |
 | Platform fallback keys: `GEMINI_API_KEY`, `OPENAI_API_KEY`, `KIE_API_KEY`, `BFL_API_KEY`, `ELEVENLABS_API_KEY` | Fallback when user has no BYOK key | AI features degrade |
 | `BROWSERLESS_API_KEY`, `APIFY_API_TOKEN` | Competitor analysis | Competitor features break |
-| `CANVA_CLIENT_ID` + `CANVA_CLIENT_SECRET` | Canva OAuth | Canva integration breaks |
+| `CANVA_CLIENT_ID` + `CANVA_CLIENT_SECRET` | Canva OAuth + state encryption key | Canva integration breaks |
+| `CANVA_REDIRECT_URI` | Canva OAuth callback URL | Must be `https://estrategasia.com/api/canva/callback` |
+| `FAL_API_KEY` | fal.ai platform fallback | Image/video cascade skips fal.ai step |
 | `RESEND_API_KEY` | Email notifications | Coaching emails fail |
 
 ---
@@ -505,6 +579,11 @@ BREAKS: ALL AI features in DropPage (key resolution for every AI call)
 - Google enabling "thinking mode" by default → 100s+ responses → timeout cascade → 504s. Fixed with reasoning_effort:'none' (KIE) and thinkingBudget:0 (Google direct)
 - KIE model cascade with slow models (gemini-2.5-pro) → total time exceeds Vercel 120s limit. Only use gemini-2.5-flash in KIE cascade for estrategas
 - Wrong client.id for Lucio WebSocket → "missing scope" errors. Must use 'openclaw-control-ui'
+- Using modelConfig.apiModelId for Gemini direct → fal.ai paths (ej: 'fal-ai/nano-banana-2') causaban 404 en Google API. Siempre usar cascade.directModelId
+- Cookies en redirect responses de Vercel → se pierden en cross-site OAuth. Solucion: state encriptado (Canva)
+- Canva Asset-Upload-Metadata name > 50 chars → "Invalid upload metadata header". Truncar filename
+- Seedream prompts > 800 chars → KIE error "text length cannot exceed maximum limit". Truncar automaticamente
+- Cross-origin `<a download>` no descarga, navega la pagina. Nunca usar link.click() con URLs de otro dominio como fallback
 
 ---
 
@@ -607,4 +686,4 @@ Key entries: cron schedule for `/api/cron/automations`, function maxDuration set
 
 ---
 
-*Last updated: 2026-02-27 — Generated from file-by-file audit of all 4 repositories*
+*Last updated: 2026-03-02 — Added Canva Connect integration, image cascade directModelId/usedProvider, seedream fixes, env var fallbacks*
