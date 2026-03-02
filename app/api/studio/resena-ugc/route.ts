@@ -1,9 +1,14 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { decrypt } from '@/lib/services/encryption'
-import { GoogleGenerativeAI } from '@google/generative-ai'
 import { generateAIText, getAIKeys, requireAIKeys } from '@/lib/services/ai-text'
 import { generateVideo, VIDEO_MODELS } from '@/lib/video-providers'
+import {
+  generateImage,
+  pollForResult,
+  type GenerateImageRequest,
+  type ImageModelId,
+} from '@/lib/image-providers'
 
 // Extended timeout for video generation
 export const maxDuration = 120
@@ -98,7 +103,7 @@ export async function POST(request: Request) {
     // Get user's API keys
     const { data: profile } = await supabase
       .from('profiles')
-      .select('google_api_key, kie_api_key')
+      .select('google_api_key, kie_api_key, openai_api_key, bfl_api_key, fal_api_key')
       .eq('id', user.id)
       .single()
 
@@ -113,12 +118,15 @@ export async function POST(request: Request) {
     requireAIKeys(aiKeys)
 
     const kieApiKey = decrypt(profile.kie_api_key)
+    const falApiKey = profile?.fal_api_key ? decrypt(profile.fal_api_key) : undefined
 
-    // For image generation with Imagen 3, we still need the Google API key directly
-    let googleApiKey: string | undefined
-    if (profile?.google_api_key) {
-      googleApiKey = decrypt(profile.google_api_key)
-    }
+    // Image generation keys (for face generation cascade)
+    const imageApiKeys: { gemini?: string; openai?: string; kie?: string; bfl?: string; fal?: string } = {}
+    if (profile?.google_api_key) imageApiKeys.gemini = decrypt(profile.google_api_key)
+    if (profile?.openai_api_key) imageApiKeys.openai = decrypt(profile.openai_api_key)
+    imageApiKeys.kie = kieApiKey
+    if (profile?.bfl_api_key) imageApiKeys.bfl = decrypt(profile.bfl_api_key)
+    if (falApiKey) imageApiKeys.fal = falApiKey
 
     console.log(`[ResenaUGC] Starting - User: ${user.id.substring(0, 8)}...`)
     console.log(`[ResenaUGC] Product: ${productName}, Model: ${videoModel}, Duration: ${duration}s`)
@@ -130,73 +138,58 @@ export async function POST(request: Request) {
     let faceImageBase64: string | null = imageBase64 || null
 
     if (imageSource === 'generate') {
-      console.log(`[ResenaUGC] Step 1: Generating face with ${imageModel}...`)
+      console.log(`[ResenaUGC] Step 1: Generating face via image cascade...`)
 
-      if (!googleApiKey) {
+      // Check we have at least one image generation key
+      if (!imageApiKeys.gemini && !imageApiKeys.kie && !imageApiKeys.fal) {
         return NextResponse.json({
-          error: 'Configura tu API key de Google AI en Settings para generar imagenes',
+          error: 'Configura tu API key de Google AI, KIE.ai o fal.ai en Settings para generar imágenes',
         }, { status: 400 })
       }
 
       const facePrompt = FACE_PROMPTS[persona] || FACE_PROMPTS['mujer-joven']
-      const genAI = new GoogleGenerativeAI(googleApiKey)
 
-      if (imageModel === 'gemini' || imageModel === 'imagen3') {
-        // Use Google's Imagen 3
-        try {
-          const imageGenModel = genAI.getGenerativeModel({
-            model: 'imagen-3.0-generate-002'
+      // Use image cascade: KIE→fal→Gemini direct (T2I, no reference image)
+      const faceModelId: ImageModelId = 'gemini-3-pro-image' as ImageModelId
+      const faceRequest: GenerateImageRequest = {
+        provider: 'gemini',
+        modelId: faceModelId,
+        prompt: facePrompt,
+        aspectRatio: '9:16',
+      }
+
+      try {
+        const genStartTime = Date.now()
+        let faceResult = await generateImage(faceRequest, imageApiKeys, {
+          maxTotalMs: 60000,
+        })
+
+        // Poll if async
+        if (faceResult.success && faceResult.status === 'processing' && faceResult.taskId) {
+          const elapsedMs = Date.now() - genStartTime
+          const remainingMs = Math.max(60000 - elapsedMs, 15000)
+          const pollKey = imageApiKeys.kie || imageApiKeys.bfl || imageApiKeys.fal || ''
+          faceResult = await pollForResult('gemini', faceResult.taskId, pollKey, {
+            maxAttempts: Math.floor(remainingMs / 1000),
+            intervalMs: 1000,
+            timeoutMs: remainingMs,
           })
+        }
 
-          const result = await imageGenModel.generateContent({
-            contents: [{ role: 'user', parts: [{ text: facePrompt }] }],
-            generationConfig: { responseMimeType: 'image/png' },
-          })
-
-          const response = await result.response
-          const parts = response.candidates?.[0]?.content?.parts || []
-
-          for (const part of parts) {
-            if (part.inlineData?.mimeType?.startsWith('image/')) {
-              faceImageBase64 = part.inlineData.data
-              break
-            }
-          }
-        } catch (error: any) {
-          console.error('[ResenaUGC] Imagen 3 failed:', error.message)
+        if (faceResult.success && faceResult.imageBase64) {
+          faceImageBase64 = faceResult.imageBase64
+          console.log(`[ResenaUGC] Face generated via cascade`)
+        } else {
+          console.error('[ResenaUGC] Face generation failed:', faceResult.error)
           return NextResponse.json({
-            error: 'Error generando imagen de cara. Verifica tu API key de Google AI.',
+            error: 'Error generando imagen de cara. Intenta de nuevo.',
           }, { status: 500 })
         }
-      } else {
-        // TODO: Implement Nano Banana Pro for face generation
-        // For now, fall back to Imagen 3
-        console.log('[ResenaUGC] Nano Banana not implemented, using Imagen 3')
-        try {
-          const imageGenModel = genAI.getGenerativeModel({
-            model: 'imagen-3.0-generate-002'
-          })
-
-          const result = await imageGenModel.generateContent({
-            contents: [{ role: 'user', parts: [{ text: facePrompt }] }],
-            generationConfig: { responseMimeType: 'image/png' },
-          })
-
-          const response = await result.response
-          const parts = response.candidates?.[0]?.content?.parts || []
-
-          for (const part of parts) {
-            if (part.inlineData?.mimeType?.startsWith('image/')) {
-              faceImageBase64 = part.inlineData.data
-              break
-            }
-          }
-        } catch (error: any) {
-          console.error('[ResenaUGC] Image generation failed:', error.message)
-          return NextResponse.json({
-            error: 'Error generando imagen de cara.',
-          }, { status: 500 })
-        }
+      } catch (error: any) {
+        console.error('[ResenaUGC] Face generation error:', error.message)
+        return NextResponse.json({
+          error: 'Error generando imagen de cara.',
+        }, { status: 500 })
       }
     }
 
@@ -334,7 +327,8 @@ The person should be speaking the dialog naturally, with appropriate facial expr
         enableAudio: modelConfig?.supportsAudio ?? true,
         imageUrls: [faceImageUrl],
       },
-      kieApiKey
+      kieApiKey,
+      falApiKey
     )
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)

@@ -4,15 +4,39 @@ import { decrypt } from '@/lib/services/encryption'
 
 export const maxDuration = 120
 
+/** Try KIE createTask, return taskId or null */
+async function tryKie(model: string, input: any, apiKey: string, label: string): Promise<string | null> {
+  try {
+    const res = await fetch('https://api.kie.ai/api/v1/jobs/createTask', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({ model, input }),
+    })
+    const text = await res.text()
+    const data = JSON.parse(text)
+    if (data.code && data.code !== 200 && data.code !== 0) {
+      console.warn(`[CloneViral/LipSync] KIE ${label} error: ${data.msg || data.message}`)
+      return null
+    }
+    const taskId = data.data?.taskId || data.taskId
+    if (taskId) {
+      console.log(`[CloneViral/LipSync] KIE ${label} OK: ${taskId}`)
+      return taskId
+    }
+    console.warn(`[CloneViral/LipSync] KIE ${label} no taskId`)
+    return null
+  } catch (e: any) {
+    console.warn(`[CloneViral/LipSync] KIE ${label} error:`, e.message)
+    return null
+  }
+}
+
 /**
  * Generate lip-synced video using Kling AI Avatar via KIE.ai.
  * Takes influencer image + audio URL → produces talking video with lip sync.
  *
  * Model: kling/ai-avatar-pro (1080p) or kling/ai-avatar-standard (720p)
- * Docs: https://kie.ai/kling-ai-avatar
- *
- * Input: image_url (JPEG/PNG/WEBP, max 10MB) + audio_url (MP3/WAV/AAC, max 10MB, max 15s)
- * Channel: fal_request
+ * Cascade: KIE user key → KIE platform key
  */
 export async function POST(request: Request) {
   try {
@@ -46,56 +70,31 @@ export async function POST(request: Request) {
       .eq('id', user.id)
       .single()
 
-    if (!profile?.kie_api_key) {
+    const userKieKey = profile?.kie_api_key ? decrypt(profile.kie_api_key) : null
+    const platformKieKey = process.env.KIE_API_KEY || null
+
+    if (!userKieKey && !platformKieKey) {
       return NextResponse.json({ error: 'Configura tu API key de KIE.ai en Settings' }, { status: 400 })
     }
 
-    const kieApiKey = decrypt(profile.kie_api_key)
-
     const model = quality === 'pro' ? 'kling/ai-avatar-pro' : 'kling/ai-avatar-standard'
+    const input = { image_url, audio_url, prompt }
 
     console.log(`[CloneViral/LipSync] Model: ${model}, Image: ${image_url.substring(0, 80)}..., Audio: ${audio_url.substring(0, 80)}...`)
 
-    const taskResponse = await fetch('https://api.kie.ai/api/v1/jobs/createTask', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${kieApiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        input: {
-          image_url,
-          audio_url,
-          prompt,
-        },
-      }),
-    })
+    // Cascade: user key → platform key
+    let taskId: string | null = null
 
-    const responseText = await taskResponse.text()
-    console.log('[CloneViral/LipSync] KIE Response:', taskResponse.status, responseText.substring(0, 500))
-
-    let taskData: any
-    try {
-      taskData = JSON.parse(responseText)
-    } catch (e) {
-      console.error('[CloneViral/LipSync] Invalid JSON:', responseText.substring(0, 200))
-      return NextResponse.json({ error: 'Respuesta inválida de KIE' }, { status: 500 })
+    if (userKieKey) {
+      taskId = await tryKie(model, input, userKieKey, 'user')
+    }
+    if (!taskId && platformKieKey && platformKieKey !== userKieKey) {
+      console.log('[CloneViral/LipSync] Trying platform KIE key...')
+      taskId = await tryKie(model, input, platformKieKey, 'platform')
     }
 
-    if (taskData.code && taskData.code !== 200) {
-      console.error('[CloneViral/LipSync] KIE error:', taskData.msg || taskData.message)
-      return NextResponse.json({
-        error: taskData.msg || taskData.message || 'Error en KIE al crear lip sync'
-      }, { status: 500 })
-    }
-
-    const taskId = taskData.data?.taskId || taskData.taskId
     if (!taskId) {
-      console.error('[CloneViral/LipSync] No taskId:', JSON.stringify(taskData))
-      return NextResponse.json({
-        error: 'No se recibió taskId de KIE'
-      }, { status: 500 })
+      return NextResponse.json({ error: 'Error en lip sync. Intenta de nuevo.' }, { status: 500 })
     }
 
     console.log(`[CloneViral/LipSync] User: ${user.id.substring(0, 8)}..., TaskId: ${taskId}`)

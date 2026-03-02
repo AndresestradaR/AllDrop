@@ -4,6 +4,8 @@ import { decrypt } from '@/lib/services/encryption'
 
 export const maxDuration = 60
 
+const KIE_MODEL = 'elevenlabs/text-to-speech-multilingual-v2'
+
 // Voces de ElevenLabs disponibles en KIE
 // Lista completa en: https://elevenlabs.io/voice-library
 const VOICES = {
@@ -21,6 +23,33 @@ const VOICES = {
   },
 }
 
+/** Try KIE createTask, return taskId or null */
+async function tryKie(model: string, input: any, apiKey: string, label: string): Promise<string | null> {
+  try {
+    const res = await fetch('https://api.kie.ai/api/v1/jobs/createTask', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({ model, input }),
+    })
+    const text = await res.text()
+    const data = JSON.parse(text)
+    if (data.code && data.code !== 200 && data.code !== 0) {
+      console.warn(`[CloneViral/Voice] KIE ${label} error: ${data.msg || data.message}`)
+      return null
+    }
+    const taskId = data.data?.taskId || data.taskId
+    if (taskId) {
+      console.log(`[CloneViral/Voice] KIE ${label} OK: ${taskId}`)
+      return taskId
+    }
+    console.warn(`[CloneViral/Voice] KIE ${label} no taskId`)
+    return null
+  } catch (e: any) {
+    console.warn(`[CloneViral/Voice] KIE ${label} error:`, e.message)
+    return null
+  }
+}
+
 /**
  * Generate voice audio using ElevenLabs TTS via KIE.ai.
  *
@@ -30,6 +59,8 @@ const VOICES = {
  * - Soporta 29 idiomas incluyendo español
  * - Usa "voice" (nombre) en vez de "voice_id"
  * - Params: stability, similarity_boost, style, speed, language_code
+ *
+ * Cascade: KIE user key → KIE platform key
  */
 export async function POST(request: Request) {
   try {
@@ -65,11 +96,12 @@ export async function POST(request: Request) {
       .eq('id', user.id)
       .single()
 
-    if (!profile?.kie_api_key) {
+    const userKieKey = profile?.kie_api_key ? decrypt(profile.kie_api_key) : null
+    const platformKieKey = process.env.KIE_API_KEY || null
+
+    if (!userKieKey && !platformKieKey) {
       return NextResponse.json({ error: 'Configura tu API key de KIE.ai en Settings' }, { status: 400 })
     }
-
-    const kieApiKey = decrypt(profile.kie_api_key)
 
     // Seleccionar voz: usar la proporcionada o elegir por género
     const selectedVoice = voice || (gender === 'male' ? VOICES.male.default : VOICES.female.default)
@@ -77,51 +109,29 @@ export async function POST(request: Request) {
     console.log(`[CloneViral/Voice] Voice: ${selectedVoice}, Language: ${language_code}, Speed: ${speed}`)
     console.log(`[CloneViral/Voice] Text preview: ${text.substring(0, 100)}...`)
 
-    const taskResponse = await fetch('https://api.kie.ai/api/v1/jobs/createTask', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${kieApiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'elevenlabs/text-to-speech-multilingual-v2',
-        input: {
-          text,
-          voice: selectedVoice,
-          stability: 0.5,
-          similarity_boost: 0.75,
-          style: 0,
-          speed: speed,
-          language_code: language_code,
-        },
-      }),
-    })
-
-    const responseText = await taskResponse.text()
-    console.log('[CloneViral/Voice] KIE Response:', taskResponse.status, responseText.substring(0, 500))
-
-    let taskData: any
-    try {
-      taskData = JSON.parse(responseText)
-    } catch (e) {
-      console.error('[CloneViral/Voice] Invalid JSON response:', responseText.substring(0, 200))
-      return NextResponse.json({ error: 'Respuesta inválida de KIE' }, { status: 500 })
+    const input = {
+      text,
+      voice: selectedVoice,
+      stability: 0.5,
+      similarity_boost: 0.75,
+      style: 0,
+      speed: speed,
+      language_code: language_code,
     }
 
-    // Verificar error de KIE
-    if (taskData.code && taskData.code !== 200) {
-      console.error('[CloneViral/Voice] KIE error:', taskData.msg || taskData.message)
-      return NextResponse.json({
-        error: taskData.msg || taskData.message || 'Error en KIE al generar voz'
-      }, { status: 500 })
+    // Cascade: user key → platform key
+    let taskId: string | null = null
+
+    if (userKieKey) {
+      taskId = await tryKie(KIE_MODEL, input, userKieKey, 'user')
+    }
+    if (!taskId && platformKieKey && platformKieKey !== userKieKey) {
+      console.log('[CloneViral/Voice] Trying platform KIE key...')
+      taskId = await tryKie(KIE_MODEL, input, platformKieKey, 'platform')
     }
 
-    const taskId = taskData.data?.taskId || taskData.taskId
     if (!taskId) {
-      console.error('[CloneViral/Voice] No taskId in response:', JSON.stringify(taskData))
-      return NextResponse.json({
-        error: 'No se recibió taskId de KIE'
-      }, { status: 500 })
+      return NextResponse.json({ error: 'Error al generar voz. Intenta de nuevo.' }, { status: 500 })
     }
 
     console.log(`[CloneViral/Voice] User: ${user.id.substring(0, 8)}..., TaskId: ${taskId}`)

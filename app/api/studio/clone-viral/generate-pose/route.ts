@@ -4,9 +4,34 @@ import { decrypt } from '@/lib/services/encryption'
 
 export const maxDuration = 60
 
+const KIE_MODEL = 'kling-2.6/image'
+
+/** Try KIE createTask, return taskId or null */
+async function tryKie(model: string, input: any, apiKey: string): Promise<string | null> {
+  try {
+    const res = await fetch('https://api.kie.ai/api/v1/jobs/createTask', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({ model, input }),
+    })
+    const text = await res.text()
+    const data = JSON.parse(text)
+    const taskId = data.data?.taskId || data.taskId
+    if (taskId) {
+      console.log(`[CloneViral/GeneratePose] KIE OK: ${taskId}`)
+      return taskId
+    }
+    console.warn(`[CloneViral/GeneratePose] KIE no taskId:`, text.substring(0, 300))
+    return null
+  } catch (e: any) {
+    console.warn(`[CloneViral/GeneratePose] KIE error:`, e.message)
+    return null
+  }
+}
+
 /**
  * Generate influencer pose matching the viral video frame.
- * Uses KIE.ai image generation with the influencer's character profile as reference.
+ * Cascade: KIE user key → KIE platform key
  */
 export async function POST(request: Request) {
   try {
@@ -34,51 +59,36 @@ export async function POST(request: Request) {
       .eq('id', user.id)
       .single()
 
-    if (!profile?.kie_api_key) {
+    const userKieKey = profile?.kie_api_key ? decrypt(profile.kie_api_key) : null
+    const platformKieKey = process.env.KIE_API_KEY || null
+
+    if (!userKieKey && !platformKieKey) {
       return NextResponse.json({ error: 'Configura tu API key de KIE.ai en Settings' }, { status: 400 })
     }
 
-    const kieApiKey = decrypt(profile.kie_api_key)
-
-    // Use Kling motion control to generate the influencer in the same pose
     const prompt = prompt_descriptor
       ? `${prompt_descriptor}, same pose and angle as reference, professional photo`
       : 'Person in the same pose and angle as the reference image, professional photo'
 
-    // CORREGIDO: endpoint /jobs/createTask + Authorization Bearer
-    const taskResponse = await fetch('https://api.kie.ai/api/v1/jobs/createTask', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${kieApiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'kling-2.6/image',
-        input: {
-          prompt,
-          image_urls: [influencer_image_url, frame_url],
-          aspect_ratio: '9:16',
-        },
-      }),
-    })
-
-    const responseText = await taskResponse.text()
-    console.log('[CloneViral/GeneratePose] KIE Response:', taskResponse.status, responseText.substring(0, 500))
-
-    let taskData: any
-    try {
-      taskData = JSON.parse(responseText)
-    } catch (e) {
-      console.error('[CloneViral/GeneratePose] Invalid JSON:', responseText.substring(0, 200))
-      return NextResponse.json({ error: 'Respuesta inválida de KIE' }, { status: 500 })
+    const input = {
+      prompt,
+      image_urls: [influencer_image_url, frame_url],
+      aspect_ratio: '9:16',
     }
 
-    const taskId = taskData.data?.taskId || taskData.taskId
+    // Cascade: user key → platform key
+    let taskId: string | null = null
+
+    if (userKieKey) {
+      taskId = await tryKie(KIE_MODEL, input, userKieKey)
+    }
+    if (!taskId && platformKieKey && platformKieKey !== userKieKey) {
+      console.log('[CloneViral/GeneratePose] Trying platform KIE key...')
+      taskId = await tryKie(KIE_MODEL, input, platformKieKey)
+    }
+
     if (!taskId) {
-      console.error('[CloneViral/GeneratePose] No taskId:', JSON.stringify(taskData))
-      return NextResponse.json({
-        error: taskData.msg || taskData.message || 'Error al crear tarea de generacion'
-      }, { status: 500 })
+      return NextResponse.json({ error: 'Error al generar pose. Intenta de nuevo.' }, { status: 500 })
     }
 
     console.log(`[CloneViral/GeneratePose] User: ${user.id.substring(0, 8)}..., TaskId: ${taskId}`)

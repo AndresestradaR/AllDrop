@@ -4,9 +4,40 @@ import { decrypt } from '@/lib/services/encryption'
 
 export const maxDuration = 120
 
+const KIE_MODEL = 'kling-2.6/motion-control'
+
+/** Try KIE createTask, return taskId or null */
+async function tryKie(model: string, input: any, apiKey: string, label: string): Promise<string | null> {
+  try {
+    const res = await fetch('https://api.kie.ai/api/v1/jobs/createTask', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({ model, input }),
+    })
+    const text = await res.text()
+    const data = JSON.parse(text)
+    if (data.code && data.code !== 200 && data.code !== 0) {
+      console.warn(`[CloneViral/MotionControl] KIE ${label} error: ${data.msg || data.message}`)
+      return null
+    }
+    const taskId = data.data?.taskId || data.taskId
+    if (taskId) {
+      console.log(`[CloneViral/MotionControl] KIE ${label} OK: ${taskId}`)
+      return taskId
+    }
+    console.warn(`[CloneViral/MotionControl] KIE ${label} no taskId`)
+    return null
+  } catch (e: any) {
+    console.warn(`[CloneViral/MotionControl] KIE ${label} error:`, e.message)
+    return null
+  }
+}
+
 /**
  * Generate video using Kling motion control.
  * Takes the influencer pose image + original viral video as motion source.
+ *
+ * Cascade: KIE user key → KIE platform key
  */
 export async function POST(request: Request) {
   try {
@@ -35,11 +66,12 @@ export async function POST(request: Request) {
       .eq('id', user.id)
       .single()
 
-    if (!profile?.kie_api_key) {
+    const userKieKey = profile?.kie_api_key ? decrypt(profile.kie_api_key) : null
+    const platformKieKey = process.env.KIE_API_KEY || null
+
+    if (!userKieKey && !platformKieKey) {
       return NextResponse.json({ error: 'Configura tu API key de KIE.ai en Settings' }, { status: 400 })
     }
-
-    const kieApiKey = decrypt(profile.kie_api_key)
 
     const motionPrompt = prompt || 'Person speaking naturally with expressive gestures, professional lighting'
 
@@ -47,49 +79,29 @@ export async function POST(request: Request) {
     // Docs: https://docs.kie.ai/market/kling/motion-control
     // mode: "720p" (standard) | "1080p" (pro)
     // character_orientation: "image" (match photo, max 10s) | "video" (match video, max 30s)
-    const taskResponse = await fetch('https://api.kie.ai/api/v1/jobs/createTask', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${kieApiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'kling-2.6/motion-control',
-        input: {
-          prompt: motionPrompt,
-          input_urls: [pose_image_url],
-          video_urls: [motion_video_url],
-          mode: '1080p',
-          character_orientation: 'video',
-        },
-      }),
-    })
-
-    const responseText = await taskResponse.text()
-    console.log('[CloneViral/MotionControl] KIE Response:', taskResponse.status, responseText.substring(0, 500))
-
-    let taskData: any
-    try {
-      taskData = JSON.parse(responseText)
-    } catch (e) {
-      console.error('[CloneViral/MotionControl] Invalid JSON:', responseText.substring(0, 200))
-      return NextResponse.json({ error: 'Respuesta inválida de KIE' }, { status: 500 })
+    const input = {
+      prompt: motionPrompt,
+      input_urls: [pose_image_url],
+      video_urls: [motion_video_url],
+      mode: '1080p',
+      character_orientation: 'video',
     }
 
-    // Check for API error codes (same as working deep-face tool)
-    if (taskData.code !== 200 && taskData.code !== 0) {
-      console.error('[CloneViral/MotionControl] API error:', JSON.stringify(taskData))
-      return NextResponse.json({
-        error: taskData.msg || taskData.message || 'Error en KIE API'
-      }, { status: 500 })
+    console.log(`[CloneViral/MotionControl] Pose: ${pose_image_url.substring(0, 80)}..., Video: ${motion_video_url.substring(0, 80)}...`)
+
+    // Cascade: user key → platform key
+    let taskId: string | null = null
+
+    if (userKieKey) {
+      taskId = await tryKie(KIE_MODEL, input, userKieKey, 'user')
+    }
+    if (!taskId && platformKieKey && platformKieKey !== userKieKey) {
+      console.log('[CloneViral/MotionControl] Trying platform KIE key...')
+      taskId = await tryKie(KIE_MODEL, input, platformKieKey, 'platform')
     }
 
-    const taskId = taskData.data?.taskId || taskData.taskId
     if (!taskId) {
-      console.error('[CloneViral/MotionControl] No taskId:', JSON.stringify(taskData))
-      return NextResponse.json({
-        error: taskData.msg || taskData.message || 'Error al crear tarea de motion control'
-      }, { status: 500 })
+      return NextResponse.json({ error: 'Error en motion control. Intenta de nuevo.' }, { status: 500 })
     }
 
     console.log(`[CloneViral/MotionControl] User: ${user.id.substring(0, 8)}..., TaskId: ${taskId}`)

@@ -181,6 +181,64 @@ KIE/fal.ai necesitan URLs publicas → upload temp a Supabase Storage si Gemini 
   Solo trucosecomydrop@gmail.com puede usarlos (check en UI + API route).
 ```
 
+#### Dropshipping Tools (Studio IA tabs: Mi Influencer, Clonar Viral, Reseña UGC, Video Producto, Auto Publicar)
+```
+Todas las herramientas de dropshipping tienen cascade para no fallar.
+Patron comun: KIE user key → KIE platform key (env KIE_API_KEY).
+Donde es posible, cascade completa multi-proveedor via servicios centralizados.
+
+  MI INFLUENCER (9 endpoints en app/api/studio/influencer/):
+    Todos ya usan servicios centralizados — cascade completa.
+    | Endpoint           | Servicio                | Cascade                           |
+    | generate-base      | generateImage()         | KIE → fal.ai → Direct API        |
+    | enhance-realism    | generateImage()         | KIE → fal.ai → Direct API        |
+    | generate-angles    | generateImage()         | KIE → fal.ai → Direct API        |
+    | generate-body-grid | generateImage()         | KIE → fal.ai → Direct API        |
+    | generate-content   | generateImage()         | KIE → fal.ai → Direct API        |
+    | analyze            | generateAIText()        | KIE → OpenAI → Google Gemini     |
+    | visual-analysis    | generateAIText()        | KIE → OpenAI → Google Gemini     |
+    | video-constructor  | generateAIText()        | KIE → OpenAI → Google Gemini     |
+    | gallery + CRUD     | Sin IA (solo Supabase)  | N/A                               |
+
+  CLONAR VIRAL (8 endpoints en app/api/studio/clone-viral/):
+    Texto: usa servicios centralizados. Video/audio: KIE key cascade.
+    | Endpoint           | Modelo KIE                              | Cascade                           |
+    | transcribe         | generateAIText()                        | KIE → OpenAI → Google Gemini     |
+    | translate          | generateAIText()                        | KIE → OpenAI → Google Gemini     |
+    | generate-prompts   | generateAIText()                        | KIE → OpenAI → Google Gemini     |
+    | extract-frame      | Sin IA (solo upload)                    | N/A                               |
+    | generate-pose      | kling-2.6/image                         | KIE user → KIE platform          |
+    | generate-voice     | elevenlabs/text-to-speech-multilingual-v2 | KIE user → KIE platform        |
+    | lip-sync           | kling/ai-avatar-pro|standard            | KIE user → KIE platform          |
+    | motion-control     | kling-2.6/motion-control                | KIE user → KIE platform          |
+
+  RESEÑA UGC (app/api/studio/resena-ugc/):
+    Pipeline: face image → character profile → script → upload → video.
+    | Paso               | Servicio                | Cascade                           |
+    | Face generation    | generateImage()         | KIE → fal.ai → Direct API        |
+    | Character profile  | generateAIText()        | KIE → OpenAI → Google Gemini     |
+    | Script generation  | generateAIText()        | KIE → OpenAI → Google Gemini     |
+    | Video generation   | generateVideo()         | KIE → fal.ai                     |
+
+  VIDEO PRODUCTO (app/api/studio/generate-video/):
+    Usa generateVideo() centralizado — cascade KIE → fal.ai.
+    13 modelos de video disponibles (ver Video Generation section arriba).
+
+  AUTO PUBLICAR (app/api/studio/automations/):
+    | Endpoint           | Servicio                | Cascade                           |
+    | route.ts (CRUD)    | Sin IA (solo Supabase)  | N/A                               |
+    | execute-now        | generateAIText() + generateVideo() | Texto: KIE→OpenAI→Google. Video: KIE→fal.ai |
+    | cron/automations   | Delega a execute-now    | Misma cascade                     |
+
+  DEEP FACE (app/api/studio/tools/ — herramienta "deep-face"):
+    Solo KIE soporta deep-face-swap. KIE user → KIE platform.
+    No hay alternativa en fal.ai ni otro proveedor.
+
+  System prompts: TODOS son SACRED — NO SE TOCAN.
+  Polling: video-status solo soporta KIE tasks (no fal.ai task IDs).
+  Por eso clone-viral endpoints usan KIE key cascade, no provider switch.
+```
+
 #### Landing IA Multi-Agent — `lib/landing-ia/`
 ```
 4 parallel agents via SSE streaming (/api/landing-ia/stream):

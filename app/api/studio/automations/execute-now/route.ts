@@ -6,6 +6,7 @@ import {
   VIDEO_MODELS,
   type VideoModelId,
 } from '@/lib/video-providers'
+import { generateAIText, getAIKeys } from '@/lib/services/ai-text'
 
 import sharp from 'sharp'
 
@@ -178,17 +179,7 @@ async function ensureJpegUrl(
   }
 }
 
-/**
- * Optimize video prompt using Gemini with strict timeout
- */
-async function optimizePrompt(
-  apiKey: string,
-  promptDescriptor: string,
-  userIdea: string,
-  modelId: string,
-  presetId: string,
-): Promise<string> {
-  const system = `You are an expert video prompt optimizer for AI video generation models. Your job is to take a character description and a user's video idea, and produce a highly detailed, model-optimized prompt.
+const OPTIMIZE_PROMPT_SYSTEM = `You are an expert video prompt optimizer for AI video generation models. Your job is to take a character description and a user's video idea, and produce a highly detailed, model-optimized prompt.
 
 RULES:
 1. Output ONLY the optimized prompt text - no explanations, no markdown.
@@ -199,55 +190,6 @@ RULES:
 6. Always include "speaks in Spanish with a feminine voice" when the character is female.
 7. Always include "speaks in Spanish with a masculine voice" when the character is male.
 8. The character must match the descriptor exactly - preserve gender, ethnicity, age.`
-
-  const userMessage = `CHARACTER DESCRIPTOR: ${promptDescriptor}
-VIDEO IDEA: ${userIdea}
-TARGET MODEL: ${modelId}
-PRESET: ${presetId}
-
-Generate an optimized video prompt.`
-
-  // Use current Gemini models with strict 15s timeout each
-  const models = ['gemini-2.5-flash', 'gemini-2.5-flash-lite']
-  for (const model of models) {
-    try {
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 15000)
-
-      console.log(`[ExecuteNow] Trying Gemini model: ${model}`)
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            systemInstruction: { parts: [{ text: system }] },
-            contents: [{ parts: [{ text: userMessage }] }],
-            generationConfig: { temperature: 0.7, maxOutputTokens: 1024 },
-          }),
-          signal: controller.signal,
-        }
-      )
-      clearTimeout(timeoutId)
-
-      if (res.ok) {
-        const data = await res.json()
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
-        if (text.trim()) {
-          console.log(`[ExecuteNow] Gemini ${model} succeeded (${text.length} chars)`)
-          return text.trim()
-        }
-      } else {
-        console.warn(`[ExecuteNow] Gemini ${model} returned ${res.status}`)
-      }
-    } catch (err: any) {
-      console.warn(`[ExecuteNow] Gemini ${model} failed: ${err.name === 'AbortError' ? 'TIMEOUT (15s)' : err.message}`)
-      continue
-    }
-  }
-  console.warn('[ExecuteNow] All Gemini models failed, using raw prompt')
-  return ''
-}
 
 /**
  * POST — Execute a flow immediately (manual trigger)
@@ -298,7 +240,7 @@ export async function POST(request: Request) {
     // Get API keys
     const { data: profile } = await supabase
       .from('profiles')
-      .select('google_api_key, kie_api_key')
+      .select('google_api_key, kie_api_key, fal_api_key')
       .eq('id', user.id)
       .single()
 
@@ -307,9 +249,11 @@ export async function POST(request: Request) {
     }
 
     const kieApiKey = decrypt(profile.kie_api_key)
-    const googleApiKey = profile.google_api_key ? decrypt(profile.google_api_key) : null
+    const falApiKey = profile?.fal_api_key ? decrypt(profile.fal_api_key) : undefined
 
-    // Log masked API key for debugging
+    // Get AI text keys for prompt optimization cascade (KIE→OAI→Google)
+    const aiKeys = await getAIKeys(supabase, user.id)
+
     console.log(`[ExecuteNow] KIE key: ${kieApiKey.substring(0, 6)}...${kieApiKey.substring(kieApiKey.length - 4)} (${kieApiKey.length} chars)`)
     timing('Keys decrypted')
 
@@ -347,28 +291,33 @@ export async function POST(request: Request) {
     const modelId = getModelIdFromPreset(flow.video_preset)
     let finalPrompt = userIdea
 
-    if (googleApiKey) {
-      try {
-        const optimized = await optimizePrompt(
-          googleApiKey,
-          influencer.prompt_descriptor || '',
-          userIdea,
-          modelId,
-          flow.video_preset,
-        )
-        if (optimized) {
-          if (flow.video_preset === 'producto') {
-            finalPrompt = `${influencer.prompt_descriptor || ''}\n\n${optimized}`
-          } else {
-            finalPrompt = optimized
-            if (!finalPrompt.toLowerCase().includes('español')) {
-              finalPrompt += `. ${voiceInstruction}`
-            }
+    // Optimize prompt via ai-text cascade (KIE→OpenAI→Google Gemini)
+    try {
+      const optimizeMessage = `CHARACTER DESCRIPTOR: ${influencer.prompt_descriptor || ''}
+VIDEO IDEA: ${userIdea}
+TARGET MODEL: ${modelId}
+PRESET: ${flow.video_preset}
+
+Generate an optimized video prompt.`
+
+      const optimized = await generateAIText(aiKeys, {
+        systemPrompt: OPTIMIZE_PROMPT_SYSTEM,
+        userMessage: optimizeMessage,
+        temperature: 0.7,
+      })
+      if (optimized?.trim()) {
+        if (flow.video_preset === 'producto') {
+          finalPrompt = `${influencer.prompt_descriptor || ''}\n\n${optimized.trim()}`
+        } else {
+          finalPrompt = optimized.trim()
+          if (!finalPrompt.toLowerCase().includes('español')) {
+            finalPrompt += `. ${voiceInstruction}`
           }
         }
-      } catch (err: any) {
-        console.warn('[ExecuteNow] Prompt optimization failed, using raw:', err.message)
+        console.log(`[ExecuteNow] Prompt optimized (${finalPrompt.length} chars)`)
       }
+    } catch (err: any) {
+      console.warn('[ExecuteNow] Prompt optimization failed, using raw:', err.message)
     }
     timing('Prompt ready')
 
@@ -457,7 +406,7 @@ export async function POST(request: Request) {
     console.log(`[ExecuteNow] Params:`, JSON.stringify({ ...generationParams, prompt: generationParams.prompt?.substring(0, 80) + '...' }))
     timing('Calling generateVideo')
 
-    const result = await generateVideo(generationParams, kieApiKey)
+    const result = await generateVideo(generationParams, kieApiKey, falApiKey)
 
     timing('generateVideo returned')
     console.log(`[ExecuteNow] Result:`, JSON.stringify(result))
