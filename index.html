@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AlllDrop — Próximamente</title>
+    <meta name="description" content="AlllDrop - La suite definitiva para dropshippers en LATAM. Product Research, Creativos IA, Landings y más. Próximamente.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #050508;
+            --accent-cyan: #00f0ff;
+            --accent-violet: #8b5cf6;
+            --accent-magenta: #f43f8e;
+            --text-primary: #f0f0f5;
+            --text-muted: #6b6b80;
+            --text-subtle: #3a3a50;
+        }
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+        }
+        .bg-grid {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-image: linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+            background-size: 60px 60px; z-index: 0;
+        }
+        .bg-glow {
+            position: fixed; width: 600px; height: 600px; border-radius: 50%;
+            filter: blur(150px); opacity: 0.15; z-index: 0; pointer-events: none;
+        }
+        .bg-glow--cyan { background: var(--accent-cyan); top: -200px; right: -100px; animation: float-glow 12s ease-in-out infinite; }
+        .bg-glow--violet { background: var(--accent-violet); bottom: -200px; left: -100px; animation: float-glow 15s ease-in-out infinite reverse; }
+        .bg-glow--magenta {
+            background: var(--accent-magenta); top: 50%; left: 50%;
+            transform: translate(-50%, -50%); width: 400px; height: 400px;
+            opacity: 0.08; animation: pulse-glow 8s ease-in-out infinite;
+        }
+        @keyframes float-glow {
+            0%, 100% { transform: translate(0, 0); }
+            33% { transform: translate(30px, -20px); }
+            66% { transform: translate(-20px, 30px); }
+        }
+        @keyframes pulse-glow {
+            0%, 100% { opacity: 0.08; transform: translate(-50%, -50%) scale(1); }
+            50% { opacity: 0.14; transform: translate(-50%, -50%) scale(1.15); }
+        }
+        .noise {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 1; pointer-events: none; opacity: 0.035;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+            background-repeat: repeat; background-size: 256px 256px;
+        }
+        .container {
+            position: relative; z-index: 2; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; min-height: 100vh; padding: 2rem;
+        }
+        .logo-container { margin-bottom: 1rem; animation: fade-up 1s ease-out 0.2s both; }
+        .logo {
+            font-family: 'Outfit', sans-serif; font-weight: 900;
+            font-size: clamp(2.2rem, 5vw, 3.5rem); letter-spacing: -0.03em;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-violet), var(--accent-magenta));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+        }
+        .badge {
+            display: inline-flex; align-items: center; gap: 0.5rem;
+            padding: 0.4rem 1rem; border-radius: 100px;
+            background: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.25);
+            font-size: 0.75rem; font-weight: 500; color: var(--accent-violet);
+            letter-spacing: 0.08em; text-transform: uppercase;
+            margin-bottom: 2rem; animation: fade-up 1s ease-out 0.4s both;
+        }
+        .badge-dot {
+            width: 6px; height: 6px; border-radius: 50%;
+            background: var(--accent-violet); animation: blink 2s ease-in-out infinite;
+        }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+        .heading { text-align: center; margin-bottom: 1.5rem; animation: fade-up 1s ease-out 0.6s both; }
+        .heading h1 {
+            font-size: clamp(3rem, 10vw, 7rem); font-weight: 900;
+            line-height: 0.95; letter-spacing: -0.04em; text-transform: uppercase;
+        }
+        .heading h1 .outline { -webkit-text-stroke: 1.5px var(--text-subtle); -webkit-text-fill-color: transparent; }
+        .heading h1 .gradient-word {
+            background: linear-gradient(135deg, var(--accent-cyan) 0%, var(--accent-violet) 50%, var(--accent-magenta) 100%);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+        }
+        .subtext {
+            text-align: center; max-width: 520px; color: var(--text-muted);
+            font-size: clamp(0.95rem, 2vw, 1.15rem); font-weight: 300;
+            line-height: 1.7; margin-bottom: 3rem; animation: fade-up 1s ease-out 0.8s both;
+        }
+        .countdown-wrapper { animation: fade-up 1s ease-out 1s both; margin-bottom: 3rem; }
+        .countdown { display: flex; gap: clamp(0.75rem, 3vw, 1.5rem); align-items: center; }
+        .countdown-block { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
+        .countdown-number {
+            font-family: 'Space Mono', monospace; font-size: clamp(2.5rem, 7vw, 4.5rem);
+            font-weight: 700; line-height: 1; color: var(--text-primary);
+            width: clamp(70px, 15vw, 110px); height: clamp(70px, 15vw, 110px);
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 16px; background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.06); backdrop-filter: blur(10px);
+            position: relative; overflow: hidden;
+        }
+        .countdown-number::before {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(0, 240, 255, 0.3), transparent);
+        }
+        .countdown-number::after {
+            content: ''; position: absolute; top: 50%; left: 0; right: 0; height: 1px;
+            background: rgba(255, 255, 255, 0.03);
+        }
+        .countdown-label {
+            font-size: 0.7rem; letter-spacing: 0.15em; text-transform: uppercase;
+            color: var(--text-muted); font-weight: 500;
+        }
+        .countdown-separator {
+            font-family: 'Space Mono', monospace; font-size: clamp(1.5rem, 5vw, 3rem);
+            color: var(--text-subtle); margin-top: -1.5rem; animation: blink 1.5s step-end infinite;
+        }
+        .features {
+            display: flex; flex-wrap: wrap; justify-content: center;
+            gap: 0.75rem; margin-bottom: 3rem; animation: fade-up 1s ease-out 1.2s both;
+        }
+        .feature-tag {
+            padding: 0.5rem 1rem; border-radius: 8px;
+            background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.06);
+            font-size: 0.8rem; font-weight: 400; color: var(--text-muted);
+            transition: all 0.3s ease; cursor: default;
+        }
+        .feature-tag:hover {
+            border-color: rgba(0, 240, 255, 0.3); color: var(--accent-cyan);
+            background: rgba(0, 240, 255, 0.05); transform: translateY(-2px);
+        }
+        .feature-tag .icon { margin-right: 0.4rem; }
+        .cta-section { animation: fade-up 1s ease-out 1.4s both; width: 100%; max-width: 480px; }
+        .email-form {
+            display: flex; gap: 0; width: 100%;
+            background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 14px; padding: 5px; transition: border-color 0.3s ease;
+        }
+        .email-form:focus-within { border-color: rgba(139, 92, 246, 0.4); }
+        .email-form input {
+            flex: 1; background: transparent; border: none; outline: none;
+            color: var(--text-primary); font-family: 'Outfit', sans-serif;
+            font-size: 0.9rem; padding: 0.8rem 1rem; font-weight: 300;
+        }
+        .email-form input::placeholder { color: var(--text-subtle); }
+        .email-form button {
+            background: linear-gradient(135deg, var(--accent-violet), var(--accent-magenta));
+            border: none; color: white; padding: 0.8rem 1.5rem; border-radius: 10px;
+            font-family: 'Outfit', sans-serif; font-size: 0.85rem; font-weight: 600;
+            cursor: pointer; white-space: nowrap; transition: all 0.3s ease; letter-spacing: 0.02em;
+        }
+        .email-form button:hover { opacity: 0.9; transform: scale(1.02); }
+        .form-note {
+            text-align: center; margin-top: 0.75rem; font-size: 0.72rem;
+            color: var(--text-subtle); font-weight: 300;
+        }
+        .success-message {
+            display: none; text-align: center; padding: 1rem;
+            color: var(--accent-cyan); font-weight: 500; font-size: 0.9rem;
+            animation: fade-up 0.5s ease-out;
+        }
+        .success-message.show { display: block; }
+        .footer {
+            position: relative; z-index: 2; text-align: center; padding: 2rem;
+            font-size: 0.72rem; color: var(--text-subtle); font-weight: 300; letter-spacing: 0.05em;
+        }
+        @keyframes fade-up {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .particles { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; overflow: hidden; }
+        .particle {
+            position: absolute; width: 2px; height: 2px; background: var(--accent-cyan);
+            border-radius: 50%; opacity: 0; animation: particle-rise linear infinite;
+        }
+        @keyframes particle-rise {
+            0% { opacity: 0; transform: translateY(100vh) scale(0); }
+            10% { opacity: 0.6; }
+            90% { opacity: 0.6; }
+            100% { opacity: 0; transform: translateY(-10vh) scale(1); }
+        }
+        @media (max-width: 600px) {
+            .countdown-number { border-radius: 12px; }
+            .email-form { flex-direction: column; border-radius: 12px; }
+            .email-form button { width: 100%; padding: 1rem; }
+            .features { gap: 0.5rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-grid"></div>
+    <div class="bg-glow bg-glow--cyan"></div>
+    <div class="bg-glow bg-glow--violet"></div>
+    <div class="bg-glow bg-glow--magenta"></div>
+    <div class="noise"></div>
+    <div class="particles" id="particles"></div>
+
+    <div class="container">
+        <div class="logo-container">
+            <div class="logo">AlllDrop</div>
+        </div>
+        <div class="badge">
+            <div class="badge-dot"></div>
+            En desarrollo
+        </div>
+        <div class="heading">
+            <h1>
+                <span class="outline">PRÓXIMA</span><br>
+                <span class="gradient-word">MENTE</span>
+            </h1>
+        </div>
+        <p class="subtext">
+            La suite todo-en-uno para dropshippers en LATAM.<br>
+            Product Research · Creativos IA · Landings · Analytics.<br>
+            Todo lo que necesitas, en un solo lugar.
+        </p>
+        <div class="countdown-wrapper">
+            <div class="countdown">
+                <div class="countdown-block">
+                    <div class="countdown-number" id="days">10</div>
+                    <div class="countdown-label">Días</div>
+                </div>
+                <div class="countdown-separator">:</div>
+                <div class="countdown-block">
+                    <div class="countdown-number" id="hours">00</div>
+                    <div class="countdown-label">Horas</div>
+                </div>
+                <div class="countdown-separator">:</div>
+                <div class="countdown-block">
+                    <div class="countdown-number" id="minutes">00</div>
+                    <div class="countdown-label">Min</div>
+                </div>
+                <div class="countdown-separator">:</div>
+                <div class="countdown-block">
+                    <div class="countdown-number" id="seconds">00</div>
+                    <div class="countdown-label">Seg</div>
+                </div>
+            </div>
+        </div>
+        <div class="features">
+            <div class="feature-tag"><span class="icon">🔍</span> Product Research</div>
+            <div class="feature-tag"><span class="icon">🎨</span> Studio Creativo IA</div>
+            <div class="feature-tag"><span class="icon">🚀</span> Landing Builder</div>
+            <div class="feature-tag"><span class="icon">📊</span> Analytics Pro</div>
+            <div class="feature-tag"><span class="icon">🎬</span> Video Generator</div>
+            <div class="feature-tag"><span class="icon">🤖</span> Automatización</div>
+        </div>
+        <div class="cta-section">
+            <form class="email-form" id="emailForm">
+                <input type="email" placeholder="tu@email.com" required id="emailInput">
+                <button type="submit">Avísame</button>
+            </form>
+            <div class="form-note">Sé el primero en acceder. Sin spam, lo prometemos.</div>
+            <div class="success-message" id="successMessage">✓ ¡Listo! Te avisaremos cuando lancemos.</div>
+        </div>
+    </div>
+
+    <div class="footer">© 2026 AlllDrop · Hecho para la comunidad dropshipper de LATAM</div>
+
+    <script>
+        const launchDate = new Date();
+        launchDate.setDate(launchDate.getDate() + 10);
+        launchDate.setHours(0, 0, 0, 0);
+
+        function updateCountdown() {
+            const now = new Date().getTime();
+            const distance = launchDate.getTime() - now;
+            if (distance <= 0) {
+                document.getElementById('days').textContent = '00';
+                document.getElementById('hours').textContent = '00';
+                document.getElementById('minutes').textContent = '00';
+                document.getElementById('seconds').textContent = '00';
+                return;
+            }
+            const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+            document.getElementById('days').textContent = String(days).padStart(2, '0');
+            document.getElementById('hours').textContent = String(hours).padStart(2, '0');
+            document.getElementById('minutes').textContent = String(minutes).padStart(2, '0');
+            document.getElementById('seconds').textContent = String(seconds).padStart(2, '0');
+        }
+        updateCountdown();
+        setInterval(updateCountdown, 1000);
+
+        const particlesContainer = document.getElementById('particles');
+        function createParticle() {
+            const particle = document.createElement('div');
+            particle.classList.add('particle');
+            const x = Math.random() * 100;
+            const duration = 8 + Math.random() * 12;
+            const delay = Math.random() * 5;
+            const size = 1 + Math.random() * 2;
+            const colors = ['var(--accent-cyan)', 'var(--accent-violet)', 'var(--accent-magenta)'];
+            const color = colors[Math.floor(Math.random() * colors.length)];
+            particle.style.cssText = `left:${x}%;width:${size}px;height:${size}px;background:${color};animation-duration:${duration}s;animation-delay:${delay}s;`;
+            particlesContainer.appendChild(particle);
+            setTimeout(() => particle.remove(), (duration + delay) * 1000);
+        }
+        for (let i = 0; i < 20; i++) setTimeout(createParticle, i * 200);
+        setInterval(createParticle, 600);
+
+        document.getElementById('emailForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const email = document.getElementById('emailInput').value;
+            this.style.display = 'none';
+            document.querySelector('.form-note').style.display = 'none';
+            document.getElementById('successMessage').classList.add('show');
+            console.log('Email registered:', email);
+        });
+    </script>
+</body>
+</html>
