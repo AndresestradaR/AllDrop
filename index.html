@@ -156,6 +156,28 @@
             .rm-stats { position:relative;top:auto;right:auto;width:100%; }
         }
 
+        /* STORE BUILDER SECTION */
+        .builder-section { position:relative;z-index:2;padding:3rem 2rem 3.5rem;max-width:1100px;margin:0 auto; }
+        .builder-layout { display:flex;align-items:center;gap:3rem; }
+        .builder-img { flex:1;min-width:0;position:relative;border-radius:18px;overflow:hidden;border:1px solid rgba(139,92,246,0.2);box-shadow:0 30px 80px rgba(0,0,0,0.5),0 0 60px rgba(139,92,246,0.08); }
+        .builder-img img { width:100%;height:auto;display:block; }
+        .builder-img::before { content:'';position:absolute;inset:0;background:linear-gradient(180deg,transparent 60%,rgba(5,5,8,0.5) 100%);z-index:1;pointer-events:none; }
+        .builder-img::after { content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(139,92,246,0.4),transparent);z-index:2; }
+        .builder-content { flex:1;min-width:0; }
+        .builder-content h2 { font-size:clamp(1.8rem,4vw,2.8rem);font-weight:800;line-height:1.1;margin-bottom:1rem;letter-spacing:-0.03em; }
+        .builder-content h2 .bh-grad { background:linear-gradient(135deg,var(--accent-cyan),var(--accent-violet));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text; }
+        .builder-content p { color:var(--text-muted);font-size:0.95rem;line-height:1.7;font-weight:300;max-width:420px;margin-bottom:1.2rem; }
+        .builder-features { display:flex;flex-direction:column;gap:10px; }
+        .builder-feat { display:flex;align-items:center;gap:10px;font-size:0.85rem;color:var(--text-muted);font-weight:400; }
+        .builder-feat-icon { width:28px;height:28px;border-radius:8px;background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.2);display:flex;align-items:center;justify-content:center;font-size:0.8rem;flex-shrink:0; }
+        @media(max-width:750px) {
+            .builder-section { padding:2rem 1.2rem; }
+            .builder-layout { flex-direction:column;gap:2rem; }
+            .builder-content { text-align:center; }
+            .builder-content p { max-width:none; }
+            .builder-features { align-items:center; }
+        }
+
         /* BOTTOM */
         .bottom { position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;padding:1rem 2rem 2rem; }
         .countdown-wrapper { margin-bottom:2.5rem;animation:fade-up 1s ease-out 1.1s both; }
@@ -267,6 +289,28 @@
                         <div class="rm-stat-value" data-target="342">0</div>
                         <div class="rm-stat-mini"><span class="rm-stat-trend up">4.6★</span></div>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- STORE BUILDER -->
+    <div class="builder-section">
+        <div class="section-label">🏪 Tu tienda online profesional — incluida en AllDrop</div>
+        <div class="builder-layout">
+            <div class="builder-img">
+                <img src="images/droppage.webp" alt="Dashboard de tu tienda online en AllDrop" loading="lazy">
+            </div>
+            <div class="builder-content">
+                <h2>Tu propia tienda<br><span class="bh-grad">tipo Shopify</span></h2>
+                <p>No necesitas Shopify ni plataformas externas. AllDrop incluye un constructor de tiendas completo con todo lo que necesitas para vender desde el primer día.</p>
+                <div class="builder-features">
+                    <div class="builder-feat"><div class="builder-feat-icon">📦</div> Gestión de productos y variantes</div>
+                    <div class="builder-feat"><div class="builder-feat-icon">💳</div> Checkout optimizado para conversión</div>
+                    <div class="builder-feat"><div class="builder-feat-icon">📊</div> Analytics y métricas en tiempo real</div>
+                    <div class="builder-feat"><div class="builder-feat-icon">🎨</div> Diseño personalizable sin código</div>
+                    <div class="builder-feat"><div class="builder-feat-icon">🌍</div> Dominio propio y SEO incluido</div>
+                    <div class="builder-feat"><div class="builder-feat-icon">🔄</div> Carritos abandonados y remarketing</div>
                 </div>
             </div>
         </div>
