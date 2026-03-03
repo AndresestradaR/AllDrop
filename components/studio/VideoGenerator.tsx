@@ -125,22 +125,27 @@ export function VideoGenerator() {
         const supabase = createClient()
         const { data } = await supabase
           .from('generations')
-          .select('id, product_name, original_prompt, generated_image_url, created_at')
+          .select('id, product_name, original_prompt, enhanced_prompt, generated_image_url, created_at')
           .like('product_name', 'Video:%')
           .not('generated_image_url', 'is', null)
           .order('created_at', { ascending: false })
           .limit(50)
 
         if (data?.length) {
-          const saved = data.map((gen) => ({
-            id: gen.id,
-            url: gen.generated_image_url!,
-            prompt: gen.original_prompt || '',
-            model: gen.product_name?.replace('Video: ', '') || 'Video',
-            timestamp: new Date(gen.created_at),
-            duration: '',
-            aspectRatio: '16:9',
-          }))
+          const saved = data.map((gen) => {
+            // Parse aspect ratio from enhanced_prompt (format: "ar:9:16")
+            const arMatch = gen.enhanced_prompt?.match(/^ar:(.+)$/)
+            const savedAr = arMatch?.[1] || '16:9'
+            return {
+              id: gen.id,
+              url: gen.generated_image_url!,
+              prompt: gen.original_prompt || '',
+              model: gen.product_name?.replace('Video: ', '') || 'Video',
+              timestamp: new Date(gen.created_at),
+              duration: '',
+              aspectRatio: savedAr,
+            }
+          })
           setGeneratedVideos(saved)
         }
       } catch (err) {
@@ -176,10 +181,10 @@ export function VideoGenerator() {
   const currentModel = VIDEO_MODELS[selectedModel]
 
   // Poll for video status
-  const pollForStatus = async (taskId: string, modelName?: string, promptText?: string): Promise<{ success: boolean; videoUrl?: string; error?: string }> => {
+  const pollForStatus = async (taskId: string, modelName?: string, promptText?: string, videoAspectRatio?: string): Promise<{ success: boolean; videoUrl?: string; error?: string }> => {
     const maxAttempts = 200 // ~10 minutes at 3s intervals
     const interval = 3000 // 3 seconds
-    const extraParams = `&modelName=${encodeURIComponent(modelName || '')}&prompt=${encodeURIComponent((promptText || '').substring(0, 500))}`
+    const extraParams = `&modelName=${encodeURIComponent(modelName || '')}&prompt=${encodeURIComponent((promptText || '').substring(0, 500))}&aspectRatio=${encodeURIComponent(videoAspectRatio || '16:9')}`
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       try {
@@ -296,7 +301,7 @@ export function VideoGenerator() {
 
       // Poll for result from frontend
       setGeneratingStatus('Video en cola, esperando...')
-      const result = await pollForStatus(data.taskId, currentModel.name, prompt)
+      const result = await pollForStatus(data.taskId, currentModel.name, prompt, aspectRatio)
 
       if (!result.success) {
         throw new Error(result.error || 'Error al generar video')
@@ -1126,11 +1131,17 @@ export function VideoGenerator() {
           </div>
         ) : (
           <div className="flex-1 overflow-y-auto">
-            <div className="grid grid-cols-2 gap-4">
-              {generatedVideos.map((video) => (
+            <div className="flex flex-wrap gap-4">
+              {generatedVideos.map((video) => {
+                const isVertical = video.aspectRatio === '9:16'
+                const isSquare = video.aspectRatio === '1:1'
+                return (
                 <div
                   key={video.id}
-                  className="rounded-xl overflow-hidden bg-surface-elevated"
+                  className={cn(
+                    'rounded-xl overflow-hidden bg-surface-elevated',
+                    isVertical ? 'w-[45%] max-w-[200px]' : isSquare ? 'w-[48%]' : 'w-full'
+                  )}
                 >
                   <div
                     className="relative"
@@ -1145,7 +1156,7 @@ export function VideoGenerator() {
                   >
                     <video
                       src={video.url}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-contain bg-black rounded-t-xl"
                       controls
                       poster=""
                     />
@@ -1203,7 +1214,8 @@ export function VideoGenerator() {
                     </div>
                   </div>
                 </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         )}

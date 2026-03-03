@@ -209,6 +209,7 @@ export async function GET(request: Request) {
       // Save to generations table (non-blocking)
       const modelName = searchParams.get('modelName') || 'Video'
       const prompt = searchParams.get('prompt') || ''
+      const videoAspectRatio = searchParams.get('aspectRatio') || '16:9'
       const videoRef = r2Url || result.videoUrl || null
       if (videoRef) {
         const serviceClient = await createServiceClient()
@@ -218,7 +219,7 @@ export async function GET(request: Request) {
             user_id: userId,
             product_name: `Video: ${modelName}`,
             original_prompt: prompt,
-            enhanced_prompt: prompt,
+            enhanced_prompt: `ar:${videoAspectRatio}`,
             status: 'completed',
             generated_image_url: videoRef,
           })
