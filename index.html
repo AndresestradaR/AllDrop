@@ -178,6 +178,20 @@
             .builder-features { align-items:center; }
         }
 
+        /* FAQ SECTION */
+        .faq-section { position:relative;z-index:2;padding:3rem 2rem 3.5rem;max-width:720px;margin:0 auto; }
+        .faq-section h2 { text-align:center;font-size:clamp(1.8rem,4vw,2.6rem);font-weight:800;letter-spacing:-0.03em;margin-bottom:2rem; }
+        .faq-section h2 .faq-grad { background:linear-gradient(135deg,var(--accent-violet),var(--accent-magenta));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text; }
+        .faq-item { border-bottom:1px solid rgba(255,255,255,0.06); }
+        .faq-q { width:100%;background:none;border:none;color:var(--text-primary);font-family:'Outfit',sans-serif;font-size:0.95rem;font-weight:500;padding:1.1rem 0;display:flex;align-items:center;justify-content:space-between;gap:1rem;cursor:pointer;text-align:left;transition:color 0.3s; }
+        .faq-q:hover { color:var(--accent-violet); }
+        .faq-q-icon { flex-shrink:0;width:24px;height:24px;border-radius:50%;border:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;font-size:0.75rem;color:var(--text-muted);transition:all 0.3s; }
+        .faq-item.open .faq-q-icon { transform:rotate(45deg);border-color:var(--accent-violet);color:var(--accent-violet); }
+        .faq-a { max-height:0;overflow:hidden;transition:max-height 0.4s ease,padding 0.3s ease; }
+        .faq-item.open .faq-a { max-height:300px; }
+        .faq-a-inner { padding:0 0 1.2rem;color:var(--text-muted);font-size:0.88rem;line-height:1.7;font-weight:300; }
+        @media(max-width:600px) { .faq-section { padding:2rem 1.2rem; } }
+
         /* BOTTOM */
         .bottom { position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;padding:1rem 2rem 2rem; }
         .countdown-wrapper { margin-bottom:2.5rem;animation:fade-up 1s ease-out 1.1s both; }
@@ -313,6 +327,35 @@
                     <div class="builder-feat"><div class="builder-feat-icon">🔄</div> Carritos abandonados y remarketing</div>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- FAQ -->
+    <div class="faq-section">
+        <h2><span class="faq-grad">Preguntas frecuentes</span></h2>
+        <div class="faq-item">
+            <button class="faq-q"><span>¿Qué es AllDrop exactamente?</span><span class="faq-q-icon">+</span></button>
+            <div class="faq-a"><div class="faq-a-inner">AllDrop es una suite todo-en-uno diseñada para dropshippers en Europa. Incluye herramientas de product research con IA, generador de landings, studio creativo para anuncios y videos, tu propia tienda online, analytics avanzados y automatización — todo en una sola plataforma.</div></div>
+        </div>
+        <div class="faq-item">
+            <button class="faq-q"><span>¿Necesito experiencia previa en dropshipping?</span><span class="faq-q-icon">+</span></button>
+            <div class="faq-a"><div class="faq-a-inner">No. AllDrop está pensado tanto para principiantes como para dropshippers avanzados. La IA te guía en cada paso: desde encontrar productos ganadores hasta crear creativos profesionales y lanzar tu tienda sin escribir una línea de código.</div></div>
+        </div>
+        <div class="faq-item">
+            <button class="faq-q"><span>¿Realmente incluye una tienda online tipo Shopify?</span><span class="faq-q-icon">+</span></button>
+            <div class="faq-a"><div class="faq-a-inner">Sí. AllDrop incluye un constructor de tiendas completo con gestión de productos, checkout optimizado, dominio propio, políticas legales, carritos abandonados, analytics y más. No necesitas pagar Shopify ni ninguna otra plataforma externa.</div></div>
+        </div>
+        <div class="faq-item">
+            <button class="faq-q"><span>¿Cómo funciona el product research con IA?</span><span class="faq-q-icon">+</span></button>
+            <div class="faq-a"><div class="faq-a-inner">Nuestro motor de IA analiza millones de productos en tiempo real. Te muestra métricas clave como volumen de búsquedas, revenue estimado, nivel de competencia, margen de beneficio y tendencias — para que puedas tomar decisiones basadas en datos, no en intuición.</div></div>
+        </div>
+        <div class="faq-item">
+            <button class="faq-q"><span>¿Puedo generar landings y creativos con IA?</span><span class="faq-q-icon">+</span></button>
+            <div class="faq-a"><div class="faq-a-inner">Absolutamente. AllDrop genera landing pages completas optimizadas para conversión, videos UGC con influencers virtuales, imágenes de producto profesionales y textos persuasivos para tus anuncios — todo con inteligencia artificial en segundos.</div></div>
+        </div>
+        <div class="faq-item">
+            <button class="faq-q"><span>¿Cuándo se lanza y cuánto costará?</span><span class="faq-q-icon">+</span></button>
+            <div class="faq-a"><div class="faq-a-inner">Estamos en fase final de desarrollo. Déjanos tu email para ser de los primeros en acceder. Los early adopters tendrán acceso a precios especiales de lanzamiento y funcionalidades exclusivas.</div></div>
         </div>
     </div>
 
@@ -644,6 +687,16 @@
             }, { threshold: 0.3 });
             researchObs.observe(document.querySelector('.research-section'));
         })();
+
+        // FAQ Accordion
+        document.querySelectorAll('.faq-q').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var item = btn.closest('.faq-item');
+                var wasOpen = item.classList.contains('open');
+                document.querySelectorAll('.faq-item.open').forEach(function(o) { o.classList.remove('open'); });
+                if (!wasOpen) item.classList.add('open');
+            });
+        });
 
         // Email
         document.getElementById('emailForm').addEventListener('submit', function(e) {
