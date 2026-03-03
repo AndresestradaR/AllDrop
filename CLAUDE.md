@@ -71,8 +71,9 @@ generateImage(model, params) -> ImageResult
   CASCADA MODO-AWARE — detecta T2I vs I2I segun presencia de imagenes de referencia.
   Cada modelo define su propio `cascade` config en types.ts con endpoints T2I e I2I.
 
-  9 modelos, 5 companias (Google, OpenAI, ByteDance, BFL, fal.ai)
-  Modelos eliminados: seedream-3, seedream-4, seedream-4-4k, flux-2-klein
+  8 modelos, 4 companias (Google, OpenAI, ByteDance, BFL)
+  Modelos eliminados: seedream-3, seedream-4, seedream-4-4k, seedream-4.5, flux-2-klein
+  fal.ai es proveedor de infraestructura (multi-provider), NO es compania dueña de modelos
 
   Cascade config por modelo (en ImageModelConfig.cascade):
     cascade.kie   → { t2i, i2i?, mode } — KIE model IDs
@@ -80,16 +81,15 @@ generateImage(model, params) -> ImageResult
     cascade.directApi → 'gemini' | 'openai' | 'bfl' — fallback final
 
   Tabla de cascada:
-    | Modelo           | KIE T2I / I2I                          | fal T2I / I2I                          | Direct |
-    | gemini-3-pro     | nano-banana-pro / (mismo)              | fal-ai/nano-banana-pro                 | gemini |
-    | nano-banana-2    | nano-banana-2 / (mismo)                | fal-ai/nano-banana-2                   | gemini |
-    | gpt-image-1.5    | gpt-image/1.5-t2i / 1.5-i2i           | fal-ai/gpt-image-1.5                   | openai |
-    | seedream-4.5     | seedream/4.5-t2i / 4.5-edit            | bytedance/seedream/v4.5/t2i / edit     | —      |
-    | seedream-5-lite  | seedream/5-lite-t2i / 5-lite-i2i       | bytedance/seedream/v5/lite/t2i / edit  | —      |
-    | seedream-5       | seedream/5-lite-t2i / 5-lite-i2i       | fal-ai/seedream-3.0/pro                | —      |
-    | flux-2-max       | (sin KIE)                              | fal-ai/flux-2-max / edit               | bfl    |
-    | flux-2-pro       | flux-2/pro-t2i / pro-i2i               | fal-ai/flux-2-pro / edit               | bfl    |
-    | flux-2-flex      | flux-2/flex-t2i / flex-i2i             | fal-ai/flux-2-flex / edit              | bfl    |
+    | Modelo           | Compania  | KIE T2I / I2I                    | fal T2I / I2I                          | Direct |
+    | gemini-3-pro     | Google    | nano-banana-pro / (mismo)        | fal-ai/nano-banana-pro                 | gemini |
+    | nano-banana-2    | Google    | nano-banana-2 / (mismo)          | fal-ai/nano-banana-2                   | gemini |
+    | gpt-image-1.5    | OpenAI    | gpt-image/1.5-t2i / 1.5-i2i     | fal-ai/gpt-image-1.5                   | openai |
+    | seedream-5-lite  | ByteDance | seedream/5-lite-t2i / 5-lite-i2i | bytedance/seedream/v5/lite/t2i / edit  | —      |
+    | seedream-5       | ByteDance | seedream/5-lite-t2i / 5-lite-i2i | fal-ai/seedream-3.0/pro                | —      |
+    | flux-2-max       | BFL       | (sin KIE)                        | fal-ai/flux-2-max / edit               | bfl    |
+    | flux-2-pro       | BFL       | flux-2/pro-t2i / pro-i2i         | fal-ai/flux-2-pro / edit               | bfl    |
+    | flux-2-flex      | BFL       | flux-2/flex-t2i / flex-i2i       | fal-ai/flux-2-flex / edit              | bfl    |
 
   Flujo de ejecucion:
     1. OpenAI directo PRIMERO (solo modelos GPT Image)
@@ -573,17 +573,48 @@ BREAKS: ALL AI features in DropPage (key resolution for every AI call)
 5. **ALWAYS** use per-user keys from profiles table (BYOK), not hardcoded keys
 6. **ALWAYS** add `reasoning_effort: 'none'` for KIE calls and `thinkingBudget: 0` for Google direct to prevent timeout cascades (Google Gemini has thinking mode ON by default)
 
-### Known Anti-Patterns (things that have broken production):
-- Changing AI API in one route but not others (e.g., Landing IA updated but Coaching forgotten)
-- Adding a model without updating types.ts → UI breaks
-- Google enabling "thinking mode" by default → 100s+ responses → timeout cascade → 504s. Fixed with reasoning_effort:'none' (KIE) and thinkingBudget:0 (Google direct)
-- KIE model cascade with slow models (gemini-2.5-pro) → total time exceeds Vercel 120s limit. Only use gemini-2.5-flash in KIE cascade for estrategas
-- Wrong client.id for Lucio WebSocket → "missing scope" errors. Must use 'openclaw-control-ui'
-- Using modelConfig.apiModelId for Gemini direct → fal.ai paths (ej: 'fal-ai/nano-banana-2') causaban 404 en Google API. Siempre usar cascade.directModelId
-- Cookies en redirect responses de Vercel → se pierden en cross-site OAuth. Solucion: state encriptado (Canva)
-- Canva Asset-Upload-Metadata name > 50 chars → "Invalid upload metadata header". Truncar filename
-- Seedream prompts > 800 chars → KIE error "text length cannot exceed maximum limit". Truncar automaticamente
-- Cross-origin `<a download>` no descarga, navega la pagina. Nunca usar link.click() con URLs de otro dominio como fallback
+### Known Anti-Patterns & Production Bugs (documentados para no repetir):
+
+#### AI Model Errors
+- **Google thinking mode por defecto** → 100s+ responses → timeout cascade → 504s en Vercel. FIX: `reasoning_effort:'none'` (KIE) y `thinkingBudget:0` (Google direct). SIEMPRE agregar en toda llamada a Gemini.
+- **KIE cascade con gemini-2.5-pro** → demasiado lento, total excede Vercel 120s. FIX: solo `gemini-2.5-flash` en KIE cascade (salvo copy-optimize/enhance-prompt que tienen maxDuration=120s y usan pro explicitamente).
+- **Wrong model ID para Gemini direct** → `modelConfig.apiModelId` contiene paths de fal.ai (ej: `fal-ai/nano-banana-2`) que causan 404 en Google API. FIX: SIEMPRE usar `cascade.directModelId` para direct API.
+- **gemini-2.5-flash-image NO EXISTE** como modelo de imagen. Se intentó usar → 404. El correcto es `gemini-3.1-flash-image-preview` o `gemini-3-pro-image-preview`.
+- **Seedream prompts > 800 chars** → KIE error "The text length cannot exceed the maximum limit". FIX: truncar automaticamente a 800 chars en generateViaKie() y fal.ai para paths seedream.
+- **Seedream /edit endpoints en fal.ai son lentos** → timeout 45s insuficiente. FIX: timeout 90s para seedream en fal.ai.
+- **Modelos eliminados que causaban errores**: seedream-3 (sin image input), seedream-4 (duplicado), seedream-4-4k (sin uso), seedream-4.5 (reemplazado por 5/5Pro), flux-2-klein (sin uso). NUNCA re-agregar.
+- **fal.ai NO es compania de modelos** — es proveedor de infraestructura multi-provider. Los modelos se atribuyen a su empresa real: nano-banana → Google, seedream → ByteDance, flux → BFL.
+
+#### Cambios de tipo que rompen multiples archivos
+- **Eliminar un valor de `ImageProviderType` o `ImageProviderCompany`** → rompe TODOS los `Record<ImageProviderType, ...>` en 7+ archivos. SIEMPRE grep por el tipo antes de eliminarlo y actualizar TODOS los records.
+- **Agregar modelo sin actualizar types.ts** → UI selector no lo muestra, cascada lo ignora.
+- **Cambiar company de un modelo** → IMAGE_COMPANY_GROUPS se desincroniza, modelo aparece en grupo equivocado.
+
+#### OAuth & Auth Errors
+- **Cookies en redirect responses de Vercel** → se pierden en cross-site OAuth (estrategasia.com → canva.com → estrategasia.com). Vercel serverless no persiste cookies en 307 redirects de forma confiable. FIX: state encriptado AES-256-GCM que viaja con el flujo OAuth. Nunca depender de cookies para data que cruza dominios.
+- **Canva OAuth `invalid_state`** → se perdia el code_verifier guardado en cookie. FIX: encriptar {code_verifier, returnUrl, timestamp} EN el parametro state de OAuth con AES-256-GCM (key = sha256(CANVA_CLIENT_SECRET)).
+
+#### API External Limits
+- **Canva Asset-Upload-Metadata name > 50 chars** → "Invalid upload metadata header" (HTTP 500). El header `name_base64` se decodifica y Canva valida max 50 chars del nombre. FIX: truncar filename a 46 chars + ".png" = 50. NUNCA incluir UUIDs en filenames para Canva.
+- **Canva rate limit**: 30 requests/min por usuario. No hay retry automatico.
+
+#### Frontend Errors
+- **Cross-origin `<a download>`** → el atributo `download` es ignorado por browsers para URLs de otro dominio. El browser NAVEGA la pagina en vez de descargar. NUNCA usar `link.click()` con URLs de dominio diferente (ej: Supabase Storage → navegaba la pagina de la app). FIX: mostrar error toast y/o usar window.open() en nueva pestaña.
+- **`window.open()` bloqueado por popup blocker** → solo funciona en contexto de click directo del usuario, no en callbacks async. Considerar esto al diseñar flujos que abren URLs.
+
+#### Env Var & Key Errors
+- **Fallback keys faltantes en env vars** → cuando un usuario no tiene BYOK key Y no hay env var de plataforma, la cascada ENTERA falla silenciosamente. FIX: `hasCascadeKey()` valida que AL MENOS UNA key existe antes de intentar generar. Ambas rutas (landing + studio) tienen fallback a: GEMINI_API_KEY, OPENAI_API_KEY, KIE_API_KEY, BFL_API_KEY, FAL_API_KEY.
+- **ENCRYPTION_KEY incorrecto** → NO HAY error visible, simplemente todas las keys BYOK se descifran como basura → 401s en todos los proveedores. Si todos los usuarios fallan simultaneamente, verificar ENCRYPTION_KEY primero.
+
+#### Deploy & Infrastructure
+- **CLAUDE.md-only commits** → triggerean deploy innecesario en Vercel. CLAUDE.md es archivo de referencia para Claude, no codigo. Agrupar cambios de CLAUDE.md con cambios de codigo o dejar como commit local.
+- **Vercel maxDuration** → funciones serverless tienen limite (120s por default en vercel.json). Toda cadena de cascada debe completar dentro de este limite. Si un paso tarda mucho, los siguientes no tienen tiempo.
+- **Vercel MIDDLEWARE_INVOCATION_TIMEOUT** → middleware.ts tiene timeout 3s para evitar esto. NO agregar logica pesada al middleware.
+
+#### Patrones Generales
+- **Cambiar AI API en una ruta pero no en otras** → ej: Landing IA actualizado pero Coaching olvidado. SIEMPRE revisar impact map (Section 6) antes de cambiar cualquier servicio.
+- **Wrong client.id para Lucio WebSocket** → "missing scope" errors. DEBE ser 'openclaw-control-ui'.
+- **`usedProvider` tracking** → cada paso de cascada retorna cual proveedor realmente genero la imagen (ej: 'kie:nano-banana-2', 'fal:fal-ai/nano-banana-2'). SIEMPRE incluir en respuesta API para debugging.
 
 ---
 
@@ -686,4 +717,4 @@ Key entries: cron schedule for `/api/cron/automations`, function maxDuration set
 
 ---
 
-*Last updated: 2026-03-02 — Added Canva Connect integration, image cascade directModelId/usedProvider, seedream fixes, env var fallbacks*
+*Last updated: 2026-03-03 — Removed seedream-4.5 and fal.ai company, reorganized models (nano-banana-2→Google, seedream-5/5Pro→ByteDance), comprehensive anti-patterns documentation*

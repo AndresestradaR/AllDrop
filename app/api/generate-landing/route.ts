@@ -333,7 +333,7 @@ export async function POST(request: Request) {
       console.log(`Task created: ${result.taskId}, polling for result...`)
 
       const providerKeyMap: Record<ImageProviderType, keyof typeof apiKeys> = {
-        gemini: 'gemini', openai: 'openai', seedream: 'kie', flux: 'bfl', fal: 'fal',
+        gemini: 'gemini', openai: 'openai', seedream: 'kie', flux: 'bfl',
       }
       const apiKey = apiKeys[providerKeyMap[selectedProvider]]!
       const pollElapsed = Date.now() - startTime
@@ -474,7 +474,6 @@ function getProviderTip(provider: ImageProviderType): string {
     openai: 'Para usar OpenAI necesitas:\n1. API key de OpenAI (platform.openai.com → API Keys)\n2. Creditos disponibles (platform.openai.com/account/billing)',
     seedream: 'Para usar Seedream necesitas:\n1. API key de KIE.ai\n2. Creditos disponibles en tu cuenta KIE',
     flux: 'Para usar FLUX necesitas:\n1. API key de Black Forest Labs\n2. Creditos disponibles',
-    fal: 'Para usar fal.ai necesitas:\n1. API key de fal.ai (fal.ai/dashboard/keys)\n2. Creditos disponibles en tu cuenta fal.ai',
   }
   return tips[provider]
 }

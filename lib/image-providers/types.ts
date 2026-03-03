@@ -1,27 +1,25 @@
 // Types for multi-model image generation system
 
 // Provider types (companies)
-export type ImageProviderCompany = 'google' | 'openai' | 'bytedance' | 'bfl' | 'fal'
+export type ImageProviderCompany = 'google' | 'openai' | 'bytedance' | 'bfl'
 
 // Specific model IDs (10 models — removed seedream-3, seedream-4, seedream-4-4k, flux-2-klein)
 export type ImageModelId =
-  // Google (1 model)
+  // Google (2 models)
   | 'gemini-3-pro-image'
-  // OpenAI (1 model only - GPT Image 1.5)
+  | 'nano-banana-2'
+  // OpenAI (1 model)
   | 'gpt-image-1.5'
-  // ByteDance via KIE.ai (1 model)
-  | 'seedream-4.5'
+  // ByteDance (2 models)
+  | 'seedream-5-lite'
+  | 'seedream-5'
   // Black Forest Labs FLUX 2 (3 models)
   | 'flux-2-max'
   | 'flux-2-pro'
   | 'flux-2-flex'
-  // fal.ai models (used as fallback + standalone)
-  | 'nano-banana-2'
-  | 'seedream-5-lite'
-  | 'seedream-5'
 
 // Legacy type for backward compatibility
-export type ImageProviderType = 'gemini' | 'openai' | 'seedream' | 'flux' | 'fal'
+export type ImageProviderType = 'gemini' | 'openai' | 'seedream' | 'flux'
 
 export type ModelTag = 'NEW' | 'TRENDING' | 'FAST' | 'PREMIUM' | 'BEST_TEXT' | 'HD' | '4K' | 'RECOMENDADO' | 'TEXT_ONLY'
 
@@ -126,32 +124,6 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModelConfig> = {
   },
 
   // ============================================
-  // BYTEDANCE via KIE.ai (4 models)
-  // Seedream 3: TEXT ONLY (no image input)
-  // Seedream 4, 4.5, 4K: Support image input
-  // ============================================
-  'seedream-4.5': {
-    id: 'seedream-4.5',
-    name: 'Seedream 4.5',
-    description: 'Multi-imagen estetica - Soporta imagenes de referencia',
-    company: 'bytedance',
-    companyName: 'ByteDance',
-    supportsImageInput: true,
-    supportsAspectRatio: true,
-    maxImages: 6,
-    requiresPolling: true,
-    pricePerImage: '~$0.032',
-    recommended: true,
-    tags: ['RECOMENDADO', 'TRENDING'],
-    apiModelId: 'seedream/4.5-text-to-image',
-    availableIn: 'both',
-    cascade: {
-      kie: { t2i: 'seedream/4.5-text-to-image', i2i: 'seedream/4.5-edit', mode: 'seedream' },
-      fal: { t2i: 'fal-ai/bytedance/seedream/v4.5/text-to-image', i2i: 'fal-ai/bytedance/seedream/v4.5/edit' },
-    },
-  },
-
-  // ============================================
   // BLACK FOREST LABS FLUX 2 (3 models)
   // flux-2-max: no KIE, fal.ai → BFL direct
   // flux-2-pro, flex: KIE → fal.ai → BFL direct
@@ -217,14 +189,14 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModelConfig> = {
   },
 
   // ============================================
-  // FAL.AI (3 models — backup + standalone)
+  // GOOGLE (continued) — Nano Banana 2
   // ============================================
   'nano-banana-2': {
     id: 'nano-banana-2',
     name: 'Nano Banana 2',
     description: 'Rapido y economico — Ideal para landings',
-    company: 'fal',
-    companyName: 'fal.ai',
+    company: 'google',
+    companyName: 'Google',
     supportsImageInput: true,
     supportsAspectRatio: true,
     maxImages: 1,
@@ -246,8 +218,8 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModelConfig> = {
     id: 'seedream-5-lite',
     name: 'Seedream 5',
     description: 'ByteDance Seedream 5 — Rapido y creativo',
-    company: 'fal',
-    companyName: 'fal.ai',
+    company: 'bytedance',
+    companyName: 'ByteDance',
     supportsImageInput: true,
     supportsAspectRatio: true,
     maxImages: 1,
@@ -265,9 +237,9 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModelConfig> = {
   'seedream-5': {
     id: 'seedream-5',
     name: 'Seedream 5 Pro',
-    description: 'ByteDance Seedream 5 Pro via fal.ai — Mayor calidad',
-    company: 'fal',
-    companyName: 'fal.ai',
+    description: 'ByteDance Seedream 5 Pro — Mayor calidad',
+    company: 'bytedance',
+    companyName: 'ByteDance',
     supportsImageInput: true,
     supportsAspectRatio: true,
     maxImages: 1,
@@ -292,23 +264,13 @@ function filterModelsByAvailability(models: ImageModelConfig[], target: ModelAva
 // Grouped by company for hierarchical selector - ALL models (for Studio IA)
 export const IMAGE_COMPANY_GROUPS: ImageCompanyGroup[] = [
   {
-    id: 'fal',
-    name: 'fal.ai',
-    icon: 'Zap',
-    color: 'from-indigo-500 to-violet-500',
-    models: [
-      IMAGE_MODELS['nano-banana-2'],
-      IMAGE_MODELS['seedream-5-lite'],
-      IMAGE_MODELS['seedream-5'],
-    ],
-  },
-  {
     id: 'google',
     name: 'Google',
     icon: 'Sparkles',
     color: 'from-blue-500 to-purple-500',
     models: [
       IMAGE_MODELS['gemini-3-pro-image'],
+      IMAGE_MODELS['nano-banana-2'],
     ],
   },
   {
@@ -326,7 +288,8 @@ export const IMAGE_COMPANY_GROUPS: ImageCompanyGroup[] = [
     icon: 'Image',
     color: 'from-orange-500 to-red-500',
     models: [
-      IMAGE_MODELS['seedream-4.5'],
+      IMAGE_MODELS['seedream-5-lite'],
+      IMAGE_MODELS['seedream-5'],
     ],
   },
   {
@@ -354,7 +317,7 @@ export const LANDING_MODELS: ImageModelConfig[] = filterModelsByAvailability([
 // Legacy grouped format (kept for backward compat, single group)
 export const LANDING_COMPANY_GROUPS: ImageCompanyGroup[] = [
   {
-    id: 'fal',
+    id: 'google',
     name: 'Modelos',
     icon: 'Zap',
     color: 'from-indigo-500 to-violet-500',
@@ -398,26 +361,17 @@ export const IMAGE_PROVIDERS: Record<ImageProviderType, ImageProviderConfig> = {
   },
   seedream: {
     id: 'seedream',
-    name: 'Seedream 4.5',
-    description: 'ByteDance Seedream - Excelente para edicion',
+    name: 'Seedream 5',
+    description: 'ByteDance Seedream - Rapido y creativo',
     supportsImageInput: true,
     supportsAspectRatio: true,
-    maxImages: 6,
+    maxImages: 1,
     requiresPolling: true,
   },
   flux: {
     id: 'flux',
     name: 'FLUX 2 Pro',
     description: 'Black Forest Labs - Next-gen generation',
-    supportsImageInput: true,
-    supportsAspectRatio: true,
-    maxImages: 1,
-    requiresPolling: true,
-  },
-  fal: {
-    id: 'fal',
-    name: 'fal.ai',
-    description: 'fal.ai - Modelos serverless rapidos',
     supportsImageInput: true,
     supportsAspectRatio: true,
     maxImages: 1,
@@ -437,8 +391,6 @@ export function modelIdToProviderType(modelId: ImageModelId): ImageProviderType 
       return 'seedream'
     case 'bfl':
       return 'flux'
-    case 'fal':
-      return 'fal'
   }
 }
 
@@ -454,8 +406,6 @@ export function getApiKeyField(modelId: ImageModelId): string {
       return 'kie_api_key'
     case 'bfl':
       return 'bfl_api_key'
-    case 'fal':
-      return 'fal_api_key'
   }
 }
 

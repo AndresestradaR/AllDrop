@@ -106,7 +106,7 @@ export async function POST(request: Request) {
     const selectedProvider = modelIdToProviderType(modelId)
 
     const providerKeyMap: Record<ImageProviderType, keyof typeof apiKeys> = {
-      gemini: 'gemini', openai: 'openai', seedream: 'kie', flux: 'bfl', fal: 'fal',
+      gemini: 'gemini', openai: 'openai', seedream: 'kie', flux: 'bfl',
     }
 
     // For Gemini: accept either Google key OR KIE key (KIE provides Gemini models)
@@ -116,7 +116,7 @@ export async function POST(request: Request) {
 
     if (!hasRequiredKey) {
       const keyNames: Record<ImageProviderType, string> = {
-        gemini: 'Google (Gemini) o KIE.ai', openai: 'OpenAI', seedream: 'KIE.ai', flux: 'Black Forest Labs', fal: 'fal.ai',
+        gemini: 'Google (Gemini) o KIE.ai', openai: 'OpenAI', seedream: 'KIE.ai', flux: 'Black Forest Labs',
       }
       return NextResponse.json({
         error: `Configura tu API key de ${keyNames[selectedProvider]} en Settings`,

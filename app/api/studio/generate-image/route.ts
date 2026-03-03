@@ -223,7 +223,7 @@ export async function POST(request: Request) {
       console.log(`[Studio] Async task created: ${result.taskId}, polling...`)
 
       const providerKeyMap: Record<ImageProviderType, keyof typeof apiKeys> = {
-        gemini: 'gemini', openai: 'openai', seedream: 'kie', flux: 'bfl', fal: 'fal',
+        gemini: 'gemini', openai: 'openai', seedream: 'kie', flux: 'bfl',
       }
       const apiKey = apiKeys[providerKeyMap[selectedProvider]]!
       const elapsedMs = Date.now() - startTime
