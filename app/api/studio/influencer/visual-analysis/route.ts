@@ -254,7 +254,7 @@ RULES:
 
     // Call AI for visual analysis (with timeout to avoid Vercel 504)
     const abortController = new AbortController()
-    const timeout = setTimeout(() => abortController.abort(), 100000) // 100s safety limit
+    const timeout = setTimeout(() => abortController.abort(), 110000) // 110s safety limit (maxDuration=120)
 
     let text: string
     try {
@@ -263,7 +263,8 @@ RULES:
         userMessage: 'Analyze these reference images of the same person and generate an exhaustive visual analysis following the format specified in your instructions.',
         images,
         temperature: 0.3,
-        kieModel: 'gemini-2.5-pro',
+        // KIE: use default flash (pro + reasoning_effort:'none' returns empty on complex multimodal)
+        // Google direct: use pro for quality (thinkingBudget:0 still works for text output)
         googleModel: 'gemini-2.5-pro',
         signal: abortController.signal,
       })

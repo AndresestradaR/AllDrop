@@ -216,13 +216,14 @@ export async function POST(request: Request) {
     const imageInput = [{ mimeType, base64 }]
 
     // Execute BOTH techniques in parallel
+    // KIE: use default flash (pro + reasoning_effort:'none' returns empty on multimodal)
+    // Google direct: use pro for quality
     const [text1, text2] = await Promise.all([
       generateAIText(keys, {
         systemPrompt: TECHNIQUE_1_SYSTEM,
         userMessage: 'Analyze this person and generate an exhaustive visual analysis following the format specified in your instructions.',
         images: imageInput,
         temperature: 0.3,
-        kieModel: 'gemini-2.5-pro',
         googleModel: 'gemini-2.5-pro',
       }).catch(() => ''),
       generateAIText(keys, {
@@ -230,7 +231,6 @@ export async function POST(request: Request) {
         userMessage: 'Decompose this person\'s facial structure and generate the 8K cinematographic character profile following your instructions.',
         images: imageInput,
         temperature: 0.3,
-        kieModel: 'gemini-2.5-pro',
         googleModel: 'gemini-2.5-pro',
       }).catch(() => ''),
     ])
