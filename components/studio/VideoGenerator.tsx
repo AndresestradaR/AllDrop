@@ -218,7 +218,8 @@ export function VideoGenerator() {
     return { success: false, error: 'Timeout: el video tardó demasiado en generarse' }
   }
 
-  // Extend a Veo video (adds more seconds to the end)
+  // Extend a Veo video (adds more seconds from last frame)
+  // Uses current prompt field if filled, otherwise original video prompt
   const handleExtend = async (video: GeneratedVideo) => {
     if (!video.taskId || extendingVideoId) return
 
@@ -226,15 +227,16 @@ export function VideoGenerator() {
     setError(null)
 
     try {
-      // Determine Veo model from the video's model name
       const veoModel = video.model.toLowerCase().includes('fast') ? 'veo3_fast' : 'veo3'
+      // Use current prompt if user typed something new, otherwise keep original
+      const extendPrompt = prompt.trim() || video.prompt
 
       const response = await fetch('/api/studio/extend-video', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           taskId: video.taskId,
-          prompt: video.prompt,
+          prompt: extendPrompt,
           model: veoModel,
         }),
       })
@@ -245,7 +247,7 @@ export function VideoGenerator() {
       }
 
       // Poll for the extended video
-      const result = await pollForStatus(data.taskId, video.model, video.prompt, video.aspectRatio)
+      const result = await pollForStatus(data.taskId, video.model, extendPrompt, video.aspectRatio)
 
       if (!result.success) {
         throw new Error(result.error || 'Error al extender video')
@@ -256,7 +258,7 @@ export function VideoGenerator() {
         {
           id: Date.now().toString(),
           url: result.videoUrl!,
-          prompt: video.prompt,
+          prompt: extendPrompt,
           model: `${video.model} (ext)`,
           timestamp: new Date(),
           duration: '',
