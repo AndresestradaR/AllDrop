@@ -60,23 +60,10 @@
         .carousel-item.far-next { z-index:2;transform:translateX(460px) rotateY(-40deg) scale(0.7);opacity:0.35; }
         .carousel-item.hidden-item { opacity:0;transform:translateX(0) scale(0.5);z-index:0;pointer-events:none; }
         .carousel-item .notch { position:absolute;top:10px;left:50%;transform:translateX(-50%);width:55px;height:7px;border-radius:10px;background:rgba(255,255,255,0.08);z-index:3; }
-        .carousel-item .scr { width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px 14px 18px;position:relative; }
-        .carousel-item .cb { font-size:0.5rem;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;padding:4px 10px;border-radius:5px;margin-bottom:10px;color:white; }
-        .carousel-item .ce { font-size:3rem;margin-bottom:12px;filter:drop-shadow(0 4px 15px rgba(0,0,0,0.3)); }
-        .carousel-item .ct { font-size:0.8rem;font-weight:800;text-align:center;margin-bottom:5px;line-height:1.2;color:white;text-transform:uppercase;letter-spacing:0.02em; }
-        .carousel-item .cd { font-size:0.5rem;color:rgba(255,255,255,0.5);text-align:center;margin-bottom:12px;line-height:1.4;font-weight:300; }
-        .carousel-item .cp { font-family:'Space Mono',monospace;font-size:1.4rem;font-weight:700;color:white;margin-bottom:4px; }
-        .carousel-item .co { font-size:0.55rem;color:rgba(255,255,255,0.35);text-decoration:line-through;margin-bottom:14px; }
-        .carousel-item .cs { font-size:0.55rem;margin-bottom:8px;letter-spacing:1px; }
-        .carousel-item .cbtn { padding:8px 24px;border-radius:10px;border:none;font-size:0.55rem;font-weight:700;color:white;text-transform:uppercase;letter-spacing:0.08em; }
-
-        .ct1 .scr{background:linear-gradient(165deg,#0a0f2e,#0a1f4a,#081a2a)} .ct1 .cb,.ct1 .cbtn{background:linear-gradient(135deg,#00f0ff,#0080ff)}
-        .ct2 .scr{background:linear-gradient(165deg,#2d0a15,#1a0a2e,#0a1a2e)} .ct2 .cb,.ct2 .cbtn{background:linear-gradient(135deg,#f43f8e,#ff6b35)}
-        .ct3 .scr{background:linear-gradient(165deg,#0a2e1a,#0a1a2e,#1a0a2e)} .ct3 .cb,.ct3 .cbtn{background:linear-gradient(135deg,#10b981,#06d6a0)}
-        .ct4 .scr{background:linear-gradient(165deg,#2e1a0a,#2e0a1a,#1a0a2e)} .ct4 .cb,.ct4 .cbtn{background:linear-gradient(135deg,#f59e0b,#ef4444)}
-        .ct5 .scr{background:linear-gradient(165deg,#1a0a2e,#2e0a2e,#0a1a2e)} .ct5 .cb,.ct5 .cbtn{background:linear-gradient(135deg,#8b5cf6,#d946ef)}
-        .ct6 .scr{background:linear-gradient(165deg,#0a1a2e,#0a2e2e,#1a2e0a)} .ct6 .cb,.ct6 .cbtn{background:linear-gradient(135deg,#06b6d4,#3b82f6)}
-        .ct7 .scr{background:linear-gradient(165deg,#2e2e0a,#2e0a0a,#0a0a2e)} .ct7 .cb,.ct7 .cbtn{background:linear-gradient(135deg,#ec4899,#f43f5e)}
+        .carousel-item img { width:100%;height:100%;object-fit:cover; }
+        .carousel-item .loading-placeholder { width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:linear-gradient(165deg,#0a0f2e,#0a1f4a,#081a2a);font-size:2rem; }
+        @keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
+        .carousel-item .loading-placeholder::after { content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent 25%,rgba(255,255,255,0.04) 50%,transparent 75%);background-size:200% 100%;animation:shimmer 2s infinite; }
 
         .carousel-controls { display:flex;align-items:center;justify-content:center;gap:1.5rem;margin-top:1.5rem; }
         .carousel-btn { width:48px;height:48px;border-radius:50%;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.03);color:var(--text-muted);font-size:1.2rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.3s; }
@@ -111,7 +98,6 @@
         .ugc-quote { font-size:0.5rem;color:rgba(255,255,255,0.6);line-height:1.4;font-style:italic;font-weight:300; }
         .ugc-platform { position:absolute;top:10px;right:10px;font-size:0.85rem; }
         .ugc-views { position:absolute;top:10px;left:10px;font-size:0.44rem;color:rgba(255,255,255,0.6);background:rgba(0,0,0,0.5);padding:3px 7px;border-radius:4px;font-weight:500;backdrop-filter:blur(4px); }
-        .ugc-live { position:absolute;top:10px;left:50%;transform:translateX(-50%);font-size:0.4rem;color:white;background:rgba(239,68,68,0.8);padding:2px 8px;border-radius:4px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em; }
 
         .ut1 .ugc-bg{background:linear-gradient(180deg,#1a0525 0%,#0d0a2e 50%,#0a0a14 100%)}
         .ut2 .ugc-bg{background:linear-gradient(180deg,#0a1a25 0%,#0a0d2e 50%,#0a0a14 100%)}
@@ -170,15 +156,7 @@
     <div class="carousel-section">
         <div class="section-label">🚀 Landings que convierten — generadas con IA</div>
         <div class="carousel-wrapper">
-            <div class="carousel-track" id="carouselTrack">
-                <div class="carousel-item ct1" data-i="0"><div class="notch"></div><div class="scr"><div class="cb">Trending</div><div class="cs">⭐⭐⭐⭐⭐</div><div class="ce">💆</div><div class="ct">Masajeador<br>Terapéutico Pro</div><div class="cd">Alivio inmediato del estrés y dolor muscular</div><div class="cp">€59.90</div><div class="co">€99.90</div><div class="cbtn">Comprar Ahora</div></div></div>
-                <div class="carousel-item ct2" data-i="1"><div class="notch"></div><div class="scr"><div class="cb">Hot Sale</div><div class="cs">⭐⭐⭐⭐⭐</div><div class="ce">💄</div><div class="ct">Kit Skincare<br>Premium</div><div class="cd">Rutina completa de lujo para tu piel</div><div class="cp">€47.00</div><div class="co">€70.00</div><div class="cbtn">Comprar Ahora</div></div></div>
-                <div class="carousel-item ct3" data-i="2"><div class="notch"></div><div class="scr"><div class="cb">Nuevo</div><div class="cs">⭐⭐⭐⭐⭐</div><div class="ce">🎧</div><div class="ct">Auriculares<br>Noise Cancel</div><div class="cd">Sonido envolvente HiFi premium</div><div class="cp">€29.90</div><div class="co">€49.90</div><div class="cbtn">Comprar Ahora</div></div></div>
-                <div class="carousel-item ct4" data-i="3"><div class="notch"></div><div class="scr"><div class="cb">-50% Off</div><div class="cs">⭐⭐⭐⭐⭐</div><div class="ce">⌚</div><div class="ct">Smartwatch<br>Fitness Pro</div><div class="cd">Monitor cardíaco + GPS integrado</div><div class="cp">€39.90</div><div class="co">€79.90</div><div class="cbtn">Comprar Ahora</div></div></div>
-                <div class="carousel-item ct5" data-i="4"><div class="notch"></div><div class="scr"><div class="cb">Best Seller</div><div class="cs">⭐⭐⭐⭐⭐</div><div class="ce">✨</div><div class="ct">Lámpara LED<br>Smart Home</div><div class="cd">Control por voz y app móvil</div><div class="cp">€24.90</div><div class="co">€44.90</div><div class="cbtn">Comprar Ahora</div></div></div>
-                <div class="carousel-item ct6" data-i="5"><div class="notch"></div><div class="scr"><div class="cb">Exclusivo</div><div class="cs">⭐⭐⭐⭐⭐</div><div class="ce">🔌</div><div class="ct">Cargador Solar<br>PowerBank</div><div class="cd">20000mAh carga ultra rápida</div><div class="cp">€34.90</div><div class="co">€59.90</div><div class="cbtn">Comprar Ahora</div></div></div>
-                <div class="carousel-item ct7" data-i="6"><div class="notch"></div><div class="scr"><div class="cb">Flash Sale</div><div class="cs">⭐⭐⭐⭐⭐</div><div class="ce">🧴</div><div class="ct">Sérum Vitamina C<br>Anti-edad</div><div class="cd">Resultados visibles en 7 días</div><div class="cp">€19.90</div><div class="co">€39.90</div><div class="cbtn">Comprar Ahora</div></div></div>
-            </div>
+            <div class="carousel-track" id="carouselTrack"></div>
         </div>
         <div class="carousel-controls">
             <button class="carousel-btn" id="prevBtn">‹</button>
@@ -263,10 +241,50 @@
         function mkP(){const p=document.createElement('div');p.classList.add('particle');const x=Math.random()*100,dur=8+Math.random()*12,del=Math.random()*5,sz=1+Math.random()*2;const cols=['var(--accent-cyan)','var(--accent-violet)','var(--accent-magenta)'];p.style.cssText=`left:${x}%;width:${sz}px;height:${sz}px;background:${cols[Math.floor(Math.random()*3)]};animation-duration:${dur}s;animation-delay:${del}s;`;pc.appendChild(p);setTimeout(()=>p.remove(),(dur+del)*1000);}
         for(let i=0;i<20;i++)setTimeout(mkP,i*200);setInterval(mkP,600);
 
-        // 3D Carousel
-        const items = document.querySelectorAll('.carousel-item');
-        const total = items.length;
-        let current = 0, autoTimer, resumeTimer;
+        // 3D Carousel with dynamic images
+        const IMAGE_COUNT = 10;
+        const BASE_URL = 'https://raw.githubusercontent.com/AndresestradaR/AllDrop/main/images/';
+        const track = document.getElementById('carouselTrack');
+        let items, total, current = 0, autoTimer, resumeTimer;
+
+        // Build carousel items
+        for (let i = 0; i < IMAGE_COUNT; i++) {
+            const div = document.createElement('div');
+            div.className = 'carousel-item';
+            div.dataset.i = i;
+            div.innerHTML = '<div class="notch"></div><div class="loading-placeholder">⏳</div>';
+            track.appendChild(div);
+        }
+        items = document.querySelectorAll('.carousel-item');
+        total = items.length;
+
+        // Load images from base64 text files
+        async function loadImages() {
+            const promises = [];
+            for (let i = 0; i < IMAGE_COUNT; i++) {
+                promises.push(
+                    fetch(BASE_URL + i + '.txt')
+                        .then(r => r.text())
+                        .then(b64 => {
+                            const item = items[i];
+                            const placeholder = item.querySelector('.loading-placeholder');
+                            const img = document.createElement('img');
+                            img.src = 'data:image/webp;base64,' + b64.trim();
+                            img.alt = 'Landing de producto ' + (i + 1);
+                            img.loading = (i <= 2) ? 'eager' : 'lazy';
+                            img.onload = () => { if (placeholder) placeholder.remove(); };
+                            item.insertBefore(img, placeholder);
+                        })
+                        .catch(() => {
+                            const item = items[i];
+                            const ph = item.querySelector('.loading-placeholder');
+                            if (ph) ph.textContent = '📱';
+                        })
+                );
+            }
+            await Promise.all(promises);
+        }
+        loadImages();
 
         function updateCarousel() {
             items.forEach((item, i) => {
