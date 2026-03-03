@@ -25,6 +25,7 @@ import {
   X,
   Check,
   Type,
+  Trash2,
   Image as ImageLucide,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -308,6 +309,17 @@ export function ImageGenerator() {
     setGeneratedImages((prev) =>
       prev.map((img) => (img.id === id ? { ...img, isFavorite: !img.isFavorite } : img))
     )
+  }
+
+  const handleDelete = async (image: GeneratedImage) => {
+    // Remove from UI immediately
+    setGeneratedImages((prev) => prev.filter((img) => img.id !== image.id))
+    // Delete from DB (fire-and-forget)
+    const supabase = createClient()
+    supabase.from('generations').delete().eq('id', image.id).then(({ error }) => {
+      if (error) console.warn('[Studio] Delete failed:', error.message)
+    })
+    toast.success('Imagen eliminada')
   }
 
   const handleFileSelect = (
@@ -775,6 +787,13 @@ export function ImageGenerator() {
                           title="Usar prompt"
                         >
                           <Copy className="w-4 h-4 text-white" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(image)}
+                          className="p-2 bg-red-500/70 hover:bg-red-500 rounded-lg transition-colors ml-auto"
+                          title="Eliminar"
+                        >
+                          <Trash2 className="w-4 h-4 text-white" />
                         </button>
                       </div>
                     </div>
