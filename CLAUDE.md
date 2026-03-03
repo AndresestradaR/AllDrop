@@ -134,13 +134,39 @@ generateImage(model, params) -> ImageResult
     6. Boton eliminar: borra de UI + DELETE de tabla generations
     7. Descarga: fetch como blob → URL.createObjectURL → <a download> (cross-origin fix)
 
-  REGLAS CRITICAS de persistencia Studio IA:
+  Studio IA video persistence (generados):
+    Videos TAMBIEN sobreviven refresh. Mismo patron que imagenes pero con diferencias:
+    1. Backend (video-status): cuando polling detecta status=completed, guarda en `generations`:
+       - product_name='Video: {modelName}'
+       - generated_image_url = R2 URL (tryUploadUrlToR2) o KIE URL directo
+       - enhanced_prompt = "ar:{aspectRatio}|tid:{taskId}" (metadata para UI)
+    2. Frontend (VideoGenerator.tsx): useEffect carga de generations WHERE product_name LIKE 'Video:%'
+       - Parsea enhanced_prompt para extraer aspectRatio (ar:9:16) y taskId (tid:abc123)
+       - Videos sin metadata legacy: aspectRatio default 16:9, sin taskId
+    3. Galeria adaptativa: videos verticales (9:16) → max-w-200px tipo telefono,
+       horizontales (16:9) → ancho completo, cuadrados (1:1) → 48%
+    4. Botones siempre visibles debajo del video (NO hover overlay — <video controls> captura mouse):
+       - Compartir | Descargar (blob) | Extender (solo Veo) | Eliminar (UI + DB)
+    5. Video element usa object-contain + bg-black (respeta aspect ratio sin recortar)
+
+  Veo Extend (boton FastForward en galeria):
+    Solo aparece para videos Veo 3.1 y Veo 3.1 Fast que tienen taskId guardado.
+    - Usa prompt del campo de texto si el usuario escribio algo nuevo, sino prompt original
+    - Llama a /api/studio/extend-video con {taskId, prompt, model: 'veo3'|'veo3_fast'}
+    - KIE continua desde el ultimo frame del video original
+    - El video extendido se agrega como nuevo item "(ext)" en la galeria
+    - El video extendido TAMBIEN se puede extender de nuevo (tiene su propio taskId)
+    - Requisito: solo funciona con videos generados via KIE (no fal.ai — fal no da taskId)
+
+  REGLAS CRITICAS de persistencia Studio IA (imagenes Y videos):
     - NUNCA usar persistedUrl/publicUrl para mostrar imagen recien generada → SIEMPRE base64
     - NUNCA retornar URL del S3 API de R2 como URL publica → SIEMPRE 400 sin auth
     - NUNCA usar <a download> con URLs cross-origin → browser NAVEGA en vez de descargar
-    - SIEMPRE subir a Supabase Storage como fallback (R2 es opcional, Storage es garantizado)
+    - SIEMPRE subir a Supabase Storage como fallback para imagenes (R2 opcional, Storage garantizado)
     - SIEMPRE usar signed URLs para cargar de Storage (bucket puede no ser publico)
     - SIEMPRE usar createServiceClient() para INSERT en generations (bypassa RLS)
+    - NUNCA poner botones de accion en hover overlay sobre <video controls> → controles nativos capturan mouse
+    - SIEMPRE guardar aspectRatio y taskId en enhanced_prompt con formato "ar:{ratio}|tid:{id}"
 
   Errores: siempre en espanol simple (humanizeErrors), sin JSON ni IDs de modelo.
   Providers: gemini.ts | openai.ts | kie-seedream.ts | bfl-flux.ts | fal.ts
@@ -195,8 +221,15 @@ ALL video models route through KIE.ai with fal.ai cascade fallback.
     | wan-2.5         | wan/2-5-text/image-to-video                  | (no fal)                                        |
 
   Veo Extend: only veo-3.1 and veo-3.1-fast (supportsExtend: true)
-    Requires original taskId from KIE generation
+    Requires original taskId from KIE generation (fal.ai no da taskId → no se puede extender)
     API route: /api/studio/extend-video
+    UI: boton FastForward en galeria, solo visible si video.taskId existe y modelo es Veo
+    Prompt: usa campo de texto actual si tiene contenido, sino prompt original del video
+
+  Video persistence: videos se guardan en tabla `generations` (product_name LIKE 'Video:%')
+    Metadata en enhanced_prompt: "ar:{aspectRatio}|tid:{taskId}"
+    Galeria adaptativa: verticales como telefono, horizontales ancho completo
+    Botones debajo del video (NO hover overlay — <video controls> se come los eventos)
 
   Types: lib/video-providers/types.ts
   fal fallback: lib/video-providers/fal-video.ts
