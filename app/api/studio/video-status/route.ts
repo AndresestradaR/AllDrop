@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthContext } from '@/lib/auth/cron-auth'
+import { createServiceClient } from '@/lib/supabase/server'
 import { decrypt } from '@/lib/services/encryption'
 import { tryUploadUrlToR2 } from '@/lib/services/r2-upload'
 
@@ -203,6 +204,28 @@ export async function GET(request: Request) {
           'video/mp4'
         )
         if (r2Url) console.log(`[VideoStatus] ✓ Video saved to R2: ${r2Url}`)
+      }
+
+      // Save to generations table (non-blocking)
+      const modelName = searchParams.get('modelName') || 'Video'
+      const prompt = searchParams.get('prompt') || ''
+      const videoRef = r2Url || result.videoUrl || null
+      if (videoRef) {
+        const serviceClient = await createServiceClient()
+        serviceClient
+          .from('generations')
+          .insert({
+            user_id: userId,
+            product_name: `Video: ${modelName}`,
+            original_prompt: prompt,
+            enhanced_prompt: prompt,
+            status: 'completed',
+            generated_image_url: videoRef,
+          })
+          .then(({ error: dbErr }) => {
+            if (dbErr) console.warn('[VideoStatus] DB save failed:', dbErr.message)
+            else console.log('[VideoStatus] ✓ Saved to generations table')
+          })
       }
 
       return NextResponse.json({

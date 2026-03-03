@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
+import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils/cn'
 import {
   Video,
@@ -117,6 +118,38 @@ export function VideoGenerator() {
   const [publishVideoUrl, setPublishVideoUrl] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  // Load saved videos from database on mount
+  useEffect(() => {
+    const loadSavedVideos = async () => {
+      try {
+        const supabase = createClient()
+        const { data } = await supabase
+          .from('generations')
+          .select('id, product_name, original_prompt, generated_image_url, created_at')
+          .like('product_name', 'Video:%')
+          .not('generated_image_url', 'is', null)
+          .order('created_at', { ascending: false })
+          .limit(50)
+
+        if (data?.length) {
+          const saved = data.map((gen) => ({
+            id: gen.id,
+            url: gen.generated_image_url!,
+            prompt: gen.original_prompt || '',
+            model: gen.product_name?.replace('Video: ', '') || 'Video',
+            timestamp: new Date(gen.created_at),
+            duration: '',
+            aspectRatio: '16:9',
+          }))
+          setGeneratedVideos(saved)
+        }
+      } catch (err) {
+        console.warn('[Studio] Failed to load saved videos:', err)
+      }
+    }
+    loadSavedVideos()
+  }, [])
+
   // Kling 3.0 multi-shot state
   const [multiShotEnabled, setMultiShotEnabled] = useState(false)
   const [multiPrompts, setMultiPrompts] = useState<{ prompt: string; duration: number }[]>([
@@ -143,15 +176,16 @@ export function VideoGenerator() {
   const currentModel = VIDEO_MODELS[selectedModel]
 
   // Poll for video status
-  const pollForStatus = async (taskId: string): Promise<{ success: boolean; videoUrl?: string; error?: string }> => {
+  const pollForStatus = async (taskId: string, modelName?: string, promptText?: string): Promise<{ success: boolean; videoUrl?: string; error?: string }> => {
     const maxAttempts = 200 // ~10 minutes at 3s intervals
     const interval = 3000 // 3 seconds
+    const extraParams = `&modelName=${encodeURIComponent(modelName || '')}&prompt=${encodeURIComponent((promptText || '').substring(0, 500))}`
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       try {
         setGeneratingStatus(`Procesando video... (${Math.floor(attempt * 3 / 60)}:${String((attempt * 3) % 60).padStart(2, '0')})`)
 
-        const response = await fetch(`/api/studio/video-status?taskId=${taskId}`)
+        const response = await fetch(`/api/studio/video-status?taskId=${taskId}${extraParams}`)
         const data = await response.json()
 
         if (data.status === 'completed' && data.videoUrl) {
@@ -262,7 +296,7 @@ export function VideoGenerator() {
 
       // Poll for result from frontend
       setGeneratingStatus('Video en cola, esperando...')
-      const result = await pollForStatus(data.taskId)
+      const result = await pollForStatus(data.taskId, currentModel.name, prompt)
 
       if (!result.success) {
         throw new Error(result.error || 'Error al generar video')
@@ -1154,7 +1188,13 @@ export function VideoGenerator() {
                         <Download className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => setGeneratedVideos((prev) => prev.filter((v) => v.id !== video.id))}
+                        onClick={() => {
+                          setGeneratedVideos((prev) => prev.filter((v) => v.id !== video.id))
+                          const supabase = createClient()
+                          supabase.from('generations').delete().eq('id', video.id).then(({ error: dbErr }) => {
+                            if (dbErr) console.warn('[Studio] Video delete failed:', dbErr.message)
+                          })
+                        }}
                         className="p-1.5 text-text-secondary hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
                         title="Eliminar"
                       >
