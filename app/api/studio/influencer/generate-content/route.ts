@@ -107,6 +107,13 @@ export async function POST(request: Request) {
     if (profile?.bfl_api_key) apiKeys.bfl = decrypt(profile.bfl_api_key)
     if (profile?.fal_api_key) apiKeys.fal = decrypt(profile.fal_api_key)
 
+    // Environment variable fallbacks (platform keys)
+    if (!apiKeys.openai && process.env.OPENAI_API_KEY) apiKeys.openai = process.env.OPENAI_API_KEY
+    if (!apiKeys.kie && process.env.KIE_API_KEY) apiKeys.kie = process.env.KIE_API_KEY
+    if (!apiKeys.bfl && process.env.BFL_API_KEY) apiKeys.bfl = process.env.BFL_API_KEY
+    if (!apiKeys.fal && process.env.FAL_API_KEY) apiKeys.fal = process.env.FAL_API_KEY
+    if (!apiKeys.gemini && process.env.GEMINI_API_KEY) apiKeys.gemini = process.env.GEMINI_API_KEY
+
     const selectedProvider = modelIdToProviderType(modelId)
 
     const providerKeyMap: Record<ImageProviderType, keyof typeof apiKeys> = {
