@@ -62,7 +62,7 @@
         }
         .container {
             position: relative; z-index: 2; display: flex; flex-direction: column;
-            align-items: center; justify-content: center; min-height: 100vh; padding: 2rem;
+            align-items: center; justify-content: center; min-height: 100vh; padding: 2rem 2rem 1rem;
         }
         .logo-container { margin-bottom: 1rem; animation: fade-up 1s ease-out 0.2s both; }
         .logo {
@@ -97,9 +97,133 @@
         .subtext {
             text-align: center; max-width: 520px; color: var(--text-muted);
             font-size: clamp(0.95rem, 2vw, 1.15rem); font-weight: 300;
-            line-height: 1.7; margin-bottom: 3rem; animation: fade-up 1s ease-out 0.8s both;
+            line-height: 1.7; margin-bottom: 2.5rem; animation: fade-up 1s ease-out 0.8s both;
         }
-        .countdown-wrapper { animation: fade-up 1s ease-out 1s both; margin-bottom: 3rem; }
+
+        /* === PHONE MARQUEE === */
+        .marquee-section {
+            width: 100vw; position: relative; z-index: 2;
+            overflow: hidden; margin-bottom: 2.5rem;
+            animation: fade-up 1s ease-out 0.9s both;
+            mask-image: linear-gradient(90deg, transparent, black 10%, black 90%, transparent);
+            -webkit-mask-image: linear-gradient(90deg, transparent, black 10%, black 90%, transparent);
+        }
+        .marquee-track {
+            display: flex; gap: 1.5rem; width: max-content;
+            animation: marquee-scroll 35s linear infinite;
+        }
+        .marquee-track:hover { animation-play-state: paused; }
+        @keyframes marquee-scroll {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+        }
+        .phone-mockup {
+            flex-shrink: 0; width: 160px; height: 320px;
+            border-radius: 24px; border: 2.5px solid rgba(255,255,255,0.12);
+            background: #111118; position: relative; overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 30px rgba(139,92,246,0.08);
+            transition: transform 0.4s ease, box-shadow 0.4s ease;
+        }
+        .phone-mockup:hover {
+            transform: translateY(-8px) scale(1.03);
+            box-shadow: 0 30px 80px rgba(0,0,0,0.6), 0 0 40px rgba(139,92,246,0.15);
+        }
+        .phone-notch {
+            position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+            width: 50px; height: 6px; border-radius: 10px;
+            background: rgba(255,255,255,0.08); z-index: 3;
+        }
+        .phone-screen {
+            width: 100%; height: 100%; display: flex; flex-direction: column;
+            align-items: center; padding: 28px 12px 16px; position: relative; overflow: hidden;
+        }
+        .phone-screen .product-badge {
+            font-size: 0.45rem; font-weight: 600; text-transform: uppercase;
+            letter-spacing: 0.1em; padding: 3px 8px; border-radius: 4px;
+            margin-bottom: 8px; color: white;
+        }
+        .phone-screen .product-visual {
+            width: 70px; height: 70px; border-radius: 50%;
+            margin-bottom: 10px; display: flex; align-items: center;
+            justify-content: center; font-size: 2rem;
+        }
+        .phone-screen .product-name {
+            font-size: 0.65rem; font-weight: 700; text-align: center;
+            margin-bottom: 4px; line-height: 1.2; color: white;
+            text-transform: uppercase; letter-spacing: 0.02em;
+        }
+        .phone-screen .product-desc {
+            font-size: 0.45rem; color: rgba(255,255,255,0.5); text-align: center;
+            margin-bottom: 10px; line-height: 1.4; font-weight: 300;
+        }
+        .phone-screen .product-price {
+            font-family: 'Space Mono', monospace; font-size: 1.1rem;
+            font-weight: 700; color: white; margin-bottom: 4px;
+        }
+        .phone-screen .product-old-price {
+            font-size: 0.5rem; color: rgba(255,255,255,0.35);
+            text-decoration: line-through; margin-bottom: 10px;
+        }
+        .phone-screen .product-cta {
+            padding: 6px 20px; border-radius: 8px; border: none;
+            font-size: 0.5rem; font-weight: 700; color: white;
+            text-transform: uppercase; letter-spacing: 0.08em;
+            cursor: default;
+        }
+        .phone-screen .product-stars {
+            font-size: 0.5rem; margin-bottom: 6px; letter-spacing: 1px;
+        }
+
+        /* Phone themes */
+        .phone--1 .phone-screen { background: linear-gradient(165deg, #1a0a2e, #0d1f4a, #0a2a1f); }
+        .phone--1 .product-badge { background: linear-gradient(135deg, #00f0ff, #0080ff); }
+        .phone--1 .product-visual { background: radial-gradient(circle, rgba(0,240,255,0.2), transparent); }
+        .phone--1 .product-cta { background: linear-gradient(135deg, #00f0ff, #0080ff); }
+
+        .phone--2 .phone-screen { background: linear-gradient(165deg, #2d0a0a, #1a0a2e, #0a1a2e); }
+        .phone--2 .product-badge { background: linear-gradient(135deg, #f43f8e, #ff6b35); }
+        .phone--2 .product-visual { background: radial-gradient(circle, rgba(244,63,142,0.2), transparent); }
+        .phone--2 .product-cta { background: linear-gradient(135deg, #f43f8e, #ff6b35); }
+
+        .phone--3 .phone-screen { background: linear-gradient(165deg, #0a2e1a, #0a1a2e, #1a0a2e); }
+        .phone--3 .product-badge { background: linear-gradient(135deg, #10b981, #06d6a0); }
+        .phone--3 .product-visual { background: radial-gradient(circle, rgba(16,185,129,0.2), transparent); }
+        .phone--3 .product-cta { background: linear-gradient(135deg, #10b981, #06d6a0); }
+
+        .phone--4 .phone-screen { background: linear-gradient(165deg, #2e1a0a, #2e0a1a, #1a0a2e); }
+        .phone--4 .product-badge { background: linear-gradient(135deg, #f59e0b, #ef4444); }
+        .phone--4 .product-visual { background: radial-gradient(circle, rgba(245,158,11,0.2), transparent); }
+        .phone--4 .product-cta { background: linear-gradient(135deg, #f59e0b, #ef4444); }
+
+        .phone--5 .phone-screen { background: linear-gradient(165deg, #1a0a2e, #2e0a2e, #0a1a2e); }
+        .phone--5 .product-badge { background: linear-gradient(135deg, #8b5cf6, #d946ef); }
+        .phone--5 .product-visual { background: radial-gradient(circle, rgba(139,92,246,0.2), transparent); }
+        .phone--5 .product-cta { background: linear-gradient(135deg, #8b5cf6, #d946ef); }
+
+        .phone--6 .phone-screen { background: linear-gradient(165deg, #0a1a2e, #0a2e2e, #1a2e0a); }
+        .phone--6 .product-badge { background: linear-gradient(135deg, #06b6d4, #3b82f6); }
+        .phone--6 .product-visual { background: radial-gradient(circle, rgba(6,182,212,0.2), transparent); }
+        .phone--6 .product-cta { background: linear-gradient(135deg, #06b6d4, #3b82f6); }
+
+        .phone--7 .phone-screen { background: linear-gradient(165deg, #2e2e0a, #2e0a0a, #0a0a2e); }
+        .phone--7 .product-badge { background: linear-gradient(135deg, #ec4899, #f43f5e); }
+        .phone--7 .product-visual { background: radial-gradient(circle, rgba(236,72,153,0.2), transparent); }
+        .phone--7 .product-cta { background: linear-gradient(135deg, #ec4899, #f43f5e); }
+
+        .phone--8 .phone-screen { background: linear-gradient(165deg, #0a2e0a, #1a0a2e, #2e1a0a); }
+        .phone--8 .product-badge { background: linear-gradient(135deg, #22c55e, #16a34a); }
+        .phone--8 .product-visual { background: radial-gradient(circle, rgba(34,197,94,0.2), transparent); }
+        .phone--8 .product-cta { background: linear-gradient(135deg, #22c55e, #16a34a); }
+
+        @media (max-width: 600px) {
+            .phone-mockup { width: 130px; height: 260px; border-radius: 20px; }
+            .phone-screen { padding: 24px 10px 12px; }
+            .phone-screen .product-visual { width: 55px; height: 55px; font-size: 1.5rem; }
+            .phone-screen .product-name { font-size: 0.55rem; }
+            .phone-screen .product-price { font-size: 0.9rem; }
+        }
+
+        .countdown-wrapper { animation: fade-up 1s ease-out 1s both; margin-bottom: 2.5rem; }
         .countdown { display: flex; gap: clamp(0.75rem, 3vw, 1.5rem); align-items: center; }
         .countdown-block { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
         .countdown-number {
@@ -129,7 +253,7 @@
         }
         .features {
             display: flex; flex-wrap: wrap; justify-content: center;
-            gap: 0.75rem; margin-bottom: 3rem; animation: fade-up 1s ease-out 1.2s both;
+            gap: 0.75rem; margin-bottom: 2.5rem; animation: fade-up 1s ease-out 1.2s both;
         }
         .feature-tag {
             padding: 0.5rem 1rem; border-radius: 8px;
@@ -226,6 +350,226 @@
             Product Research · Creativos IA · Landings · Analytics.<br>
             Todo lo que necesitas, en un solo lugar.
         </p>
+    </div>
+
+    <!-- Phone Marquee -->
+    <div class="marquee-section">
+        <div class="marquee-track" id="marqueeTrack">
+            <!-- Set 1 -->
+            <div class="phone-mockup phone--1">
+                <div class="phone-notch"></div>
+                <div class="phone-screen">
+                    <div class="product-badge">Trending</div>
+                    <div class="product-stars">⭐⭐⭐⭐⭐</div>
+                    <div class="product-visual">💆</div>
+                    <div class="product-name">Masajeador<br>Terapéutico Pro</div>
+                    <div class="product-desc">Alivio inmediato del estrés</div>
+                    <div class="product-price">€59.90</div>
+                    <div class="product-old-price">€99.90</div>
+                    <div class="product-cta">Comprar Ahora</div>
+                </div>
+            </div>
+            <div class="phone-mockup phone--2">
+                <div class="phone-notch"></div>
+                <div class="phone-screen">
+                    <div class="product-badge">Hot Sale</div>
+                    <div class="product-stars">⭐⭐⭐⭐⭐</div>
+                    <div class="product-visual">💄</div>
+                    <div class="product-name">Kit Skincare<br>Premium</div>
+                    <div class="product-desc">Rutina completa facial</div>
+                    <div class="product-price">€47.00</div>
+                    <div class="product-old-price">€70.00</div>
+                    <div class="product-cta">Comprar Ahora</div>
+                </div>
+            </div>
+            <div class="phone-mockup phone--3">
+                <div class="phone-notch"></div>
+                <div class="phone-screen">
+                    <div class="product-badge">Nuevo</div>
+                    <div class="product-stars">⭐⭐⭐⭐⭐</div>
+                    <div class="product-visual">🔌</div>
+                    <div class="product-name">Cargador Solar<br>PowerBank</div>
+                    <div class="product-desc">20000mAh ultra rápido</div>
+                    <div class="product-price">€34.90</div>
+                    <div class="product-old-price">€59.90</div>
+                    <div class="product-cta">Comprar Ahora</div>
+                </div>
+            </div>
+            <div class="phone-mockup phone--4">
+                <div class="phone-notch"></div>
+                <div class="phone-screen">
+                    <div class="product-badge">-40% Off</div>
+                    <div class="product-stars">⭐⭐⭐⭐⭐</div>
+                    <div class="product-visual">🎧</div>
+                    <div class="product-name">Auriculares<br>Noise Cancel</div>
+                    <div class="product-desc">Sonido envolvente HiFi</div>
+                    <div class="product-price">€29.90</div>
+                    <div class="product-old-price">€49.90</div>
+                    <div class="product-cta">Comprar Ahora</div>
+                </div>
+            </div>
+            <div class="phone-mockup phone--5">
+                <div class="phone-notch"></div>
+                <div class="phone-screen">
+                    <div class="product-badge">Best Seller</div>
+                    <div class="product-stars">⭐⭐⭐⭐⭐</div>
+                    <div class="product-visual">✨</div>
+                    <div class="product-name">Lámpara LED<br>Smart Home</div>
+                    <div class="product-desc">Control por voz & app</div>
+                    <div class="product-price">€24.90</div>
+                    <div class="product-old-price">€44.90</div>
+                    <div class="product-cta">Comprar Ahora</div>
+                </div>
+            </div>
+            <div class="phone-mockup phone--6">
+                <div class="phone-notch"></div>
+                <div class="phone-screen">
+                    <div class="product-badge">Exclusivo</div>
+                    <div class="product-stars">⭐⭐⭐⭐⭐</div>
+                    <div class="product-visual">⌚</div>
+                    <div class="product-name">Smartwatch<br>Fitness Pro</div>
+                    <div class="product-desc">Monitor cardíaco + GPS</div>
+                    <div class="product-price">€39.90</div>
+                    <div class="product-old-price">€79.90</div>
+                    <div class="product-cta">Comprar Ahora</div>
+                </div>
+            </div>
+            <div class="phone-mockup phone--7">
+                <div class="phone-notch"></div>
+                <div class="phone-screen">
+                    <div class="product-badge">Flash Sale</div>
+                    <div class="product-stars">⭐⭐⭐⭐⭐</div>
+                    <div class="product-visual">🧴</div>
+                    <div class="product-name">Sérum Vitamina C<br>Anti-edad</div>
+                    <div class="product-desc">Resultados en 7 días</div>
+                    <div class="product-price">€19.90</div>
+                    <div class="product-old-price">€39.90</div>
+                    <div class="product-cta">Comprar Ahora</div>
+                </div>
+            </div>
+            <div class="phone-mockup phone--8">
+                <div class="phone-notch"></div>
+                <div class="phone-screen">
+                    <div class="product-badge">Limited</div>
+                    <div class="product-stars">⭐⭐⭐⭐⭐</div>
+                    <div class="product-visual">🏋️</div>
+                    <div class="product-name">Bandas<br>Resistencia Pro</div>
+                    <div class="product-desc">Kit completo 5 niveles</div>
+                    <div class="product-price">€22.90</div>
+                    <div class="product-old-price">€45.90</div>
+                    <div class="product-cta">Comprar Ahora</div>
+                </div>
+            </div>
+            <!-- Set 2 (duplicate for seamless loop) -->
+            <div class="phone-mockup phone--1">
+                <div class="phone-notch"></div>
+                <div class="phone-screen">
+                    <div class="product-badge">Trending</div>
+                    <div class="product-stars">⭐⭐⭐⭐⭐</div>
+                    <div class="product-visual">💆</div>
+                    <div class="product-name">Masajeador<br>Terapéutico Pro</div>
+                    <div class="product-desc">Alivio inmediato del estrés</div>
+                    <div class="product-price">€59.90</div>
+                    <div class="product-old-price">€99.90</div>
+                    <div class="product-cta">Comprar Ahora</div>
+                </div>
+            </div>
+            <div class="phone-mockup phone--2">
+                <div class="phone-notch"></div>
+                <div class="phone-screen">
+                    <div class="product-badge">Hot Sale</div>
+                    <div class="product-stars">⭐⭐⭐⭐⭐</div>
+                    <div class="product-visual">💄</div>
+                    <div class="product-name">Kit Skincare<br>Premium</div>
+                    <div class="product-desc">Rutina completa facial</div>
+                    <div class="product-price">€47.00</div>
+                    <div class="product-old-price">€70.00</div>
+                    <div class="product-cta">Comprar Ahora</div>
+                </div>
+            </div>
+            <div class="phone-mockup phone--3">
+                <div class="phone-notch"></div>
+                <div class="phone-screen">
+                    <div class="product-badge">Nuevo</div>
+                    <div class="product-stars">⭐⭐⭐⭐⭐</div>
+                    <div class="product-visual">🔌</div>
+                    <div class="product-name">Cargador Solar<br>PowerBank</div>
+                    <div class="product-desc">20000mAh ultra rápido</div>
+                    <div class="product-price">€34.90</div>
+                    <div class="product-old-price">€59.90</div>
+                    <div class="product-cta">Comprar Ahora</div>
+                </div>
+            </div>
+            <div class="phone-mockup phone--4">
+                <div class="phone-notch"></div>
+                <div class="phone-screen">
+                    <div class="product-badge">-40% Off</div>
+                    <div class="product-stars">⭐⭐⭐⭐⭐</div>
+                    <div class="product-visual">🎧</div>
+                    <div class="product-name">Auriculares<br>Noise Cancel</div>
+                    <div class="product-desc">Sonido envolvente HiFi</div>
+                    <div class="product-price">€29.90</div>
+                    <div class="product-old-price">€49.90</div>
+                    <div class="product-cta">Comprar Ahora</div>
+                </div>
+            </div>
+            <div class="phone-mockup phone--5">
+                <div class="phone-notch"></div>
+                <div class="phone-screen">
+                    <div class="product-badge">Best Seller</div>
+                    <div class="product-stars">⭐⭐⭐⭐⭐</div>
+                    <div class="product-visual">✨</div>
+                    <div class="product-name">Lámpara LED<br>Smart Home</div>
+                    <div class="product-desc">Control por voz & app</div>
+                    <div class="product-price">€24.90</div>
+                    <div class="product-old-price">€44.90</div>
+                    <div class="product-cta">Comprar Ahora</div>
+                </div>
+            </div>
+            <div class="phone-mockup phone--6">
+                <div class="phone-notch"></div>
+                <div class="phone-screen">
+                    <div class="product-badge">Exclusivo</div>
+                    <div class="product-stars">⭐⭐⭐⭐⭐</div>
+                    <div class="product-visual">⌚</div>
+                    <div class="product-name">Smartwatch<br>Fitness Pro</div>
+                    <div class="product-desc">Monitor cardíaco + GPS</div>
+                    <div class="product-price">€39.90</div>
+                    <div class="product-old-price">€79.90</div>
+                    <div class="product-cta">Comprar Ahora</div>
+                </div>
+            </div>
+            <div class="phone-mockup phone--7">
+                <div class="phone-notch"></div>
+                <div class="phone-screen">
+                    <div class="product-badge">Flash Sale</div>
+                    <div class="product-stars">⭐⭐⭐⭐⭐</div>
+                    <div class="product-visual">🧴</div>
+                    <div class="product-name">Sérum Vitamina C<br>Anti-edad</div>
+                    <div class="product-desc">Resultados en 7 días</div>
+                    <div class="product-price">€19.90</div>
+                    <div class="product-old-price">€39.90</div>
+                    <div class="product-cta">Comprar Ahora</div>
+                </div>
+            </div>
+            <div class="phone-mockup phone--8">
+                <div class="phone-notch"></div>
+                <div class="phone-screen">
+                    <div class="product-badge">Limited</div>
+                    <div class="product-stars">⭐⭐⭐⭐⭐</div>
+                    <div class="product-visual">🏋️</div>
+                    <div class="product-name">Bandas<br>Resistencia Pro</div>
+                    <div class="product-desc">Kit completo 5 niveles</div>
+                    <div class="product-price">€22.90</div>
+                    <div class="product-old-price">€45.90</div>
+                    <div class="product-cta">Comprar Ahora</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom section -->
+    <div class="container" style="min-height: auto; padding-top: 0;">
         <div class="countdown-wrapper">
             <div class="countdown">
                 <div class="countdown-block">
@@ -270,10 +614,7 @@
     <div class="footer">© 2026 AllDrop · Hecho para dropshippers en Europa</div>
 
     <script>
-        // 13 de marzo 2026, 16:00 hora España (CET = UTC+1)
-        // 16:00 CET = 15:00 UTC
         const launchDate = new Date('2026-03-13T15:00:00Z');
-
         function updateCountdown() {
             const now = new Date().getTime();
             const distance = launchDate.getTime() - now;
