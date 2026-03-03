@@ -1096,67 +1096,71 @@ export function VideoGenerator() {
               {generatedVideos.map((video) => (
                 <div
                   key={video.id}
-                  className="group relative rounded-xl overflow-hidden bg-surface-elevated"
-                  style={{
-                    aspectRatio:
-                      video.aspectRatio === '16:9'
-                        ? '16/9'
-                        : video.aspectRatio === '9:16'
-                        ? '9/16'
-                        : '1/1',
-                  }}
+                  className="rounded-xl overflow-hidden bg-surface-elevated"
                 >
-                  <video
-                    src={video.url}
-                    className="w-full h-full object-cover"
-                    controls
-                    poster=""
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                    <div className="absolute bottom-0 left-0 right-0 p-3">
-                      <p className="text-xs text-white/80 line-clamp-2">
+                  <div
+                    className="relative"
+                    style={{
+                      aspectRatio:
+                        video.aspectRatio === '16:9'
+                          ? '16/9'
+                          : video.aspectRatio === '9:16'
+                          ? '9/16'
+                          : '1/1',
+                    }}
+                  >
+                    <video
+                      src={video.url}
+                      className="w-full h-full object-cover"
+                      controls
+                      poster=""
+                    />
+                  </div>
+                  <div className="p-2.5 flex items-center justify-between">
+                    <div className="min-w-0 flex-1 mr-2">
+                      <p className="text-xs text-text-secondary truncate">
                         {video.prompt}
                       </p>
-                      <p className="text-[10px] text-white/60 mt-1">
+                      <p className="text-[10px] text-text-tertiary mt-0.5">
                         {video.model} · {video.duration}
                       </p>
                     </div>
-                  </div>
-                  <div className="absolute top-2 right-2 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={() => setPublishVideoUrl(video.url)}
-                      className="p-2 bg-indigo-500/80 hover:bg-indigo-500 rounded-lg transition-colors"
-                      title="Publicar en redes"
-                    >
-                      <Share2 className="w-4 h-4 text-white" />
-                    </button>
-                    <button
-                      onClick={async () => {
-                        try {
-                          const response = await fetch(video.url)
-                          const blob = await response.blob()
-                          const blobUrl = URL.createObjectURL(blob)
-                          const a = document.createElement('a')
-                          a.href = blobUrl
-                          a.download = `video-${video.id}.mp4`
-                          a.click()
-                          URL.revokeObjectURL(blobUrl)
-                        } catch {
-                          window.open(video.url, '_blank')
-                        }
-                      }}
-                      className="p-2 bg-black/50 rounded-lg hover:bg-black/70 transition-colors"
-                      title="Descargar"
-                    >
-                      <Download className="w-4 h-4 text-white" />
-                    </button>
-                    <button
-                      onClick={() => setGeneratedVideos((prev) => prev.filter((v) => v.id !== video.id))}
-                      className="p-2 bg-red-500/70 hover:bg-red-500 rounded-lg transition-colors"
-                      title="Eliminar"
-                    >
-                      <Trash2 className="w-4 h-4 text-white" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setPublishVideoUrl(video.url)}
+                        className="p-1.5 text-text-secondary hover:text-indigo-400 hover:bg-indigo-500/10 rounded-lg transition-colors"
+                        title="Publicar en redes"
+                      >
+                        <Share2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={async () => {
+                          try {
+                            const response = await fetch(video.url)
+                            const blob = await response.blob()
+                            const blobUrl = URL.createObjectURL(blob)
+                            const a = document.createElement('a')
+                            a.href = blobUrl
+                            a.download = `video-${video.id}.mp4`
+                            a.click()
+                            URL.revokeObjectURL(blobUrl)
+                          } catch {
+                            window.open(video.url, '_blank')
+                          }
+                        }}
+                        className="p-1.5 text-text-secondary hover:text-accent hover:bg-accent/10 rounded-lg transition-colors"
+                        title="Descargar"
+                      >
+                        <Download className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setGeneratedVideos((prev) => prev.filter((v) => v.id !== video.id))}
+                        className="p-1.5 text-text-secondary hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                        title="Eliminar"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
