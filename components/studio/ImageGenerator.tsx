@@ -205,11 +205,11 @@ export function ImageGenerator() {
       }
 
       if (data.success && data.imageBase64) {
-        // Use persisted URL if available (survives refresh), fallback to inline base64
-        const imageUrl = data.persistedUrl || `data:${data.mimeType || 'image/png'};base64,${data.imageBase64}`
+        // Always use base64 for immediate display (guaranteed to work)
+        // persistedUrl is only used when loading saved images from DB on mount
         const newImage: GeneratedImage = {
           id: crypto.randomUUID(),
-          url: imageUrl,
+          url: `data:${data.mimeType || 'image/png'};base64,${data.imageBase64}`,
           prompt,
           model: currentModel.name,
           timestamp: new Date(),
@@ -690,7 +690,22 @@ export function ImageGenerator() {
                     src={image.url}
                     alt={image.prompt}
                     className="w-full h-full object-cover"
+                    onError={(e) => {
+                      // Hide broken images — show placeholder instead
+                      const target = e.currentTarget
+                      target.style.display = 'none'
+                      const placeholder = target.nextElementSibling as HTMLElement
+                      if (placeholder?.dataset.placeholder) placeholder.style.display = 'flex'
+                    }}
                   />
+                  <div
+                    data-placeholder="true"
+                    className="w-full h-full items-center justify-center bg-surface-elevated text-text-secondary text-xs text-center p-2"
+                    style={{ display: 'none' }}
+                  >
+                    <ImageIcon className="w-6 h-6 mb-1 opacity-50" />
+                    <span>Imagen no disponible</span>
+                  </div>
                   {/* Overlay */}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
                     <div className="absolute bottom-0 left-0 right-0 p-3">
