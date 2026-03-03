@@ -298,11 +298,21 @@ export function ImageGenerator() {
     toast.error('Tiempo de espera agotado')
   }
 
-  const handleDownload = (image: GeneratedImage) => {
-    const link = document.createElement('a')
-    link.href = image.url
-    link.download = `estudio-ia-${Date.now()}.png`
-    link.click()
+  const handleDownload = async (image: GeneratedImage) => {
+    try {
+      const response = await fetch(image.url)
+      const blob = await response.blob()
+      const blobUrl = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = blobUrl
+      link.download = `estudio-ia-${Date.now()}.png`
+      link.click()
+      URL.revokeObjectURL(blobUrl)
+    } catch {
+      // Fallback: open in new tab if fetch fails (e.g. CORS)
+      window.open(image.url, '_blank')
+      toast.error('No se pudo descargar directamente. Se abrio en nueva pestaña.')
+    }
   }
 
   const toggleFavorite = (id: string) => {
