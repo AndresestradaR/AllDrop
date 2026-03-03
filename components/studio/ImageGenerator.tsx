@@ -107,15 +107,31 @@ export function ImageGenerator() {
           .limit(50)
 
         if (data?.length) {
-          const saved: GeneratedImage[] = data.map((gen) => ({
-            id: gen.id,
-            url: gen.generated_image_url,
-            prompt: gen.original_prompt || '',
-            model: gen.product_name?.replace('Studio: ', '') || 'Unknown',
-            timestamp: new Date(gen.created_at),
-            isFavorite: false,
-            aspectRatio: '1:1' as AspectRatio,
-          }))
+          // Resolve Supabase Storage URLs to signed URLs (public URLs may not work)
+          const saved: GeneratedImage[] = await Promise.all(
+            data.map(async (gen) => {
+              let url = gen.generated_image_url
+              // If it's a Supabase Storage URL, create a signed URL that works
+              if (url?.includes('/landing-images/')) {
+                const path = url.split('/landing-images/')[1]
+                if (path) {
+                  const { data: signed } = await supabase.storage
+                    .from('landing-images')
+                    .createSignedUrl(path, 86400) // 24h — refreshed on each page load
+                  if (signed?.signedUrl) url = signed.signedUrl
+                }
+              }
+              return {
+                id: gen.id,
+                url,
+                prompt: gen.original_prompt || '',
+                model: gen.product_name?.replace('Studio: ', '') || 'Unknown',
+                timestamp: new Date(gen.created_at),
+                isFavorite: false,
+                aspectRatio: '1:1' as AspectRatio,
+              }
+            })
+          )
           setGeneratedImages(saved)
         }
       } catch (err) {
