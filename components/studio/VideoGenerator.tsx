@@ -26,6 +26,7 @@ import {
   Hash,
   Plus,
   Trash2,
+  FastForward,
   UserCircle,
 } from 'lucide-react'
 import { PublisherModal } from './PublisherModal'
@@ -77,6 +78,7 @@ interface GeneratedVideo {
   timestamp: Date
   duration: string
   aspectRatio: string
+  taskId?: string // KIE task ID — needed for Veo extend
 }
 
 // Tag styling config
@@ -117,6 +119,7 @@ export function VideoGenerator() {
   const [generatedVideos, setGeneratedVideos] = useState<GeneratedVideo[]>([])
   const [publishVideoUrl, setPublishVideoUrl] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [extendingVideoId, setExtendingVideoId] = useState<string | null>(null)
 
   // Load saved videos from database on mount
   useEffect(() => {
@@ -133,9 +136,10 @@ export function VideoGenerator() {
 
         if (data?.length) {
           const saved = data.map((gen) => {
-            // Parse aspect ratio from enhanced_prompt (format: "ar:9:16")
-            const arMatch = gen.enhanced_prompt?.match(/^ar:(.+)$/)
-            const savedAr = arMatch?.[1] || '16:9'
+            // Parse metadata from enhanced_prompt (format: "ar:9:16|tid:abc123")
+            const meta = gen.enhanced_prompt || ''
+            const arMatch = meta.match(/ar:([^|]+)/)
+            const tidMatch = meta.match(/tid:([^|]+)/)
             return {
               id: gen.id,
               url: gen.generated_image_url!,
@@ -143,7 +147,8 @@ export function VideoGenerator() {
               model: gen.product_name?.replace('Video: ', '') || 'Video',
               timestamp: new Date(gen.created_at),
               duration: '',
-              aspectRatio: savedAr,
+              aspectRatio: arMatch?.[1] || '16:9',
+              taskId: tidMatch?.[1] || undefined,
             }
           })
           setGeneratedVideos(saved)
@@ -181,7 +186,7 @@ export function VideoGenerator() {
   const currentModel = VIDEO_MODELS[selectedModel]
 
   // Poll for video status
-  const pollForStatus = async (taskId: string, modelName?: string, promptText?: string, videoAspectRatio?: string): Promise<{ success: boolean; videoUrl?: string; error?: string }> => {
+  const pollForStatus = async (taskId: string, modelName?: string, promptText?: string, videoAspectRatio?: string): Promise<{ success: boolean; videoUrl?: string; error?: string; taskId?: string }> => {
     const maxAttempts = 200 // ~10 minutes at 3s intervals
     const interval = 3000 // 3 seconds
     const extraParams = `&modelName=${encodeURIComponent(modelName || '')}&prompt=${encodeURIComponent((promptText || '').substring(0, 500))}&aspectRatio=${encodeURIComponent(videoAspectRatio || '16:9')}`
@@ -194,7 +199,7 @@ export function VideoGenerator() {
         const data = await response.json()
 
         if (data.status === 'completed' && data.videoUrl) {
-          return { success: true, videoUrl: data.videoUrl }
+          return { success: true, videoUrl: data.videoUrl, taskId }
         }
 
         if (data.status === 'failed') {
@@ -211,6 +216,60 @@ export function VideoGenerator() {
     }
 
     return { success: false, error: 'Timeout: el video tardó demasiado en generarse' }
+  }
+
+  // Extend a Veo video (adds more seconds to the end)
+  const handleExtend = async (video: GeneratedVideo) => {
+    if (!video.taskId || extendingVideoId) return
+
+    setExtendingVideoId(video.id)
+    setError(null)
+
+    try {
+      // Determine Veo model from the video's model name
+      const veoModel = video.model.toLowerCase().includes('fast') ? 'veo3_fast' : 'veo3'
+
+      const response = await fetch('/api/studio/extend-video', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taskId: video.taskId,
+          prompt: video.prompt,
+          model: veoModel,
+        }),
+      })
+
+      const data = await response.json()
+      if (!data.success || !data.taskId) {
+        throw new Error(data.error || 'No se pudo extender el video')
+      }
+
+      // Poll for the extended video
+      const result = await pollForStatus(data.taskId, video.model, video.prompt, video.aspectRatio)
+
+      if (!result.success) {
+        throw new Error(result.error || 'Error al extender video')
+      }
+
+      // Add extended video to gallery
+      setGeneratedVideos((prev) => [
+        {
+          id: Date.now().toString(),
+          url: result.videoUrl!,
+          prompt: video.prompt,
+          model: `${video.model} (ext)`,
+          timestamp: new Date(),
+          duration: '',
+          aspectRatio: video.aspectRatio,
+          taskId: result.taskId,
+        },
+        ...prev,
+      ])
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setExtendingVideoId(null)
+    }
   }
 
   const handleGenerate = async () => {
@@ -317,6 +376,7 @@ export function VideoGenerator() {
           timestamp: new Date(),
           duration: `${duration}s`,
           aspectRatio,
+          taskId: result.taskId,
         },
         ...prev,
       ])
@@ -1198,6 +1258,25 @@ export function VideoGenerator() {
                       >
                         <Download className="w-4 h-4" />
                       </button>
+                      {video.taskId && video.model.toLowerCase().includes('veo') && (
+                        <button
+                          onClick={() => handleExtend(video)}
+                          disabled={extendingVideoId === video.id || isGenerating}
+                          className={cn(
+                            'p-1.5 rounded-lg transition-colors',
+                            extendingVideoId === video.id
+                              ? 'text-accent animate-pulse'
+                              : 'text-text-secondary hover:text-accent hover:bg-accent/10'
+                          )}
+                          title="Extender video (+segundos)"
+                        >
+                          {extendingVideoId === video.id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <FastForward className="w-4 h-4" />
+                          )}
+                        </button>
+                      )}
                       <button
                         onClick={() => {
                           setGeneratedVideos((prev) => prev.filter((v) => v.id !== video.id))

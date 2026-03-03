@@ -219,7 +219,7 @@ export async function GET(request: Request) {
             user_id: userId,
             product_name: `Video: ${modelName}`,
             original_prompt: prompt,
-            enhanced_prompt: `ar:${videoAspectRatio}`,
+            enhanced_prompt: `ar:${videoAspectRatio}|tid:${taskId}`,
             status: 'completed',
             generated_image_url: videoRef,
           })
