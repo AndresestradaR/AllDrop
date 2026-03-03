@@ -599,6 +599,7 @@ BREAKS: ALL AI features in DropPage (key resolution for every AI call)
 7. **NEVER** remove API endpoints without verifying no frontend uses them
 8. **NEVER** use `"/"` in FastAPI routes — use `""` to avoid 307 redirects
 9. **NEVER** modify the system prompts in `enhance-prompt/route.ts` or `generate-angles/route.ts` — these are hand-tuned, battle-tested prompts (~1,100 lines each) that produce exceptional banner results. Only touch cascade/infrastructure code around them.
+10. **NEVER** hacer `git push` cuando CLAUDE.md es el unico archivo modificado — triggerea deploy en Vercel innecesariamente. Commit local OK, push solo junto con cambios de codigo real.
 
 ### ALWAYS do:
 1. **ALWAYS** check the impact map before touching any service file
@@ -648,7 +649,7 @@ BREAKS: ALL AI features in DropPage (key resolution for every AI call)
 - **ENCRYPTION_KEY incorrecto** → NO HAY error visible, simplemente todas las keys BYOK se descifran como basura → 401s en todos los proveedores. Si todos los usuarios fallan simultaneamente, verificar ENCRYPTION_KEY primero.
 
 #### Deploy & Infrastructure
-- **CLAUDE.md-only commits** → triggerean deploy innecesario en Vercel. CLAUDE.md es archivo de referencia para Claude, no codigo. Agrupar cambios de CLAUDE.md con cambios de codigo o dejar como commit local.
+- **PROHIBIDO push de CLAUDE.md solo** → CLAUDE.md es documentacion interna para Claude, NO es codigo. Hacer push de CLAUDE.md SOLO triggerea un deploy en Vercel COMPLETAMENTE INNECESARIO que gasta build minutes y tiempo del usuario. REGLA ABSOLUTA: NUNCA hacer `git push` cuando el unico archivo modificado es CLAUDE.md. Opciones: (1) acumular cambios de CLAUDE.md y pushearlos junto con el proximo cambio de codigo real, o (2) hacer commit local sin push. Si el usuario pide explicitamente pushear CLAUDE.md, advertirle que triggerea deploy innecesario.
 - **Vercel maxDuration** → funciones serverless tienen limite (120s por default en vercel.json). Toda cadena de cascada debe completar dentro de este limite. Si un paso tarda mucho, los siguientes no tienen tiempo.
 - **Vercel MIDDLEWARE_INVOCATION_TIMEOUT** → middleware.ts tiene timeout 3s para evitar esto. NO agregar logica pesada al middleware.
 
