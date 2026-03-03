@@ -97,15 +97,50 @@ generateImage(model, params) -> ImageResult
     3. fal.ai fallback de KIE — elige T2I o I2I segun hasImages
     4. Direct API ultimo fallback (Gemini o BFL — mas caro)
 
+  Hard timeout con withTimeout() — Promise.race en CADA paso de la cascada:
+    Cada paso tiene budget proporcional al tiempo restante:
+      OpenAI: min(remaining*0.35, 30s)
+      KIE: min(remaining*0.45, 40s) + 2s grace
+      fal.ai: min(remaining - directReserve, 50s), min 15s + 2s grace
+      Direct API: remaining - 2s, min 10s
+    Si fetch() se cuelga (KIE polling infinito, fal.ai lento), withTimeout() lo MATA
+    y la cascada continua al siguiente paso. Sin esto → Vercel mata la funcion a 120s → 504.
+    NUNCA quitar withTimeout() de ningun paso. NUNCA confiar en soft timeouts (loops/counters).
+    hasTime() verifica que queda tiempo antes de iniciar cada paso.
+
   Input de imagenes en KIE (segun cascade.kie.mode):
     nano-banana (Flash/Pro): image_input + resolution:'1K'
     seedream: image_urls + quality:'basic'
     gpt-image: image_input
 
-  Studio IA temp images:
+  Studio IA temp images (referencia para cascade):
     Siempre sube imagenes a Supabase Storage (temp/{userId}/...)
     Genera URLs publicas para KIE/fal.ai
     Limpieza fire-and-forget al final
+
+  Studio IA image persistence (generadas):
+    Las imagenes generadas DEBEN sobrevivir refresh de pagina. Flujo:
+    1. Genera imagen → base64 → se muestra inmediato en UI (SIEMPRE base64, nunca URL)
+    2. Intenta R2 (user's Cloudflare) → SI tiene publicUrl → guarda R2 URL
+       SI NO tiene publicUrl → retorna null (archivo sube como backup pero URL no sirve)
+       NUNCA retornar URL del endpoint S3 (bucket.accountId.r2.cloudflarestorage.com) → requiere auth → 400
+    3. SIEMPRE sube a Supabase Storage (studio/{userId}/...) como fallback garantizado
+    4. Guarda en tabla `generations`: product_name='Studio: {modelName}',
+       generated_image_url = R2 URL si existe, o "storage:{path}" si no
+    5. Al recargar pagina: useEffect carga de `generations` table:
+       - URL con "storage:" → extrae path → crea signed URL (24h, se renueva cada carga)
+       - URL con "supabase" + "/landing-images/" → legacy → signed URL
+       - URL https:// normal → R2 URL → carga directa
+    6. Boton eliminar: borra de UI + DELETE de tabla generations
+    7. Descarga: fetch como blob → URL.createObjectURL → <a download> (cross-origin fix)
+
+  REGLAS CRITICAS de persistencia Studio IA:
+    - NUNCA usar persistedUrl/publicUrl para mostrar imagen recien generada → SIEMPRE base64
+    - NUNCA retornar URL del S3 API de R2 como URL publica → SIEMPRE 400 sin auth
+    - NUNCA usar <a download> con URLs cross-origin → browser NAVEGA en vez de descargar
+    - SIEMPRE subir a Supabase Storage como fallback (R2 es opcional, Storage es garantizado)
+    - SIEMPRE usar signed URLs para cargar de Storage (bucket puede no ser publico)
+    - SIEMPRE usar createServiceClient() para INSERT en generations (bypassa RLS)
 
   Errores: siempre en espanol simple (humanizeErrors), sin JSON ni IDs de modelo.
   Providers: gemini.ts | openai.ts | kie-seedream.ts | bfl-flux.ts | fal.ts
@@ -598,8 +633,14 @@ BREAKS: ALL AI features in DropPage (key resolution for every AI call)
 - **Canva Asset-Upload-Metadata name > 50 chars** → "Invalid upload metadata header" (HTTP 500). El header `name_base64` se decodifica y Canva valida max 50 chars del nombre. FIX: truncar filename a 46 chars + ".png" = 50. NUNCA incluir UUIDs en filenames para Canva.
 - **Canva rate limit**: 30 requests/min por usuario. No hay retry automatico.
 
+#### Storage & R2 Errors
+- **R2 S3 API endpoint URL en browser → SIEMPRE 400** → `bucket.accountId.r2.cloudflarestorage.com` es el endpoint de API S3, REQUIERE auth headers (AWS Signature V4). Browsers NO pueden cargar estas URLs. Error: `<Error><Code>InvalidArgument</Code><Message>Authorization</Message></Error>`. FIX: `tryUploadToR2()` retorna null si no hay `publicUrl` configurado (el archivo SI se sube como backup, pero la URL no es usable). NUNCA guardar URL del S3 endpoint en la DB. Solo guardar R2 URLs cuando el usuario tiene un dominio publico configurado (campo `cf_public_url` en profiles).
+- **Imagenes generadas perdidas al refrescar** → Si solo se guardan en React state (base64), se pierden al recargar. FIX: SIEMPRE persistir a Storage + DB (tabla `generations`). Al recargar, useEffect carga de DB y genera signed URLs.
+- **Usar persistedUrl/R2 URL para mostrar imagen recien generada** → la URL puede tardar en propagarse, o puede estar rota (R2 sin public URL, Storage error). FIX: SIEMPRE usar base64 del response API para display inmediato. La URL persistida solo se usa al recargar pagina desde DB.
+- **Supabase Storage URLs sin signed URL** → si el bucket no es publico, la URL directa da 400. FIX: SIEMPRE usar `createSignedUrl(path, 86400)` para generar URLs temporales (24h). Patron `storage:` prefix en DB: `generated_image_url = "storage:studio/{userId}/file.png"` → frontend extrae path → signed URL.
+
 #### Frontend Errors
-- **Cross-origin `<a download>`** → el atributo `download` es ignorado por browsers para URLs de otro dominio. El browser NAVEGA la pagina en vez de descargar. NUNCA usar `link.click()` con URLs de dominio diferente (ej: Supabase Storage → navegaba la pagina de la app). FIX: mostrar error toast y/o usar window.open() en nueva pestaña.
+- **Cross-origin `<a download>`** → el atributo `download` es ignorado por browsers para URLs de otro dominio. El browser NAVEGA la pagina en vez de descargar. NUNCA usar `<a download>` directo con URLs cross-origin (ej: Supabase signed URLs, R2 URLs). FIX: fetch como blob → `URL.createObjectURL(blob)` → `<a download>` con blob URL (same-origin). Fallback: `window.open(url, '_blank')` + toast de error.
 - **`window.open()` bloqueado por popup blocker** → solo funciona en contexto de click directo del usuario, no en callbacks async. Considerar esto al diseñar flujos que abren URLs.
 
 #### Env Var & Key Errors
@@ -717,4 +758,4 @@ Key entries: cron schedule for `/api/cron/automations`, function maxDuration set
 
 ---
 
-*Last updated: 2026-03-03 — Removed seedream-4.5 and fal.ai company, reorganized models (nano-banana-2→Google, seedream-5/5Pro→ByteDance), comprehensive anti-patterns documentation*
+*Last updated: 2026-03-03 — Studio IA image persistence (R2+Storage dual-write, storage: prefix, signed URLs, blob download), withTimeout cascade hard timeouts, R2/Storage anti-patterns, cross-origin download fix*
