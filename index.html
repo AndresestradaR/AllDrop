@@ -80,9 +80,8 @@
 
         /* UGC ROTATING STACK */
         .ugc-section { position:relative;z-index:2;padding:2rem 0 3rem;animation:fade-up 1s ease-out 1s both; }
-        .ugc-stack-wrapper { position:relative;width:100%;height:440px;display:flex;align-items:center;justify-content:center;perspective:1000px; }
-        .ugc-stack-wrapper::before { content:'';position:absolute;width:260px;height:430px;border-radius:40px;background:radial-gradient(ellipse,rgba(139,92,246,0.12) 0%,transparent 70%);filter:blur(30px);pointer-events:none; }
-        .ugc-card { position:absolute;width:185px;height:330px;border-radius:22px;overflow:hidden;border:2.5px solid rgba(255,255,255,0.15);background:#0a0a14;transition:all 0.7s cubic-bezier(0.4,0,0.2,1);cursor:pointer; }
+        .ugc-stack-wrapper { position:relative;width:100%;height:420px;display:flex;align-items:center;justify-content:center;perspective:1200px;overflow:hidden; }
+        .ugc-card { position:absolute;width:185px;height:330px;border-radius:22px;overflow:hidden;border:2.5px solid rgba(255,255,255,0.15);background:#0a0a14;transition:all 0.75s cubic-bezier(0.4,0,0.2,1);cursor:pointer; }
         .ugc-card video { width:100%;height:100%;object-fit:cover;display:block; }
         .ugc-card .ugc-overlay { position:absolute;bottom:0;left:0;right:0;padding:14px;background:linear-gradient(0deg,rgba(0,0,0,0.8) 0%,rgba(0,0,0,0.4) 60%,transparent 100%);z-index:2;pointer-events:none; }
         .ugc-card .ugc-views { position:absolute;top:10px;left:10px;font-size:0.5rem;color:rgba(255,255,255,0.8);background:rgba(0,0,0,0.55);padding:3px 8px;border-radius:4px;font-weight:500;backdrop-filter:blur(4px);z-index:2; }
@@ -91,15 +90,23 @@
         .ugc-card .ugc-handle { font-size:0.55rem;color:rgba(255,255,255,0.5); }
         .ugc-card .ugc-notch { position:absolute;top:8px;left:50%;transform:translateX(-50%);width:45px;height:5px;border-radius:10px;background:rgba(255,255,255,0.1);z-index:3; }
 
-        /* Stack positions: front (0), behind-1 (1), behind-2 (2), behind-3 (3), exiting, hidden */
-        .ugc-card[data-pos="0"] { z-index:10;transform:translateY(42px) scale(1);opacity:1;border-color:rgba(139,92,246,0.5);box-shadow:0 20px 60px rgba(0,0,0,0.6),0 0 50px rgba(139,92,246,0.15); }
-        .ugc-card[data-pos="1"] { z-index:9;transform:translateY(12px) scale(0.94);opacity:1;border-color:rgba(255,255,255,0.22);box-shadow:0 10px 40px rgba(0,0,0,0.5); }
-        .ugc-card[data-pos="2"] { z-index:8;transform:translateY(-16px) scale(0.88);opacity:1;border-color:rgba(255,255,255,0.18);box-shadow:0 8px 30px rgba(0,0,0,0.4); }
-        .ugc-card[data-pos="3"] { z-index:7;transform:translateY(-42px) scale(0.82);opacity:0.9;border-color:rgba(255,255,255,0.14);box-shadow:0 5px 20px rgba(0,0,0,0.3); }
-        .ugc-card[data-pos="exit"] { z-index:20;transform:translateY(180%) scale(0.8);opacity:0;pointer-events:none; }
-        .ugc-card[data-pos="hidden"] { z-index:1;transform:translateY(-65px) scale(0.76);opacity:0;pointer-events:none; }
+        /* 3-card layout: center + left + right */
+        .ugc-card[data-pos="center"] { z-index:10;transform:translateX(0) scale(1) rotateY(0);opacity:1;border-color:rgba(139,92,246,0.5);box-shadow:0 20px 60px rgba(0,0,0,0.6),0 0 50px rgba(139,92,246,0.15); }
+        .ugc-card[data-pos="left"] { z-index:5;transform:translateX(-220px) scale(0.82) rotateY(12deg);opacity:0.75;border-color:rgba(255,255,255,0.18);box-shadow:0 10px 40px rgba(0,0,0,0.5); }
+        .ugc-card[data-pos="right"] { z-index:5;transform:translateX(220px) scale(0.82) rotateY(-12deg);opacity:0.75;border-color:rgba(255,255,255,0.18);box-shadow:0 10px 40px rgba(0,0,0,0.5); }
+        .ugc-card[data-pos="exit-left"] { z-index:15;transform:translateX(-380px) scale(0.6) rotateY(25deg);opacity:0;pointer-events:none; }
+        .ugc-card[data-pos="exit-right"] { z-index:15;transform:translateX(380px) scale(0.6) rotateY(-25deg);opacity:0;pointer-events:none; }
+        .ugc-card[data-pos="enter"] { z-index:1;transform:translateX(0) scale(0.5) rotateY(0);opacity:0;pointer-events:none; }
+        .ugc-card[data-pos="hidden"] { z-index:0;transform:translateX(0) scale(0.5);opacity:0;pointer-events:none; }
 
-        @media(max-width:600px) { .ugc-stack-wrapper{height:360px;} .ugc-card{width:160px;height:285px;border-radius:18px;} }
+        @media(max-width:600px) {
+            .ugc-stack-wrapper{height:350px;}
+            .ugc-card{width:145px;height:260px;border-radius:18px;}
+            .ugc-card[data-pos="left"] { transform:translateX(-160px) scale(0.78) rotateY(10deg); }
+            .ugc-card[data-pos="right"] { transform:translateX(160px) scale(0.78) rotateY(-10deg); }
+            .ugc-card[data-pos="exit-left"] { transform:translateX(-280px) scale(0.5) rotateY(20deg); }
+            .ugc-card[data-pos="exit-right"] { transform:translateX(280px) scale(0.5) rotateY(-20deg); }
+        }
 
         /* PRODUCT RESEARCH SECTION */
         .research-section { position:relative;z-index:2;padding:3rem 2rem 3rem;max-width:1100px;margin:0 auto; }
@@ -478,9 +485,9 @@
 
         updateCarousel(); startAuto();
 
-        // UGC Rotating Video Stack
+        // UGC 3-Card Spread (center + left + right, alternating throws)
         (function(){
-            const ugcData = [
+            var ugcData = [
                 { name:'Laura M.', handle:'@laura.beauty', views:'12.4K' },
                 { name:'Carlos R.', handle:'@carlos.tech', views:'8.7K' },
                 { name:'Maria G.', handle:'@maria.fitness', views:'23.1K' },
@@ -490,11 +497,9 @@
                 { name:'Sofia V.', handle:'@sofia.reviews', views:'18.9K' },
                 { name:'Javier T.', handle:'@javi.drops', views:'42.5K' },
             ];
-            const stack = document.getElementById('ugcStack');
-            const VISIBLE = 4;
-            let ugcCards = [];
+            var stack = document.getElementById('ugcStack');
+            var allCards = [];
 
-            // Build cards using safe DOM methods (no untrusted input)
             ugcData.forEach(function(d, i) {
                 var card = document.createElement('div');
                 card.className = 'ugc-card';
@@ -539,18 +544,25 @@
                 card.appendChild(overlay);
 
                 stack.appendChild(card);
-                ugcCards.push(card);
+                allCards.push(card);
             });
 
-            function updateStack() {
-                ugcCards.forEach(function(c, i) {
-                    if (i < VISIBLE) c.dataset.pos = String(i);
-                    else c.dataset.pos = 'hidden';
+            // State: 3 visible slots + queue
+            var slots = { center: allCards[0], left: allCards[1], right: allCards[2] };
+            var queue = allCards.slice(3);
+            var throwDir = 0; // 0=left, 1=right — alternates
+
+            function applyPositions() {
+                allCards.forEach(function(c) {
+                    if (c === slots.center) c.dataset.pos = 'center';
+                    else if (c === slots.left) c.dataset.pos = 'left';
+                    else if (c === slots.right) c.dataset.pos = 'right';
+                    else if (c.dataset.pos !== 'exit-left' && c.dataset.pos !== 'exit-right') c.dataset.pos = 'hidden';
                 });
             }
-            updateStack();
+            applyPositions();
 
-            // Lazy-load videos with IntersectionObserver
+            // Lazy-load videos
             var obs = new IntersectionObserver(function(entries) {
                 entries.forEach(function(e) {
                     if (e.isIntersecting) {
@@ -563,20 +575,41 @@
             }, { threshold: 0.3 });
             obs.observe(stack);
 
-            // Rotate: front card exits to bottom, rest move forward, exited card goes to back
-            function rotateStack() {
-                var front = ugcCards[0];
-                front.dataset.pos = 'exit';
+            function rotate() {
+                var exitDir = throwDir === 0 ? 'left' : 'right';
+                var exitPos = 'exit-' + exitDir;
+
+                // The card on the exit side gets pushed out
+                var exiting = slots[exitDir];
+                exiting.dataset.pos = exitPos;
+
+                // Center card moves to that side
+                slots[exitDir] = slots.center;
+
+                // Next card from queue enters center
+                var next = queue.shift();
+                next.dataset.pos = 'enter';
+                // Force reflow so enter->center transition plays
+                void next.offsetWidth;
+                slots.center = next;
+
+                applyPositions();
+
+                // Play video on new center card
+                var vid = slots.center.querySelector('video');
+                if (vid) { vid.currentTime = 0; vid.play().catch(function(){}); }
+
+                // After exit transition, recycle card to queue
                 setTimeout(function() {
-                    ugcCards.shift();
-                    ugcCards.push(front);
-                    front.dataset.pos = 'hidden';
-                    updateStack();
-                    var vid = ugcCards[0].querySelector('video');
-                    if (vid) { vid.currentTime = 0; vid.play().catch(function(){}); }
-                }, 700);
+                    exiting.dataset.pos = 'hidden';
+                    queue.push(exiting);
+                }, 800);
+
+                // Alternate direction
+                throwDir = 1 - throwDir;
             }
-            setInterval(rotateStack, 3500);
+
+            setInterval(rotate, 3500);
         })();
 
         // Product Research Animations
