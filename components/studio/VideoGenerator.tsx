@@ -1131,15 +1131,31 @@ export function VideoGenerator() {
                       <Share2 className="w-4 h-4 text-white" />
                     </button>
                     <button
-                      onClick={() => {
-                        const a = document.createElement('a')
-                        a.href = video.url
-                        a.download = `video-${video.id}.mp4`
-                        a.click()
+                      onClick={async () => {
+                        try {
+                          const response = await fetch(video.url)
+                          const blob = await response.blob()
+                          const blobUrl = URL.createObjectURL(blob)
+                          const a = document.createElement('a')
+                          a.href = blobUrl
+                          a.download = `video-${video.id}.mp4`
+                          a.click()
+                          URL.revokeObjectURL(blobUrl)
+                        } catch {
+                          window.open(video.url, '_blank')
+                        }
                       }}
                       className="p-2 bg-black/50 rounded-lg hover:bg-black/70 transition-colors"
+                      title="Descargar"
                     >
                       <Download className="w-4 h-4 text-white" />
+                    </button>
+                    <button
+                      onClick={() => setGeneratedVideos((prev) => prev.filter((v) => v.id !== video.id))}
+                      className="p-2 bg-red-500/70 hover:bg-red-500 rounded-lg transition-colors"
+                      title="Eliminar"
+                    >
+                      <Trash2 className="w-4 h-4 text-white" />
                     </button>
                   </div>
                 </div>
