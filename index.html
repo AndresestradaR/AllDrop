@@ -78,35 +78,28 @@
             .carousel-item.far-prev,.carousel-item.far-next { opacity:0; }
         }
 
-        /* UGC SECTION */
+        /* UGC ROTATING STACK */
         .ugc-section { position:relative;z-index:2;padding:2rem 0 3rem;animation:fade-up 1s ease-out 1s both; }
-        .ugc-marquee { width:100vw;overflow:hidden;mask-image:linear-gradient(90deg,transparent,black 8%,black 92%,transparent);-webkit-mask-image:linear-gradient(90deg,transparent,black 8%,black 92%,transparent); }
-        .ugc-track { display:flex;gap:1.2rem;width:max-content;animation:ugc-scroll 45s linear infinite; }
-        .ugc-track:hover { animation-play-state:paused; }
-        @keyframes ugc-scroll { 0%{transform:translateX(0)} 100%{transform:translateX(-50%)} }
+        .ugc-stack-wrapper { position:relative;width:100%;height:440px;display:flex;align-items:center;justify-content:center;perspective:1000px; }
+        .ugc-stack-wrapper::before { content:'';position:absolute;width:260px;height:430px;border-radius:40px;background:radial-gradient(ellipse,rgba(139,92,246,0.12) 0%,transparent 70%);filter:blur(30px);pointer-events:none; }
+        .ugc-card { position:absolute;width:185px;height:330px;border-radius:22px;overflow:hidden;border:2.5px solid rgba(255,255,255,0.15);background:#0a0a14;transition:all 0.7s cubic-bezier(0.4,0,0.2,1);cursor:pointer; }
+        .ugc-card video { width:100%;height:100%;object-fit:cover;display:block; }
+        .ugc-card .ugc-overlay { position:absolute;bottom:0;left:0;right:0;padding:14px;background:linear-gradient(0deg,rgba(0,0,0,0.8) 0%,rgba(0,0,0,0.4) 60%,transparent 100%);z-index:2;pointer-events:none; }
+        .ugc-card .ugc-views { position:absolute;top:10px;left:10px;font-size:0.5rem;color:rgba(255,255,255,0.8);background:rgba(0,0,0,0.55);padding:3px 8px;border-radius:4px;font-weight:500;backdrop-filter:blur(4px);z-index:2; }
+        .ugc-card .ugc-platform { position:absolute;top:10px;right:10px;font-size:0.8rem;z-index:2; }
+        .ugc-card .ugc-name { font-size:0.75rem;font-weight:700;color:white;margin-bottom:2px; }
+        .ugc-card .ugc-handle { font-size:0.55rem;color:rgba(255,255,255,0.5); }
+        .ugc-card .ugc-notch { position:absolute;top:8px;left:50%;transform:translateX(-50%);width:45px;height:5px;border-radius:10px;background:rgba(255,255,255,0.1);z-index:3; }
 
-        .ugc-card { flex-shrink:0;width:185px;height:330px;border-radius:22px;overflow:hidden;position:relative;border:2px solid rgba(255,255,255,0.08);background:#0a0a14;transition:transform 0.4s,box-shadow 0.4s; }
-        .ugc-card:hover { transform:translateY(-6px) scale(1.02);box-shadow:0 20px 60px rgba(0,0,0,0.5); }
-        .ugc-bg { width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding:14px;position:relative; }
-        .ugc-avatar { width:65px;height:65px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:2rem;position:absolute;top:40%;left:50%;transform:translate(-50%,-60%);background:rgba(255,255,255,0.05);border:2px solid rgba(255,255,255,0.1); }
-        .ugc-play { position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,0.12);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;border:2px solid rgba(255,255,255,0.25);transition:all 0.3s; }
-        .ugc-play::after { content:'';width:0;height:0;border-left:14px solid white;border-top:8px solid transparent;border-bottom:8px solid transparent;margin-left:3px; }
-        .ugc-card:hover .ugc-play { background:rgba(139,92,246,0.3);border-color:var(--accent-violet); }
-        .ugc-info { position:relative;z-index:2;text-align:center; }
-        .ugc-name { font-size:0.72rem;font-weight:700;color:white;margin-bottom:2px; }
-        .ugc-handle { font-size:0.5rem;color:rgba(255,255,255,0.4);margin-bottom:6px; }
-        .ugc-quote { font-size:0.5rem;color:rgba(255,255,255,0.6);line-height:1.4;font-style:italic;font-weight:300; }
-        .ugc-platform { position:absolute;top:10px;right:10px;font-size:0.85rem; }
-        .ugc-views { position:absolute;top:10px;left:10px;font-size:0.44rem;color:rgba(255,255,255,0.6);background:rgba(0,0,0,0.5);padding:3px 7px;border-radius:4px;font-weight:500;backdrop-filter:blur(4px); }
+        /* Stack positions: front (0), behind-1 (1), behind-2 (2), behind-3 (3), exiting, hidden */
+        .ugc-card[data-pos="0"] { z-index:10;transform:translateY(42px) scale(1);opacity:1;border-color:rgba(139,92,246,0.5);box-shadow:0 20px 60px rgba(0,0,0,0.6),0 0 50px rgba(139,92,246,0.15); }
+        .ugc-card[data-pos="1"] { z-index:9;transform:translateY(12px) scale(0.94);opacity:1;border-color:rgba(255,255,255,0.22);box-shadow:0 10px 40px rgba(0,0,0,0.5); }
+        .ugc-card[data-pos="2"] { z-index:8;transform:translateY(-16px) scale(0.88);opacity:1;border-color:rgba(255,255,255,0.18);box-shadow:0 8px 30px rgba(0,0,0,0.4); }
+        .ugc-card[data-pos="3"] { z-index:7;transform:translateY(-42px) scale(0.82);opacity:0.9;border-color:rgba(255,255,255,0.14);box-shadow:0 5px 20px rgba(0,0,0,0.3); }
+        .ugc-card[data-pos="exit"] { z-index:20;transform:translateY(180%) scale(0.8);opacity:0;pointer-events:none; }
+        .ugc-card[data-pos="hidden"] { z-index:1;transform:translateY(-65px) scale(0.76);opacity:0;pointer-events:none; }
 
-        .ut1 .ugc-bg{background:linear-gradient(180deg,#1a0525 0%,#0d0a2e 50%,#0a0a14 100%)}
-        .ut2 .ugc-bg{background:linear-gradient(180deg,#0a1a25 0%,#0a0d2e 50%,#0a0a14 100%)}
-        .ut3 .ugc-bg{background:linear-gradient(180deg,#1a1005 0%,#150a2e 50%,#0a0a14 100%)}
-        .ut4 .ugc-bg{background:linear-gradient(180deg,#051a15 0%,#0a0d2e 50%,#0a0a14 100%)}
-        .ut5 .ugc-bg{background:linear-gradient(180deg,#1a050a 0%,#1a0a2e 50%,#0a0a14 100%)}
-        .ut6 .ugc-bg{background:linear-gradient(180deg,#0a0a25 0%,#150a1e 50%,#0a0a14 100%)}
-
-        @media(max-width:600px) { .ugc-card{width:155px;height:280px;border-radius:18px;} }
+        @media(max-width:600px) { .ugc-stack-wrapper{height:360px;} .ugc-card{width:160px;height:285px;border-radius:18px;} }
 
         /* BOTTOM */
         .bottom { position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;padding:1rem 2rem 2rem; }
@@ -165,30 +158,10 @@
         </div>
     </div>
 
-    <!-- UGC SECTION -->
+    <!-- UGC ROTATING STACK -->
     <div class="ugc-section">
         <div class="section-label">🎬 Videos UGC con Influencers — generados con IA</div>
-        <div class="ugc-marquee">
-            <div class="ugc-track">
-                <div class="ugc-card ut1"><div class="ugc-bg"><div class="ugc-views">▶ 12.4K</div><div class="ugc-platform">📱</div><div class="ugc-avatar">👩‍🦰</div><div class="ugc-play"></div><div class="ugc-info"><div class="ugc-name">Laura M.</div><div class="ugc-handle">@laura.beauty</div><div class="ugc-quote">"Este sérum cambió mi rutina por completo"</div></div></div></div>
-                <div class="ugc-card ut2"><div class="ugc-bg"><div class="ugc-views">▶ 8.7K</div><div class="ugc-platform">📱</div><div class="ugc-avatar">👨‍💻</div><div class="ugc-play"></div><div class="ugc-info"><div class="ugc-name">Carlos R.</div><div class="ugc-handle">@carlos.tech</div><div class="ugc-quote">"Los mejores auriculares calidad-precio"</div></div></div></div>
-                <div class="ugc-card ut3"><div class="ugc-bg"><div class="ugc-views">▶ 23.1K</div><div class="ugc-platform">📱</div><div class="ugc-avatar">👩‍🎤</div><div class="ugc-play"></div><div class="ugc-info"><div class="ugc-name">María G.</div><div class="ugc-handle">@maria.fitness</div><div class="ugc-quote">"Mis bandas favoritas para entrenar en casa"</div></div></div></div>
-                <div class="ugc-card ut4"><div class="ugc-bg"><div class="ugc-views">▶ 15.6K</div><div class="ugc-platform">📱</div><div class="ugc-avatar">👨</div><div class="ugc-play"></div><div class="ugc-info"><div class="ugc-name">Pablo S.</div><div class="ugc-handle">@pablo.lifestyle</div><div class="ugc-quote">"El smartwatch que uso todos los días"</div></div></div></div>
-                <div class="ugc-card ut5"><div class="ugc-bg"><div class="ugc-views">▶ 31.2K</div><div class="ugc-platform">📱</div><div class="ugc-avatar">👩</div><div class="ugc-play"></div><div class="ugc-info"><div class="ugc-name">Ana P.</div><div class="ugc-handle">@ana.skincare</div><div class="ugc-quote">"Resultados reales en solo 7 días"</div></div></div></div>
-                <div class="ugc-card ut6"><div class="ugc-bg"><div class="ugc-views">▶ 9.3K</div><div class="ugc-platform">📱</div><div class="ugc-avatar">👨‍🎨</div><div class="ugc-play"></div><div class="ugc-info"><div class="ugc-name">Diego L.</div><div class="ugc-handle">@diego.unbox</div><div class="ugc-quote">"Unboxing del gadget más viral del año"</div></div></div></div>
-                <div class="ugc-card ut1"><div class="ugc-bg"><div class="ugc-views">▶ 18.9K</div><div class="ugc-platform">📱</div><div class="ugc-avatar">👩‍💼</div><div class="ugc-play"></div><div class="ugc-info"><div class="ugc-name">Sofia V.</div><div class="ugc-handle">@sofia.reviews</div><div class="ugc-quote">"Lo probé y quedé completamente impresionada"</div></div></div></div>
-                <div class="ugc-card ut3"><div class="ugc-bg"><div class="ugc-views">▶ 42.5K</div><div class="ugc-platform">📱</div><div class="ugc-avatar">👨‍🏫</div><div class="ugc-play"></div><div class="ugc-info"><div class="ugc-name">Javier T.</div><div class="ugc-handle">@javi.drops</div><div class="ugc-quote">"El masajeador que todos me preguntan"</div></div></div></div>
-                <!-- Duplicate for seamless loop -->
-                <div class="ugc-card ut1"><div class="ugc-bg"><div class="ugc-views">▶ 12.4K</div><div class="ugc-platform">📱</div><div class="ugc-avatar">👩‍🦰</div><div class="ugc-play"></div><div class="ugc-info"><div class="ugc-name">Laura M.</div><div class="ugc-handle">@laura.beauty</div><div class="ugc-quote">"Este sérum cambió mi rutina por completo"</div></div></div></div>
-                <div class="ugc-card ut2"><div class="ugc-bg"><div class="ugc-views">▶ 8.7K</div><div class="ugc-platform">📱</div><div class="ugc-avatar">👨‍💻</div><div class="ugc-play"></div><div class="ugc-info"><div class="ugc-name">Carlos R.</div><div class="ugc-handle">@carlos.tech</div><div class="ugc-quote">"Los mejores auriculares calidad-precio"</div></div></div></div>
-                <div class="ugc-card ut3"><div class="ugc-bg"><div class="ugc-views">▶ 23.1K</div><div class="ugc-platform">📱</div><div class="ugc-avatar">👩‍🎤</div><div class="ugc-play"></div><div class="ugc-info"><div class="ugc-name">María G.</div><div class="ugc-handle">@maria.fitness</div><div class="ugc-quote">"Mis bandas favoritas para entrenar en casa"</div></div></div></div>
-                <div class="ugc-card ut4"><div class="ugc-bg"><div class="ugc-views">▶ 15.6K</div><div class="ugc-platform">📱</div><div class="ugc-avatar">👨</div><div class="ugc-play"></div><div class="ugc-info"><div class="ugc-name">Pablo S.</div><div class="ugc-handle">@pablo.lifestyle</div><div class="ugc-quote">"El smartwatch que uso todos los días"</div></div></div></div>
-                <div class="ugc-card ut5"><div class="ugc-bg"><div class="ugc-views">▶ 31.2K</div><div class="ugc-platform">📱</div><div class="ugc-avatar">👩</div><div class="ugc-play"></div><div class="ugc-info"><div class="ugc-name">Ana P.</div><div class="ugc-handle">@ana.skincare</div><div class="ugc-quote">"Resultados reales en solo 7 días"</div></div></div></div>
-                <div class="ugc-card ut6"><div class="ugc-bg"><div class="ugc-views">▶ 9.3K</div><div class="ugc-platform">📱</div><div class="ugc-avatar">👨‍🎨</div><div class="ugc-play"></div><div class="ugc-info"><div class="ugc-name">Diego L.</div><div class="ugc-handle">@diego.unbox</div><div class="ugc-quote">"Unboxing del gadget más viral del año"</div></div></div></div>
-                <div class="ugc-card ut1"><div class="ugc-bg"><div class="ugc-views">▶ 18.9K</div><div class="ugc-platform">📱</div><div class="ugc-avatar">👩‍💼</div><div class="ugc-play"></div><div class="ugc-info"><div class="ugc-name">Sofia V.</div><div class="ugc-handle">@sofia.reviews</div><div class="ugc-quote">"Lo probé y quedé completamente impresionada"</div></div></div></div>
-                <div class="ugc-card ut3"><div class="ugc-bg"><div class="ugc-views">▶ 42.5K</div><div class="ugc-platform">📱</div><div class="ugc-avatar">👨‍🏫</div><div class="ugc-play"></div><div class="ugc-info"><div class="ugc-name">Javier T.</div><div class="ugc-handle">@javi.drops</div><div class="ugc-quote">"El masajeador que todos me preguntan"</div></div></div></div>
-            </div>
-        </div>
+        <div class="ugc-stack-wrapper" id="ugcStack"></div>
     </div>
 
     <!-- BOTTOM -->
@@ -313,6 +286,107 @@
         cw.addEventListener('touchend', e => { const diff = e.changedTouches[0].clientX - touchX; if(Math.abs(diff)>50){go(diff<0?1:-1);pauseAndResume();} }, {passive:true});
 
         updateCarousel(); startAuto();
+
+        // UGC Rotating Video Stack
+        (function(){
+            const ugcData = [
+                { name:'Laura M.', handle:'@laura.beauty', views:'12.4K' },
+                { name:'Carlos R.', handle:'@carlos.tech', views:'8.7K' },
+                { name:'Maria G.', handle:'@maria.fitness', views:'23.1K' },
+                { name:'Pablo S.', handle:'@pablo.lifestyle', views:'15.6K' },
+                { name:'Ana P.', handle:'@ana.skincare', views:'31.2K' },
+                { name:'Diego L.', handle:'@diego.unbox', views:'9.3K' },
+                { name:'Sofia V.', handle:'@sofia.reviews', views:'18.9K' },
+                { name:'Javier T.', handle:'@javi.drops', views:'42.5K' },
+            ];
+            const stack = document.getElementById('ugcStack');
+            const VISIBLE = 4;
+            let ugcCards = [];
+
+            // Build cards using safe DOM methods (no untrusted input)
+            ugcData.forEach(function(d, i) {
+                var card = document.createElement('div');
+                card.className = 'ugc-card';
+
+                var notch = document.createElement('div');
+                notch.className = 'ugc-notch';
+                card.appendChild(notch);
+
+                var views = document.createElement('div');
+                views.className = 'ugc-views';
+                views.textContent = d.views;
+                card.appendChild(views);
+
+                var platform = document.createElement('div');
+                platform.className = 'ugc-platform';
+                platform.textContent = '\uD83D\uDCF1';
+                card.appendChild(platform);
+
+                var video = document.createElement('video');
+                video.autoplay = true;
+                video.muted = true;
+                video.loop = true;
+                video.playsInline = true;
+                video.poster = 'videos/' + i + '.webp';
+                video.preload = 'none';
+                var source = document.createElement('source');
+                source.src = 'videos/' + i + '.mp4';
+                source.type = 'video/mp4';
+                video.appendChild(source);
+                card.appendChild(video);
+
+                var overlay = document.createElement('div');
+                overlay.className = 'ugc-overlay';
+                var nameEl = document.createElement('div');
+                nameEl.className = 'ugc-name';
+                nameEl.textContent = d.name;
+                overlay.appendChild(nameEl);
+                var handleEl = document.createElement('div');
+                handleEl.className = 'ugc-handle';
+                handleEl.textContent = d.handle;
+                overlay.appendChild(handleEl);
+                card.appendChild(overlay);
+
+                stack.appendChild(card);
+                ugcCards.push(card);
+            });
+
+            function updateStack() {
+                ugcCards.forEach(function(c, i) {
+                    if (i < VISIBLE) c.dataset.pos = String(i);
+                    else c.dataset.pos = 'hidden';
+                });
+            }
+            updateStack();
+
+            // Lazy-load videos with IntersectionObserver
+            var obs = new IntersectionObserver(function(entries) {
+                entries.forEach(function(e) {
+                    if (e.isIntersecting) {
+                        e.target.querySelectorAll('video').forEach(function(v) {
+                            if (v.preload === 'none') { v.preload = 'auto'; v.load(); v.play().catch(function(){}); }
+                        });
+                        obs.unobserve(e.target);
+                    }
+                });
+            }, { threshold: 0.3 });
+            obs.observe(stack);
+
+            // Rotate: front card exits to bottom, rest move forward, exited card goes to back
+            function rotateStack() {
+                var front = ugcCards[0];
+                front.dataset.pos = 'exit';
+                setTimeout(function() {
+                    ugcCards.shift();
+                    ugcCards.push(front);
+                    front.dataset.pos = 'hidden';
+                    updateStack();
+                    var vid = ugcCards[0].querySelector('video');
+                    if (vid) { vid.currentTime = 0; vid.play().catch(function(){}); }
+                }, 700);
+            }
+            setInterval(rotateStack, 3500);
+        })();
 
         // Email
         document.getElementById('emailForm').addEventListener('submit', function(e) {
