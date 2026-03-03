@@ -101,6 +101,61 @@
 
         @media(max-width:600px) { .ugc-stack-wrapper{height:360px;} .ugc-card{width:160px;height:285px;border-radius:18px;} }
 
+        /* PRODUCT RESEARCH SECTION */
+        .research-section { position:relative;z-index:2;padding:3rem 2rem 3rem;max-width:1100px;margin:0 auto; }
+        .research-layout { display:flex;align-items:center;gap:3rem; }
+        .research-text { flex:1;min-width:0; }
+        .research-text h2 { font-size:clamp(1.8rem,4vw,2.8rem);font-weight:800;line-height:1.1;margin-bottom:1rem;letter-spacing:-0.03em; }
+        .research-text h2 .rh-grad { background:linear-gradient(135deg,var(--accent-violet),var(--accent-magenta));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text; }
+        .research-text p { color:var(--text-muted);font-size:0.95rem;line-height:1.7;font-weight:300;max-width:420px; }
+        .research-mockup { flex:1;min-width:0;position:relative;height:420px; }
+
+        /* Search bar */
+        .rm-search { position:absolute;top:0;right:0;width:280px;background:rgba(255,255,255,0.06);border:1px solid rgba(139,92,246,0.3);border-radius:12px;padding:10px 14px;display:flex;align-items:center;gap:8px;backdrop-filter:blur(8px); }
+        .rm-search-icon { color:var(--accent-violet);font-size:0.9rem;flex-shrink:0; }
+        .rm-search-text { font-size:0.8rem;color:var(--text-primary);font-weight:400;white-space:nowrap;overflow:hidden;border-right:2px solid var(--accent-violet);padding-right:2px;animation:rm-blink-cursor 0.8s step-end infinite; }
+        @keyframes rm-blink-cursor { 0%,100%{border-color:var(--accent-violet)} 50%{border-color:transparent} }
+
+        /* Product cards column */
+        .rm-products { position:absolute;top:0;left:0;width:150px;height:100%;overflow:hidden;mask-image:linear-gradient(180deg,transparent 0%,black 15%,black 85%,transparent 100%);-webkit-mask-image:linear-gradient(180deg,transparent 0%,black 15%,black 85%,transparent 100%); }
+        .rm-products-track { display:flex;flex-direction:column;gap:12px;animation:rm-scroll-products 18s linear infinite; }
+        @keyframes rm-scroll-products { 0%{transform:translateY(0)} 100%{transform:translateY(-50%)} }
+        .rm-pcard { width:140px;height:105px;border-radius:14px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);overflow:hidden;flex-shrink:0;display:flex;flex-direction:column;padding:8px;gap:6px;backdrop-filter:blur(4px); }
+        .rm-pcard-img { width:100%;flex:1;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.8rem; }
+        .rm-pcard-name { font-size:0.55rem;color:rgba(255,255,255,0.7);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+        .rm-pcard-price { font-size:0.6rem;color:var(--accent-cyan);font-weight:700;font-family:'Space Mono',monospace; }
+
+        /* Scan line */
+        .rm-products::after { content:'';position:absolute;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,var(--accent-violet),transparent);box-shadow:0 0 15px var(--accent-violet),0 0 30px rgba(139,92,246,0.3);animation:rm-scan 3s ease-in-out infinite;z-index:5;pointer-events:none; }
+        @keyframes rm-scan { 0%,100%{top:15%} 50%{top:85%} }
+
+        /* Stat cards */
+        .rm-stats { position:absolute;top:50px;right:0;width:280px;display:grid;grid-template-columns:1fr 1fr;gap:7px; }
+        .rm-stat { background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:10px 12px;backdrop-filter:blur(4px);transition:border-color 0.4s; }
+        .rm-stat.rm-stat-active { border-color:rgba(139,92,246,0.4);box-shadow:0 0 20px rgba(139,92,246,0.08); }
+        .rm-stat-label { font-size:0.5rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;font-weight:500; }
+        .rm-stat-value { font-size:1.1rem;font-weight:700;font-family:'Space Mono',monospace;color:var(--text-primary); }
+        .rm-stat-mini { display:flex;align-items:center;gap:4px;margin-top:3px; }
+        .rm-stat-trend { font-size:0.5rem;font-weight:600; }
+        .rm-stat-trend.up { color:#34d399; }
+        .rm-stat-trend.down { color:var(--accent-magenta); }
+
+        /* Connecting line between products and stats */
+        .rm-connect { position:absolute;top:50%;left:145px;right:calc(100% - 280px + 145px);height:1px;z-index:1; }
+        .rm-connect::after { content:'';position:absolute;top:-1px;left:0;width:40px;height:3px;background:linear-gradient(90deg,var(--accent-violet),transparent);border-radius:2px;animation:rm-pulse-line 2s ease-in-out infinite; }
+        @keyframes rm-pulse-line { 0%{left:0;opacity:0} 20%{opacity:1} 80%{opacity:1} 100%{left:calc(100% - 40px);opacity:0} }
+
+        @media(max-width:750px) {
+            .research-section { padding:2rem 1.2rem; }
+            .research-layout { flex-direction:column;text-align:center; }
+            .research-text p { max-width:none; }
+            .research-mockup { position:relative;width:100%;max-width:340px;height:auto;margin:0 auto;display:flex;flex-direction:column;gap:12px; }
+            .rm-search { position:relative;top:auto;right:auto;width:100%; }
+            .rm-products { display:none; }
+            .rm-connect { display:none; }
+            .rm-stats { position:relative;top:auto;right:auto;width:100%; }
+        }
+
         /* BOTTOM */
         .bottom { position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;padding:1rem 2rem 2rem; }
         .countdown-wrapper { margin-bottom:2.5rem;animation:fade-up 1s ease-out 1.1s both; }
@@ -162,6 +217,59 @@
     <div class="ugc-section">
         <div class="section-label">🎬 Videos UGC con Influencers — generados con IA</div>
         <div class="ugc-stack-wrapper" id="ugcStack"></div>
+    </div>
+
+    <!-- PRODUCT RESEARCH -->
+    <div class="research-section">
+        <div class="section-label">🔍 Encuentra productos ganadores — análisis con IA</div>
+        <div class="research-layout">
+            <div class="research-text">
+                <h2>Encuentra tu próximo<br><span class="rh-grad">producto ganador</span></h2>
+                <p>Analiza millones de productos en tiempo real. Métricas de demanda, competencia, márgenes y tendencias — todo potenciado por inteligencia artificial.</p>
+            </div>
+            <div class="research-mockup">
+                <div class="rm-search">
+                    <span class="rm-search-icon">🔍</span>
+                    <span class="rm-search-text" id="rmSearchText"></span>
+                </div>
+                <div class="rm-products">
+                    <div class="rm-products-track" id="rmProductsTrack"></div>
+                </div>
+                <div class="rm-connect"></div>
+                <div class="rm-stats" id="rmStats">
+                    <div class="rm-stat" data-stat="0">
+                        <div class="rm-stat-label">Volumen búsquedas</div>
+                        <div class="rm-stat-value" data-target="14500">0</div>
+                        <div class="rm-stat-mini"><span class="rm-stat-trend up">+23%</span></div>
+                    </div>
+                    <div class="rm-stat" data-stat="1">
+                        <div class="rm-stat-label">Revenue mensual</div>
+                        <div class="rm-stat-value" data-target="8420">€0</div>
+                        <div class="rm-stat-mini"><span class="rm-stat-trend up">+18%</span></div>
+                    </div>
+                    <div class="rm-stat" data-stat="2">
+                        <div class="rm-stat-label">Competencia</div>
+                        <div class="rm-stat-value" data-target="34">0</div>
+                        <div class="rm-stat-mini"><span class="rm-stat-trend down">Baja</span></div>
+                    </div>
+                    <div class="rm-stat" data-stat="3">
+                        <div class="rm-stat-label">Margen estimado</div>
+                        <div class="rm-stat-value" data-target="67">0%</div>
+                        <div class="rm-stat-mini"><span class="rm-stat-trend up">Alto</span></div>
+                    </div>
+                    <div class="rm-stat" data-stat="4">
+                        <div class="rm-stat-label">BSR Rank</div>
+                        <div class="rm-stat-value" data-target="1247">#0</div>
+                        <div class="rm-stat-mini"><span class="rm-stat-trend up">Top 5%</span></div>
+                    </div>
+                    <div class="rm-stat" data-stat="5">
+                        <div class="rm-stat-label">Reviews</div>
+                        <div class="rm-stat-value" data-target="342">0</div>
+                        <div class="rm-stat-mini"><span class="rm-stat-trend up">4.6★</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- BOTTOM -->
@@ -386,6 +494,111 @@
                 }, 700);
             }
             setInterval(rotateStack, 3500);
+        })();
+
+        // Product Research Animations
+        (function(){
+            // Typing animation for search bar
+            var searchTerms = ['Gafas de sol polarizadas','Sérum facial vitamina C','Smartwatch deportivo','Faja reductora','Luz LED tiktok','Masajeador cervical','Botella térmica','Cepillo alisador','Auriculares inalámbricos','Organizador maquillaje'];
+            var searchEl = document.getElementById('rmSearchText');
+            var termIdx = 0, charIdx = 0, deleting = false;
+            function typeSearch() {
+                var term = searchTerms[termIdx];
+                if (!deleting) {
+                    charIdx++;
+                    searchEl.textContent = term.substring(0, charIdx);
+                    if (charIdx >= term.length) { setTimeout(function(){ deleting = true; typeSearch(); }, 1800); return; }
+                    setTimeout(typeSearch, 60 + Math.random() * 40);
+                } else {
+                    charIdx--;
+                    searchEl.textContent = term.substring(0, charIdx);
+                    if (charIdx <= 0) { deleting = false; termIdx = (termIdx + 1) % searchTerms.length; setTimeout(typeSearch, 400); return; }
+                    setTimeout(typeSearch, 30);
+                }
+            }
+
+            // Build product cards
+            var products = [
+                { emoji:'🕶️', name:'Gafas de sol', price:'€12.90' },
+                { emoji:'✨', name:'Sérum facial', price:'€8.50' },
+                { emoji:'⌚', name:'Smartwatch', price:'€24.90' },
+                { emoji:'🏋️', name:'Faja reductora', price:'€15.40' },
+                { emoji:'💡', name:'Luz LED ring', price:'€11.20' },
+                { emoji:'💆', name:'Masajeador', price:'€19.90' },
+                { emoji:'🧴', name:'Botella térmica', price:'€9.80' },
+                { emoji:'💄', name:'Cepillo alisador', price:'€18.50' },
+                { emoji:'🎧', name:'Auriculares BT', price:'€14.30' },
+                { emoji:'👜', name:'Organizador', price:'€7.90' },
+            ];
+            var track = document.getElementById('rmProductsTrack');
+            // Duplicate for seamless loop
+            var allProducts = products.concat(products);
+            allProducts.forEach(function(p) {
+                var card = document.createElement('div');
+                card.className = 'rm-pcard';
+                var imgDiv = document.createElement('div');
+                imgDiv.className = 'rm-pcard-img';
+                imgDiv.textContent = p.emoji;
+                card.appendChild(imgDiv);
+                var nameEl = document.createElement('div');
+                nameEl.className = 'rm-pcard-name';
+                nameEl.textContent = p.name;
+                card.appendChild(nameEl);
+                var priceEl = document.createElement('div');
+                priceEl.className = 'rm-pcard-price';
+                priceEl.textContent = p.price;
+                card.appendChild(priceEl);
+                track.appendChild(card);
+            });
+
+            // Count-up animation for stats
+            function animateStats() {
+                var stats = document.querySelectorAll('.rm-stat-value');
+                stats.forEach(function(el) {
+                    var target = parseInt(el.dataset.target);
+                    var prefix = '', suffix = '';
+                    var text = el.textContent;
+                    if (text.indexOf('#') === 0) prefix = '#';
+                    if (text.indexOf('%') > -1) suffix = '%';
+                    if (text.indexOf('€') > -1) prefix = '€';
+                    var duration = 1500;
+                    var start = performance.now();
+                    function step(now) {
+                        var elapsed = now - start;
+                        var progress = Math.min(elapsed / duration, 1);
+                        var eased = 1 - Math.pow(1 - progress, 3);
+                        var val = Math.floor(eased * target);
+                        el.textContent = prefix + val.toLocaleString('es-ES') + suffix;
+                        if (progress < 1) requestAnimationFrame(step);
+                    }
+                    requestAnimationFrame(step);
+                });
+            }
+
+            // Cycle active stat highlight
+            var statCards = document.querySelectorAll('.rm-stat');
+            var activeStatIdx = 0;
+            function cycleStats() {
+                statCards.forEach(function(s){ s.classList.remove('rm-stat-active'); });
+                statCards[activeStatIdx].classList.add('rm-stat-active');
+                activeStatIdx = (activeStatIdx + 1) % statCards.length;
+            }
+
+            // Trigger on scroll
+            var triggered = false;
+            var researchObs = new IntersectionObserver(function(entries) {
+                entries.forEach(function(e) {
+                    if (e.isIntersecting && !triggered) {
+                        triggered = true;
+                        typeSearch();
+                        animateStats();
+                        cycleStats();
+                        setInterval(cycleStats, 2000);
+                        researchObs.unobserve(e.target);
+                    }
+                });
+            }, { threshold: 0.3 });
+            researchObs.observe(document.querySelector('.research-section'));
         })();
 
         // Email
