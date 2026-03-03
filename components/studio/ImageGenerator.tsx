@@ -107,20 +107,32 @@ export function ImageGenerator() {
           .limit(50)
 
         if (data?.length) {
-          // Resolve Supabase Storage URLs to signed URLs (public URLs may not work)
-          const saved: GeneratedImage[] = await Promise.all(
+          // Resolve image URLs: R2 URLs load directly, storage paths get signed URLs
+          const saved = await Promise.all(
             data.map(async (gen) => {
               let url = gen.generated_image_url
-              // If it's a Supabase Storage URL, create a signed URL that works
-              if (url?.includes('/landing-images/')) {
+
+              // Format: "storage:studio/userId/file.png" → create signed URL
+              if (url?.startsWith('storage:')) {
+                const path = url.replace('storage:', '')
+                const { data: signed } = await supabase.storage
+                  .from('landing-images')
+                  .createSignedUrl(path, 86400) // 24h — refreshed on each page load
+                url = signed?.signedUrl || null
+              }
+              // Legacy: old entries with full Supabase Storage URL
+              else if (url?.includes('/landing-images/') && url?.includes('supabase')) {
                 const path = url.split('/landing-images/')[1]
                 if (path) {
                   const { data: signed } = await supabase.storage
                     .from('landing-images')
-                    .createSignedUrl(path, 86400) // 24h — refreshed on each page load
+                    .createSignedUrl(path, 86400)
                   if (signed?.signedUrl) url = signed.signedUrl
                 }
               }
+              // Otherwise: R2 URL or other external URL → use directly
+
+              if (!url) return null
               return {
                 id: gen.id,
                 url,
@@ -132,7 +144,7 @@ export function ImageGenerator() {
               }
             })
           )
-          setGeneratedImages(saved)
+          setGeneratedImages(saved.filter(Boolean) as GeneratedImage[])
         }
       } catch (err) {
         console.warn('[Studio] Failed to load saved images:', err)

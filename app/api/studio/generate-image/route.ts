@@ -253,31 +253,33 @@ export async function POST(request: Request) {
     const resultMime = result.mimeType || 'image/png'
     const ext = resultMime.includes('png') ? 'png' : resultMime.includes('webp') ? 'webp' : 'jpg'
 
-    // ── Persist image: Supabase Storage (permanent) + R2 (optional) ──
-    let persistedUrl: string | null = null
-
-    // 1. Upload to Supabase Storage (permanent path, NOT temp/)
-    const storagePath = `studio/${user.id}/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${ext}`
+    // ── Persist image: R2 (primary) + Supabase Storage (guaranteed fallback) ──
     const buffer = Buffer.from(result.imageBase64, 'base64')
+    let r2Url: string | null = null
+    let storagePath: string | null = null
+
+    // 1. Try R2 upload first (user's own Cloudflare — preferred)
+    const r2Key = `images/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${ext}`
+    r2Url = await tryUploadToR2(user.id, buffer, r2Key, resultMime)
+    if (r2Url) console.log(`[Studio] ✓ Image saved to R2: ${r2Url}`)
+
+    // 2. Always upload to Supabase Storage as fallback (signed URLs always work)
+    storagePath = `studio/${user.id}/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${ext}`
     const { error: storageErr } = await supabase.storage
       .from('landing-images')
       .upload(storagePath, buffer, { contentType: resultMime, upsert: true })
 
-    if (!storageErr) {
-      const { data: { publicUrl } } = supabase.storage
-        .from('landing-images')
-        .getPublicUrl(storagePath)
-      persistedUrl = publicUrl
-      console.log(`[Studio] ✓ Image saved to Storage: ${publicUrl}`)
-    } else {
+    if (storageErr) {
       console.warn(`[Studio] Storage upload failed:`, storageErr.message)
+      storagePath = null
+    } else {
+      console.log(`[Studio] ✓ Image saved to Storage: ${storagePath}`)
     }
 
-    // 2. Try R2 upload (optional extra backup)
-    const r2Url = await tryUploadToR2(user.id, buffer, `images/${storagePath.split('/').pop()}`, resultMime)
-    if (r2Url) console.log(`[Studio] ✓ Image saved to R2: ${r2Url}`)
-
     // 3. Save to generations table (non-blocking — don't fail the request)
+    // Store R2 URL if available, otherwise store storage path prefixed with "storage:"
+    // Frontend knows how to handle both: R2 URLs load directly, storage paths get signed URLs
+    const imageRef = r2Url || (storagePath ? `storage:${storagePath}` : null)
     const serviceClient = await createServiceClient()
     serviceClient
       .from('generations')
@@ -287,7 +289,7 @@ export async function POST(request: Request) {
         original_prompt: prompt,
         enhanced_prompt: prompt,
         status: 'completed',
-        generated_image_url: r2Url || persistedUrl,
+        generated_image_url: imageRef,
       })
       .then(({ error: dbErr }) => {
         if (dbErr) console.warn('[Studio] DB save failed:', dbErr.message)
@@ -311,7 +313,6 @@ export async function POST(request: Request) {
       imageBase64: result.imageBase64,
       mimeType: resultMime,
       provider: selectedProvider,
-      persistedUrl: r2Url || persistedUrl,
       r2Url,
     })
 
