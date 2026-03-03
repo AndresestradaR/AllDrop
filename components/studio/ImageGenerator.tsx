@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
+import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils/cn'
 import {
   IMAGE_COMPANY_GROUPS,
@@ -92,6 +93,38 @@ export function ImageGenerator() {
   const characterInputRef = useRef<HTMLInputElement>(null)
   const uploadInputRef = useRef<HTMLInputElement>(null)
 
+  // Load previously generated images from database on mount
+  useEffect(() => {
+    const loadSavedImages = async () => {
+      try {
+        const supabase = createClient()
+        const { data } = await supabase
+          .from('generations')
+          .select('id, product_name, original_prompt, generated_image_url, created_at')
+          .like('product_name', 'Studio:%')
+          .not('generated_image_url', 'is', null)
+          .order('created_at', { ascending: false })
+          .limit(50)
+
+        if (data?.length) {
+          const saved: GeneratedImage[] = data.map((gen) => ({
+            id: gen.id,
+            url: gen.generated_image_url,
+            prompt: gen.original_prompt || '',
+            model: gen.product_name?.replace('Studio: ', '') || 'Unknown',
+            timestamp: new Date(gen.created_at),
+            isFavorite: false,
+            aspectRatio: '1:1' as AspectRatio,
+          }))
+          setGeneratedImages(saved)
+        }
+      } catch (err) {
+        console.warn('[Studio] Failed to load saved images:', err)
+      }
+    }
+    loadSavedImages()
+  }, [])
+
   const currentModel = IMAGE_MODELS[selectedModel]
   
   // Check if current model supports image input
@@ -172,9 +205,11 @@ export function ImageGenerator() {
       }
 
       if (data.success && data.imageBase64) {
+        // Use persisted URL if available (survives refresh), fallback to inline base64
+        const imageUrl = data.persistedUrl || `data:${data.mimeType || 'image/png'};base64,${data.imageBase64}`
         const newImage: GeneratedImage = {
           id: crypto.randomUUID(),
-          url: `data:${data.mimeType || 'image/png'};base64,${data.imageBase64}`,
+          url: imageUrl,
           prompt,
           model: currentModel.name,
           timestamp: new Date(),

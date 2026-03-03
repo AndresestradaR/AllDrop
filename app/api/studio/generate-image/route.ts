@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
 import { decrypt } from '@/lib/services/encryption'
 import {
   generateImage,
@@ -249,16 +250,49 @@ export async function POST(request: Request) {
 
     console.log(`[Studio] ✓ Image generated successfully in ${totalTime}s with ${selectedProvider}`)
 
-    // Try R2 upload (optional, non-blocking)
     const resultMime = result.mimeType || 'image/png'
     const ext = resultMime.includes('png') ? 'png' : resultMime.includes('webp') ? 'webp' : 'jpg'
-    const r2Url = await tryUploadToR2(
-      user.id,
-      Buffer.from(result.imageBase64, 'base64'),
-      `images/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${ext}`,
-      resultMime
-    )
+
+    // ── Persist image: Supabase Storage (permanent) + R2 (optional) ──
+    let persistedUrl: string | null = null
+
+    // 1. Upload to Supabase Storage (permanent path, NOT temp/)
+    const storagePath = `studio/${user.id}/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${ext}`
+    const buffer = Buffer.from(result.imageBase64, 'base64')
+    const { error: storageErr } = await supabase.storage
+      .from('landing-images')
+      .upload(storagePath, buffer, { contentType: resultMime, upsert: true })
+
+    if (!storageErr) {
+      const { data: { publicUrl } } = supabase.storage
+        .from('landing-images')
+        .getPublicUrl(storagePath)
+      persistedUrl = publicUrl
+      console.log(`[Studio] ✓ Image saved to Storage: ${publicUrl}`)
+    } else {
+      console.warn(`[Studio] Storage upload failed:`, storageErr.message)
+    }
+
+    // 2. Try R2 upload (optional extra backup)
+    const r2Url = await tryUploadToR2(user.id, buffer, `images/${storagePath.split('/').pop()}`, resultMime)
     if (r2Url) console.log(`[Studio] ✓ Image saved to R2: ${r2Url}`)
+
+    // 3. Save to generations table (non-blocking — don't fail the request)
+    const serviceClient = await createServiceClient()
+    serviceClient
+      .from('generations')
+      .insert({
+        user_id: user.id,
+        product_name: `Studio: ${modelConfig.name}`,
+        original_prompt: prompt,
+        enhanced_prompt: prompt,
+        status: 'completed',
+        generated_image_url: r2Url || persistedUrl,
+      })
+      .then(({ error: dbErr }) => {
+        if (dbErr) console.warn('[Studio] DB save failed:', dbErr.message)
+        else console.log('[Studio] ✓ Saved to generations table')
+      })
 
     // Cleanup temp images from storage (fire-and-forget)
     if (productImageUrls?.length) {
@@ -277,6 +311,7 @@ export async function POST(request: Request) {
       imageBase64: result.imageBase64,
       mimeType: resultMime,
       provider: selectedProvider,
+      persistedUrl: r2Url || persistedUrl,
       r2Url,
     })
 
