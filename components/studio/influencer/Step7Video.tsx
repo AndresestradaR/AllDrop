@@ -1569,13 +1569,13 @@ export function Step7Video({
               </div>
 
               {/* Galería */}
-              {galleryImages.length > 0 && (
+              {galleryImages.filter((item: any) => item.content_type !== 'video').length > 0 && (
                 <>
                   <p className="text-[10px] font-semibold text-text-muted uppercase tracking-wide mb-2">
-                    Galeria ({galleryImages.length})
+                    Galeria ({galleryImages.filter((item: any) => item.content_type !== 'video').length})
                   </p>
                   <div className="grid grid-cols-4 gap-2">
-                    {galleryImages.map((item: any) => (
+                    {galleryImages.filter((item: any) => item.content_type !== 'video').map((item: any) => (
                       <div
                         key={item.id}
                         onClick={() => {
