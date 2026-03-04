@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AllDrop — Próximamente</title>
     <meta name="description" content="AllDrop - La suite definitiva para dropshippers en Europa. Product Research, Creativos IA, Landings y más. Próximamente.">
+    <link rel="icon" href="favicon.ico" type="image/x-icon">
+    <link rel="apple-touch-icon" href="images/apple-touch-icon.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -37,7 +39,8 @@
 
         /* HERO */
         .hero { position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;padding:3rem 2rem 3rem;text-align:center; }
-        .logo-container { margin-bottom:1rem;animation:fade-up 1s ease-out 0.2s both; }
+        .logo-container { margin-bottom:1rem;animation:fade-up 1s ease-out 0.2s both;display:flex;flex-direction:column;align-items:center;gap:0.5rem; }
+        .logo-img { width:80px;height:80px;object-fit:contain;filter:drop-shadow(0 0 20px rgba(139,92,246,0.3)); }
         .logo { font-weight:900;font-size:clamp(2.2rem,5vw,3.5rem);letter-spacing:-0.03em;background:linear-gradient(135deg,var(--accent-cyan),var(--accent-violet),var(--accent-magenta));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text; }
         .badge { display:inline-flex;align-items:center;gap:0.5rem;padding:0.4rem 1rem;border-radius:100px;background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.25);font-size:0.75rem;font-weight:500;color:var(--accent-violet);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:2rem;animation:fade-up 1s ease-out 0.4s both; }
         .badge-dot { width:6px;height:6px;border-radius:50%;background:var(--accent-violet);animation:blink 2s ease-in-out infinite; }
@@ -236,7 +239,7 @@
 
     <!-- HERO -->
     <div class="hero">
-        <div class="logo-container"><div class="logo">AllDrop</div></div>
+        <div class="logo-container"><img src="images/logo.png" alt="AllDrop" class="logo-img"><div class="logo">AllDrop</div></div>
         <div class="badge"><div class="badge-dot"></div>En desarrollo</div>
         <div class="heading"><h1><span class="outline">PRÓXIMA</span><br><span class="gradient-word">MENTE</span></h1></div>
         <p class="subtext">La suite todo-en-uno para dropshippers en Europa.<br>Product Research · Creativos IA · Landings · Analytics.<br>Todo lo que necesitas, en un solo lugar.</p>
@@ -743,19 +746,27 @@
                 body: JSON.stringify({
                     email: email,
                     _subject: 'Nueva suscripcion AllDrop - Lista de espera',
-                    _template: 'table'
+                    _template: 'table',
+                    _captcha: 'false'
                 })
             })
             .then(function(r) { return r.json(); })
             .then(function(data) {
-                if (data.success) {
+                if (data.success === 'true' || data.success === true) {
                     form.style.display = 'none';
                     document.querySelector('.form-note').style.display = 'none';
                     document.getElementById('successMessage').classList.add('show');
+                } else if (data.message && data.message.indexOf('Confirm') > -1) {
+                    // First submission: FormSubmit sends confirmation email
+                    form.style.display = 'none';
+                    document.querySelector('.form-note').style.display = 'none';
+                    var msg = document.getElementById('successMessage');
+                    msg.textContent = 'Revisa alldropsoporte@gmail.com para confirmar FormSubmit (solo la primera vez). Tu email fue registrado.';
+                    msg.classList.add('show');
                 } else {
                     btn.textContent = origText;
                     btn.disabled = false;
-                    alert('Error al enviar. Intenta de nuevo.');
+                    alert('Error: ' + (data.message || 'Intenta de nuevo'));
                 }
             })
             .catch(function() {
