@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { Button, Card, CardHeader, CardTitle, CardContent } from '@/components/ui'
 import { Clock, Images, Store, ArrowRight } from 'lucide-react'
+import BalanceCards from '@/components/dashboard/BalanceCards'
 
 export const dynamic = 'force-dynamic'
 
@@ -84,6 +85,9 @@ export default async function DashboardPage() {
           </Link>
         </CardContent>
       </Card>
+
+      {/* API Balances */}
+      <BalanceCards />
 
       {/* Recent generations */}
       <Card>

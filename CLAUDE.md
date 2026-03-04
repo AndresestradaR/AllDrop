@@ -457,7 +457,7 @@ Flow: enhance-prompt fills controls → generate-angles creates angles
 
 | Page | Path | Key API Routes |
 |------|------|----------------|
-| Home | `/dashboard` | Server-side: profiles, generations |
+| Home | `/dashboard` | Server-side: profiles, generations. Client: keys/balance (KIE, ElevenLabs, BFL) |
 | Banner Generator | `/dashboard/landing/[id]` | generate-landing, edit-section, enhance-prompt, generate-angles, templates, sections, share |
 | Image Generator (legacy) | `/dashboard/generate` | generate (uses @google/generative-ai SDK directly) |
 | Studio Creativo | `/dashboard/studio` | studio/* (image, video, audio, tools, influencer/*, clone-viral/*, automations/*, prompt-bot, copy-optimize, resena-ugc) |
@@ -797,12 +797,12 @@ BREAKS: ALL AI features in DropPage (key resolution for every AI call)
 
 | Service | Used By | API Base | Auth Type |
 |---------|---------|----------|-----------|
-| KIE.ai | Both repos | `api.kie.ai` | Per-user BYOK key |
+| KIE.ai | Both repos | `api.kie.ai` | Per-user BYOK key | Balance: `GET /api/v1/chat/credit` → `{data: int}` |
 | Google Gemini | Both repos | `generativelanguage.googleapis.com/v1beta` | Per-user BYOK + platform fallback |
 | OpenAI | Both repos | `api.openai.com/v1` | Per-user BYOK + platform fallback |
-| BFL/FLUX | estrategas only | `api.bfl.ai/v1` | Per-user BYOK |
+| BFL/FLUX | estrategas only | `api.bfl.ai/v1` | Per-user BYOK | Balance: `GET /v1/credits` → `{credits: num}` (1cr=$0.01) |
 | fal.ai | Both repos | `queue.fal.ai` | Per-user BYOK (profiles.fal_api_key) |
-| ElevenLabs | Both repos | `api.elevenlabs.io/v1` | Per-user BYOK + platform fallback |
+| ElevenLabs | Both repos | `api.elevenlabs.io/v1` | Per-user BYOK + platform fallback | Balance: `GET /v1/user/subscription` → chars used/limit |
 | Cloudflare R2 | Both repos | `{accountId}.r2.cloudflarestorage.com` | Per-user BYOK (estrategas) / env vars (DropPage) |
 | Supabase | Both repos | env var | Service role key |
 | Publer | estrategas only | `app.publer.com/api/v1` | Per-user BYOK |
