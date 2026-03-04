@@ -112,8 +112,6 @@ export default async function DashboardPage() {
                           muted
                           playsInline
                           preload="metadata"
-                          onMouseEnter={(e) => (e.target as HTMLVideoElement).play().catch(() => {})}
-                          onMouseLeave={(e) => { const v = e.target as HTMLVideoElement; v.pause(); v.currentTime = 0 }}
                         />
                       ) : (
                         <img
