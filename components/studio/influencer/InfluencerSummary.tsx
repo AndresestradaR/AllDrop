@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Copy, Check, Pencil, Loader2, Heart, Download, Image as ImageIcon, Video, LayoutGrid } from 'lucide-react'
+import { Copy, Check, Pencil, Loader2, Heart, Download, Image as ImageIcon, Video, LayoutGrid, Share2, X } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
 import toast from 'react-hot-toast'
+import { PublisherModal } from '../PublisherModal'
 
 interface InfluencerSummaryProps {
   influencer: any
@@ -29,6 +30,8 @@ export function InfluencerSummary({
   const [loadingContent, setLoadingContent] = useState(true)
   const [contentFilter, setContentFilter] = useState<'all' | 'favorites' | 'images' | 'videos'>('all')
   const [showAllContent, setShowAllContent] = useState(false)
+  const [lightboxItem, setLightboxItem] = useState<any | null>(null)
+  const [publishItem, setPublishItem] = useState<any | null>(null)
 
   // Load gallery content
   useEffect(() => {
@@ -96,6 +99,20 @@ export function InfluencerSummary({
       URL.revokeObjectURL(blobUrl)
     } catch {
       // silently fail
+    }
+  }
+
+  const handleDeleteItem = async (item: any) => {
+    if (!item.id) return
+    try {
+      const res = await fetch(`/api/studio/influencer/gallery?id=${item.id}`, { method: 'DELETE' })
+      if (res.ok) {
+        setRecentContent(prev => prev.filter(g => g.id !== item.id))
+        setLightboxItem(null)
+        toast.success('Eliminado')
+      }
+    } catch {
+      toast.error('Error al eliminar')
     }
   }
 
@@ -253,7 +270,8 @@ export function InfluencerSummary({
               {displayContent.map((item: any) => (
                 <div
                   key={item.id}
-                  className="group relative rounded-xl overflow-hidden bg-surface-elevated border border-border aspect-[9/16]"
+                  className="group relative rounded-xl overflow-hidden bg-surface-elevated border border-border aspect-[9/16] cursor-pointer"
+                  onClick={() => setLightboxItem(item)}
                 >
                   {item.content_type === 'video' && item.video_url ? (
                     <div className="relative w-full h-full">
@@ -298,7 +316,7 @@ export function InfluencerSummary({
                   {/* Botones hover */}
                   <div className="absolute top-1.5 right-1.5 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
-                      onClick={() => handleToggleFavorite(item)}
+                      onClick={(e) => { e.stopPropagation(); handleToggleFavorite(item) }}
                       className={cn(
                         'p-1 rounded-md transition-colors',
                         item.is_favorite ? 'bg-amber-500/80 text-white' : 'bg-black/40 text-white hover:bg-black/60'
@@ -307,10 +325,23 @@ export function InfluencerSummary({
                       <Heart className={cn('w-3 h-3', item.is_favorite && 'fill-current')} />
                     </button>
                     <button
-                      onClick={() => handleDownloadItem(item)}
+                      onClick={(e) => { e.stopPropagation(); setPublishItem(item) }}
+                      className="p-1 bg-indigo-500/80 rounded-md text-white hover:bg-indigo-500 transition-colors"
+                      title="Publicar en redes"
+                    >
+                      <Share2 className="w-3 h-3" />
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleDownloadItem(item) }}
                       className="p-1 bg-black/40 rounded-md text-white hover:bg-black/60 transition-colors"
                     >
                       <Download className="w-3 h-3" />
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleDeleteItem(item) }}
+                      className="p-1 bg-red-500/60 rounded-md text-white hover:bg-red-500/80 transition-colors"
+                    >
+                      <X className="w-3 h-3" />
                     </button>
                   </div>
                 </div>
@@ -355,6 +386,97 @@ export function InfluencerSummary({
           Crear Video
         </button>
       </div>
+
+      {/* Lightbox modal */}
+      {lightboxItem && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4"
+          onClick={() => setLightboxItem(null)}
+        >
+          <div
+            className="relative max-w-lg w-full max-h-[85vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setLightboxItem(null)}
+              className="absolute -top-10 right-0 p-2 text-white/70 hover:text-white transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="rounded-2xl overflow-hidden bg-surface-elevated">
+              {lightboxItem.content_type === 'video' && lightboxItem.video_url ? (
+                <video
+                  src={lightboxItem.video_url}
+                  className="w-full max-h-[70vh] object-contain"
+                  controls
+                  autoPlay
+                  loop
+                />
+              ) : (
+                <img
+                  src={lightboxItem.image_url}
+                  alt={lightboxItem.situation || ''}
+                  className="w-full max-h-[70vh] object-contain"
+                />
+              )}
+            </div>
+
+            <div className="mt-3 flex items-center justify-between">
+              <div className="flex-1 min-w-0">
+                {lightboxItem.situation && (
+                  <p className="text-sm text-white/80 truncate">{lightboxItem.situation}</p>
+                )}
+                {lightboxItem.created_at && (
+                  <p className="text-[10px] text-white/40 mt-0.5">
+                    {new Date(lightboxItem.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </p>
+                )}
+              </div>
+              <div className="flex gap-2 ml-3">
+                <button
+                  onClick={() => { setPublishItem(lightboxItem); setLightboxItem(null) }}
+                  className="p-2 bg-indigo-500/30 rounded-lg text-indigo-400 hover:bg-indigo-500/50 transition-colors"
+                  title="Publicar en redes"
+                >
+                  <Share2 className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => handleToggleFavorite(lightboxItem)}
+                  className={cn(
+                    'p-2 rounded-lg transition-colors',
+                    lightboxItem.is_favorite ? 'bg-amber-500/80 text-white' : 'bg-white/10 text-white/70 hover:bg-white/20'
+                  )}
+                >
+                  <Heart className={cn('w-4 h-4', lightboxItem.is_favorite && 'fill-current')} />
+                </button>
+                <button
+                  onClick={() => handleDownloadItem(lightboxItem)}
+                  className="p-2 bg-white/10 rounded-lg text-white/70 hover:bg-white/20 transition-colors"
+                >
+                  <Download className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => handleDeleteItem(lightboxItem)}
+                  className="p-2 bg-red-500/20 rounded-lg text-red-400 hover:bg-red-500/30 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Publisher Modal */}
+      <PublisherModal
+        isOpen={!!publishItem}
+        onClose={() => setPublishItem(null)}
+        mediaUrl={publishItem?.content_type === 'video' ? publishItem?.video_url : publishItem?.image_url}
+        contentType={publishItem?.content_type === 'video' ? 'video' : 'photo'}
+        defaultCaption={publishItem?.situation || `${influencer.name} - Contenido generado con IA`}
+        previewUrl={publishItem?.content_type === 'video' ? publishItem?.video_url : publishItem?.image_url}
+      />
     </div>
   )
 }
