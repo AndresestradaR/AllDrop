@@ -2,9 +2,10 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { cn } from '@/lib/utils/cn'
-import { Sparkles, Loader2, RefreshCw, Upload, Shuffle, Heart, Download, X } from 'lucide-react'
+import { Sparkles, Loader2, RefreshCw, Upload, Shuffle, Heart, Download, X, Share2, RectangleVertical, RectangleHorizontal, Square, Image as ImageIcon } from 'lucide-react'
 import { IMAGE_MODELS, STUDIO_COMPANY_GROUPS, type ImageModelId } from '@/lib/image-providers/types'
 import toast from 'react-hot-toast'
+import { PublisherModal } from '@/components/studio/PublisherModal'
 
 interface Step6GalleryProps {
   influencerId: string
@@ -51,6 +52,24 @@ const PRODUCT_POSITIONS = [
   { v: 'usando', l: 'Usandolo' },
 ]
 
+type AspectRatio = '9:16' | '16:9' | '1:1' | '4:5'
+
+const ASPECT_RATIOS: { value: AspectRatio; label: string; sublabel: string; icon: typeof RectangleVertical }[] = [
+  { value: '9:16', label: 'Vertical', sublabel: 'Stories/TikTok', icon: RectangleVertical },
+  { value: '16:9', label: 'Horizontal', sublabel: 'YouTube', icon: RectangleHorizontal },
+  { value: '1:1', label: 'Cuadrado', sublabel: 'Feed', icon: Square },
+  { value: '4:5', label: 'Post IG', sublabel: 'Instagram', icon: ImageIcon },
+]
+
+function getAspectClass(ratio?: string): string {
+  switch (ratio) {
+    case '16:9': return 'aspect-video'
+    case '1:1': return 'aspect-square'
+    case '4:5': return 'aspect-[4/5]'
+    default: return 'aspect-[9/16]'
+  }
+}
+
 interface GalleryItem {
   id?: string
   image_url: string
@@ -60,6 +79,7 @@ interface GalleryItem {
   type: string
   product_name?: string
   is_favorite?: boolean
+  aspect_ratio?: string
 }
 
 export function Step6Gallery({
@@ -72,6 +92,7 @@ export function Step6Gallery({
   onBack,
 }: Step6GalleryProps) {
   const [mode, setMode] = useState<'solo' | 'with_product'>('solo')
+  const [aspectRatio, setAspectRatio] = useState<AspectRatio>('9:16')
   const [situation, setSituation] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -79,6 +100,7 @@ export function Step6Gallery({
   const [selectedImage, setSelectedImage] = useState<GalleryItem | null>(null)
   const [isLoadingGallery, setIsLoadingGallery] = useState(true)
   const [galleryFilter, setGalleryFilter] = useState<'all' | 'favorites' | 'solo' | 'with_product'>('all')
+  const [publishItem, setPublishItem] = useState<GalleryItem | null>(null)
 
   // Product mode state
   const [productName, setProductName] = useState('')
@@ -105,6 +127,7 @@ export function Step6Gallery({
             type: item.type || 'solo',
             product_name: item.product_name,
             is_favorite: item.is_favorite,
+            aspect_ratio: item.aspect_ratio || '9:16',
           })))
         }
       } catch (err) {
@@ -165,6 +188,7 @@ export function Step6Gallery({
           situation: situation.trim(),
           promptDescriptor,
           realisticImageUrl,
+          aspectRatio,
           productName: mode === 'with_product' ? productName : undefined,
           productPosition: mode === 'with_product' ? productPosition : undefined,
           productImageBase64: mode === 'with_product' ? productBase64 : undefined,
@@ -187,6 +211,7 @@ export function Step6Gallery({
         type: mode,
         product_name: mode === 'with_product' ? productName : undefined,
         is_favorite: false,
+        aspect_ratio: aspectRatio,
       }
 
       setGallery(prev => [newItem, ...prev])
@@ -369,6 +394,32 @@ export function Step6Gallery({
         </div>
       </div>
 
+      {/* Aspect Ratio selector */}
+      <div className="mb-4">
+        <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">Formato de imagen</label>
+        <div className="flex gap-2">
+          {ASPECT_RATIOS.map(ar => {
+            const Icon = ar.icon
+            return (
+              <button
+                key={ar.value}
+                onClick={() => setAspectRatio(ar.value)}
+                className={cn(
+                  'flex-1 flex flex-col items-center gap-1 py-2.5 rounded-xl text-xs font-medium transition-all border',
+                  aspectRatio === ar.value
+                    ? 'bg-accent/15 border-accent text-accent'
+                    : 'bg-surface-elevated border-border text-text-secondary hover:border-text-muted'
+                )}
+              >
+                <Icon className="w-4 h-4" />
+                <span>{ar.label}</span>
+                <span className="text-[9px] opacity-60">{ar.sublabel}</span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
       {error && (
         <div className="p-3 bg-error/10 border border-error/20 rounded-xl mb-4">
           <p className="text-sm text-error">{error}</p>
@@ -444,7 +495,7 @@ export function Step6Gallery({
                 <img
                   src={item.image_url}
                   alt={item.situation}
-                  className="w-full aspect-[9/16] object-cover"
+                  className={cn('w-full object-cover', getAspectClass(item.aspect_ratio))}
                 />
                 {/* Overlay con info */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
@@ -467,6 +518,13 @@ export function Step6Gallery({
                     )}
                   >
                     <Heart className={cn('w-3.5 h-3.5', item.is_favorite && 'fill-current')} />
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setPublishItem(item) }}
+                    className="p-1.5 bg-black/40 rounded-lg text-white hover:bg-black/60 transition-colors"
+                    title="Publicar en redes"
+                  >
+                    <Share2 className="w-3.5 h-3.5" />
                   </button>
                   <button
                     onClick={(e) => { e.stopPropagation(); handleDownload(item) }}
@@ -492,6 +550,16 @@ export function Step6Gallery({
           </div>
         )}
       </div>
+
+      {/* Publisher modal (Publer) */}
+      <PublisherModal
+        isOpen={!!publishItem}
+        onClose={() => setPublishItem(null)}
+        mediaUrl={publishItem?.image_url}
+        contentType="photo"
+        defaultCaption={publishItem?.situation || 'Contenido generado con IA'}
+        previewUrl={publishItem?.image_url}
+      />
 
       {/* Image preview modal */}
       {selectedImage && (

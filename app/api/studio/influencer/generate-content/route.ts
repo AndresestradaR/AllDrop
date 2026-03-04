@@ -60,6 +60,7 @@ export async function POST(request: Request) {
       productImageMimeType,
       promptDescriptor: fallbackDescriptor,
       realisticImageUrl: fallbackRealisticUrl,
+      aspectRatio: requestedAR,
     } = body as {
       influencerId: string
       modelId: ImageModelId
@@ -71,7 +72,10 @@ export async function POST(request: Request) {
       productImageMimeType?: string
       promptDescriptor?: string
       realisticImageUrl?: string
+      aspectRatio?: '9:16' | '16:9' | '1:1' | '4:5'
     }
+
+    const aspectRatio = requestedAR || '9:16'
 
     if (!influencerId || !modelId || !situation) {
       return NextResponse.json({ error: 'influencerId, modelId y situation son requeridos' }, { status: 400 })
@@ -208,7 +212,7 @@ export async function POST(request: Request) {
       prompt,
       productImagesBase64: refImages.length > 0 ? refImages : undefined,
       productImageUrls,
-      aspectRatio: '9:16',
+      aspectRatio,
     }
 
     const elapsedMs = Date.now() - startTime
@@ -267,6 +271,7 @@ export async function POST(request: Request) {
           product_image_url: null,
           prompt_used: prompt,
           situation,
+          aspect_ratio: aspectRatio,
         })
         .select('id')
         .single()

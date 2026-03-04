@@ -277,6 +277,11 @@ Donde es posible, cascade completa multi-proveedor via servicios centralizados.
 
   MI INFLUENCER (9 endpoints en app/api/studio/influencer/):
     Todos ya usan servicios centralizados — cascade completa.
+    Todas las rutas con generateImage() tienen env var fallbacks (OPENAI_API_KEY, KIE_API_KEY, etc).
+    FIX (2026-03-04): Se agregaron env var fallbacks a las 5 rutas de imagen que no los tenian
+    (generate-base, enhance-realism, generate-angles, generate-body-grid, generate-content).
+    Sin fallbacks, la cascada solo intentaba 1 provider si el usuario no tenia BYOK keys.
+
     | Endpoint           | Servicio                | Cascade                           |
     | generate-base      | generateImage()         | KIE → fal.ai → Direct API        |
     | enhance-realism    | generateImage()         | KIE → fal.ai → Direct API        |
@@ -287,6 +292,15 @@ Donde es posible, cascade completa multi-proveedor via servicios centralizados.
     | visual-analysis    | generateAIText()        | KIE → OpenAI → Google Gemini     |
     | video-constructor  | generateAIText()        | KIE → OpenAI → Google Gemini     |
     | gallery + CRUD     | Sin IA (solo Supabase)  | N/A                               |
+
+    Galeria de Contenido (Step 6 — generate-content + gallery):
+      - Soporta 4 aspect ratios: 9:16 (vertical), 16:9 (horizontal), 1:1 (cuadrado), 4:5 (IG post)
+      - aspectRatio se pasa en body del POST, default '9:16', se guarda en influencer_gallery.aspect_ratio
+      - Publicacion directa a redes via Publer (PublisherModal) desde botones hover de galeria
+      - Migracion: supabase/migrations/20260304_gallery_aspect_ratio.sql
+
+    ANTI-PATRON: Rutas que usan generateImage() sin env var fallbacks → cascade solo intenta 1 provider.
+    Todas las rutas de imagen DEBEN tener fallback a env vars (ver generate-content como referencia).
 
   CLONAR VIRAL (8 endpoints en app/api/studio/clone-viral/):
     Texto: usa servicios centralizados. Video/audio: KIE key cascade.
@@ -647,6 +661,7 @@ BREAKS: ALL AI features in DropPage (key resolution for every AI call)
 #### AI Model Errors
 - **Google thinking mode por defecto** → 100s+ responses → timeout cascade → 504s en Vercel. FIX: `reasoning_effort:'none'` (KIE) y `thinkingBudget:0` (Google direct). SIEMPRE agregar en toda llamada a Gemini.
 - **KIE cascade con gemini-2.5-pro** → demasiado lento, total excede Vercel 120s. FIX: solo `gemini-2.5-flash` en KIE cascade (salvo copy-optimize/enhance-prompt que tienen maxDuration=120s y usan pro explicitamente).
+- **KIE gemini-2.5-pro + reasoning_effort:'none' + imagenes = respuesta vacia** → En tareas multimodal complejas (ej: visual-analysis con 3 imagenes), pro con reasoning desactivado devuelve empty response. Luego OpenAI consume 90s timeout, Google no tiene tiempo. FIX: NUNCA usar `kieModel: 'gemini-2.5-pro'` con imagenes. Usar flash por defecto para KIE (confiable con multimodal), y `googleModel: 'gemini-2.5-pro'` solo para Google direct como fallback final. Afecta: influencer/visual-analysis, tools/describe-person. REGLA: `kieModel: 'gemini-2.5-pro'` solo para texto puro (copy-optimize, enhance-prompt), NUNCA con `images: [...]`.
 - **Wrong model ID para Gemini direct** → `modelConfig.apiModelId` contiene paths de fal.ai (ej: `fal-ai/nano-banana-2`) que causan 404 en Google API. FIX: SIEMPRE usar `cascade.directModelId` para direct API.
 - **gemini-2.5-flash-image NO EXISTE** como modelo de imagen. Se intentó usar → 404. El correcto es `gemini-3.1-flash-image-preview` o `gemini-3-pro-image-preview`.
 - **Seedream prompts > 800 chars** → KIE error "The text length cannot exceed the maximum limit". FIX: truncar automaticamente a 800 chars en generateViaKie() y fal.ai para paths seedream.
@@ -792,4 +807,4 @@ Key entries: cron schedule for `/api/cron/automations`, function maxDuration set
 
 ---
 
-*Last updated: 2026-03-03 — Studio IA image persistence (R2+Storage dual-write, storage: prefix, signed URLs, blob download), withTimeout cascade hard timeouts, R2/Storage anti-patterns, cross-origin download fix*
+*Last updated: 2026-03-03 — KIE pro+imagenes=empty fix (influencer/describe-person), video persistence, Veo extend, R2/Storage anti-patterns*
