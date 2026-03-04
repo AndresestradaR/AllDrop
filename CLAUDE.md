@@ -299,6 +299,23 @@ Donde es posible, cascade completa multi-proveedor via servicios centralizados.
       - Publicacion directa a redes via Publer (PublisherModal) desde botones hover de galeria
       - Migracion: supabase/migrations/20260304_gallery_aspect_ratio.sql
 
+    Video Influencer (Step 7 — Step7Video.tsx):
+      - Video resultado se muestra estilo Instagram: 9:16 → max-w-220px, 16:9 → max-w-lg, 1:1 → max-w-300px
+      - object-contain + bg-black (respeta aspect ratio sin recortar)
+      - Botones debajo del video (NO hover overlay — <video controls> captura mouse):
+        - Extender (solo Veo) → usa /api/studio/extend-video con completedTaskId
+        - Compartir → PublisherModal para publicar a redes via Publer
+        - Pizarra → onBack() para volver al InfluencerBoard
+      - completedTaskId se guarda al terminar polling exitoso para habilitar extend
+      - Extend reutiliza el polling existente: setTaskId(newId) + setVideoUrl(null) + setIsGenerating(true)
+      - Picker de imagen de inicio: filtra content_type='video' para no mostrar videos como imgs rotas
+
+    Resumen del Influencer (InfluencerSummary.tsx) — Pizarra de Contenido mini:
+      - Click en item → abre lightbox con vista completa (video con controls, imagen object-contain)
+      - Hover overlay: favorito, share (PublisherModal), download, delete
+      - Lightbox: share, favorito, download, delete — mismas acciones que InfluencerBoard
+      - stopPropagation en botones hover para no disparar lightbox al clickear accion
+
     ANTI-PATRON: Rutas que usan generateImage() sin env var fallbacks → cascade solo intenta 1 provider.
     Todas las rutas de imagen DEBEN tener fallback a env vars (ver generate-content como referencia).
 
