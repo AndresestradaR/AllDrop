@@ -730,9 +730,39 @@
         // Email
         document.getElementById('emailForm').addEventListener('submit', function(e) {
             e.preventDefault();
-            this.style.display='none';
-            document.querySelector('.form-note').style.display='none';
-            document.getElementById('successMessage').classList.add('show');
+            var form = this;
+            var email = document.getElementById('emailInput').value.trim();
+            var btn = form.querySelector('button');
+            var origText = btn.textContent;
+            btn.textContent = 'Enviando...';
+            btn.disabled = true;
+
+            fetch('https://formsubmit.co/ajax/alldropsoporte@gmail.com', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify({
+                    email: email,
+                    _subject: 'Nueva suscripcion AllDrop - Lista de espera',
+                    _template: 'table'
+                })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    form.style.display = 'none';
+                    document.querySelector('.form-note').style.display = 'none';
+                    document.getElementById('successMessage').classList.add('show');
+                } else {
+                    btn.textContent = origText;
+                    btn.disabled = false;
+                    alert('Error al enviar. Intenta de nuevo.');
+                }
+            })
+            .catch(function() {
+                btn.textContent = origText;
+                btn.disabled = false;
+                alert('Error de conexion. Intenta de nuevo.');
+            });
         });
     </script>
 </body>
