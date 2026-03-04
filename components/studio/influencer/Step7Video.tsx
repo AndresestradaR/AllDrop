@@ -3,8 +3,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { cn } from '@/lib/utils/cn'
 import { VIDEO_MODELS, VIDEO_COMPANY_GROUPS, type VideoModelId } from '@/lib/video-providers/types'
-import { Video, Loader2, Copy, Check, Wand2, Image as ImageIcon, Heart, X, Package, Info, Plus, Trash2, ChevronDown, ChevronUp, Volume2, VolumeX, Film } from 'lucide-react'
+import { Video, Loader2, Copy, Check, Wand2, Image as ImageIcon, Heart, X, Package, Info, Plus, Trash2, ChevronDown, ChevronUp, Volume2, VolumeX, Film, Share2, FastForward, ArrowLeft } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { PublisherModal } from '@/components/studio/PublisherModal'
 
 interface Step7VideoProps {
   influencerId: string
@@ -130,6 +131,11 @@ export function Step7Video({
   const [duration, setDuration] = useState(5)
   const [aspectRatio, setAspectRatio] = useState<'16:9' | '9:16' | '1:1'>('9:16')
 
+  // Extend, Publer, navigation
+  const [isExtending, setIsExtending] = useState(false)
+  const [publishVideoUrl, setPublishVideoUrl] = useState<string | null>(null)
+  const [completedTaskId, setCompletedTaskId] = useState<string | null>(null)
+
   // === Kling 3.0 specific state ===
   const [isMultiShot, setIsMultiShot] = useState(false)
   const [enableAudio, setEnableAudio] = useState(true)
@@ -237,6 +243,7 @@ export function Step7Video({
         if (data.status === 'completed' && data.videoUrl) {
           console.log('[Step7Video] Video completed:', data.videoUrl)
           setVideoUrl(data.videoUrl)
+          setCompletedTaskId(taskId)
           setIsGenerating(false)
           toast.success('¡Video generado!')
 
@@ -715,6 +722,48 @@ export function Step7Video({
   const canGenerate = isKling30 && isMultiShot
     ? multiPrompts.filter(s => s.prompt.trim()).length >= 2 && multiShotTotalDuration >= 3 && multiShotTotalDuration <= 15
     : !!(prompt.trim() || userIdea.trim())
+
+  // Check if current model is Veo (for extend button)
+  const isVeoModel = videoModelId.startsWith('veo-')
+
+  const handleExtend = async () => {
+    if (!completedTaskId || isExtending) return
+
+    setIsExtending(true)
+    setError(null)
+
+    try {
+      const veoModel = videoModelId.includes('fast') ? 'veo3_fast' : 'veo3'
+      const extendPrompt = prompt.trim() || userIdea.trim() || 'Continue the scene naturally'
+
+      const res = await fetch('/api/studio/extend-video', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taskId: completedTaskId,
+          prompt: extendPrompt,
+          model: veoModel,
+        }),
+      })
+
+      const data = await res.json()
+
+      if (!data.success || !data.taskId) {
+        throw new Error(data.error || 'No se pudo extender el video')
+      }
+
+      // Set new taskId to trigger polling for extended video
+      setVideoUrl(null)
+      setCompletedTaskId(null)
+      setTaskId(data.taskId)
+      setIsGenerating(true)
+      toast.success('Extendiendo video...')
+    } catch (err: any) {
+      setError(err.message || 'Error al extender video')
+    } finally {
+      setIsExtending(false)
+    }
+  }
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -1394,8 +1443,52 @@ export function Step7Video({
       )}
 
       {videoUrl && (
-        <div className="mb-4 rounded-xl overflow-hidden bg-surface-elevated border border-border">
-          <video src={videoUrl} controls className="w-full" autoPlay loop />
+        <div className="mb-4 flex flex-col items-center">
+          <div className={cn(
+            'rounded-xl overflow-hidden bg-black border border-border',
+            aspectRatio === '9:16' ? 'w-[45%] max-w-[220px]' : aspectRatio === '1:1' ? 'w-[50%] max-w-[300px]' : 'w-full max-w-lg'
+          )}>
+            <div
+              className="relative"
+              style={{ aspectRatio: aspectRatio === '16:9' ? '16/9' : aspectRatio === '9:16' ? '9/16' : '1/1' }}
+            >
+              <video src={videoUrl} controls className="w-full h-full object-contain bg-black" autoPlay loop />
+            </div>
+          </div>
+          {/* Action buttons below video */}
+          <div className="flex items-center gap-2 mt-3">
+            {/* Extend — solo Veo */}
+            {isVeoModel && completedTaskId && (
+              <button
+                onClick={handleExtend}
+                disabled={isExtending || isGenerating}
+                className={cn(
+                  'flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all border',
+                  isExtending ? 'text-accent animate-pulse border-accent/30' : 'text-text-secondary border-border hover:text-accent hover:border-accent/30'
+                )}
+                title="Extender video (+segundos)"
+              >
+                {isExtending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FastForward className="w-3.5 h-3.5" />}
+                Extender
+              </button>
+            )}
+            {/* Publicar */}
+            <button
+              onClick={() => setPublishVideoUrl(videoUrl)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium text-text-secondary border border-border hover:text-accent hover:border-accent/30 transition-all"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              Compartir
+            </button>
+            {/* Volver a pizarra */}
+            <button
+              onClick={onBack}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium text-text-secondary border border-border hover:text-accent hover:border-accent/30 transition-all"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              Pizarra
+            </button>
+          </div>
         </div>
       )}
 
@@ -1523,6 +1616,14 @@ export function Step7Video({
           </div>
         </div>
       )}
+      {/* Publisher modal (Publer) */}
+      <PublisherModal
+        isOpen={publishVideoUrl !== null}
+        onClose={() => setPublishVideoUrl(null)}
+        mediaUrl={publishVideoUrl ?? undefined}
+        contentType="video"
+        defaultCaption={userIdea || prompt.substring(0, 200) || `Video de ${selectedInfluencerName} generado con IA`}
+      />
     </div>
   )
 }
