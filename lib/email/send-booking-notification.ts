@@ -20,7 +20,7 @@ export async function sendBookingNotification(booking: BookingDetails) {
 
   const { error } = await resend.emails.send({
     from: 'Estrategas IA <noreply@estrategasia.com>',
-    to: [NOTIFICATION_EMAIL],
+    to: [NOTIFICATION_EMAIL, 'notificaciones@estrategasia.com', booking.mentorEmail],
     subject: `Nueva Reserva de Coaching — ${booking.topic}`,
     html: `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px;">
