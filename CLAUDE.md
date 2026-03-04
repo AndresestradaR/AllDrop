@@ -461,7 +461,7 @@ Flow: enhance-prompt fills controls → generate-angles creates angles
 | Banner Generator | `/dashboard/landing/[id]` | generate-landing, edit-section, enhance-prompt, generate-angles, templates, sections, share |
 | Image Generator (legacy) | `/dashboard/generate` | generate (uses @google/generative-ai SDK directly) |
 | Studio Creativo | `/dashboard/studio` | studio/* (image, video, audio, tools, influencer/*, clone-viral/*, automations/*, prompt-bot, copy-optimize, resena-ugc) |
-| Landing IA | `/dashboard/landing-ia` | landing-ia/scrape, landing-ia/stream, landing-ia/draft/* |
+| Landing IA (Landing Code) | `/dashboard/landing-ia` | landing-ia/scrape, landing-ia/stream, landing-ia/draft/* | **ADMIN ONLY en sidebar** |
 | Product Research | `/dashboard/product-research` | productos/search (DropKiller), FastMoss (hardcoded Supabase) |
 | Coaching | `/dashboard/coaching` | coaching/mentors, coaching/availability, coaching/bookings |
 | Settings | `/dashboard/settings` | keys (BYOK management) |
@@ -627,7 +627,7 @@ BREAKS: ALL AI features in DropPage (key resolution for every AI call)
 | `lib/video-providers/types.ts` | HIGH | Video model configs for studio |
 | `lib/rate-limit.ts` | HIGH | Rate limiting for AI routes |
 | `lib/auth/cron-auth.ts` | HIGH | Cron + API auth bypass pattern |
-| `app/(dashboard)/layout.tsx` | HIGH | Dashboard sidebar, nav, auth check |
+| `app/(dashboard)/layout.tsx` | HIGH | Dashboard sidebar, nav, auth check. Landing Code filtrado para !isAdmin |
 | `app/api/keys/route.ts` | HIGH | BYOK key management |
 | `lib/services/r2-upload.ts` | HIGH | All file uploads |
 | `vercel.json` | MEDIUM | Cron schedule, function timeouts, MiniShop rewrites |

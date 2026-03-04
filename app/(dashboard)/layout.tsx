@@ -205,7 +205,9 @@ export default function DashboardLayout({
                 Herramientas
               </p>
               <div className="space-y-1">
-                {creatorNavigation.map((item) => (
+                {creatorNavigation
+                  .filter(item => item.name !== 'Landing Code' || isAdmin)
+                  .map((item) => (
                   <NavLink key={item.name} item={item} />
                 ))}
               </div>
