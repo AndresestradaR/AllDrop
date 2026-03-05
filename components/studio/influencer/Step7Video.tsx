@@ -255,8 +255,11 @@ export function Step7Video({
     const poll = async () => {
       if (cancelled || pollCount >= MAX_POLLS) {
         if (pollCount >= MAX_POLLS) {
-          setError('El video está tardando demasiado. Puedes verificar en el tab de Video principal.')
+          setError(chainScenes
+            ? 'La escena tardó demasiado. Usa el botón Reintentar.'
+            : 'El video está tardando demasiado. Puedes verificar en el tab de Video principal.')
           setIsGenerating(false)
+          setTaskId(null)
         }
         return
       }
@@ -324,6 +327,7 @@ export function Step7Video({
           console.error('[Step7Video] Video failed:', data.error)
           setError(data.error || 'Error al generar el video')
           setIsGenerating(false)
+          setTaskId(null)
           return // Stop polling
         }
 
@@ -851,8 +855,50 @@ export function Step7Video({
     }
   }
 
+  // === CHAIN: Retry failed scene using last completed video's taskId ===
+  const handleRetryScene = async () => {
+    if (!chainScenes || !chainCompletedVideos.length || isExtending) return
+
+    const lastCompleted = chainCompletedVideos[chainCompletedVideos.length - 1]
+
+    setIsExtending(true)
+    setError(null)
+
+    try {
+      const veoModel = videoModelId.includes('fast') ? 'veo3_fast' : 'veo3'
+      const retryPrompt = chainScenes[chainCurrentIndex].veoPrompt
+
+      const res = await fetch('/api/studio/extend-video', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taskId: lastCompleted.taskId,
+          prompt: retryPrompt,
+          model: veoModel,
+        }),
+      })
+
+      const data = await res.json()
+      if (!data.success || !data.taskId) {
+        throw new Error(data.error || 'No se pudo reintentar la escena')
+      }
+
+      setPrompt(retryPrompt)
+      setVideoUrl(null)
+      setCompletedTaskId(null)
+      setTaskId(data.taskId)
+      setIsGenerating(true)
+      toast.success(`Reintentando escena ${chainCurrentIndex + 1}/${chainScenes.length}...`)
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setIsExtending(false)
+    }
+  }
+
   const isChainComplete = chainScenes && chainCompletedVideos.length === chainScenes.length
   const hasNextScene = chainScenes && chainCurrentIndex < chainScenes.length - 1
+  const canRetryChainScene = chainScenes && !isGenerating && !completedTaskId && chainCompletedVideos.length > 0 && !isChainComplete
 
   // VideoEditor mode: show editor when all chain scenes complete and user clicks "Enviar al Editor"
   if (showChainEditor && chainCompletedVideos.length > 0) {
@@ -1603,7 +1649,18 @@ export function Step7Video({
       {/* ============ ERRORES Y RESULTADOS ============ */}
       {error && (
         <div className="p-3 bg-error/10 border border-error/20 rounded-xl mb-4">
-          <p className="text-sm text-error">{error}</p>
+          <p className="text-sm text-error">{error.length > 150 ? 'Error del servidor al generar video. Reintenta.' : error}</p>
+          {/* Reintentar escena en modo chain */}
+          {canRetryChainScene && (
+            <button
+              onClick={handleRetryScene}
+              disabled={isExtending}
+              className="mt-2 flex items-center gap-1.5 px-3 py-2 bg-amber-500/20 text-amber-400 rounded-lg text-xs font-semibold hover:bg-amber-500/30 transition-all border border-amber-500/30"
+            >
+              {isExtending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FastForward className="w-3.5 h-3.5" />}
+              Reintentar Escena {chainCurrentIndex + 1}/{chainScenes?.length}
+            </button>
+          )}
         </div>
       )}
 
