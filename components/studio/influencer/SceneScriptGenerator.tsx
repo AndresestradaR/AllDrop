@@ -31,6 +31,7 @@ interface SceneScriptGeneratorProps {
   realisticImageUrl: string
   onFillVeoPrompt: (prompt: string, sceneIndex: number) => void
   onGenerateAll: (scenes: SceneData[]) => void
+  onStartSequential: (scenes: SceneData[]) => void
 }
 
 export function SceneScriptGenerator({
@@ -40,6 +41,7 @@ export function SceneScriptGenerator({
   realisticImageUrl,
   onFillVeoPrompt,
   onGenerateAll,
+  onStartSequential,
 }: SceneScriptGeneratorProps) {
   // Step 1: Angle selection
   const [selectedAngle, setSelectedAngle] = useState<AngleData | null>(null)
@@ -303,14 +305,36 @@ export function SceneScriptGenerator({
             )
           })}
 
-          {/* Generate All button */}
-          <button
-            onClick={() => onGenerateAll(scenes)}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-teal-600 to-emerald-600 text-white rounded-xl text-sm font-bold hover:from-teal-500 hover:to-emerald-500 transition-all shadow-lg shadow-teal-500/25 mt-3"
-          >
-            <Film className="w-4 h-4" />
-            Generar Todo en Paralelo ({scenes.length} escenas)
-          </button>
+          {/* ===== Modo de Generacion: Secuencial vs Paralelo ===== */}
+          <div className="mt-4 pt-4 border-t border-[#333]">
+            <p className="text-[10px] font-semibold text-text-muted uppercase tracking-wide mb-3 text-center">
+              Generar {scenes.length} Escenas
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {/* Secuencial con Veo Extend */}
+              <button
+                onClick={() => onStartSequential(scenes)}
+                className="flex flex-col items-center gap-1.5 px-3 py-3 bg-gradient-to-b from-teal-600/20 to-teal-600/5 text-teal-400 rounded-xl text-xs font-semibold hover:from-teal-600/30 hover:to-teal-600/10 transition-all border border-teal-500/30"
+              >
+                <Film className="w-5 h-5" />
+                <span className="font-bold">Secuencial</span>
+                <span className="text-[9px] text-teal-400/60 font-normal leading-tight text-center">
+                  Veo Extend — transiciones fluidas entre escenas
+                </span>
+              </button>
+              {/* Paralelo */}
+              <button
+                onClick={() => onGenerateAll(scenes)}
+                className="flex flex-col items-center gap-1.5 px-3 py-3 bg-gradient-to-b from-emerald-600/20 to-emerald-600/5 text-emerald-400 rounded-xl text-xs font-semibold hover:from-emerald-600/30 hover:to-emerald-600/10 transition-all border border-emerald-500/30"
+              >
+                <Play className="w-5 h-5" />
+                <span className="font-bold">Paralelo</span>
+                <span className="text-[9px] text-emerald-400/60 font-normal leading-tight text-center">
+                  Todas a la vez — más rápido, sin transiciones
+                </span>
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

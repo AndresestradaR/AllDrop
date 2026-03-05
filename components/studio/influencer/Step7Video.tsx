@@ -1388,16 +1388,19 @@ export function Step7Video({
             influencerName={selectedInfluencerName}
             promptDescriptor={resolvedDescriptor}
             realisticImageUrl={selectedInfluencerImage}
-            onFillVeoPrompt={(prompt, sceneIndex) => {
-              // Iniciar modo chain si hay script con múltiples escenas
-              if (scriptScenes && scriptScenes.length > 1) {
-                setChainScenes(scriptScenes)
-                setChainCurrentIndex(sceneIndex)
-                setChainCompletedVideos([])
-                setShowChainEditor(false)
-              }
+            onFillVeoPrompt={(prompt, _index) => {
               setVideoModelId('veo-3.1' as any)
               setPrompt(prompt)
+              setShowScriptGenerator(false)
+            }}
+            onStartSequential={(scenes) => {
+              setChainScenes(scenes)
+              setChainCurrentIndex(0)
+              setChainCompletedVideos([])
+              setShowChainEditor(false)
+              setScriptScenes(scenes)
+              setVideoModelId('veo-3.1' as any)
+              setPrompt(scenes[0].veoPrompt)
               setShowScriptGenerator(false)
             }}
             onGenerateAll={(scenes) => {
