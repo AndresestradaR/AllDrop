@@ -275,7 +275,7 @@ Todas las herramientas de dropshipping tienen cascade para no fallar.
 Patron comun: KIE user key → KIE platform key (env KIE_API_KEY).
 Donde es posible, cascade completa multi-proveedor via servicios centralizados.
 
-  MI INFLUENCER (9 endpoints en app/api/studio/influencer/):
+  MI INFLUENCER (11 endpoints en app/api/studio/influencer/):
     Todos ya usan servicios centralizados — cascade completa.
     Todas las rutas con generateImage() tienen env var fallbacks (OPENAI_API_KEY, KIE_API_KEY, etc).
     FIX (2026-03-04): Se agregaron env var fallbacks a las 5 rutas de imagen que no los tenian
@@ -291,7 +291,9 @@ Donde es posible, cascade completa multi-proveedor via servicios centralizados.
     | analyze            | generateAIText()        | KIE → OpenAI → Google Gemini     |
     | visual-analysis    | generateAIText()        | KIE → OpenAI → Google Gemini     |
     | video-constructor  | generateAIText()        | KIE → OpenAI → Google Gemini     |
+    | generate-script    | generateAIText()        | KIE → OpenAI → Google Gemini     |
     | gallery + CRUD     | Sin IA (solo Supabase)  | N/A                               |
+    | saved-angles CRUD  | Sin IA (solo Supabase)  | N/A                               |
 
     Galeria de Contenido (Step 6 — generate-content + gallery):
       - Soporta 4 aspect ratios: 9:16 (vertical), 16:9 (horizontal), 1:1 (cuadrado), 4:5 (IG post)
@@ -309,6 +311,34 @@ Donde es posible, cascade completa multi-proveedor via servicios centralizados.
       - completedTaskId se guarda al terminar polling exitoso para habilitar extend
       - Extend reutiliza el polling existente: setTaskId(newId) + setVideoUrl(null) + setIsGenerating(true)
       - Picker de imagen de inicio: filtra content_type='video' para no mostrar videos como imgs rotas
+
+    Guion por Escenas (Step 7 — SceneScriptGenerator.tsx + ParallelVideoManager.tsx):
+      - Flujo: Seleccionar angulo guardado → Describir producto → Generar guion AI → Editar prompts → Generar videos
+      - SceneScriptGenerator: panel colapsable con 3 pasos:
+        1. SavedAnglesPanel con showProductFilter (dropdown de producto)
+        2. Textarea producto + selector voz (femenina/masculina) + slider escenas (3-6)
+        3. Cards de escenas editables con veoPrompt editable (max 400 chars)
+      - API: POST /api/studio/influencer/generate-script
+        - Usa generateAIText() con skipKIE:true, googleModel:'gemini-2.5-pro', temp 0.8, jsonMode:true
+        - System prompt: director UGC LATAM, 8s por escena, dialogo espanol, veoPrompt ingles
+        - Arcos narrativos: 3 escenas (Hook→Demo→CTA) hasta 6 (Hook→Problema→Descubrimiento→Demo→Resultado→CTA)
+      - ParallelVideoManager: genera multiples escenas en paralelo con Veo 3.1
+        - Semaforo: max 3 concurrentes, poll cada 5s, max 60 polls
+        - Cada escena: POST /api/studio/generate-video con modelId:'veo-3.1', duration:8, enableAudio:true
+        - Auto-save a gallery al completar cada escena
+        - UI: barra progreso + grid cards con status (gris=pendiente, ambar=generando, azul=polling, verde=ok, rojo=error)
+      - Botones: "Generar Video" por escena (llena prompt de Step7Video) o "Generar Todo en Paralelo"
+
+    Hub de Angulos Guardados (SavedAnglesPanel.tsx — componente compartido):
+      - Tabla Supabase: saved_angles (id, user_id, product_name, angle_data JSONB, created_at)
+      - API: app/api/studio/saved-angles/ (GET ?productName=X, POST batch upsert, DELETE por producto)
+      - Props adaptativas: filterByProduct (solo ese producto), showProductFilter (dropdown), selectable (modo seleccion)
+      - Usado en Banner Generator: filterByProduct={product.name}, solo lectura
+      - Usado en SceneScriptGenerator: showProductFilter=true, selectable=true
+      - Cada angulo es accordion: click expande info completa (salesAngle, description, avatarSuggestion)
+      - Boton copiar por angulo (clipboard formatted text)
+      - Boton "Guardar Angulos" en Banner Generator: persiste angulos generados a Supabase
+      - Migracion: supabase/migrations/20260305_saved_angles.sql
 
     Resumen del Influencer (InfluencerSummary.tsx) — Pizarra de Contenido mini:
       - Click en item → abre lightbox con vista completa (video con controls, imagen object-contain)
@@ -342,6 +372,9 @@ Donde es posible, cascade completa multi-proveedor via servicios centralizados.
   VIDEO PRODUCTO (app/api/studio/generate-video/):
     Usa generateVideo() centralizado — cascade KIE → fal.ai.
     13 modelos de video disponibles (ver Video Generation section arriba).
+    Env var fallbacks: KIE_API_KEY (platform key) + FAL_API_KEY (cascade fallback).
+    FIX (2026-03-05): generate-video route ahora tiene fallback a env vars
+    (antes solo usaba BYOK keys, sin platform fallback → cascade no llegaba a fal.ai).
 
   AUTO PUBLICAR (app/api/studio/automations/):
     | Endpoint           | Servicio                | Cascade                           |
@@ -457,7 +490,7 @@ Flow: enhance-prompt fills controls → generate-angles creates angles
 
 | Page | Path | Key API Routes |
 |------|------|----------------|
-| Home | `/dashboard` | Server-side: profiles, generations. Client: keys/balance (KIE, ElevenLabs, BFL) |
+| Home | `/dashboard` | Server-side: profiles, generations (videos como `<video>`). Client: BalanceCards → keys/balance (KIE, ElevenLabs, BFL en USD) |
 | Banner Generator | `/dashboard/landing/[id]` | generate-landing, edit-section, enhance-prompt, generate-angles, templates, sections, share |
 | Image Generator (legacy) | `/dashboard/generate` | generate (uses @google/generative-ai SDK directly) |
 | Studio Creativo | `/dashboard/studio` | studio/* (image, video, audio, tools, influencer/*, clone-viral/*, automations/*, prompt-bot, copy-optimize, resena-ugc) |
@@ -471,7 +504,7 @@ Flow: enhance-prompt fills controls → generate-angles creates angles
 
 ### Supabase Tables (this repo)
 
-profiles, templates, products, landing_sections, generations, allowed_emails, landing_ia_drafts, influencers, influencer_gallery, automation_flows, automation_runs, coaching_mentors, coaching_availability, coaching_bookings, import_bundles. Storage bucket: `landing-images`.
+profiles, templates, products, landing_sections, generations, allowed_emails, landing_ia_drafts, influencers, influencer_gallery, automation_flows, automation_runs, coaching_mentors, coaching_availability, coaching_bookings, import_bundles, saved_angles. Storage bucket: `landing-images`.
 
 ### Environment Variables (critical subset)
 
@@ -708,9 +741,12 @@ BREAKS: ALL AI features in DropPage (key resolution for every AI call)
 #### Frontend Errors
 - **Cross-origin `<a download>`** → el atributo `download` es ignorado por browsers para URLs de otro dominio. El browser NAVEGA la pagina en vez de descargar. NUNCA usar `<a download>` directo con URLs cross-origin (ej: Supabase signed URLs, R2 URLs). FIX: fetch como blob → `URL.createObjectURL(blob)` → `<a download>` con blob URL (same-origin). Fallback: `window.open(url, '_blank')` + toast de error.
 - **`window.open()` bloqueado por popup blocker** → solo funciona en contexto de click directo del usuario, no en callbacks async. Considerar esto al diseñar flujos que abren URLs.
+- **Event handlers en server components** → `onMouseEnter`, `onClick`, etc. en un async server component (como dashboard/page.tsx) causan crash en produccion ("server-side exception"). Next.js NO lo detecta en build. FIX: NUNCA poner event handlers en server components. Si necesitas interactividad, extraer a un client component con 'use client'. Este bug tumbo el dashboard entero en produccion.
+- **Videos renderizados como `<img>`** → Generaciones recientes y galeria pueden tener videos (product_name LIKE 'Video:%'). Si se renderizan como `<img>`, se ven como iconos rotos. FIX: detectar `product_name?.startsWith('Video:')` y renderizar `<video>` en vez de `<img>`.
 
 #### Env Var & Key Errors
 - **Fallback keys faltantes en env vars** → cuando un usuario no tiene BYOK key Y no hay env var de plataforma, la cascada ENTERA falla silenciosamente. FIX: `hasCascadeKey()` valida que AL MENOS UNA key existe antes de intentar generar. Ambas rutas (landing + studio) tienen fallback a: GEMINI_API_KEY, OPENAI_API_KEY, KIE_API_KEY, BFL_API_KEY, FAL_API_KEY.
+- **Video cascade `throw` en vez de `return`** → `generateVeoVideo()` y `generateStandardVideo()` en kie-video.ts usaban `throw new Error(...)` cuando KIE fallaba (sin saldo, error API). El throw era atrapado por el try/catch EXTERNO de `generateVideo()`, saltandose completamente el codigo de fallback a fal.ai. FIX (2026-03-05): cambiar todos los `throw` a `return { success: false, error: ... }` para que la cascada continue a fal.ai. REGLA: funciones internas de cascade NUNCA deben hacer throw — siempre retornar `{success: false}` para que el router pueda intentar el siguiente provider.
 - **ENCRYPTION_KEY incorrecto** → NO HAY error visible, simplemente todas las keys BYOK se descifran como basura → 401s en todos los proveedores. Si todos los usuarios fallan simultaneamente, verificar ENCRYPTION_KEY primero.
 
 #### Deploy & Infrastructure
@@ -797,12 +833,12 @@ BREAKS: ALL AI features in DropPage (key resolution for every AI call)
 
 | Service | Used By | API Base | Auth Type |
 |---------|---------|----------|-----------|
-| KIE.ai | Both repos | `api.kie.ai` | Per-user BYOK key | Balance: `GET /api/v1/chat/credit` → `{data: int}` |
+| KIE.ai | Both repos | `api.kie.ai` | Per-user BYOK key | Balance: `GET /api/v1/chat/credit` → `{data: int}` (1cr=$0.005) |
 | Google Gemini | Both repos | `generativelanguage.googleapis.com/v1beta` | Per-user BYOK + platform fallback |
 | OpenAI | Both repos | `api.openai.com/v1` | Per-user BYOK + platform fallback |
 | BFL/FLUX | estrategas only | `api.bfl.ai/v1` | Per-user BYOK | Balance: `GET /v1/credits` → `{credits: num}` (1cr=$0.01) |
 | fal.ai | Both repos | `queue.fal.ai` | Per-user BYOK (profiles.fal_api_key) |
-| ElevenLabs | Both repos | `api.elevenlabs.io/v1` | Per-user BYOK + platform fallback | Balance: `GET /v1/user/subscription` → chars used/limit |
+| ElevenLabs | Both repos | `api.elevenlabs.io/v1` | Per-user BYOK + platform fallback | Balance: `GET /v1/user/subscription` → chars used/limit + tier (suscripcion, no creditos) |
 | Cloudflare R2 | Both repos | `{accountId}.r2.cloudflarestorage.com` | Per-user BYOK (estrategas) / env vars (DropPage) |
 | Supabase | Both repos | env var | Service role key |
 | Publer | estrategas only | `app.publer.com/api/v1` | Per-user BYOK |
@@ -824,4 +860,4 @@ Key entries: cron schedule for `/api/cron/automations`, function maxDuration set
 
 ---
 
-*Last updated: 2026-03-03 — KIE pro+imagenes=empty fix (influencer/describe-person), video persistence, Veo extend, R2/Storage anti-patterns*
+*Last updated: 2026-03-05 — Hub de angulos guardados, guion por escenas, generacion paralela video, video cascade throw→return fix, env var fallbacks para video*

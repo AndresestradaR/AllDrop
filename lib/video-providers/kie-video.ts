@@ -258,12 +258,22 @@ async function generateVeoVideo(
   }
 
   if (data.code !== 200) {
-    throw new Error(`Veo API error: ${data.msg || data.message || JSON.stringify(data)}`)
+    const errorMsg = data.msg || data.message || JSON.stringify(data)
+    console.error(`[Video/Veo] KIE error (code ${data.code}): ${errorMsg}`)
+    return {
+      success: false,
+      error: errorMsg,
+      provider: 'kie-veo',
+    }
   }
 
   const taskId = data.data?.taskId
   if (!taskId) {
-    throw new Error(`No taskId in Veo response`)
+    return {
+      success: false,
+      error: 'No taskId in Veo response',
+      provider: 'kie-veo',
+    }
   }
 
   return {
@@ -506,12 +516,22 @@ async function generateStandardVideo(
   }
 
   if (data.code !== 200 && data.code !== 0) {
-    throw new Error(`KIE API error: ${data.msg || data.message || JSON.stringify(data)}`)
+    const errorMsg = data.msg || data.message || JSON.stringify(data)
+    console.error(`[Video] KIE error (code ${data.code}): ${errorMsg}`)
+    return {
+      success: false,
+      error: errorMsg,
+      provider: 'kie',
+    }
   }
 
   const taskId = data.data?.taskId || data.taskId
   if (!taskId) {
-    throw new Error(`No taskId in response`)
+    return {
+      success: false,
+      error: 'No taskId in response',
+      provider: 'kie',
+    }
   }
 
   return {

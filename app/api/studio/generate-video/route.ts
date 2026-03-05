@@ -134,14 +134,14 @@ export async function POST(request: Request) {
       .eq('id', userId)
       .single()
 
-    if (!profile?.kie_api_key) {
+    const kieApiKey = profile?.kie_api_key ? decrypt(profile.kie_api_key) : (process.env.KIE_API_KEY || '')
+    const falApiKey = profile?.fal_api_key ? decrypt(profile.fal_api_key) : (process.env.FAL_API_KEY || undefined)
+
+    if (!kieApiKey) {
       return NextResponse.json({
         error: 'Configura tu API key de KIE.ai en Settings para generar videos',
       }, { status: 400 })
     }
-
-    const kieApiKey = decrypt(profile.kie_api_key)
-    const falApiKey = profile?.fal_api_key ? decrypt(profile.fal_api_key) : undefined
 
     console.log(`[Video] Starting - Model: ${modelId}, User: ${userId.substring(0, 8)}...`)
     console.log(`[Video] Prompt: ${prompt.substring(0, 100)}...`)
