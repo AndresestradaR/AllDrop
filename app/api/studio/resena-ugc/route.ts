@@ -107,26 +107,31 @@ export async function POST(request: Request) {
       .eq('id', user.id)
       .single()
 
-    if (!profile?.kie_api_key) {
-      return NextResponse.json({
-        error: 'Configura tu API key de KIE.ai en Settings para generar videos',
-      }, { status: 400 })
-    }
-
     // Get AI text keys (for text generation: character profiling & script)
     const aiKeys = await getAIKeys(supabase, user.id)
     requireAIKeys(aiKeys)
 
-    const kieApiKey = decrypt(profile.kie_api_key)
-    const falApiKey = profile?.fal_api_key ? decrypt(profile.fal_api_key) : undefined
+    // Video keys — BYOK first, then platform env var fallbacks
+    const kieApiKey = profile?.kie_api_key ? decrypt(profile.kie_api_key) : (process.env.KIE_API_KEY || '')
+    const falApiKey = profile?.fal_api_key ? decrypt(profile.fal_api_key) : (process.env.FAL_API_KEY || undefined)
 
-    // Image generation keys (for face generation cascade)
+    if (!kieApiKey && !falApiKey) {
+      return NextResponse.json({
+        error: 'No hay API keys disponibles para generar videos. Configura KIE.ai o fal.ai en Settings.',
+      }, { status: 400 })
+    }
+
+    // Image generation keys — BYOK first, then platform env var fallbacks
     const imageApiKeys: { gemini?: string; openai?: string; kie?: string; bfl?: string; fal?: string } = {}
     if (profile?.google_api_key) imageApiKeys.gemini = decrypt(profile.google_api_key)
+    else if (process.env.GEMINI_API_KEY) imageApiKeys.gemini = process.env.GEMINI_API_KEY
     if (profile?.openai_api_key) imageApiKeys.openai = decrypt(profile.openai_api_key)
-    imageApiKeys.kie = kieApiKey
+    else if (process.env.OPENAI_API_KEY) imageApiKeys.openai = process.env.OPENAI_API_KEY
+    imageApiKeys.kie = kieApiKey || process.env.KIE_API_KEY || ''
     if (profile?.bfl_api_key) imageApiKeys.bfl = decrypt(profile.bfl_api_key)
+    else if (process.env.BFL_API_KEY) imageApiKeys.bfl = process.env.BFL_API_KEY
     if (falApiKey) imageApiKeys.fal = falApiKey
+    else if (process.env.FAL_API_KEY) imageApiKeys.fal = process.env.FAL_API_KEY
 
     console.log(`[ResenaUGC] Starting - User: ${user.id.substring(0, 8)}...`)
     console.log(`[ResenaUGC] Product: ${productName}, Model: ${videoModel}, Duration: ${duration}s`)
@@ -141,9 +146,9 @@ export async function POST(request: Request) {
       console.log(`[ResenaUGC] Step 1: Generating face via image cascade...`)
 
       // Check we have at least one image generation key
-      if (!imageApiKeys.gemini && !imageApiKeys.kie && !imageApiKeys.fal) {
+      if (!imageApiKeys.gemini && !imageApiKeys.openai && !imageApiKeys.kie && !imageApiKeys.bfl && !imageApiKeys.fal) {
         return NextResponse.json({
-          error: 'Configura tu API key de Google AI, KIE.ai o fal.ai en Settings para generar imágenes',
+          error: 'No hay API keys disponibles para generar imágenes. Configura al menos una en Settings.',
         }, { status: 400 })
       }
 

@@ -215,7 +215,11 @@ async function generateVeoVideo(
     } else if (request.veoGenerationType === 'REFERENCE_2_VIDEO') {
       // 1-3 images for reference (only veo3_fast)
       if (kieModel !== 'veo3_fast') {
-        throw new Error('REFERENCE_2_VIDEO solo funciona con Veo 3 Fast')
+        return {
+          success: false,
+          error: 'REFERENCE_2_VIDEO solo funciona con Veo 3 Fast',
+          provider: 'kie-veo',
+        }
       }
       if (request.imageUrls && request.imageUrls.length > 0) {
         body.imageUrls = request.imageUrls.slice(0, 3)
@@ -254,7 +258,11 @@ async function generateVeoVideo(
   try {
     data = JSON.parse(responseText)
   } catch (e) {
-    throw new Error(`Invalid JSON response: ${responseText.substring(0, 200)}`)
+    return {
+      success: false,
+      error: `Invalid JSON response from KIE Veo: ${responseText.substring(0, 200)}`,
+      provider: 'kie-veo',
+    }
   }
 
   if (data.code !== 200) {
@@ -512,7 +520,11 @@ async function generateStandardVideo(
   try {
     data = JSON.parse(responseText)
   } catch (e) {
-    throw new Error(`Invalid JSON: ${responseText.substring(0, 200)}`)
+    return {
+      success: false,
+      error: `Invalid JSON response from KIE: ${responseText.substring(0, 200)}`,
+      provider: 'kie',
+    }
   }
 
   if (data.code !== 200 && data.code !== 0) {
