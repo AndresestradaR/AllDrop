@@ -8,6 +8,7 @@ import toast from 'react-hot-toast'
 import { PublisherModal } from '@/components/studio/PublisherModal'
 import { SceneScriptGenerator, type SceneData } from './SceneScriptGenerator'
 import { ParallelVideoManager } from './ParallelVideoManager'
+import { VideoEditor } from '@/components/studio/video-prompt/VideoEditor'
 
 interface Step7VideoProps {
   influencerId: string
@@ -96,6 +97,11 @@ export function Step7Video({
     setPrompt('')
     setVideoUrl(null)
     setError(null)
+    // Reset chain state
+    setChainScenes(null)
+    setChainCurrentIndex(0)
+    setChainCompletedVideos([])
+    setShowChainEditor(false)
   }
 
   // Model & config
@@ -142,6 +148,14 @@ export function Step7Video({
   const [isExtending, setIsExtending] = useState(false)
   const [publishVideoUrl, setPublishVideoUrl] = useState<string | null>(null)
   const [completedTaskId, setCompletedTaskId] = useState<string | null>(null)
+
+  // Scene chain state (sequential extend-based generation)
+  const [chainScenes, setChainScenes] = useState<SceneData[] | null>(null)
+  const [chainCurrentIndex, setChainCurrentIndex] = useState(0)
+  const [chainCompletedVideos, setChainCompletedVideos] = useState<
+    { url: string; taskId: string; sceneIndex: number; label: string }[]
+  >([])
+  const [showChainEditor, setShowChainEditor] = useState(false)
 
   // === Kling 3.0 specific state ===
   const [isMultiShot, setIsMultiShot] = useState(false)
@@ -262,6 +276,19 @@ export function Step7Video({
           setCompletedTaskId(taskId)
           setIsGenerating(false)
           toast.success('¡Video generado!')
+
+          // Si estamos en modo chain, acumular video completado
+          if (chainScenes) {
+            setChainCompletedVideos(prev => [
+              ...prev,
+              {
+                url: data.videoUrl,
+                taskId: taskId,
+                sceneIndex: chainCurrentIndex,
+                label: `Escena ${chainScenes[chainCurrentIndex]?.sceneNumber || chainCurrentIndex + 1}`,
+              },
+            ])
+          }
 
           // Guardar video en la galería del influencer
           try {
@@ -779,6 +806,65 @@ export function Step7Video({
     } finally {
       setIsExtending(false)
     }
+  }
+
+  // === CHAIN: Generate next scene via Veo Extend ===
+  const handleNextScene = async () => {
+    if (!completedTaskId || !chainScenes || isExtending) return
+
+    const nextIndex = chainCurrentIndex + 1
+    if (nextIndex >= chainScenes.length) return
+
+    setIsExtending(true)
+    setError(null)
+
+    try {
+      const veoModel = videoModelId.includes('fast') ? 'veo3_fast' : 'veo3'
+      const nextPrompt = chainScenes[nextIndex].veoPrompt
+
+      const res = await fetch('/api/studio/extend-video', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taskId: completedTaskId,
+          prompt: nextPrompt,
+          model: veoModel,
+        }),
+      })
+
+      const data = await res.json()
+      if (!data.success || !data.taskId) {
+        throw new Error(data.error || 'No se pudo generar siguiente escena')
+      }
+
+      setChainCurrentIndex(nextIndex)
+      setPrompt(nextPrompt)
+      setVideoUrl(null)
+      setCompletedTaskId(null)
+      setTaskId(data.taskId)
+      setIsGenerating(true)
+      toast.success(`Generando escena ${nextIndex + 1}/${chainScenes.length}...`)
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setIsExtending(false)
+    }
+  }
+
+  const isChainComplete = chainScenes && chainCompletedVideos.length === chainScenes.length
+  const hasNextScene = chainScenes && chainCurrentIndex < chainScenes.length - 1
+
+  // VideoEditor mode: show editor when all chain scenes complete and user clicks "Enviar al Editor"
+  if (showChainEditor && chainCompletedVideos.length > 0) {
+    return (
+      <VideoEditor
+        initialClips={chainCompletedVideos.map(cv => ({
+          url: cv.url,
+          label: cv.label,
+        }))}
+        onBack={() => setShowChainEditor(false)}
+      />
+    )
   }
 
   return (
@@ -1302,7 +1388,14 @@ export function Step7Video({
             influencerName={selectedInfluencerName}
             promptDescriptor={resolvedDescriptor}
             realisticImageUrl={selectedInfluencerImage}
-            onFillVeoPrompt={(prompt, _index) => {
+            onFillVeoPrompt={(prompt, sceneIndex) => {
+              // Iniciar modo chain si hay script con múltiples escenas
+              if (scriptScenes && scriptScenes.length > 1) {
+                setChainScenes(scriptScenes)
+                setChainCurrentIndex(sceneIndex)
+                setChainCompletedVideos([])
+                setShowChainEditor(false)
+              }
               setVideoModelId('veo-3.1' as any)
               setPrompt(prompt)
               setShowScriptGenerator(false)
@@ -1526,8 +1619,22 @@ export function Step7Video({
           </div>
           {/* Action buttons below video */}
           <div className="flex items-center gap-2 mt-3">
-            {/* Extend — solo Veo */}
-            {isVeoModel && completedTaskId && (
+            {/* Siguiente Escena (modo chain) */}
+            {chainScenes && hasNextScene && completedTaskId && !isGenerating && (
+              <button
+                onClick={handleNextScene}
+                disabled={isExtending}
+                className={cn(
+                  'flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all border',
+                  isExtending ? 'text-teal-400 animate-pulse border-teal-500/30' : 'text-teal-400 border-teal-500/30 hover:bg-teal-500/10'
+                )}
+              >
+                {isExtending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FastForward className="w-3.5 h-3.5" />}
+                Siguiente Escena ({chainCurrentIndex + 2}/{chainScenes.length})
+              </button>
+            )}
+            {/* Extend normal (sin chain) */}
+            {!chainScenes && isVeoModel && completedTaskId && (
               <button
                 onClick={handleExtend}
                 disabled={isExtending || isGenerating}
@@ -1571,6 +1678,40 @@ export function Step7Video({
             Verificando estado automaticamente. Esto puede tardar 1-3 minutos.
           </p>
           <p className="text-[10px] text-text-muted mt-1 font-mono">Task ID: {taskId}</p>
+        </div>
+      )}
+
+      {/* ============ ESCENAS COMPLETADAS (chain mode) ============ */}
+      {chainCompletedVideos.length > 0 && (
+        <div className="mt-4 mb-4 space-y-2">
+          <h4 className="text-xs font-bold text-[#e5e5e5] uppercase tracking-wide">
+            Escenas Completadas ({chainCompletedVideos.length}/{chainScenes?.length})
+          </h4>
+          <div className="grid grid-cols-2 gap-2">
+            {chainCompletedVideos.map((cv) => (
+              <div key={cv.sceneIndex} className="rounded-xl border border-green-500/30 bg-green-500/5 p-2">
+                <video
+                  src={cv.url}
+                  controls
+                  muted
+                  playsInline
+                  className="w-full rounded-lg aspect-video object-contain bg-black"
+                />
+                <p className="text-[10px] text-green-400 font-medium mt-1">{cv.label}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Botón Enviar al Editor — cuando todas las escenas están completas */}
+          {isChainComplete && (
+            <button
+              onClick={() => setShowChainEditor(true)}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-pink-600 to-rose-600 text-white rounded-xl text-sm font-bold hover:from-pink-500 hover:to-rose-500 transition-all shadow-lg shadow-pink-500/25 mt-3"
+            >
+              <Film className="w-4 h-4" />
+              Enviar al Editor ({chainCompletedVideos.length} clips)
+            </button>
+          )}
         </div>
       )}
 
