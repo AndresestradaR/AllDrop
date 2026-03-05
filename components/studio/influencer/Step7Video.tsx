@@ -6,6 +6,8 @@ import { VIDEO_MODELS, VIDEO_COMPANY_GROUPS, type VideoModelId } from '@/lib/vid
 import { Video, Loader2, Copy, Check, Wand2, Image as ImageIcon, Heart, X, Package, Info, Plus, Trash2, ChevronDown, ChevronUp, Volume2, VolumeX, Film, Share2, FastForward, ArrowLeft } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { PublisherModal } from '@/components/studio/PublisherModal'
+import { SceneScriptGenerator, type SceneData } from './SceneScriptGenerator'
+import { ParallelVideoManager } from './ParallelVideoManager'
 
 interface Step7VideoProps {
   influencerId: string
@@ -131,6 +133,11 @@ export function Step7Video({
   const [duration, setDuration] = useState(5)
   const [aspectRatio, setAspectRatio] = useState<'16:9' | '9:16' | '1:1'>('9:16')
 
+  // Script Generator + Parallel Manager
+  const [showScriptGenerator, setShowScriptGenerator] = useState(false)
+  const [scriptScenes, setScriptScenes] = useState<SceneData[] | null>(null)
+  const [showParallelManager, setShowParallelManager] = useState(false)
+
   // Extend, Publer, navigation
   const [isExtending, setIsExtending] = useState(false)
   const [publishVideoUrl, setPublishVideoUrl] = useState<string | null>(null)
@@ -171,6 +178,15 @@ export function Step7Video({
     }
     loadGallery()
   }, [selectedInfluencerId])
+
+  const refreshGallery = async () => {
+    if (!selectedInfluencerId) return
+    try {
+      const res = await fetch(`/api/studio/influencer/gallery?influencerId=${selectedInfluencerId}`)
+      const data = await res.json()
+      if (data.items) setGalleryImages(data.items)
+    } catch {}
+  }
 
   // Ajustar modo cuando cambia el modelo
   useEffect(() => {
@@ -1264,6 +1280,59 @@ export function Step7Video({
             </div>
           )}
         </div>
+      )}
+
+      {/* ============ GUION POR ESCENAS (Veo 3.1) ============ */}
+      <div className="mb-4">
+        <button
+          onClick={() => setShowScriptGenerator(!showScriptGenerator)}
+          className={cn(
+            'w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all border',
+            showScriptGenerator
+              ? 'bg-teal-500/15 text-teal-400 border-teal-500/30'
+              : 'bg-teal-500/10 text-teal-500 border-teal-500/20 hover:bg-teal-500/15'
+          )}
+        >
+          <Film className="w-4 h-4" />
+          Guion por Escenas
+        </button>
+        {showScriptGenerator && (
+          <SceneScriptGenerator
+            influencerId={selectedInfluencerId}
+            influencerName={selectedInfluencerName}
+            promptDescriptor={resolvedDescriptor}
+            realisticImageUrl={selectedInfluencerImage}
+            onFillVeoPrompt={(prompt, _index) => {
+              setVideoModelId('veo-3.1' as any)
+              setPrompt(prompt)
+              setShowScriptGenerator(false)
+            }}
+            onGenerateAll={(scenes) => {
+              setScriptScenes(scenes)
+              setShowParallelManager(true)
+              setShowScriptGenerator(false)
+            }}
+          />
+        )}
+      </div>
+
+      {showParallelManager && scriptScenes && (
+        <ParallelVideoManager
+          scenes={scriptScenes}
+          influencerId={selectedInfluencerId}
+          influencerName={selectedInfluencerName}
+          realisticImageUrl={selectedInfluencerImage}
+          aspectRatio={aspectRatio}
+          onComplete={() => {
+            setShowParallelManager(false)
+            setScriptScenes(null)
+            refreshGallery()
+          }}
+          onClose={() => {
+            setShowParallelManager(false)
+            refreshGallery()
+          }}
+        />
       )}
 
       {/* ============ KLING 3.0: SCENE EDITOR (multi-shot) ============ */}
