@@ -4,10 +4,11 @@ import { useState } from 'react'
 import { ArrowLeft, Film, Check, Sparkles } from 'lucide-react'
 import { StandaloneScriptGenerator, type SceneData } from './StandaloneScriptGenerator'
 import { StandaloneVideoManager } from './StandaloneVideoManager'
+import { VideoEditor } from './VideoEditor'
 import { VIDEO_MODELS, VIDEO_COMPANY_GROUPS } from '@/lib/video-providers/types'
 import type { VideoModelId } from '@/lib/video-providers/types'
 
-type Step = 'script' | 'configure' | 'generate'
+type Step = 'script' | 'configure' | 'generate' | 'edit'
 
 interface VideoPromptStudioProps {
   onBack: () => void
@@ -19,6 +20,7 @@ export function VideoPromptStudio({ onBack }: VideoPromptStudioProps) {
   const [modelId, setModelId] = useState<VideoModelId>('veo-3.1')
   const [aspectRatio, setAspectRatio] = useState<'16:9' | '9:16' | '1:1'>('16:9')
   const [enableAudio, setEnableAudio] = useState(true)
+  const [completedClipUrls, setCompletedClipUrls] = useState<Map<number, string>>(new Map())
 
   const handleScenesGenerated = (generatedScenes: SceneData[]) => {
     setScenes(generatedScenes)
@@ -36,7 +38,7 @@ export function VideoPromptStudio({ onBack }: VideoPromptStudioProps) {
       {/* Header */}
       <div className="flex items-center gap-4 mb-6">
         <button
-          onClick={step === 'script' ? onBack : () => setStep(step === 'generate' ? 'configure' : 'script')}
+          onClick={step === 'script' ? onBack : () => setStep(step === 'edit' ? 'generate' : step === 'generate' ? 'configure' : 'script')}
           className="p-2 hover:bg-border/50 rounded-lg transition-colors"
         >
           <ArrowLeft className="w-5 h-5 text-text-secondary" />
@@ -51,30 +53,35 @@ export function VideoPromptStudio({ onBack }: VideoPromptStudioProps) {
               {step === 'script' && 'Genera guiones por escenas con IA'}
               {step === 'configure' && 'Configura modelo y parametros de video'}
               {step === 'generate' && 'Generando videos en paralelo'}
+              {step === 'edit' && 'Edita y exporta tu video final'}
             </p>
           </div>
         </div>
 
         {/* Step indicators */}
         <div className="ml-auto flex items-center gap-2">
-          {(['script', 'configure', 'generate'] as Step[]).map((s, i) => (
-            <div key={s} className="flex items-center gap-1.5">
-              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
-                step === s
-                  ? 'bg-accent text-background'
-                  : (['script', 'configure', 'generate'].indexOf(step) > i)
-                    ? 'bg-green-500/20 text-green-400'
-                    : 'bg-border text-text-muted'
-              }`}>
-                {(['script', 'configure', 'generate'].indexOf(step) > i) ? (
-                  <Check className="w-3.5 h-3.5" />
-                ) : (
-                  i + 1
-                )}
+          {(['script', 'configure', 'generate', 'edit'] as Step[]).map((s, i) => {
+            const allSteps: Step[] = ['script', 'configure', 'generate', 'edit']
+            const currentIdx = allSteps.indexOf(step)
+            return (
+              <div key={s} className="flex items-center gap-1.5">
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
+                  step === s
+                    ? 'bg-accent text-background'
+                    : currentIdx > i
+                      ? 'bg-green-500/20 text-green-400'
+                      : 'bg-border text-text-muted'
+                }`}>
+                  {currentIdx > i ? (
+                    <Check className="w-3.5 h-3.5" />
+                  ) : (
+                    i + 1
+                  )}
+                </div>
+                {i < 3 && <div className="w-6 h-0.5 bg-border rounded" />}
               </div>
-              {i < 2 && <div className="w-8 h-0.5 bg-border rounded" />}
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
 
@@ -209,12 +216,65 @@ export function VideoPromptStudio({ onBack }: VideoPromptStudioProps) {
         )}
 
         {step === 'generate' && (
-          <StandaloneVideoManager
-            scenes={scenes}
-            modelId={modelId}
-            aspectRatio={aspectRatio}
-            enableAudio={enableAudio}
-            onBack={() => setStep('configure')}
+          <div className="space-y-4">
+            <StandaloneVideoManager
+              scenes={scenes}
+              modelId={modelId}
+              aspectRatio={aspectRatio}
+              enableAudio={enableAudio}
+              onBack={() => setStep('configure')}
+            />
+            {/* Edit button — shown when videos exist */}
+            <button
+              onClick={() => {
+                // Collect video URLs from the rendered video elements
+                const videoEls = document.querySelectorAll<HTMLVideoElement>(
+                  '[data-scene-video]'
+                )
+                const clips: { url: string; label: string }[] = []
+                videoEls.forEach((el, i) => {
+                  if (el.src) {
+                    clips.push({
+                      url: el.src,
+                      label: `Escena ${scenes[i]?.sceneNumber || i + 1}`,
+                    })
+                  }
+                })
+                // Also try from all video elements in the generate step
+                if (clips.length === 0) {
+                  const allVideos = document.querySelectorAll<HTMLVideoElement>(
+                    'video[src]'
+                  )
+                  allVideos.forEach((el, i) => {
+                    if (el.src && !el.closest('[data-export-result]')) {
+                      clips.push({
+                        url: el.src,
+                        label: `Clip ${i + 1}`,
+                      })
+                    }
+                  })
+                }
+                if (clips.length === 0) {
+                  return
+                }
+                setCompletedClipUrls(new Map(clips.map((c, i) => [i, c.url])))
+                setStep('edit')
+              }}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-pink-600 to-rose-600 text-white rounded-xl text-sm font-bold hover:from-pink-500 hover:to-rose-500 transition-all shadow-lg shadow-pink-500/25"
+            >
+              <Film className="w-4 h-4" />
+              Editar Video Final
+            </button>
+          </div>
+        )}
+
+        {step === 'edit' && (
+          <VideoEditor
+            initialClips={Array.from(completedClipUrls.entries()).map(([i, url]) => ({
+              url,
+              label: `Escena ${scenes[i]?.sceneNumber || i + 1}`,
+            }))}
+            onBack={() => setStep('generate')}
           />
         )}
       </div>

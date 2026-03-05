@@ -23,6 +23,7 @@ import {
   Check,
   Hash,
   Video,
+  Film,
   MessageSquare,
   UserCircle,
 } from 'lucide-react'
@@ -31,6 +32,7 @@ import { PublisherModal } from './PublisherModal'
 import { PromptBotGenerator } from './PromptBotGenerator'
 import { PersonDescriptor } from './PersonDescriptor'
 import { VideoPromptStudio } from './video-prompt/VideoPromptStudio'
+import { VideoEditorStandalone } from './video-prompt/VideoEditorStandalone'
 
 // Lip Sync Models
 type LipSyncModel = 'kling' | 'infinitalk'
@@ -115,6 +117,14 @@ const TOOLS: Tool[] = [
     description: 'Genera guiones y videos con IA por escenas',
     icon: Video,
     color: 'from-violet-500 to-purple-500',
+  },
+  {
+    id: 'video-editor',
+    name: 'Editor de Video',
+    description: 'Corta, une clips y agrega musica de fondo',
+    icon: Film,
+    color: 'from-pink-500 to-rose-500',
+    outputsVideo: true,
   },
   {
     id: 'prompt-bot',
@@ -362,6 +372,10 @@ export function ToolsGrid() {
   )
 
   // Prompt Generator tools (separate full-screen components)
+  if (activeTool === 'video-editor') {
+    return <VideoEditorStandalone onBack={() => { setActiveTool(null); resetTool() }} />
+  }
+
   if (activeTool === 'prompt-video') {
     return <VideoPromptStudio onBack={() => { setActiveTool(null); resetTool() }} />
   }
