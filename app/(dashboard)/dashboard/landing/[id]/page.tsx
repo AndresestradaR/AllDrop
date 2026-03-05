@@ -2007,7 +2007,7 @@ export default function ProductGeneratePage() {
                   {showSavedAngles ? <ChevronDown className="w-4 h-4 text-text-muted" /> : <ChevronRight className="w-4 h-4 text-text-muted" />}
                 </button>
                 {showSavedAngles && (
-                  <SavedAnglesPanel selectable={false} />
+                  <SavedAnglesPanel selectable={false} filterByProduct={product?.name} />
                 )}
               </div>
 

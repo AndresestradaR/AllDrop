@@ -144,6 +144,7 @@ export function SceneScriptGenerator({
             {!selectedAngle && (
               <SavedAnglesPanel
                 selectable
+                showProductFilter
                 selectedAngleId={null}
                 onSelectAngle={(angle) => {
                   setSelectedAngle(angle)

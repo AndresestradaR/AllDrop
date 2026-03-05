@@ -24,6 +24,8 @@ interface SavedAnglesPanelProps {
   onSelectAngle?: (angle: AngleData) => void
   selectable?: boolean
   selectedAngleId?: string | null
+  filterByProduct?: string       // Show only this product's angles (no accordion)
+  showProductFilter?: boolean    // Show a product dropdown selector
 }
 
 const TONE_COLORS: Record<string, string> = {
@@ -40,20 +42,26 @@ const TONE_COLORS: Record<string, string> = {
   'friendly': 'bg-green-500/20 text-green-400',
 }
 
-export function SavedAnglesPanel({ onSelectAngle, selectable = false, selectedAngleId }: SavedAnglesPanelProps) {
+export function SavedAnglesPanel({ onSelectAngle, selectable = false, selectedAngleId, filterByProduct, showProductFilter = false }: SavedAnglesPanelProps) {
   const [groups, setGroups] = useState<AngleGroup[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [expandedProduct, setExpandedProduct] = useState<string | null>(null)
   const [expandedAngle, setExpandedAngle] = useState<string | null>(null)
   const [copiedAngleId, setCopiedAngleId] = useState<string | null>(null)
   const [deletingProduct, setDeletingProduct] = useState<string | null>(null)
+  const [selectedProduct, setSelectedProduct] = useState<string | ''>('')
 
   const loadAngles = async () => {
     try {
-      const res = await fetch('/api/studio/saved-angles')
+      const query = filterByProduct ? `?productName=${encodeURIComponent(filterByProduct)}` : ''
+      const res = await fetch(`/api/studio/saved-angles${query}`)
       const data = await res.json()
       if (data.success) {
         setGroups(data.groups || [])
+        // Auto-expand if single product or filtered
+        if (filterByProduct && data.groups?.length === 1) {
+          setExpandedProduct(data.groups[0].productName)
+        }
       }
     } catch {
       // silent fail
@@ -132,41 +140,76 @@ Publico Objetivo: ${angle.avatarSuggestion}`
     )
   }
 
+  // Filter groups based on product filter or dropdown selection
+  const displayGroups = showProductFilter && selectedProduct
+    ? groups.filter(g => g.productName === selectedProduct)
+    : groups
+
   return (
     <div className="space-y-2">
-      {groups.map((group) => {
-        const isExpanded = expandedProduct === group.productName
+      {/* Product filter dropdown (for Influencer) */}
+      {showProductFilter && groups.length > 1 && (
+        <select
+          value={selectedProduct}
+          onChange={(e) => {
+            setSelectedProduct(e.target.value)
+            setExpandedProduct(e.target.value || null)
+            setExpandedAngle(null)
+          }}
+          className="w-full px-3 py-2 bg-[#1a1a1a] border border-[#333] rounded-lg text-sm text-[#e5e5e5] focus:outline-none focus:ring-2 focus:ring-teal-500/50 mb-2"
+        >
+          <option value="">Seleccionar producto...</option>
+          {groups.map(g => (
+            <option key={g.productName} value={g.productName}>
+              {g.productName} ({g.angles.length} angulos)
+            </option>
+          ))}
+        </select>
+      )}
+
+      {showProductFilter && !selectedProduct && groups.length > 1 && (
+        <p className="text-[10px] text-text-muted text-center py-2">
+          Selecciona un producto para ver sus angulos
+        </p>
+      )}
+
+      {displayGroups.map((group) => {
+        // In filterByProduct mode, skip the product accordion — show angles directly
+        const skipAccordion = !!filterByProduct
+        const isExpanded = skipAccordion || expandedProduct === group.productName
 
         return (
           <div key={group.productName} className="border border-[#333] rounded-xl overflow-hidden bg-[#1a1a1a]">
-            {/* Product Accordion Header */}
-            <button
-              onClick={() => setExpandedProduct(isExpanded ? null : group.productName)}
-              className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-[#222] transition-colors"
-            >
-              <div className="flex items-center gap-2 min-w-0">
-                {isExpanded ? (
-                  <ChevronUp className="w-3.5 h-3.5 text-text-muted flex-shrink-0" />
-                ) : (
-                  <ChevronDown className="w-3.5 h-3.5 text-text-muted flex-shrink-0" />
-                )}
-                <span className="text-sm font-medium text-[#e5e5e5] truncate">{group.productName}</span>
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-teal-500/20 text-teal-400 font-medium flex-shrink-0">
-                  {group.angles.length}
-                </span>
-              </div>
+            {/* Product Accordion Header — hide when filtering by specific product */}
+            {!skipAccordion && (
               <button
-                onClick={(e) => handleDeleteProduct(group.productName, e)}
-                disabled={deletingProduct === group.productName}
-                className="p-1 hover:bg-red-500/10 rounded-lg text-text-muted hover:text-red-400 transition-colors flex-shrink-0"
+                onClick={() => setExpandedProduct(isExpanded ? null : group.productName)}
+                className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-[#222] transition-colors"
               >
-                {deletingProduct === group.productName ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Trash2 className="w-3.5 h-3.5" />
-                )}
+                <div className="flex items-center gap-2 min-w-0">
+                  {isExpanded ? (
+                    <ChevronUp className="w-3.5 h-3.5 text-text-muted flex-shrink-0" />
+                  ) : (
+                    <ChevronDown className="w-3.5 h-3.5 text-text-muted flex-shrink-0" />
+                  )}
+                  <span className="text-sm font-medium text-[#e5e5e5] truncate">{group.productName}</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-teal-500/20 text-teal-400 font-medium flex-shrink-0">
+                    {group.angles.length}
+                  </span>
+                </div>
+                <button
+                  onClick={(e) => handleDeleteProduct(group.productName, e)}
+                  disabled={deletingProduct === group.productName}
+                  className="p-1 hover:bg-red-500/10 rounded-lg text-text-muted hover:text-red-400 transition-colors flex-shrink-0"
+                >
+                  {deletingProduct === group.productName ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-3.5 h-3.5" />
+                  )}
+                </button>
               </button>
-            </button>
+            )}
 
             {/* Angles List */}
             {isExpanded && (
