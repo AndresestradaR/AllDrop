@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Copy, Check, Pencil, Loader2, Heart, Download, Image as ImageIcon, Video, LayoutGrid, Share2, X } from 'lucide-react'
+import { Copy, Check, Pencil, Loader2, Heart, Download, Image as ImageIcon, Video, LayoutGrid, Share2, X, Film, CheckSquare, Square } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
 import toast from 'react-hot-toast'
 import { PublisherModal } from '../PublisherModal'
@@ -13,6 +13,7 @@ interface InfluencerSummaryProps {
   onViewBoard: () => void
   onEditName: (name: string) => void
   onBack: () => void
+  onSendToEditor?: (clips: { url: string; label: string }[]) => void
 }
 
 export function InfluencerSummary({
@@ -22,6 +23,7 @@ export function InfluencerSummary({
   onViewBoard,
   onEditName,
   onBack,
+  onSendToEditor,
 }: InfluencerSummaryProps) {
   const [isEditingName, setIsEditingName] = useState(false)
   const [name, setName] = useState(influencer.name || 'Mi Influencer')
@@ -32,6 +34,10 @@ export function InfluencerSummary({
   const [showAllContent, setShowAllContent] = useState(false)
   const [lightboxItem, setLightboxItem] = useState<any | null>(null)
   const [publishItem, setPublishItem] = useState<any | null>(null)
+
+  // Video selection for editor
+  const [isSelectMode, setIsSelectMode] = useState(false)
+  const [selectedVideoIds, setSelectedVideoIds] = useState<Set<string>>(new Set())
 
   // Load gallery content
   useEffect(() => {
@@ -114,6 +120,30 @@ export function InfluencerSummary({
     } catch {
       toast.error('Error al eliminar')
     }
+  }
+
+  const toggleVideoSelection = (item: any) => {
+    setSelectedVideoIds(prev => {
+      const next = new Set(prev)
+      if (next.has(item.id)) next.delete(item.id)
+      else next.add(item.id)
+      return next
+    })
+  }
+
+  const videoItems = recentContent.filter((i: any) => i.content_type === 'video' && i.video_url)
+
+  const handleSendToEditor = () => {
+    if (!onSendToEditor || selectedVideoIds.size === 0) return
+    const clips = recentContent
+      .filter((item: any) => selectedVideoIds.has(item.id))
+      .map((item: any) => ({
+        url: item.video_url,
+        label: item.situation || `Video ${item.id.slice(0, 6)}`,
+      }))
+    onSendToEditor(clips)
+    setIsSelectMode(false)
+    setSelectedVideoIds(new Set())
   }
 
   const filteredContent = recentContent.filter(item => {
@@ -236,7 +266,7 @@ export function InfluencerSummary({
               ({recentContent.length})
             </span>
           </div>
-          <div className="flex gap-1">
+          <div className="flex gap-1 items-center">
             {(['all', 'favorites', 'images', 'videos'] as const).map(f => (
               <button
                 key={f}
@@ -251,6 +281,26 @@ export function InfluencerSummary({
                 {f === 'all' ? 'Todo' : f === 'favorites' ? '⭐' : f === 'images' ? '📷 Fotos' : '🎬 Videos'}
               </button>
             ))}
+            {onSendToEditor && videoItems.length > 0 && (
+              <>
+                <div className="w-px h-4 bg-border mx-1" />
+                <button
+                  onClick={() => {
+                    setIsSelectMode(!isSelectMode)
+                    if (isSelectMode) setSelectedVideoIds(new Set())
+                  }}
+                  className={cn(
+                    'flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-medium transition-all',
+                    isSelectMode
+                      ? 'bg-pink-500/15 text-pink-400'
+                      : 'text-text-muted hover:text-text-secondary'
+                  )}
+                >
+                  <Film className="w-3 h-3" />
+                  {isSelectMode ? 'Cancelar' : 'Editar videos'}
+                </button>
+              </>
+            )}
           </div>
         </div>
 
@@ -267,85 +317,130 @@ export function InfluencerSummary({
         ) : (
           <>
             <div className="grid grid-cols-3 gap-2">
-              {displayContent.map((item: any) => (
-                <div
-                  key={item.id}
-                  className="group relative rounded-xl overflow-hidden bg-surface-elevated border border-border aspect-[9/16] cursor-pointer"
-                  onClick={() => setLightboxItem(item)}
-                >
-                  {item.content_type === 'video' && item.video_url ? (
-                    <div className="relative w-full h-full">
-                      <video
-                        src={item.video_url}
-                        className="w-full h-full object-cover"
-                        muted
-                        loop
-                        playsInline
-                        onMouseEnter={(e) => (e.target as HTMLVideoElement).play()}
-                        onMouseLeave={(e) => { const v = e.target as HTMLVideoElement; v.pause(); v.currentTime = 0 }}
-                      />
-                      {/* Badge de video */}
-                      <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 bg-black/60 rounded-md">
-                        <Video className="w-3 h-3 text-white" />
+              {displayContent.map((item: any) => {
+                const isVideo = item.content_type === 'video' && item.video_url
+                const isSelected = selectedVideoIds.has(item.id)
+
+                return (
+                  <div
+                    key={item.id}
+                    className={cn(
+                      'group relative rounded-xl overflow-hidden bg-surface-elevated border aspect-[9/16] cursor-pointer',
+                      isSelectMode && isVideo && isSelected
+                        ? 'border-pink-500 ring-2 ring-pink-500/30'
+                        : 'border-border'
+                    )}
+                    onClick={() => {
+                      if (isSelectMode && isVideo) {
+                        toggleVideoSelection(item)
+                      } else {
+                        setLightboxItem(item)
+                      }
+                    }}
+                  >
+                    {isVideo ? (
+                      <div className="relative w-full h-full">
+                        <video
+                          src={item.video_url}
+                          className="w-full h-full object-cover"
+                          muted
+                          loop
+                          playsInline
+                          onMouseEnter={(e) => (e.target as HTMLVideoElement).play()}
+                          onMouseLeave={(e) => { const v = e.target as HTMLVideoElement; v.pause(); v.currentTime = 0 }}
+                        />
+                        {/* Badge de video */}
+                        {!isSelectMode && (
+                          <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 bg-black/60 rounded-md">
+                            <Video className="w-3 h-3 text-white" />
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  ) : (
-                    <img
-                      src={item.image_url}
-                      alt={item.situation || 'Contenido'}
-                      className="w-full h-full object-cover"
-                    />
-                  )}
-                  {/* Overlay */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
-                    <div className="absolute bottom-2 left-2 right-2">
-                      <p className="text-[9px] text-white/80 line-clamp-2">{item.situation}</p>
-                      {item.type === 'with_product' && item.product_name && (
-                        <span className="text-[8px] px-1.5 py-0.5 bg-accent/30 text-accent rounded-full mt-1 inline-block">
-                          {item.product_name}
-                        </span>
-                      )}
-                    </div>
+                    ) : (
+                      <img
+                        src={item.image_url}
+                        alt={item.situation || 'Contenido'}
+                        className={cn('w-full h-full object-cover', isSelectMode && 'opacity-40')}
+                      />
+                    )}
+
+                    {/* Selection checkbox for videos */}
+                    {isSelectMode && isVideo && (
+                      <div className="absolute top-1.5 left-1.5 z-10">
+                        {isSelected ? (
+                          <div className="w-6 h-6 rounded-md bg-pink-500 flex items-center justify-center">
+                            <Check className="w-4 h-4 text-white" />
+                          </div>
+                        ) : (
+                          <div className="w-6 h-6 rounded-md bg-black/50 border-2 border-white/60 flex items-center justify-center" />
+                        )}
+                      </div>
+                    )}
+
+                    {/* "No es video" indicator in select mode */}
+                    {isSelectMode && !isVideo && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                        <span className="text-[9px] text-white/60 font-medium">Solo videos</span>
+                      </div>
+                    )}
+
+                    {/* Overlay (hidden in select mode) */}
+                    {!isSelectMode && (
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="absolute bottom-2 left-2 right-2">
+                          <p className="text-[9px] text-white/80 line-clamp-2">{item.situation}</p>
+                          {item.type === 'with_product' && item.product_name && (
+                            <span className="text-[8px] px-1.5 py-0.5 bg-accent/30 text-accent rounded-full mt-1 inline-block">
+                              {item.product_name}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Favorito badge */}
+                    {item.is_favorite && !isSelectMode && (
+                      <div className="absolute top-1.5 left-1.5">
+                        <Heart className="w-3 h-3 text-amber-400 fill-current" />
+                      </div>
+                    )}
+
+                    {/* Botones hover (hidden in select mode) */}
+                    {!isSelectMode && (
+                      <div className="absolute top-1.5 right-1.5 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleToggleFavorite(item) }}
+                          className={cn(
+                            'p-1 rounded-md transition-colors',
+                            item.is_favorite ? 'bg-amber-500/80 text-white' : 'bg-black/40 text-white hover:bg-black/60'
+                          )}
+                        >
+                          <Heart className={cn('w-3 h-3', item.is_favorite && 'fill-current')} />
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setPublishItem(item) }}
+                          className="p-1 bg-indigo-500/80 rounded-md text-white hover:bg-indigo-500 transition-colors"
+                          title="Publicar en redes"
+                        >
+                          <Share2 className="w-3 h-3" />
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleDownloadItem(item) }}
+                          className="p-1 bg-black/40 rounded-md text-white hover:bg-black/60 transition-colors"
+                        >
+                          <Download className="w-3 h-3" />
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleDeleteItem(item) }}
+                          className="p-1 bg-red-500/60 rounded-md text-white hover:bg-red-500/80 transition-colors"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )}
                   </div>
-                  {/* Favorito badge */}
-                  {item.is_favorite && (
-                    <div className="absolute top-1.5 left-1.5">
-                      <Heart className="w-3 h-3 text-amber-400 fill-current" />
-                    </div>
-                  )}
-                  {/* Botones hover */}
-                  <div className="absolute top-1.5 right-1.5 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleToggleFavorite(item) }}
-                      className={cn(
-                        'p-1 rounded-md transition-colors',
-                        item.is_favorite ? 'bg-amber-500/80 text-white' : 'bg-black/40 text-white hover:bg-black/60'
-                      )}
-                    >
-                      <Heart className={cn('w-3 h-3', item.is_favorite && 'fill-current')} />
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setPublishItem(item) }}
-                      className="p-1 bg-indigo-500/80 rounded-md text-white hover:bg-indigo-500 transition-colors"
-                      title="Publicar en redes"
-                    >
-                      <Share2 className="w-3 h-3" />
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleDownloadItem(item) }}
-                      className="p-1 bg-black/40 rounded-md text-white hover:bg-black/60 transition-colors"
-                    >
-                      <Download className="w-3 h-3" />
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleDeleteItem(item) }}
-                      className="p-1 bg-red-500/60 rounded-md text-white hover:bg-red-500/80 transition-colors"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
             {/* Ver mas / Ver menos */}
             {filteredContent.length > 6 && (
@@ -386,6 +481,22 @@ export function InfluencerSummary({
           Crear Video
         </button>
       </div>
+
+      {/* Floating selection bar */}
+      {isSelectMode && selectedVideoIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 px-5 py-3 bg-[#1a1a1a] border border-pink-500/30 rounded-2xl shadow-2xl shadow-black/50">
+          <span className="text-sm text-white font-medium">
+            {selectedVideoIds.size} video{selectedVideoIds.size > 1 ? 's' : ''} seleccionado{selectedVideoIds.size > 1 ? 's' : ''}
+          </span>
+          <button
+            onClick={handleSendToEditor}
+            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 text-white rounded-xl text-sm font-semibold transition-all shadow-lg shadow-pink-500/25"
+          >
+            <Film className="w-4 h-4" />
+            Enviar al Editor
+          </button>
+        </div>
+      )}
 
       {/* Lightbox modal */}
       {lightboxItem && (
