@@ -368,6 +368,10 @@ Donde es posible, cascade completa multi-proveedor via servicios centralizados.
     | Character profile  | generateAIText()        | KIE → OpenAI → Google Gemini     |
     | Script generation  | generateAIText()        | KIE → OpenAI → Google Gemini     |
     | Video generation   | generateVideo()         | KIE → fal.ai                     |
+    Env var fallbacks: GEMINI, OPENAI, KIE, BFL, FAL (todas las keys de imagen + video).
+    FIX (2026-03-05): Se agregaron env var fallbacks para TODAS las API keys.
+    Antes exigia BYOK KIE key y no tenia fallback para imagen (gemini, openai, bfl, fal).
+    Si KIE fallaba, la cascada de imagen moria sin intentar otros providers.
 
   VIDEO PRODUCTO (app/api/studio/generate-video/):
     Usa generateVideo() centralizado — cascade KIE → fal.ai.
@@ -860,4 +864,4 @@ Key entries: cron schedule for `/api/cron/automations`, function maxDuration set
 
 ---
 
-*Last updated: 2026-03-05 — Hub de angulos guardados, guion por escenas, generacion paralela video, video cascade throw→return fix, env var fallbacks para video*
+*Last updated: 2026-03-05 — Hub de angulos guardados, guion por escenas, generacion paralela video, video cascade throw→return fix, env var fallbacks para video y resena-ugc*
