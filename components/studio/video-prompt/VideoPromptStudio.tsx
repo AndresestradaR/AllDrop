@@ -1,0 +1,223 @@
+'use client'
+
+import { useState } from 'react'
+import { ArrowLeft, Film, Check, Sparkles } from 'lucide-react'
+import { StandaloneScriptGenerator, type SceneData } from './StandaloneScriptGenerator'
+import { StandaloneVideoManager } from './StandaloneVideoManager'
+import { VIDEO_MODELS, VIDEO_COMPANY_GROUPS } from '@/lib/video-providers/types'
+import type { VideoModelId } from '@/lib/video-providers/types'
+
+type Step = 'script' | 'configure' | 'generate'
+
+interface VideoPromptStudioProps {
+  onBack: () => void
+}
+
+export function VideoPromptStudio({ onBack }: VideoPromptStudioProps) {
+  const [step, setStep] = useState<Step>('script')
+  const [scenes, setScenes] = useState<SceneData[]>([])
+  const [modelId, setModelId] = useState<VideoModelId>('veo-3.1')
+  const [aspectRatio, setAspectRatio] = useState<'16:9' | '9:16' | '1:1'>('16:9')
+  const [enableAudio, setEnableAudio] = useState(true)
+
+  const handleScenesGenerated = (generatedScenes: SceneData[]) => {
+    setScenes(generatedScenes)
+    setStep('configure')
+  }
+
+  const handleStartGeneration = () => {
+    setStep('generate')
+  }
+
+  const selectedModel = VIDEO_MODELS[modelId]
+
+  return (
+    <div className="h-[calc(100vh-200px)] min-h-[600px] flex flex-col">
+      {/* Header */}
+      <div className="flex items-center gap-4 mb-6">
+        <button
+          onClick={step === 'script' ? onBack : () => setStep(step === 'generate' ? 'configure' : 'script')}
+          className="p-2 hover:bg-border/50 rounded-lg transition-colors"
+        >
+          <ArrowLeft className="w-5 h-5 text-text-secondary" />
+        </button>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-gradient-to-br from-violet-500 to-purple-500">
+            <Film className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold text-text-primary">Video Prompt Studio</h2>
+            <p className="text-sm text-text-secondary">
+              {step === 'script' && 'Genera guiones por escenas con IA'}
+              {step === 'configure' && 'Configura modelo y parametros de video'}
+              {step === 'generate' && 'Generando videos en paralelo'}
+            </p>
+          </div>
+        </div>
+
+        {/* Step indicators */}
+        <div className="ml-auto flex items-center gap-2">
+          {(['script', 'configure', 'generate'] as Step[]).map((s, i) => (
+            <div key={s} className="flex items-center gap-1.5">
+              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
+                step === s
+                  ? 'bg-accent text-background'
+                  : (['script', 'configure', 'generate'].indexOf(step) > i)
+                    ? 'bg-green-500/20 text-green-400'
+                    : 'bg-border text-text-muted'
+              }`}>
+                {(['script', 'configure', 'generate'].indexOf(step) > i) ? (
+                  <Check className="w-3.5 h-3.5" />
+                ) : (
+                  i + 1
+                )}
+              </div>
+              {i < 2 && <div className="w-8 h-0.5 bg-border rounded" />}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto">
+        {step === 'script' && (
+          <StandaloneScriptGenerator onScenesGenerated={handleScenesGenerated} />
+        )}
+
+        {step === 'configure' && (
+          <div className="space-y-6 max-w-3xl">
+            {/* Model selector */}
+            <div className="bg-surface rounded-2xl border border-border p-6">
+              <h3 className="text-sm font-semibold text-text-primary mb-4">Modelo de Video</h3>
+              <div className="space-y-4">
+                {VIDEO_COMPANY_GROUPS.map(group => (
+                  <div key={group.id}>
+                    <p className="text-xs font-medium text-text-muted uppercase tracking-wide mb-2">{group.name}</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {group.models.map(model => (
+                        <button
+                          key={model.id}
+                          onClick={() => {
+                            setModelId(model.id)
+                            setEnableAudio(model.supportsAudio)
+                          }}
+                          className={`p-3 rounded-xl border text-left transition-all ${
+                            modelId === model.id
+                              ? 'border-accent bg-accent/10'
+                              : 'border-border hover:border-accent/50 bg-surface-elevated'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className={`text-sm font-medium ${modelId === model.id ? 'text-accent' : 'text-text-primary'}`}>
+                              {model.name}
+                            </span>
+                            {modelId === model.id && <Check className="w-4 h-4 text-accent" />}
+                          </div>
+                          <p className="text-[10px] text-text-muted mt-0.5">{model.description}</p>
+                          <div className="flex items-center gap-2 mt-1.5">
+                            <span className="text-[9px] text-text-muted">{model.priceRange}</span>
+                            <span className="text-[9px] text-text-muted">{model.durationRange}</span>
+                            {model.supportsAudio && <span className="text-[9px] text-blue-400">Audio</span>}
+                            {model.supportsExtend && <span className="text-[9px] text-violet-400">Extend</span>}
+                          </div>
+                          {model.tags && model.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1.5">
+                              {model.tags.map(tag => (
+                                <span key={tag} className="text-[8px] px-1.5 py-0.5 rounded bg-border text-text-muted">{tag}</span>
+                              ))}
+                            </div>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Aspect ratio & audio */}
+            <div className="bg-surface rounded-2xl border border-border p-6">
+              <h3 className="text-sm font-semibold text-text-primary mb-4">Configuracion</h3>
+              <div className="flex gap-6">
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-text-secondary mb-2">Aspect Ratio</label>
+                  <div className="flex gap-2">
+                    {(['16:9', '9:16', '1:1'] as const).map(ratio => (
+                      <button
+                        key={ratio}
+                        onClick={() => setAspectRatio(ratio)}
+                        className={`flex-1 py-2.5 rounded-xl border text-sm font-medium transition-all ${
+                          aspectRatio === ratio
+                            ? 'border-accent bg-accent/10 text-accent'
+                            : 'border-border bg-surface-elevated text-text-secondary hover:border-accent/50'
+                        }`}
+                      >
+                        {ratio}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-text-secondary mb-2">Audio</label>
+                  <button
+                    onClick={() => setEnableAudio(!enableAudio)}
+                    disabled={!selectedModel?.supportsAudio}
+                    className={`w-full py-2.5 rounded-xl border text-sm font-medium transition-all ${
+                      !selectedModel?.supportsAudio
+                        ? 'border-border bg-border/50 text-text-muted cursor-not-allowed'
+                        : enableAudio
+                          ? 'border-accent bg-accent/10 text-accent'
+                          : 'border-border bg-surface-elevated text-text-secondary hover:border-accent/50'
+                    }`}
+                  >
+                    {!selectedModel?.supportsAudio ? 'No soportado' : enableAudio ? 'Activado' : 'Desactivado'}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Summary & Generate */}
+            <div className="bg-surface rounded-2xl border border-border p-6">
+              <h3 className="text-sm font-semibold text-text-primary mb-3">Resumen</h3>
+              <div className="grid grid-cols-2 gap-3 text-xs mb-4">
+                <div className="p-2.5 bg-surface-elevated rounded-lg">
+                  <span className="text-text-muted">Escenas</span>
+                  <p className="text-text-primary font-medium">{scenes.length} escenas · {scenes.length * 8}s</p>
+                </div>
+                <div className="p-2.5 bg-surface-elevated rounded-lg">
+                  <span className="text-text-muted">Modelo</span>
+                  <p className="text-text-primary font-medium">{selectedModel?.name || modelId}</p>
+                </div>
+                <div className="p-2.5 bg-surface-elevated rounded-lg">
+                  <span className="text-text-muted">Aspect Ratio</span>
+                  <p className="text-text-primary font-medium">{aspectRatio}</p>
+                </div>
+                <div className="p-2.5 bg-surface-elevated rounded-lg">
+                  <span className="text-text-muted">Audio</span>
+                  <p className="text-text-primary font-medium">{enableAudio ? 'Si' : 'No'}</p>
+                </div>
+              </div>
+              <button
+                onClick={handleStartGeneration}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-xl text-sm font-bold hover:from-violet-500 hover:to-purple-500 transition-all shadow-lg shadow-violet-500/25"
+              >
+                <Sparkles className="w-4 h-4" />
+                Generar Todos ({scenes.length} videos)
+              </button>
+            </div>
+          </div>
+        )}
+
+        {step === 'generate' && (
+          <StandaloneVideoManager
+            scenes={scenes}
+            modelId={modelId}
+            aspectRatio={aspectRatio}
+            enableAudio={enableAudio}
+            onBack={() => setStep('configure')}
+          />
+        )}
+      </div>
+    </div>
+  )
+}
