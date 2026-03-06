@@ -345,6 +345,40 @@ Donde es posible, cascade completa multi-proveedor via servicios centralizados.
       - Hover overlay: favorito, share (PublisherModal), download, delete
       - Lightbox: share, favorito, download, delete — mismas acciones que InfluencerBoard
       - stopPropagation en botones hover para no disparar lightbox al clickear accion
+      - Seleccion de videos: boton "Editar videos" activa modo seleccion
+        - Solo se pueden seleccionar items con content_type='video' y video_url
+        - Imagenes se atenuan con overlay "Solo videos" en modo seleccion
+        - Barra flotante inferior muestra count + boton "Enviar al Editor"
+        - onSendToEditor prop: envia clips seleccionados al VideoEditor
+
+    Pizarra de Contenido (InfluencerBoard.tsx):
+      - Misma funcionalidad de seleccion de videos que InfluencerSummary
+      - Boton "Editar videos" en barra de filtros junto a "Crear Foto" y "Crear Video"
+      - onSendToEditor prop: envia clips seleccionados al VideoEditor
+
+    Video Editor (VideoEditor.tsx — components/studio/video-prompt/):
+      - Layout estilo CapCut/NLE: preview arriba, panel audio derecha, timeline abajo
+      - Props: { initialClips: {url, label}[], onBack: ()=>void, onExported?: (url)=>void }
+      - Preview: <video> element reproduce clips en secuencia (clipTimeMap computed)
+        - Play/pause, seek global, progress bar que cubre todos los clips
+        - object-contain con fondo negro (respeta aspect ratio sin recortar — videos verticales ok)
+      - Timeline horizontal: bloques proporcionales a duracion del clip
+        - Click en bloque → selecciona clip (border highlight)
+        - Trim handles: drag bordes izq/der para ajustar startTime/endTime (min 1s)
+        - Playhead: linea blanca vertical que se mueve durante reproduccion
+        - Zoom: slider 1x-5x para ver clips en detalle
+      - Audio panel (derecha): upload musica (MP3/WAV/M4A via Supabase Storage)
+        - Sliders volumen voz (0-200%) y musica (0-200%)
+      - Toolbar: mover clips, cortar/split en playhead, borrar clip
+      - Split/cut: divide clip en posicion del playhead en dos clips (mismo URL, diferente startTime/endTime)
+      - Export: POST /api/studio/video-editor/process → poll /api/studio/video-editor/status?jobId=
+        - Overlay fijo con resultado: player, descargar, copiar URL
+      - Navegacion: InfluencerWizard maneja vista 'editor', volver regresa a vista anterior
+
+    InfluencerWizard.tsx — Flujo de vistas:
+      - Views: 'list' | 'wizard' | 'summary' | 'board' | 'editor'
+      - handleSendToEditor: recibe clips de Summary/Board → navega a vista 'editor'
+      - Estado: editorClips (clips para VideoEditor), editorReturnView (vista a la que volver)
 
     ANTI-PATRON: Rutas que usan generateImage() sin env var fallbacks → cascade solo intenta 1 provider.
     Todas las rutas de imagen DEBEN tener fallback a env vars (ver generate-content como referencia).
