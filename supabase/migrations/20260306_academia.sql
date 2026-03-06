@@ -108,3 +108,63 @@ CREATE POLICY "Users can create community videos"
 CREATE POLICY "Users can delete own community videos"
   ON academia_community FOR DELETE
   USING (auth.uid() = user_id);
+
+-- ============================================
+-- Seed: Cursos iniciales (Dropshipping con IA)
+-- ============================================
+DO $$
+DECLARE
+  admin_id UUID;
+BEGIN
+  SELECT id INTO admin_id FROM auth.users WHERE email = 'trucosecomydrop@gmail.com' LIMIT 1;
+
+  IF admin_id IS NOT NULL THEN
+    -- Modulo 1: Crea tus Cuentas de TikTok
+    INSERT INTO academia_courses (user_id, title, description, thumbnail_url, category, is_published, sort_order)
+    VALUES (
+      admin_id,
+      'Crea tus Cuentas de TikTok',
+      'Aprende a crear y configurar tus cuentas de TikTok para vender con dropshipping. Configura tu perfil, optimiza tu bio y prepara todo para empezar a generar contenido.',
+      '/academia/modulo-1.jpg',
+      'marketing',
+      true,
+      1
+    );
+
+    -- Modulo 2: Creativos
+    INSERT INTO academia_courses (user_id, title, description, thumbnail_url, category, is_published, sort_order)
+    VALUES (
+      admin_id,
+      'Creativos',
+      'Domina la creacion de contenido creativo para tus productos. Videos, imagenes y estrategias de contenido que convierten usando inteligencia artificial.',
+      '/academia/modulo-2.jpg',
+      'marketing',
+      true,
+      2
+    );
+
+    -- Modulo 3: Busqueda de Productos
+    INSERT INTO academia_courses (user_id, title, description, thumbnail_url, category, is_published, sort_order)
+    VALUES (
+      admin_id,
+      'Busqueda de Productos',
+      'Encuentra productos ganadores con tecnicas avanzadas de investigacion. Aprende a validar productos, analizar competencia y encontrar nichos rentables.',
+      '/academia/modulo-3.jpg',
+      'dropshipping',
+      true,
+      3
+    );
+
+    -- Modulo 4: De 0 a 100 Ventas
+    INSERT INTO academia_courses (user_id, title, description, thumbnail_url, category, is_published, sort_order)
+    VALUES (
+      admin_id,
+      'De 0 a 100 Ventas',
+      'Estrategias probadas para escalar tu negocio de dropshipping desde cero hasta tus primeras 100 ventas. Publicidad, optimizacion y escalamiento.',
+      '/academia/modulo-4.jpg',
+      'ecommerce',
+      true,
+      4
+    );
+  END IF;
+END $$;
