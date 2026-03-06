@@ -3,8 +3,7 @@
 import { useState } from 'react'
 import { CheckCircle2, Send, AlertCircle, ArrowRight, Shield, Users, Zap } from 'lucide-react'
 
-// CAMBIAR ESTO por el ID del video de YouTube (la parte despues de v=)
-const YOUTUBE_VIDEO_ID = 'TU_VIDEO_ID_AQUI'
+const YOUTUBE_VIDEO_ID = 'nEHrlt4qZig'
 
 const PAISES = [
   'Colombia',
