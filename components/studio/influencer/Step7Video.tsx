@@ -1433,7 +1433,7 @@ export function Step7Video({
             influencerId={selectedInfluencerId}
             influencerName={selectedInfluencerName}
             promptDescriptor={resolvedDescriptor}
-            realisticImageUrl={selectedInfluencerImage}
+            realisticImageUrl={startImageUrl || selectedInfluencerImage}
             onFillVeoPrompt={(prompt, _index) => {
               setVideoModelId('veo-3.1' as any)
               setPrompt(prompt)
@@ -1463,7 +1463,7 @@ export function Step7Video({
           scenes={scriptScenes}
           influencerId={selectedInfluencerId}
           influencerName={selectedInfluencerName}
-          realisticImageUrl={selectedInfluencerImage}
+          realisticImageUrl={startImageUrl || selectedInfluencerImage}
           aspectRatio={aspectRatio}
           onComplete={() => {
             setShowParallelManager(false)
