@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { ArrowLeft, X, Upload, Music, Download, Copy, Loader2, Play, Pause, Film, Trash2, ChevronLeft, ChevronRight, Scissors, Volume2, ZoomIn, ZoomOut, SplitSquareHorizontal } from 'lucide-react'
+import { ArrowLeft, X, Upload, Music, Download, Copy, Loader2, Play, Pause, Film, Trash2, ChevronLeft, ChevronRight, Scissors, Volume2, ZoomIn, ZoomOut, Undo2, Redo2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { createClient } from '@/lib/supabase/client'
 
@@ -19,6 +19,8 @@ interface ClipState {
   duration: number
 }
 
+const MAX_HISTORY = 50
+
 export function VideoEditor({ initialClips, onBack, onExported }: VideoEditorProps) {
   const [clips, setClips] = useState<ClipState[]>([])
   const [isPlaying, setIsPlaying] = useState(false)
@@ -27,7 +29,7 @@ export function VideoEditor({ initialClips, onBack, onExported }: VideoEditorPro
   const [selectedClipIndex, setSelectedClipIndex] = useState<number | null>(null)
   const [isDraggingTrim, setIsDraggingTrim] = useState<'start' | 'end' | null>(null)
   const [showTrimPanel, setShowTrimPanel] = useState(false)
-  const [timelineZoom, setTimelineZoom] = useState(1) // 1 = fit all, >1 = zoomed
+  const [timelineZoom, setTimelineZoom] = useState(1)
   const [musicFile, setMusicFile] = useState<File | null>(null)
   const [musicUrl, setMusicUrl] = useState<string | null>(null)
   const [voiceVolume, setVoiceVolume] = useState(100)
@@ -38,6 +40,11 @@ export function VideoEditor({ initialClips, onBack, onExported }: VideoEditorPro
   const [exportedVideoUrl, setExportedVideoUrl] = useState<string | null>(null)
   const [showExportOverlay, setShowExportOverlay] = useState(false)
 
+  // Undo/Redo history
+  const [history, setHistory] = useState<ClipState[][]>([])
+  const [historyIndex, setHistoryIndex] = useState(-1)
+  const isUndoRedoRef = useRef(false)
+
   const videoRef = useRef<HTMLVideoElement>(null)
   const audioRef = useRef<HTMLAudioElement>(null)
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -45,6 +52,52 @@ export function VideoEditor({ initialClips, onBack, onExported }: VideoEditorPro
   const timelineScrollRef = useRef<HTMLDivElement>(null)
   const isTransitioningRef = useRef(false)
   const musicObjectUrlRef = useRef<string | null>(null)
+
+  // Push state to history whenever clips change (except during undo/redo)
+  useEffect(() => {
+    if (clips.length === 0) return
+    if (isUndoRedoRef.current) { isUndoRedoRef.current = false; return }
+    setHistory(prev => {
+      const newHistory = prev.slice(0, historyIndex + 1)
+      newHistory.push(clips)
+      if (newHistory.length > MAX_HISTORY) newHistory.shift()
+      return newHistory
+    })
+    setHistoryIndex(prev => Math.min(prev + 1, MAX_HISTORY - 1))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clips])
+
+  const canUndo = historyIndex > 0
+  const canRedo = historyIndex < history.length - 1
+
+  const undo = useCallback(() => {
+    if (!canUndo) return
+    isUndoRedoRef.current = true
+    const newIndex = historyIndex - 1
+    setHistoryIndex(newIndex)
+    setClips(history[newIndex])
+    toast('Deshacer', { icon: '↩️', duration: 1000 })
+  }, [canUndo, historyIndex, history])
+
+  const redo = useCallback(() => {
+    if (!canRedo) return
+    isUndoRedoRef.current = true
+    const newIndex = historyIndex + 1
+    setHistoryIndex(newIndex)
+    setClips(history[newIndex])
+    toast('Rehacer', { icon: '↪️', duration: 1000 })
+  }, [canRedo, historyIndex, history])
+
+  // Keyboard shortcuts: Ctrl+Z = undo, Ctrl+Shift+Z / Ctrl+Y = redo
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo() }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && e.shiftKey) { e.preventDefault(); redo() }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'y') { e.preventDefault(); redo() }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [undo, redo])
 
   // Load clip durations
   useEffect(() => {
@@ -166,7 +219,7 @@ export function VideoEditor({ initialClips, onBack, onExported }: VideoEditorPro
   }
 
   const removeClip = (index: number) => {
-    if (clips.length <= 1) return
+    if (clips.length <= 1) { toast.error('No puedes eliminar el unico clip'); return }
     setClips((prev) => prev.filter((_, i) => i !== index))
     if (selectedClipIndex === index) setSelectedClipIndex(null)
     if (activeClipIndex >= index && activeClipIndex > 0) setActiveClipIndex((prev) => prev - 1)
@@ -179,25 +232,25 @@ export function VideoEditor({ initialClips, onBack, onExported }: VideoEditorPro
     setSelectedClipIndex(newIndex)
   }
 
-  // Split clip at playhead position
+  // Split clip at playhead — simple like CapCut: position playhead, click scissors
   const splitAtPlayhead = useCallback(() => {
     if (clips.length === 0) return
-    // Find which clip the playhead is in
     for (let i = 0; i < clipTimeMap.length; i++) {
       const map = clipTimeMap[i]
-      if (globalTime > map.globalStart + 0.5 && globalTime < map.globalEnd - 0.5) {
+      // Minimum 0.1s from edges (very permissive)
+      if (globalTime > map.globalStart + 0.1 && globalTime < map.globalEnd - 0.1) {
         const clip = clips[i]
         const localSplitTime = clip.startTime + (globalTime - map.globalStart)
-        // Create two clips from one
-        const clipA: ClipState = { ...clip, endTime: Math.round(localSplitTime * 10) / 10 }
-        const clipB: ClipState = { ...clip, startTime: Math.round(localSplitTime * 10) / 10, label: clip.label + ' (B)' }
+        const splitPoint = Math.round(localSplitTime * 100) / 100
+        const clipA: ClipState = { ...clip, endTime: splitPoint, label: clip.label }
+        const clipB: ClipState = { ...clip, startTime: splitPoint, label: clip.label + ' (B)' }
         setClips(prev => [...prev.slice(0, i), clipA, clipB, ...prev.slice(i + 1)])
-        setSelectedClipIndex(i)
-        toast.success('Clip dividido')
+        setSelectedClipIndex(i + 1)
+        toast.success(`Clip dividido en ${formatTime(splitPoint)}`)
         return
       }
     }
-    toast.error('Posiciona el playhead dentro de un clip para cortar')
+    toast.error('Mueve el playhead al punto donde quieres cortar')
   }, [clips, clipTimeMap, globalTime])
 
   const handleMusicUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -213,7 +266,6 @@ export function VideoEditor({ initialClips, onBack, onExported }: VideoEditorPro
     }
   }
 
-  // Timeline click → seek (accounts for zoom + scroll)
   const handleTimelineClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!timelineRef.current || isDraggingTrim) return
     const rect = timelineRef.current.getBoundingClientRect()
@@ -324,42 +376,53 @@ export function VideoEditor({ initialClips, onBack, onExported }: VideoEditorPro
   }
 
   return (
-    <div className="flex flex-col h-full max-w-6xl mx-auto">
+    <div className="flex flex-col h-full max-w-6xl mx-auto overflow-hidden">
       {/* Header bar */}
-      <div className="flex items-center justify-between px-4 py-2 bg-surface border-b border-border flex-shrink-0 rounded-t-2xl">
+      <div className="flex items-center justify-between px-4 py-1.5 bg-surface border-b border-border flex-shrink-0 rounded-t-2xl">
         <div className="flex items-center gap-3">
-          <button onClick={onBack} className="flex items-center gap-1.5 px-3 py-1.5 hover:bg-border/50 rounded-lg transition-colors text-text-secondary hover:text-text-primary">
+          <button onClick={onBack} className="flex items-center gap-1.5 px-3 py-1 hover:bg-border/50 rounded-lg transition-colors text-text-secondary hover:text-text-primary">
             <ArrowLeft className="w-4 h-4" />
             <span className="text-xs font-medium">Volver</span>
           </button>
-          <div className="w-px h-5 bg-border" />
+          <div className="w-px h-4 bg-border" />
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-md flex items-center justify-center bg-gradient-to-br from-pink-500 to-rose-500">
+            <div className="w-5 h-5 rounded flex items-center justify-center bg-gradient-to-br from-pink-500 to-rose-500">
               <Film className="w-3 h-3 text-white" />
             </div>
             <span className="text-sm font-semibold text-text-primary">Editor</span>
             <span className="text-[10px] text-text-muted">{clips.length} clips · {formatTime(totalDuration)}</span>
           </div>
         </div>
-        <button
-          onClick={handleExport}
-          disabled={clips.length === 0 || isExporting}
-          className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-            isExporting ? 'bg-border text-text-muted cursor-not-allowed' : 'bg-gradient-to-r from-pink-600 to-rose-600 text-white hover:from-pink-500 hover:to-rose-500 shadow-lg shadow-pink-500/20'
-          }`}
-        >
-          {isExporting ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />{exportProgress}</> : <><Film className="w-3.5 h-3.5" />Exportar</>}
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Undo/Redo buttons */}
+          <div className="flex items-center gap-0.5">
+            <button onClick={undo} disabled={!canUndo} className="p-1.5 hover:bg-border/50 rounded-lg disabled:opacity-20 transition-colors" title="Deshacer (Ctrl+Z)">
+              <Undo2 className="w-4 h-4 text-text-secondary" />
+            </button>
+            <button onClick={redo} disabled={!canRedo} className="p-1.5 hover:bg-border/50 rounded-lg disabled:opacity-20 transition-colors" title="Rehacer (Ctrl+Shift+Z)">
+              <Redo2 className="w-4 h-4 text-text-secondary" />
+            </button>
+          </div>
+          <button
+            onClick={handleExport}
+            disabled={clips.length === 0 || isExporting}
+            className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              isExporting ? 'bg-border text-text-muted cursor-not-allowed' : 'bg-gradient-to-r from-pink-600 to-rose-600 text-white hover:from-pink-500 hover:to-rose-500 shadow-lg shadow-pink-500/20'
+            }`}
+          >
+            {isExporting ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />{exportProgress}</> : <><Film className="w-3.5 h-3.5" />Exportar</>}
+          </button>
+        </div>
       </div>
 
-      {/* Main area: Preview + Audio panel */}
-      <div className="flex flex-1 min-h-0 bg-black">
-        {/* Preview: video always fully visible with black bars */}
-        <div className="flex-1 flex flex-col">
-          <div className="flex-1 flex items-center justify-center bg-black relative min-h-0 p-2">
+      {/* Main area: Preview + Audio — capped height so timeline always shows */}
+      <div className="flex bg-black flex-shrink-0" style={{ height: 'min(45vh, 360px)' }}>
+        {/* Preview: video compact */}
+        <div className="flex-1 flex flex-col min-w-0">
+          <div className="flex-1 flex items-center justify-center bg-black relative min-h-0 p-1">
             <video
               ref={videoRef}
-              className="max-h-full max-w-full object-contain"
+              className="max-h-full max-w-full object-contain rounded"
               style={{ background: '#000' }}
               playsInline
               onTimeUpdate={onVideoTimeUpdate}
@@ -368,41 +431,41 @@ export function VideoEditor({ initialClips, onBack, onExported }: VideoEditorPro
             />
             {!isPlaying && (
               <button onClick={togglePlay} className="absolute inset-0 flex items-center justify-center group">
-                <div className="w-14 h-14 rounded-full bg-black/50 flex items-center justify-center group-hover:bg-black/70 transition-colors backdrop-blur-sm border border-white/10">
-                  <Play className="w-6 h-6 text-white ml-0.5" />
+                <div className="w-12 h-12 rounded-full bg-black/50 flex items-center justify-center group-hover:bg-black/70 transition-colors backdrop-blur-sm border border-white/10">
+                  <Play className="w-5 h-5 text-white ml-0.5" />
                 </div>
               </button>
             )}
           </div>
-          {/* Mini progress bar under video */}
-          <div className="px-3 pb-1.5 pt-1 flex items-center gap-2 bg-black flex-shrink-0">
-            <button onClick={togglePlay} className="p-1 hover:bg-white/10 rounded transition-colors">
-              {isPlaying ? <Pause className="w-3.5 h-3.5 text-white" /> : <Play className="w-3.5 h-3.5 text-white ml-0.5" />}
+          {/* Mini progress bar */}
+          <div className="px-3 pb-1 pt-0.5 flex items-center gap-2 bg-black flex-shrink-0">
+            <button onClick={togglePlay} className="p-0.5 hover:bg-white/10 rounded transition-colors">
+              {isPlaying ? <Pause className="w-3 h-3 text-white" /> : <Play className="w-3 h-3 text-white ml-0.5" />}
             </button>
-            <span className="text-[10px] text-gray-500 w-9 text-right font-mono">{formatTime(globalTime)}</span>
+            <span className="text-[10px] text-gray-500 w-8 text-right font-mono">{formatTime(globalTime)}</span>
             <div className="flex-1 h-1 bg-gray-800 rounded-full cursor-pointer relative group" onClick={handleProgressClick}>
               <div className="h-full bg-gradient-to-r from-pink-500 to-rose-500 rounded-full relative" style={{ width: `${playheadPercent}%` }}>
                 <div className="absolute right-0 top-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
             </div>
-            <span className="text-[10px] text-gray-500 w-9 font-mono">{formatTime(totalDuration)}</span>
+            <span className="text-[10px] text-gray-500 w-8 font-mono">{formatTime(totalDuration)}</span>
           </div>
         </div>
 
-        {/* Audio Panel */}
-        <div className="w-56 border-l border-[#222] bg-[#111] flex flex-col flex-shrink-0">
-          <div className="px-3 py-2 border-b border-[#222]">
+        {/* Audio Panel — compact */}
+        <div className="w-52 border-l border-[#222] bg-[#111] flex flex-col flex-shrink-0">
+          <div className="px-3 py-1.5 border-b border-[#222]">
             <div className="flex items-center gap-2">
-              <Music className="w-3.5 h-3.5 text-gray-400" />
-              <span className="text-xs font-semibold text-white">Audio</span>
+              <Music className="w-3 h-3 text-gray-400" />
+              <span className="text-[11px] font-semibold text-white">Audio</span>
             </div>
           </div>
-          <div className="flex-1 overflow-y-auto p-3 space-y-3">
+          <div className="flex-1 overflow-y-auto p-2.5 space-y-2.5">
             {musicFile ? (
               <div className="space-y-2">
                 <div className="flex items-center gap-2 bg-[#1a1a1a] rounded-lg p-2">
-                  <button onClick={toggleAudioPreview} className="w-6 h-6 rounded-full bg-emerald-600 flex items-center justify-center hover:bg-emerald-500 transition-colors flex-shrink-0">
-                    {isPlayingAudio ? <Pause className="w-2.5 h-2.5 text-white" /> : <Play className="w-2.5 h-2.5 text-white ml-0.5" />}
+                  <button onClick={toggleAudioPreview} className="w-5 h-5 rounded-full bg-emerald-600 flex items-center justify-center hover:bg-emerald-500 transition-colors flex-shrink-0">
+                    {isPlayingAudio ? <Pause className="w-2 h-2 text-white" /> : <Play className="w-2 h-2 text-white ml-0.5" />}
                   </button>
                   <div className="flex-1 min-w-0">
                     <p className="text-[10px] font-medium text-white truncate">{musicFile.name}</p>
@@ -415,61 +478,61 @@ export function VideoEditor({ initialClips, onBack, onExported }: VideoEditorPro
                 {musicObjectUrlRef.current && <audio ref={audioRef} src={musicObjectUrlRef.current} onEnded={() => setIsPlayingAudio(false)} className="hidden" />}
               </div>
             ) : (
-              <label className="flex flex-col items-center justify-center h-16 border border-dashed border-[#333] hover:border-emerald-500/50 rounded-lg cursor-pointer transition-colors bg-[#1a1a1a]/50">
+              <label className="flex flex-col items-center justify-center h-14 border border-dashed border-[#333] hover:border-emerald-500/50 rounded-lg cursor-pointer transition-colors bg-[#1a1a1a]/50">
                 <input type="file" accept="audio/mp3,audio/wav,audio/m4a,audio/mpeg,audio/*" className="hidden" onChange={handleMusicUpload} />
-                <Upload className="w-4 h-4 text-gray-500 mb-0.5" />
+                <Upload className="w-3.5 h-3.5 text-gray-500 mb-0.5" />
                 <p className="text-[9px] text-gray-400 font-medium">Subir musica</p>
               </label>
             )}
-            <div className="space-y-2.5">
+            <div className="space-y-2">
               <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-[10px] font-medium text-gray-400 flex items-center gap-1"><Volume2 className="w-3 h-3" />Voz</label>
-                  <span className="text-[10px] text-gray-500 font-mono">{voiceVolume}%</span>
+                <div className="flex items-center justify-between mb-0.5">
+                  <label className="text-[10px] font-medium text-gray-400 flex items-center gap-1"><Volume2 className="w-2.5 h-2.5" />Voz</label>
+                  <span className="text-[9px] text-gray-500 font-mono">{voiceVolume}%</span>
                 </div>
                 <input type="range" min={0} max={200} value={voiceVolume} onChange={(e) => setVoiceVolume(parseInt(e.target.value))}
-                  className="w-full h-1 accent-teal-500 bg-gray-700 rounded-full appearance-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-teal-400 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer" />
+                  className="w-full h-1 accent-teal-500 bg-gray-700 rounded-full appearance-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-2.5 [&::-webkit-slider-thumb]:h-2.5 [&::-webkit-slider-thumb]:bg-teal-400 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer" />
               </div>
               <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-[10px] font-medium text-gray-400 flex items-center gap-1"><Music className="w-3 h-3" />Musica</label>
-                  <span className="text-[10px] text-gray-500 font-mono">{musicVolume}%</span>
+                <div className="flex items-center justify-between mb-0.5">
+                  <label className="text-[10px] font-medium text-gray-400 flex items-center gap-1"><Music className="w-2.5 h-2.5" />Musica</label>
+                  <span className="text-[9px] text-gray-500 font-mono">{musicVolume}%</span>
                 </div>
                 <input type="range" min={0} max={200} value={musicVolume} onChange={(e) => setMusicVolume(parseInt(e.target.value))}
-                  className="w-full h-1 accent-emerald-500 bg-gray-700 rounded-full appearance-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-emerald-400 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer" />
+                  className="w-full h-1 accent-emerald-500 bg-gray-700 rounded-full appearance-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-2.5 [&::-webkit-slider-thumb]:h-2.5 [&::-webkit-slider-thumb]:bg-emerald-400 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer" />
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ===== TIMELINE SECTION (always below video, never overlapping) ===== */}
-      <div className="bg-[#111] border-t border-[#222] flex-shrink-0 rounded-b-2xl">
-        {/* Zoom controls + toolbar */}
-        <div className="flex items-center gap-1 px-3 py-1.5 border-b border-[#1a1a1a]">
+      {/* ===== TIMELINE SECTION — fills remaining space ===== */}
+      <div className="bg-[#111] border-t-2 border-[#333] flex-1 min-h-0 flex flex-col rounded-b-2xl">
+        {/* Toolbar: zoom + cut + undo/redo + clip actions */}
+        <div className="flex items-center gap-1 px-3 py-1.5 border-b border-[#1a1a1a] flex-shrink-0">
           {/* Zoom */}
           <button onClick={() => setTimelineZoom(z => Math.max(1, z - 0.5))} className="p-1 hover:bg-white/10 rounded transition-colors" title="Alejar">
             <ZoomOut className="w-3.5 h-3.5 text-gray-400" />
           </button>
-          <div className="w-16 flex items-center">
+          <div className="w-14 flex items-center">
             <input type="range" min={1} max={5} step={0.5} value={timelineZoom} onChange={(e) => setTimelineZoom(parseFloat(e.target.value))}
               className="w-full h-0.5 accent-gray-400 bg-gray-700 rounded-full appearance-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-2 [&::-webkit-slider-thumb]:h-2 [&::-webkit-slider-thumb]:bg-gray-300 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer" />
           </div>
           <button onClick={() => setTimelineZoom(z => Math.min(5, z + 0.5))} className="p-1 hover:bg-white/10 rounded transition-colors" title="Acercar">
             <ZoomIn className="w-3.5 h-3.5 text-gray-400" />
           </button>
-          <span className="text-[9px] text-gray-600 ml-1">{timelineZoom.toFixed(1)}x</span>
+          <span className="text-[9px] text-gray-600 ml-0.5">{timelineZoom.toFixed(1)}x</span>
 
-          <div className="w-px h-4 bg-[#2a2a2a] mx-2" />
+          <div className="w-px h-4 bg-[#2a2a2a] mx-1.5" />
 
-          {/* Split tool */}
+          {/* Scissors — split at playhead */}
           <button
             onClick={splitAtPlayhead}
-            className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium hover:bg-white/10 text-gray-400 transition-colors"
-            title="Cortar en la posicion del playhead"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium bg-[#1a1a1a] hover:bg-[#252525] text-orange-400 hover:text-orange-300 transition-colors border border-[#333] hover:border-orange-500/30"
+            title="Cortar clip en la posicion del playhead (posiciona la linea blanca donde quieres cortar)"
           >
             <Scissors className="w-3.5 h-3.5" />
-            Cortar
+            Cortar aqui
           </button>
 
           <div className="flex-1" />
@@ -477,7 +540,7 @@ export function VideoEditor({ initialClips, onBack, onExported }: VideoEditorPro
           {/* Selected clip actions */}
           {selectedClipIndex !== null && clips[selectedClipIndex] && (
             <div className="flex items-center gap-0.5">
-              <span className="text-[10px] text-gray-500 mr-1.5 max-w-32 truncate">
+              <span className="text-[10px] text-gray-500 mr-1.5 max-w-28 truncate">
                 {clips[selectedClipIndex].label}
               </span>
               <button onClick={() => moveClip(selectedClipIndex, -1)} disabled={selectedClipIndex === 0} className="p-1 hover:bg-white/10 rounded disabled:opacity-20 transition-colors" title="Mover izquierda">
@@ -492,16 +555,16 @@ export function VideoEditor({ initialClips, onBack, onExported }: VideoEditorPro
               >
                 Trim
               </button>
-              <button onClick={() => removeClip(selectedClipIndex)} disabled={clips.length <= 1} className="p-1 hover:bg-red-500/20 rounded disabled:opacity-20 transition-colors" title="Eliminar">
+              <button onClick={() => removeClip(selectedClipIndex)} disabled={clips.length <= 1} className="p-1 hover:bg-red-500/20 rounded disabled:opacity-20 transition-colors" title="Eliminar clip">
                 <Trash2 className="w-3 h-3 text-red-400" />
               </button>
             </div>
           )}
         </div>
 
-        {/* Scrollable timeline */}
-        <div ref={timelineScrollRef} className="overflow-x-auto">
-          <div ref={timelineRef} className="relative cursor-pointer select-none" style={{ width: `${100 * timelineZoom}%`, minWidth: '100%' }} onClick={handleTimelineClick}>
+        {/* Scrollable timeline tracks */}
+        <div ref={timelineScrollRef} className="overflow-x-auto flex-1 min-h-0">
+          <div ref={timelineRef} className="relative cursor-pointer select-none min-h-full" style={{ width: `${100 * timelineZoom}%`, minWidth: '100%' }} onClick={handleTimelineClick}>
             {/* Video track */}
             <div className="flex h-14 gap-[2px] px-2 pt-2">
               {clips.map((clip, i) => {
@@ -560,7 +623,7 @@ export function VideoEditor({ initialClips, onBack, onExported }: VideoEditorPro
 
         {/* Trim sliders panel */}
         {showTrimPanel && selectedClipIndex !== null && clips[selectedClipIndex] && (
-          <div className="px-3 pb-2 pt-1.5 border-t border-[#1a1a1a] space-y-1">
+          <div className="px-3 pb-2 pt-1.5 border-t border-[#1a1a1a] space-y-1 flex-shrink-0">
             <div className="flex items-center gap-3">
               <label className="text-[10px] text-gray-500 w-8">Inicio</label>
               <input type="range" min={0} max={clips[selectedClipIndex].duration} step={0.1} value={clips[selectedClipIndex].startTime}
