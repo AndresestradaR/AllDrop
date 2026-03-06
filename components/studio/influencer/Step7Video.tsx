@@ -16,6 +16,8 @@ interface Step7VideoProps {
   promptDescriptor: string
   realisticImageUrl: string
   onBack: () => void
+  onSendToEditor?: (clips: { url: string; label: string }[]) => void
+  onGoToBoard?: () => void
 }
 
 interface MultiPromptScene {
@@ -35,6 +37,8 @@ export function Step7Video({
   promptDescriptor,
   realisticImageUrl,
   onBack,
+  onSendToEditor,
+  onGoToBoard,
 }: Step7VideoProps) {
   console.log('[Step7Video] Props received:', { promptDescriptor: promptDescriptor?.substring(0, 30), influencerId, realisticImageUrl: !!realisticImageUrl })
 
@@ -1475,6 +1479,8 @@ export function Step7Video({
             setShowParallelManager(false)
             refreshGallery()
           }}
+          onSendToEditor={onSendToEditor}
+          onGoToBoard={onGoToBoard}
         />
       )}
 

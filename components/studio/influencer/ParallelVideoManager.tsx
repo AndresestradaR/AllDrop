@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Loader2, Check, X, RefreshCw, Film } from 'lucide-react'
+import { Loader2, Check, X, RefreshCw, Film, Scissors, LayoutGrid } from 'lucide-react'
 import toast from 'react-hot-toast'
 import type { SceneData } from './SceneScriptGenerator'
 
@@ -24,6 +24,8 @@ interface ParallelVideoManagerProps {
   modelId: string
   onComplete: () => void
   onClose: () => void
+  onSendToEditor?: (clips: { url: string; label: string }[]) => void
+  onGoToBoard?: () => void
 }
 
 const MAX_CONCURRENT = 3
@@ -39,6 +41,8 @@ export function ParallelVideoManager({
   modelId,
   onComplete,
   onClose,
+  onSendToEditor,
+  onGoToBoard,
 }: ParallelVideoManagerProps) {
   const [sceneStates, setSceneStates] = useState<Map<number, SceneState>>(() => {
     const map = new Map<number, SceneState>()
@@ -306,13 +310,46 @@ export function ParallelVideoManager({
         })}
       </div>
 
-      {/* Close button */}
-      <button
-        onClick={onClose}
-        className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2 bg-[#222] text-[#e5e5e5] rounded-xl text-xs font-medium hover:bg-[#333] border border-[#333] transition-colors"
-      >
-        Cerrar
-      </button>
+      {/* Action buttons */}
+      <div className="mt-4 flex flex-col gap-2">
+        {completedCount > 0 && (
+          <div className="flex gap-2">
+            {onSendToEditor && (
+              <button
+                onClick={() => {
+                  const clips: { url: string; label: string }[] = []
+                  scenes.forEach((scene, i) => {
+                    const state = sceneStates.get(i)
+                    if (state?.status === 'completed' && state.videoUrl) {
+                      clips.push({ url: state.videoUrl, label: `Escena ${scene.sceneNumber}` })
+                    }
+                  })
+                  if (clips.length > 0) onSendToEditor(clips)
+                }}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-teal-600 hover:bg-teal-500 text-white rounded-xl text-xs font-bold transition-colors"
+              >
+                <Scissors className="w-3.5 h-3.5" />
+                Enviar al Editor ({completedCount})
+              </button>
+            )}
+            {onGoToBoard && (
+              <button
+                onClick={onGoToBoard}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-[#222] hover:bg-[#333] text-[#e5e5e5] rounded-xl text-xs font-bold border border-[#333] transition-colors"
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+                Ir a Pizarra
+              </button>
+            )}
+          </div>
+        )}
+        <button
+          onClick={onClose}
+          className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-[#222] text-[#999] rounded-xl text-xs font-medium hover:bg-[#333] border border-[#333] transition-colors"
+        >
+          Cerrar
+        </button>
+      </div>
     </div>
   )
 }

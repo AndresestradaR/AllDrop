@@ -563,6 +563,8 @@ export function InfluencerWizard({ onBack }: { onBack: () => void }) {
               promptDescriptor={activeInfluencer.prompt_descriptor || ''}
               realisticImageUrl={activeInfluencer.realistic_image_url || ''}
               onBack={() => setView('summary')}
+              onSendToEditor={(clips) => handleSendToEditor(clips, 'wizard')}
+              onGoToBoard={() => setView('board')}
             />
           )}
         </div>
