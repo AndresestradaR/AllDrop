@@ -1465,6 +1465,7 @@ export function Step7Video({
           influencerName={selectedInfluencerName}
           realisticImageUrl={startImageUrl || selectedInfluencerImage}
           aspectRatio={aspectRatio}
+          modelId={videoModelId}
           onComplete={() => {
             setShowParallelManager(false)
             setScriptScenes(null)

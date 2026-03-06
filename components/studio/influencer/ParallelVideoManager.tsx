@@ -21,6 +21,7 @@ interface ParallelVideoManagerProps {
   influencerName: string
   realisticImageUrl: string
   aspectRatio: '9:16' | '16:9' | '1:1'
+  modelId: string
   onComplete: () => void
   onClose: () => void
 }
@@ -35,6 +36,7 @@ export function ParallelVideoManager({
   influencerName,
   realisticImageUrl,
   aspectRatio,
+  modelId,
   onComplete,
   onClose,
 }: ParallelVideoManagerProps) {
@@ -73,7 +75,7 @@ export function ParallelVideoManager({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          modelId: 'veo-3.1',
+          modelId,
           prompt: scene.veoPrompt,
           duration: 8,
           aspectRatio,
@@ -102,7 +104,7 @@ export function ParallelVideoManager({
     } finally {
       activeCountRef.current--
     }
-  }, [aspectRatio, realisticImageUrl, updateScene])
+  }, [aspectRatio, realisticImageUrl, modelId, updateScene])
 
   const pollScene = async (index: number, taskId: string, scene: SceneData) => {
     let pollCount = 0
