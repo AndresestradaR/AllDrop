@@ -180,20 +180,22 @@ export function ParallelVideoManager({
     updateScene(index, { status: 'pending', taskId: null, videoUrl: null, error: null, pollCount: 0 })
   }
 
+  const allDoneNotifiedRef = useRef(false)
+
   // Queue processor: starts pending scenes respecting concurrency limit
   useEffect(() => {
     if (startedRef.current && activeCountRef.current === 0) {
-      // Check if all done
+      // Check if all done — show toast once but DON'T auto-close (let user use buttons)
       const states = Array.from(sceneStates.values())
       const allDone = states.every(s => s.status === 'completed' || s.status === 'error')
-      if (allDone) {
-        const completedCount = states.filter(s => s.status === 'completed').length
-        if (completedCount === states.length) {
-          toast.success(`${completedCount} videos generados!`)
+      if (allDone && !allDoneNotifiedRef.current) {
+        allDoneNotifiedRef.current = true
+        const done = states.filter(s => s.status === 'completed').length
+        if (done === states.length) {
+          toast.success(`${done} videos generados!`)
         } else {
-          toast.success(`${completedCount}/${states.length} videos completados`)
+          toast.success(`${done}/${states.length} videos completados`)
         }
-        onComplete()
         return
       }
     }
@@ -213,7 +215,7 @@ export function ParallelVideoManager({
         generateScene(index, scenes[index])
       })
     }
-  }, [sceneStates, scenes, generateScene, onComplete])
+  }, [sceneStates, scenes, generateScene])
 
   const completedCount = Array.from(sceneStates.values()).filter(s => s.status === 'completed').length
   const totalCount = scenes.length
@@ -344,7 +346,7 @@ export function ParallelVideoManager({
           </div>
         )}
         <button
-          onClick={onClose}
+          onClick={() => { onComplete(); onClose() }}
           className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-[#222] text-[#999] rounded-xl text-xs font-medium hover:bg-[#333] border border-[#333] transition-colors"
         >
           Cerrar
