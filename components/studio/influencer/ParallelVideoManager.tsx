@@ -79,7 +79,7 @@ export function ParallelVideoManager({
           aspectRatio,
           enableAudio: true,
           resolution: '720p',
-          veoSeed: Math.floor(Math.random() * 1000000),
+          imageUrl: realisticImageUrl,
         }),
       })
 
@@ -102,7 +102,7 @@ export function ParallelVideoManager({
     } finally {
       activeCountRef.current--
     }
-  }, [aspectRatio, updateScene])
+  }, [aspectRatio, realisticImageUrl, updateScene])
 
   const pollScene = async (index: number, taskId: string, scene: SceneData) => {
     let pollCount = 0
