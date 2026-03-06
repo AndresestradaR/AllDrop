@@ -5,9 +5,7 @@ import { CheckCircle2, Copy, Mail, AlertCircle, Shield, Users, Zap, X, MessageCi
 
 const YOUTUBE_VIDEO_ID = 'nEHrlt4qZig'
 
-// CAMBIAR por tu numero de WhatsApp con codigo de pais (sin + ni espacios)
-const WHATSAPP_NUMBER = '573XXXXXXXXX'
-const WHATSAPP_MESSAGE = 'Hola Andres! Ya envie el correo a Dropi para el cambio de comunidad a EstrategasIA. Adjunto pantallazo.'
+const WHATSAPP_LINK = 'https://wa.link/foyivm'
 
 const PAISES = [
   'Colombia', 'Mexico', 'Peru', 'Chile', 'Ecuador', 'Panama',
@@ -80,7 +78,7 @@ MOTIVO: ${form.motivo}`
     }
   }
 
-  const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(WHATSAPP_MESSAGE)}`
+  const whatsappUrl = WHATSAPP_LINK
 
   return (
     <div className="min-h-screen bg-[#0a0a0a]">
