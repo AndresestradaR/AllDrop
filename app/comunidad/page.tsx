@@ -1,25 +1,23 @@
 'use client'
 
-import { useState } from 'react'
-import { CheckCircle2, Send, AlertCircle, ArrowRight, Shield, Users, Zap } from 'lucide-react'
+import { useState, useRef } from 'react'
+import { CheckCircle2, Copy, Mail, AlertCircle, Shield, Users, Zap, X, MessageCircle } from 'lucide-react'
 
 const YOUTUBE_VIDEO_ID = 'nEHrlt4qZig'
 
+// CAMBIAR por tu numero de WhatsApp con codigo de pais (sin + ni espacios)
+const WHATSAPP_NUMBER = '573XXXXXXXXX'
+const WHATSAPP_MESSAGE = 'Hola Andres! Ya envie el correo a Dropi para el cambio de comunidad a EstrategasIA. Adjunto pantallazo.'
+
 const PAISES = [
-  'Colombia',
-  'Mexico',
-  'Peru',
-  'Chile',
-  'Ecuador',
-  'Panama',
-  'Costa Rica',
-  'Republica Dominicana',
-  'Guatemala',
-  'Bolivia',
-  'Otro',
+  'Colombia', 'Mexico', 'Peru', 'Chile', 'Ecuador', 'Panama',
+  'Costa Rica', 'Republica Dominicana', 'Guatemala', 'Bolivia', 'Otro',
 ]
 
+type Step = 'video' | 'form' | 'template'
+
 export default function ComunidadPage() {
+  const [step, setStep] = useState<Step>('video')
   const [form, setForm] = useState({
     nombre: '',
     correo: '',
@@ -28,12 +26,17 @@ export default function ComunidadPage() {
     comunidadDestino: 'EstrategasIA',
     motivo: '',
   })
-  const [loading, setLoading] = useState(false)
-  const [sent, setSent] = useState(false)
   const [error, setError] = useState('')
-  const [videoWatched, setVideoWatched] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const templateRef = useRef<HTMLDivElement>(null)
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleAccept = () => setStep('form')
+
+  const handleReject = () => {
+    window.location.href = 'https://estrategasia.com'
+  }
+
+  const handleGenerateTemplate = (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
 
@@ -41,79 +44,51 @@ export default function ComunidadPage() {
       setError('Todos los campos son obligatorios')
       return
     }
-
     if (!form.correo.includes('@')) {
       setError('Ingresa un correo valido (el mismo con el que estas registrado en Dropi)')
       return
     }
 
-    setLoading(true)
+    setStep('template')
+    setTimeout(() => templateRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
+  }
+
+  const templateText = `NOMBRE: ${form.nombre}
+CORREO USUARIO: ${form.correo}
+PAIS DE OPERACION: ${form.pais}
+COMUNIDAD A LA QUE PERTENECE: ${form.comunidadActual}
+COMUNIDAD A LA QUE DESEA PERTENECER: ${form.comunidadDestino}
+MOTIVO: ${form.motivo}`
+
+  const mailtoLink = `mailto:Leydi.bello@dropi.co,gabriela.marrero@dropi.co?cc=notificaciones@estrategasia.com&subject=${encodeURIComponent('ENVIO DE CORREO CAMBIO DE COMUNIDAD')}&body=${encodeURIComponent(templateText)}`
+
+  const handleCopy = async () => {
     try {
-      const res = await fetch('/api/comunidad/join', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
-      })
-
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Error al enviar')
-
-      setSent(true)
-    } catch (err: any) {
-      setError(err.message || 'Error al enviar la solicitud')
-    } finally {
-      setLoading(false)
+      await navigator.clipboard.writeText(templateText)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // Fallback
+      const textarea = document.createElement('textarea')
+      textarea.value = templateText
+      document.body.appendChild(textarea)
+      textarea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textarea)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
     }
   }
 
-  if (sent) {
-    return (
-      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center p-4">
-        <div className="max-w-lg w-full text-center">
-          <div className="w-20 h-20 rounded-full bg-teal-500/10 border-2 border-teal-500 flex items-center justify-center mx-auto mb-6">
-            <CheckCircle2 className="w-10 h-10 text-teal-400" />
-          </div>
-          <h1 className="text-3xl font-bold text-white mb-3" style={{ fontFamily: 'Outfit, sans-serif' }}>
-            Solicitud Enviada
-          </h1>
-          <p className="text-[#999] text-lg mb-8">
-            Tu correo de cambio de comunidad fue enviado automaticamente a Dropi.
-          </p>
-
-          <div className="bg-[#111] border border-[#222] rounded-2xl p-6 text-left mb-6">
-            <h3 className="text-sm font-bold text-teal-400 mb-3">Siguiente paso:</h3>
-            <ol className="space-y-3 text-[#ccc] text-sm">
-              <li className="flex gap-3">
-                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-teal-500/20 text-teal-400 text-xs font-bold flex items-center justify-center">1</span>
-                <span>Toma un <strong className="text-white">pantallazo</strong> de esta pantalla</span>
-              </li>
-              <li className="flex gap-3">
-                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-teal-500/20 text-teal-400 text-xs font-bold flex items-center justify-center">2</span>
-                <span>Envialo por <strong className="text-white">WhatsApp o Instagram</strong> a Andres</span>
-              </li>
-              <li className="flex gap-3">
-                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-teal-500/20 text-teal-400 text-xs font-bold flex items-center justify-center">3</span>
-                <span>Espera la confirmacion de tu acceso a la comunidad</span>
-              </li>
-            </ol>
-          </div>
-
-          <div className="bg-[#0d1f1a] border border-teal-500/20 rounded-xl p-4 text-sm text-teal-300/80">
-            <p><strong>Correo enviado a:</strong> Leydi.bello@dropi.co y gabriela.marrero@dropi.co</p>
-            <p className="mt-1"><strong>Copia a:</strong> notificaciones@estrategasia.com</p>
-          </div>
-        </div>
-      </div>
-    )
-  }
+  const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(WHATSAPP_MESSAGE)}`
 
   return (
     <div className="min-h-screen bg-[#0a0a0a]">
       {/* Hero */}
       <div className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-teal-500/5 via-transparent to-transparent" />
-        <div className="max-w-4xl mx-auto px-4 pt-12 pb-8 relative">
-          <div className="text-center mb-8">
+        <div className="max-w-4xl mx-auto px-4 pt-12 pb-6 relative">
+          <div className="text-center mb-6">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-teal-500/10 border border-teal-500/20 text-teal-400 text-xs font-medium mb-4">
               <Users className="w-3.5 h-3.5" />
               Comunidad EstrategasIA
@@ -122,16 +97,16 @@ export default function ComunidadPage() {
               Unete a la Comunidad
             </h1>
             <p className="text-[#999] text-base sm:text-lg max-w-2xl mx-auto">
-              Antes de solicitar tu cambio, mira el siguiente video donde explicamos
-              las <strong className="text-white">politicas y requisitos</strong> para ser parte de nuestra comunidad.
+              Mira el siguiente video donde explicamos las{' '}
+              <strong className="text-white">politicas y requisitos</strong> para ser parte de nuestra comunidad.
             </p>
           </div>
         </div>
       </div>
 
       <div className="max-w-4xl mx-auto px-4 pb-20">
-        {/* Video Section */}
-        <div className="mb-10">
+        {/* Video */}
+        <div className="mb-8">
           <div className="relative rounded-2xl overflow-hidden border border-[#222] bg-black">
             <div className="aspect-video">
               <iframe
@@ -143,27 +118,10 @@ export default function ComunidadPage() {
               />
             </div>
           </div>
-
-          {!videoWatched && (
-            <button
-              onClick={() => setVideoWatched(true)}
-              className="mt-4 w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-[#111] border border-[#333] text-[#999] hover:text-white hover:border-teal-500/40 transition-all text-sm"
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              Ya vi el video y acepto las politicas
-            </button>
-          )}
-
-          {videoWatched && (
-            <div className="mt-4 flex items-center gap-2 py-3 px-4 rounded-xl bg-teal-500/5 border border-teal-500/20 text-teal-400 text-sm">
-              <CheckCircle2 className="w-4 h-4" />
-              Politicas aceptadas — completa el formulario abajo
-            </div>
-          )}
         </div>
 
         {/* Benefits */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-10">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-8">
           {[
             { icon: Zap, title: 'Herramientas IA', desc: 'Acceso a todas las herramientas de Estrategas IA' },
             { icon: Users, title: 'Comunidad Activa', desc: 'Grupo de dropshippers LATAM compartiendo estrategias' },
@@ -171,7 +129,7 @@ export default function ComunidadPage() {
           ].map((b, i) => (
             <div key={i} className="flex gap-3 p-4 rounded-xl bg-[#111] border border-[#1a1a1a]">
               <div className="flex-shrink-0 w-9 h-9 rounded-lg bg-teal-500/10 flex items-center justify-center">
-                <b.icon className="w-4.5 h-4.5 text-teal-400" />
+                <b.icon className="w-4 h-4 text-teal-400" />
               </div>
               <div>
                 <h3 className="text-sm font-semibold text-white">{b.title}</h3>
@@ -181,24 +139,42 @@ export default function ComunidadPage() {
           ))}
         </div>
 
-        {/* Form */}
-        <div className={`transition-all duration-500 ${videoWatched ? 'opacity-100' : 'opacity-30 pointer-events-none'}`}>
-          <div className="bg-[#111] border border-[#222] rounded-2xl p-6 sm:p-8">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-xl bg-teal-500/10 flex items-center justify-center">
-                <Send className="w-5 h-5 text-teal-400" />
-              </div>
-              <div>
-                <h2 className="text-lg font-bold text-white" style={{ fontFamily: 'Outfit, sans-serif' }}>
-                  Solicitud de Cambio
-                </h2>
-                <p className="text-xs text-[#777]">
-                  Se enviara un correo automatico a Dropi con tu solicitud
-                </p>
-              </div>
+        {/* STEP: Accept/Reject buttons */}
+        {step === 'video' && (
+          <div className="flex flex-col items-center gap-4">
+            <style jsx>{`
+              @keyframes pulseGlow {
+                0%, 100% { box-shadow: 0 0 20px rgba(20, 184, 166, 0.3), 0 0 60px rgba(20, 184, 166, 0.1); transform: scale(1); }
+                50% { box-shadow: 0 0 30px rgba(20, 184, 166, 0.5), 0 0 80px rgba(20, 184, 166, 0.2); transform: scale(1.02); }
+              }
+            `}</style>
+            <button
+              onClick={handleAccept}
+              style={{ animation: 'pulseGlow 2s ease-in-out infinite' }}
+              className="w-full max-w-xl py-5 px-6 rounded-2xl bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-teal-400 text-white font-bold text-base sm:text-lg transition-all flex items-center justify-center gap-3"
+            >
+              <CheckCircle2 className="w-6 h-6" />
+              Acepto las politicas y quiero ser parte de la comunidad
+            </button>
+            <button
+              onClick={handleReject}
+              className="flex items-center gap-2 py-3 px-6 rounded-xl text-[#666] hover:text-[#999] text-sm transition-colors"
+            >
+              <X className="w-4 h-4" />
+              No gracias, no me interesa
+            </button>
+          </div>
+        )}
+
+        {/* STEP: Form */}
+        {step === 'form' && (
+          <div className="bg-[#111] border border-[#222] rounded-2xl p-6 sm:p-8 animate-in fade-in duration-500">
+            <div className="flex items-center gap-2 py-3 px-4 rounded-xl bg-teal-500/5 border border-teal-500/20 text-teal-400 text-sm mb-6">
+              <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+              Politicas aceptadas — completa tus datos para generar la plantilla
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleGenerateTemplate} className="space-y-4">
               <div>
                 <label className="block text-xs font-medium text-[#999] mb-1.5">Nombre completo</label>
                 <input
@@ -263,9 +239,7 @@ export default function ComunidadPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-[#999] mb-1.5">
-                  Motivo del cambio
-                </label>
+                <label className="block text-xs font-medium text-[#999] mb-1.5">Motivo del cambio</label>
                 <textarea
                   value={form.motivo}
                   onChange={e => setForm(f => ({ ...f, motivo: e.target.value }))}
@@ -284,29 +258,107 @@ export default function ComunidadPage() {
 
               <button
                 type="submit"
-                disabled={loading}
-                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-teal-400 text-white font-bold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-teal-500/20"
+                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-teal-400 text-white font-bold text-sm transition-all shadow-lg shadow-teal-500/20"
               >
-                {loading ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Enviando solicitud...
-                  </>
-                ) : (
-                  <>
-                    Enviar Solicitud a Dropi
-                    <ArrowRight className="w-4 h-4" />
-                  </>
-                )}
+                Generar Plantilla del Correo
               </button>
-
-              <p className="text-center text-[10px] text-[#555]">
-                Al enviar, se mandara un correo automatico a Dropi solicitando tu cambio de comunidad.
-                <br />Recibiras copia en notificaciones@estrategasia.com
-              </p>
             </form>
           </div>
-        </div>
+        )}
+
+        {/* STEP: Template */}
+        {step === 'template' && (
+          <div ref={templateRef} className="space-y-6 animate-in fade-in duration-500">
+            {/* Big warning */}
+            <div className="bg-amber-500/10 border-2 border-amber-500/40 rounded-2xl p-6 text-center">
+              <div className="w-14 h-14 rounded-full bg-amber-500/20 flex items-center justify-center mx-auto mb-4">
+                <AlertCircle className="w-7 h-7 text-amber-400" />
+              </div>
+              <h2 className="text-xl sm:text-2xl font-bold text-amber-400 mb-3" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                IMPORTANTE
+              </h2>
+              <p className="text-amber-200/80 text-sm sm:text-base max-w-lg mx-auto leading-relaxed">
+                Debes enviar este correo <strong className="text-white">DESDE el correo con el que te registraste en Dropi</strong>.
+                <br />Si lo envias desde otro correo, Dropi no procesara tu solicitud.
+              </p>
+            </div>
+
+            {/* Recipients */}
+            <div className="bg-[#111] border border-[#222] rounded-2xl p-5">
+              <h3 className="text-xs font-bold text-[#999] uppercase tracking-wider mb-3">Enviar a estos correos:</h3>
+              <div className="space-y-2">
+                <div className="flex items-center gap-3 py-2 px-4 rounded-xl bg-[#0a0a0a] border border-[#1a1a1a]">
+                  <Mail className="w-4 h-4 text-teal-400 flex-shrink-0" />
+                  <span className="text-white text-sm font-medium">Leydi.bello@dropi.co</span>
+                </div>
+                <div className="flex items-center gap-3 py-2 px-4 rounded-xl bg-[#0a0a0a] border border-[#1a1a1a]">
+                  <Mail className="w-4 h-4 text-teal-400 flex-shrink-0" />
+                  <span className="text-white text-sm font-medium">gabriela.marrero@dropi.co</span>
+                </div>
+                <div className="flex items-center gap-3 py-2 px-4 rounded-xl bg-[#0a0a0a] border border-[#1a1a1a]">
+                  <Mail className="w-4 h-4 text-blue-400 flex-shrink-0" />
+                  <span className="text-[#999] text-sm">CC: notificaciones@estrategasia.com</span>
+                </div>
+              </div>
+              <p className="text-xs text-[#555] mt-3">
+                Asunto: <strong className="text-[#999]">ENVIO DE CORREO CAMBIO DE COMUNIDAD</strong>
+              </p>
+            </div>
+
+            {/* Template */}
+            <div className="bg-[#111] border border-[#222] rounded-2xl p-5">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-xs font-bold text-[#999] uppercase tracking-wider">Tu plantilla lista:</h3>
+                <button
+                  onClick={handleCopy}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    copied
+                      ? 'bg-teal-500/20 text-teal-400 border border-teal-500/30'
+                      : 'bg-[#222] text-[#999] hover:text-white border border-[#333] hover:border-[#444]'
+                  }`}
+                >
+                  {copied ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copied ? 'Copiado!' : 'Copiar'}
+                </button>
+              </div>
+              <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl p-4 font-mono text-sm text-[#ccc] whitespace-pre-wrap leading-relaxed">
+                {templateText}
+              </div>
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex flex-col gap-3">
+              <a
+                href={mailtoLink}
+                className="w-full flex items-center justify-center gap-2 py-4 rounded-xl bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-teal-400 text-white font-bold text-sm transition-all shadow-lg shadow-teal-500/20"
+              >
+                <Mail className="w-5 h-5" />
+                Abrir mi correo con la plantilla lista
+              </a>
+
+              <div className="relative flex items-center justify-center my-2">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-[#222]" />
+                </div>
+                <span className="relative bg-[#0a0a0a] px-4 text-xs text-[#555]">Cuando ya hayas enviado el correo</span>
+              </div>
+
+              <a
+                href={whatsappUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full flex items-center justify-center gap-2 py-4 rounded-xl bg-[#25D366] hover:bg-[#20BD5A] text-white font-bold text-sm transition-all"
+              >
+                <MessageCircle className="w-5 h-5" />
+                Ya envie el correo — Escribir a Andres por WhatsApp
+              </a>
+
+              <p className="text-center text-[10px] text-[#555] mt-2">
+                Envia pantallazo del correo enviado para confirmar tu solicitud
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
