@@ -146,14 +146,14 @@ export async function POST(request: Request) {
 
     const genElapsed = Date.now() - startTime
     let result = await generateImage(generateRequest, apiKeys, {
-      maxTotalMs: Math.max(95000 - genElapsed, 30000),
+      maxTotalMs: Math.max(112000 - genElapsed, 30000),
     })
 
     // Poll for async providers
     if (result.success && result.status === 'processing' && result.taskId) {
       const apiKey = apiKeys[providerKeyMap[selectedProvider]]!
       const elapsedMs = Date.now() - startTime
-      const remainingMs = Math.max(100000 - elapsedMs, 30000)
+      const remainingMs = Math.max(115000 - elapsedMs, 30000)
 
       result = await pollForResult(selectedProvider, result.taskId, apiKey, {
         maxAttempts: Math.floor(remainingMs / 1000),

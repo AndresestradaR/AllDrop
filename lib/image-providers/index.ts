@@ -131,9 +131,9 @@ export function getAllProviders() {
  * If a step times out, the remaining time goes to the next step — guarantees
  * the cascade always has time to try fallbacks instead of Vercel killing the function.
  *
- * Budget split (of total ~95s):
- *   KIE:       max 40s (or 45% of budget)  — cheapest, try first
- *   fal.ai:    max 40s (or remaining - 15s) — reliable fallback
+ * Budget split (of total ~112s):
+ *   KIE:       max 75s (or 65% of budget)  — cheapest, try first (I2I needs 43-69s)
+ *   fal.ai:    max 50s (or remaining - 10s) — reliable fallback
  *   Direct API: remaining time              — most expensive, last resort
  *
  * Each model defines its own `cascade` config in types.ts:
@@ -159,7 +159,7 @@ export async function generateImage(
   const hasImages = !!(request.productImageUrls?.length || request.productImagesBase64?.length || request.templateUrl)
 
   // ── Time budget tracking ──
-  const totalBudgetMs = options?.maxTotalMs || 95000
+  const totalBudgetMs = options?.maxTotalMs || 112000
   const cascadeStart = Date.now()
   const elapsed = () => Date.now() - cascadeStart
   const remaining = () => Math.max(totalBudgetMs - elapsed(), 0)
@@ -192,11 +192,12 @@ export async function generateImage(
   }
 
   // ── Step 2: KIE — principal, mas barato ──
-  // KIE gets max 40s or 45% of remaining budget — whichever is smaller
+  // KIE gets max 75s or 65% of remaining budget — whichever is smaller
+  // I2I operations (nano-banana-2 with image_input) take 43-69s on KIE
   // withTimeout guarantees we NEVER exceed the budget even if fetch() hangs
   if (cascade?.kie && apiKeys.kie && hasTime()) {
     const kieModelId = hasImages && cascade.kie.i2i ? cascade.kie.i2i : cascade.kie.t2i
-    const kieBudget = Math.min(remaining() * 0.45, 40000)
+    const kieBudget = Math.min(remaining() * 0.65, 75000)
     const t0 = Date.now()
     console.log(`[Cascade] KIE ${kieModelId} — budget: ${Math.round(kieBudget / 1000)}s, total remaining: ${Math.round(remaining() / 1000)}s`)
     try {
@@ -234,7 +235,7 @@ export async function generateImage(
       (cascade.directApi === 'gemini' && apiKeys.gemini) ||
       (cascade.directApi === 'bfl' && apiKeys.bfl)
     )
-    const directReserve = hasDirectFallback ? 15000 : 0
+    const directReserve = hasDirectFallback ? 10000 : 0
     const falBudget = Math.max(Math.min(remaining() - directReserve, 50000), 15000)
     console.log(`[Cascade] fal.ai ${falPath} — budget: ${Math.round(falBudget / 1000)}s, images: ${falImageUrls.length}, remaining: ${Math.round(remaining() / 1000)}s`)
 

@@ -215,7 +215,7 @@ export async function POST(request: Request) {
     // Generate image
     const elapsedMs = Date.now() - startTime
     let result = await generateImage(generateRequest, apiKeys, {
-      maxTotalMs: Math.max(95000 - elapsedMs, 30000),
+      maxTotalMs: Math.max(112000 - elapsedMs, 30000),
     })
 
     // For async providers (KIE, BFL), poll for result

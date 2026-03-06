@@ -792,6 +792,10 @@ BREAKS: ALL AI features in DropPage (key resolution for every AI call)
 - **Vercel maxDuration** → funciones serverless tienen limite (120s por default en vercel.json). Toda cadena de cascada debe completar dentro de este limite. Si un paso tarda mucho, los siguientes no tienen tiempo.
 - **Vercel MIDDLEWARE_INVOCATION_TIMEOUT** → middleware.ts tiene timeout 3s para evitar esto. NO agregar logica pesada al middleware.
 
+#### Cascade I2I vs T2I
+- **`hasImages` en index.ts DEBE revisar TODAS las formas de pasar imagenes** → `productImageUrls`, `productImagesBase64`, y `templateUrl`. Si solo revisa URLs, los fallbacks de la cascada usan T2I (texto→imagen) y generan imagenes random en vez de transformar la referencia. FIX (2026-03-06): se agrego `productImagesBase64?.length` al check.
+- **Rutas que usan I2I (enhance-realism, generate-angles, etc.) SIEMPRE deben subir la imagen a Storage y generar URL publica** → sin importar el provider seleccionado. Las URLs son necesarias para KIE y fal.ai en la cascada. Si solo se generan URLs para ciertos providers, los fallbacks no reciben la imagen. REGLA: si una ruta pasa imagenes de referencia, SIEMPRE generar `productImageUrls` ademas de `productImagesBase64`.
+
 #### Patrones Generales
 - **Cambiar AI API en una ruta pero no en otras** → ej: Landing IA actualizado pero Coaching olvidado. SIEMPRE revisar impact map (Section 6) antes de cambiar cualquier servicio.
 - **Wrong client.id para Lucio WebSocket** → "missing scope" errors. DEBE ser 'openclaw-control-ui'.
