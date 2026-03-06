@@ -419,6 +419,7 @@ export function InfluencerWizard({ onBack }: { onBack: () => void }) {
       <div className="h-[calc(100vh-200px)] min-h-[600px]">
         <VideoEditor
           initialClips={editorClips}
+          influencerId={activeInfluencer?.id}
           onBack={() => {
             setEditorClips(null)
             setView(editorReturnView)
