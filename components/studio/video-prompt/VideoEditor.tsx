@@ -35,8 +35,14 @@ export function VideoEditor({ initialClips, onBack, onExported, influencerId }: 
   const [showTrimPanel, setShowTrimPanel] = useState(false)
   const [timelineZoom, setTimelineZoom] = useState(1)
   const [musicFile, setMusicFile] = useState<File | null>(null)
+  const [musicStartTime, setMusicStartTime] = useState(0)
+  const [musicEndTime, setMusicEndTime] = useState(0)
+  const [musicDuration, setMusicDuration] = useState(0)
   const [voiceVolume, setVoiceVolume] = useState(100)
   const [musicVolume, setMusicVolume] = useState(50)
+  const [isDraggingPlayhead, setIsDraggingPlayhead] = useState(false)
+  const [selectedTrack, setSelectedTrack] = useState<'video' | 'audio' | null>(null)
+  const [musicUrl, setMusicUrl] = useState<string | null>(null)
   const [isExporting, setIsExporting] = useState(false)
   const [exportProgress, setExportProgress] = useState('')
   const [exportedVideoUrl, setExportedVideoUrl] = useState<string | null>(null)
@@ -53,7 +59,7 @@ export function VideoEditor({ initialClips, onBack, onExported, influencerId }: 
   const timelineRef = useRef<HTMLDivElement>(null)
   const timelineScrollRef = useRef<HTMLDivElement>(null)
   const isTransitioningRef = useRef(false)
-  const musicObjectUrlRef = useRef<string | null>(null)
+  const prevMusicUrlRef = useRef<string | null>(null)
   const ffmpegRef = useRef<FFmpeg | null>(null)
 
   // History tracking
@@ -117,7 +123,7 @@ export function VideoEditor({ initialClips, onBack, onExported, influencerId }: 
   }, [initialClips])
 
   useEffect(() => {
-    return () => { if (musicObjectUrlRef.current) URL.revokeObjectURL(musicObjectUrlRef.current) }
+    return () => { if (prevMusicUrlRef.current) URL.revokeObjectURL(prevMusicUrlRef.current) }
   }, [])
 
   const clipTimeMap = useMemo(() => {
@@ -131,11 +137,35 @@ export function VideoEditor({ initialClips, onBack, onExported, influencerId }: 
   }, [clips])
 
   const totalDuration = useMemo(() => clips.reduce((sum, c) => sum + (c.endTime - c.startTime), 0), [clips])
+  const musicTrimmedDuration = musicEndTime - musicStartTime
+  const timelineMaxDuration = Math.max(totalDuration, musicFile ? musicTrimmedDuration : 0, 0.1)
 
-  // Music object URL
+  const timeRulerMarks = useMemo(() => {
+    const dur = timelineMaxDuration
+    let interval = 1
+    if (dur > 120) interval = 30
+    else if (dur > 60) interval = 15
+    else if (dur > 30) interval = 10
+    else if (dur > 10) interval = 5
+    else if (dur > 5) interval = 2
+    const marks: { time: number; pct: number; major: boolean }[] = []
+    for (let t = 0; t <= dur; t += interval) marks.push({ time: t, pct: (t / dur) * 100, major: true })
+    const minor = interval / 2
+    if (minor >= 0.5) for (let t = minor; t < dur; t += interval) marks.push({ time: t, pct: (t / dur) * 100, major: false })
+    return marks
+  }, [timelineMaxDuration])
+
+  // Music object URL (state-based so audio element re-renders)
   useEffect(() => {
-    if (musicObjectUrlRef.current) { URL.revokeObjectURL(musicObjectUrlRef.current); musicObjectUrlRef.current = null }
-    if (musicFile) musicObjectUrlRef.current = URL.createObjectURL(musicFile)
+    if (prevMusicUrlRef.current) URL.revokeObjectURL(prevMusicUrlRef.current)
+    if (musicFile) {
+      const url = URL.createObjectURL(musicFile)
+      setMusicUrl(url)
+      prevMusicUrlRef.current = url
+    } else {
+      setMusicUrl(null)
+      prevMusicUrlRef.current = null
+    }
   }, [musicFile])
 
   // Sync volumes to elements
@@ -184,17 +214,17 @@ export function VideoEditor({ initialClips, onBack, onExported, influencerId }: 
     } else {
       if (globalTime >= totalDuration - 0.1) {
         setActiveClipIndex(0); setGlobalTime(0); loadClip(0, clips[0].startTime)
-        if (audioRef.current) audioRef.current.currentTime = 0
+        if (audioRef.current) audioRef.current.currentTime = musicStartTime
         setTimeout(() => {
           videoRef.current?.play()
-          if (audioRef.current && musicFile) audioRef.current.play().catch(() => {})
+          if (audioRef.current && musicFile && musicTrimmedDuration > 0) audioRef.current.play().catch(() => {})
           setIsPlaying(true)
         }, 100)
       } else {
         video.play().then(() => {
           setIsPlaying(true)
-          if (audioRef.current && musicFile) {
-            audioRef.current.currentTime = globalTime
+          if (audioRef.current && musicFile && globalTime < musicTrimmedDuration) {
+            audioRef.current.currentTime = musicStartTime + globalTime
             audioRef.current.play().catch(() => {})
           }
         }).catch(() => {})
@@ -210,13 +240,13 @@ export function VideoEditor({ initialClips, onBack, onExported, influencerId }: 
       if (clamped >= map.globalStart && clamped < map.globalEnd) {
         setActiveClipIndex(i); setGlobalTime(clamped)
         loadClip(i, clips[i].startTime + (clamped - map.globalStart))
-        if (audioRef.current) audioRef.current.currentTime = clamped
+        if (audioRef.current) audioRef.current.currentTime = musicStartTime + clamped
         return
       }
     }
     const last = clips.length - 1
     setActiveClipIndex(last); setGlobalTime(totalDuration); loadClip(last, clips[last].endTime)
-  }, [clips, clipTimeMap, totalDuration, loadClip])
+  }, [clips, clipTimeMap, totalDuration, loadClip, musicStartTime])
 
   useEffect(() => {
     if (clips.length > 0 && videoRef.current && !videoRef.current.src) loadClip(0, clips[0].startTime)
@@ -241,42 +271,66 @@ export function VideoEditor({ initialClips, onBack, onExported, influencerId }: 
   }
 
   const splitAtPlayhead = useCallback(() => {
-    if (clips.length === 0) return
+    // Try splitting video clip first
     for (let i = 0; i < clipTimeMap.length; i++) {
       const map = clipTimeMap[i]
       if (globalTime > map.globalStart + 0.1 && globalTime < map.globalEnd - 0.1) {
         const clip = clips[i]
         const sp = Math.round((clip.startTime + (globalTime - map.globalStart)) * 100) / 100
         setClips(prev => [...prev.slice(0, i), { ...clip, endTime: sp }, { ...clip, startTime: sp, label: clip.label + ' (B)' }, ...prev.slice(i + 1)])
-        setSelectedClipIndex(i + 1)
+        setSelectedClipIndex(i + 1); setSelectedTrack('video')
         toast.success('Clip dividido en ' + fmtTime(sp))
         return
       }
     }
+    // Try trimming audio at playhead
+    if (musicFile && musicTrimmedDuration > 0 && globalTime > 0.5 && globalTime < musicTrimmedDuration - 0.5) {
+      setMusicEndTime(Math.round((musicStartTime + globalTime) * 10) / 10)
+      setSelectedTrack('audio')
+      toast.success('Audio recortado en ' + fmtTime(globalTime))
+      return
+    }
     toast.error('Mueve el playhead al punto donde quieres cortar')
-  }, [clips, clipTimeMap, globalTime])
+  }, [clips, clipTimeMap, globalTime, musicFile, musicStartTime, musicTrimmedDuration])
 
   const handleMusicUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file) setMusicFile(file)
+    if (!file) return
+    setMusicFile(file)
+    const audio = new Audio()
+    audio.onloadedmetadata = () => {
+      setMusicDuration(audio.duration)
+      setMusicEndTime(audio.duration)
+      setMusicStartTime(0)
+      URL.revokeObjectURL(audio.src)
+    }
+    audio.src = URL.createObjectURL(file)
+  }
+
+  const handleRemoveMusic = () => {
+    setMusicFile(null)
+    setMusicStartTime(0); setMusicEndTime(0); setMusicDuration(0)
+    audioRef.current?.pause()
+    if (selectedTrack === 'audio') setSelectedTrack(null)
   }
 
   const handleTimelineClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!timelineRef.current || isDraggingTrim) return
+    if (!timelineRef.current || isDraggingTrim || isDraggingPlayhead) return
     const rect = timelineRef.current.getBoundingClientRect()
-    seekToGlobal(((e.clientX - rect.left) / rect.width) * totalDuration)
+    const t = ((e.clientX - rect.left) / rect.width) * timelineMaxDuration
+    seekToGlobal(Math.min(t, totalDuration))
   }
 
   const handleTrimMouseDown = (ci: number, edge: 'start' | 'end', e: React.MouseEvent) => {
     e.stopPropagation(); e.preventDefault()
-    setIsDraggingTrim(edge); setSelectedClipIndex(ci)
+    setIsDraggingTrim(edge); setSelectedClipIndex(ci); setSelectedTrack('video')
     const el = timelineRef.current
     if (!el) return
     const clip = clips[ci]
     const rect = el.getBoundingClientRect()
     const w = rect.width
     const onMove = (me: MouseEvent) => {
-      const t = ((me.clientX - rect.left) / w) * totalDuration
+      const t = ((me.clientX - rect.left) / w) * timelineMaxDuration
       const map = clipTimeMap[ci]
       if (!map) return
       if (edge === 'start') {
@@ -296,6 +350,46 @@ export function VideoEditor({ initialClips, onBack, onExported, influencerId }: 
   const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect()
     seekToGlobal(((e.clientX - rect.left) / rect.width) * totalDuration)
+  }
+
+  const handlePlayheadMouseDown = (e: React.MouseEvent) => {
+    e.stopPropagation(); e.preventDefault()
+    setIsDraggingPlayhead(true)
+    const el = timelineRef.current
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    const onMove = (me: MouseEvent) => {
+      const pct = Math.max(0, Math.min(1, (me.clientX - rect.left) / rect.width))
+      const t = pct * timelineMaxDuration
+      seekToGlobal(Math.min(t, totalDuration))
+    }
+    const onUp = () => {
+      setIsDraggingPlayhead(false)
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }
+
+  const handleAudioTrimMouseDown = (edge: 'start' | 'end', e: React.MouseEvent) => {
+    e.stopPropagation(); e.preventDefault()
+    setSelectedTrack('audio'); setSelectedClipIndex(null)
+    const el = timelineRef.current
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    const onMove = (me: MouseEvent) => {
+      const t = ((me.clientX - rect.left) / rect.width) * timelineMaxDuration
+      if (edge === 'start') {
+        const ns = Math.max(0, Math.min(t, musicEndTime - 1))
+        setMusicStartTime(Math.round(ns * 10) / 10)
+      } else {
+        const ne = Math.max(musicStartTime + 1, Math.min(t, musicDuration))
+        setMusicEndTime(Math.round(ne * 10) / 10)
+      }
+    }
+    const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }
+    document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp)
   }
 
   // =================== CLIENT-SIDE EXPORT WITH FFMPEG.WASM ===================
@@ -336,11 +430,15 @@ export function VideoEditor({ initialClips, onBack, onExported, influencerId }: 
         }
       }
 
-      // Trim clips
+      // Trim clips (with re-encode fallback per clip)
       for (let i = 0; i < clips.length; i++) {
         const c = clips[i]
         setExportProgress('Cortando clip ' + (i + 1) + '...')
-        await ff.exec(['-i', 'in' + i + '.mp4', '-ss', c.startTime.toFixed(2), '-to', c.endTime.toFixed(2), '-c', 'copy', '-avoid_negative_ts', '1', 'tr' + i + '.mp4'])
+        const trimCode = await ff.exec(['-i', 'in' + i + '.mp4', '-ss', c.startTime.toFixed(2), '-to', c.endTime.toFixed(2), '-c', 'copy', '-avoid_negative_ts', '1', 'tr' + i + '.mp4'])
+        if (trimCode !== 0) {
+          // Copy trim failed — re-encode this clip
+          await ff.exec(['-i', 'in' + i + '.mp4', '-ss', c.startTime.toFixed(2), '-to', c.endTime.toFixed(2), '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '28', '-pix_fmt', 'yuv420p', '-an', '-r', '30', 'tr' + i + '.mp4'])
+        }
       }
 
       // Concat
@@ -355,7 +453,17 @@ export function VideoEditor({ initialClips, onBack, onExported, influencerId }: 
         const list = clips.map((_, i) => "file 'tr" + i + ".mp4'").join('\n')
         await ff.writeFile('list.txt', new TextEncoder().encode(list))
         const code = await ff.exec(['-f', 'concat', '-safe', '0', '-i', 'list.txt', '-c', 'copy', concatOut])
-        if (code !== 0) {
+
+        // Verify concat output — if failed or too small, re-encode all clips
+        let needsReencode = code !== 0
+        if (!needsReencode) {
+          try {
+            const check = await ff.readFile(concatOut)
+            if ((check as Uint8Array).length < 100) needsReencode = true
+          } catch { needsReencode = true }
+        }
+
+        if (needsReencode) {
           setExportProgress('Re-codificando clips...')
           for (let i = 0; i < clips.length; i++) {
             await ff.exec(['-i', 'tr' + i + '.mp4', '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '28', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k', '-ar', '44100', '-ac', '2', '-r', '30', 'enc' + i + '.mp4'])
@@ -368,22 +476,39 @@ export function VideoEditor({ initialClips, onBack, onExported, influencerId }: 
 
       // Audio mixing
       if (musicFile) {
+        setExportProgress('Procesando musica...')
+        await ff.writeFile('music_raw.mp3', await fetchFile(musicFile))
+        // Trim music if user adjusted start/end
+        if (musicStartTime > 0.1 || (musicDuration > 0 && musicEndTime < musicDuration - 0.1)) {
+          const tc = await ff.exec(['-i', 'music_raw.mp3', '-ss', musicStartTime.toFixed(2), '-to', musicEndTime.toFixed(2), '-c', 'copy', 'music.mp3'])
+          if (tc !== 0) await ff.exec(['-i', 'music_raw.mp3', '-ss', musicStartTime.toFixed(2), '-to', musicEndTime.toFixed(2), '-c:a', 'aac', '-b:a', '128k', 'music.mp3'])
+        } else {
+          const d = await ff.readFile('music_raw.mp3'); await ff.writeFile('music.mp3', d)
+        }
         setExportProgress('Mezclando musica...')
-        await ff.writeFile('music.mp3', await fetchFile(musicFile))
         const vv = (voiceVolume / 100).toFixed(2)
         const mv = (musicVolume / 100).toFixed(2)
+
+        // First try: mix video audio + music (if video has audio track)
         const mixCode = await ff.exec([
           '-i', 'joined.mp4', '-i', 'music.mp3',
           '-filter_complex', '[0:a]volume=' + vv + '[voice];[1:a]volume=' + mv + '[mus];[voice][mus]amix=inputs=2:duration=first:dropout_transition=2[aout]',
           '-map', '0:v', '-map', '[aout]', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '128k', '-shortest', 'final.mp4'
         ])
         if (mixCode !== 0) {
-          // No audio in video, just add music
-          await ff.exec([
+          // Video has no audio track — add music as only audio using filter_complex (NOT -af with -map)
+          const fallbackCode = await ff.exec([
             '-i', 'joined.mp4', '-i', 'music.mp3',
-            '-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '128k',
-            '-af', 'volume=' + mv, '-shortest', 'final.mp4'
+            '-filter_complex', '[1:a]volume=' + mv + '[mus]',
+            '-map', '0:v', '-map', '[mus]',
+            '-c:v', 'copy', '-c:a', 'aac', '-b:a', '128k', '-shortest', 'final.mp4'
           ])
+          if (fallbackCode !== 0) {
+            // Last resort: video without music
+            const d = await ff.readFile('joined.mp4')
+            await ff.writeFile('final.mp4', d)
+            toast('Video exportado sin musica (formato no compatible)', { icon: '⚠️' })
+          }
         }
       } else if (voiceVolume !== 100) {
         setExportProgress('Ajustando volumen...')
@@ -446,7 +571,7 @@ export function VideoEditor({ initialClips, onBack, onExported, influencerId }: 
         try { await ff.deleteFile('tr' + i + '.mp4') } catch {}
         try { await ff.deleteFile('enc' + i + '.mp4') } catch {}
       }
-      for (const f of ['list.txt', 'list2.txt', 'joined.mp4', 'final.mp4', 'music.mp3']) {
+      for (const f of ['list.txt', 'list2.txt', 'joined.mp4', 'final.mp4', 'music.mp3', 'music_raw.mp3']) {
         try { await ff.deleteFile(f) } catch {}
       }
     } catch (err: any) {
@@ -455,7 +580,7 @@ export function VideoEditor({ initialClips, onBack, onExported, influencerId }: 
     } finally {
       setIsExporting(false); setExportProgress('')
     }
-  }, [clips, musicFile, voiceVolume, musicVolume, influencerId, onExported, loadFFmpeg])
+  }, [clips, musicFile, musicStartTime, musicEndTime, musicDuration, voiceVolume, musicVolume, influencerId, onExported, loadFFmpeg])
 
   const handleDownload = async () => {
     if (!exportedVideoUrl) return
@@ -474,7 +599,7 @@ export function VideoEditor({ initialClips, onBack, onExported, influencerId }: 
   }
 
   const fmtTime = (s: number) => { const m = Math.floor(s / 60); const sec = Math.floor(s % 60); return m + ':' + sec.toString().padStart(2, '0') }
-  const playheadPct = totalDuration > 0 ? (globalTime / totalDuration) * 100 : 0
+  const playheadPct = timelineMaxDuration > 0 ? (globalTime / timelineMaxDuration) * 100 : 0
 
   if (clips.length === 0 && initialClips.length > 0) {
     return <div className="flex items-center justify-center h-64"><Loader2 className="w-8 h-8 text-accent animate-spin" /></div>
@@ -546,7 +671,7 @@ export function VideoEditor({ initialClips, onBack, onExported, influencerId }: 
                   <p className="text-[10px] font-medium text-white truncate">{musicFile.name}</p>
                   <p className="text-[9px] text-gray-500">{(musicFile.size / 1024 / 1024).toFixed(1)} MB</p>
                 </div>
-                <button onClick={() => { setMusicFile(null); audioRef.current?.pause() }} className="p-0.5 hover:bg-red-500/20 rounded transition-colors"><X className="w-3 h-3 text-red-400" /></button>
+                <button onClick={handleRemoveMusic} className="p-0.5 hover:bg-red-500/20 rounded transition-colors"><X className="w-3 h-3 text-red-400" /></button>
               </div>
             ) : (
               <label className="flex flex-col items-center justify-center h-14 border border-dashed border-[#333] hover:border-emerald-500/50 rounded-lg cursor-pointer transition-colors bg-[#1a1a1a]/50">
@@ -578,10 +703,11 @@ export function VideoEditor({ initialClips, onBack, onExported, influencerId }: 
       </div>
 
       {/* Hidden audio for music sync during preview */}
-      {musicObjectUrlRef.current && <audio ref={audioRef} src={musicObjectUrlRef.current} loop className="hidden" />}
+      {musicUrl && <audio ref={audioRef} src={musicUrl} loop className="hidden" />}
 
       {/* Timeline */}
       <div className="bg-[#111] border-t-2 border-[#333] flex-1 min-h-0 flex flex-col rounded-b-2xl">
+        {/* Toolbar */}
         <div className="flex items-center gap-1 px-3 py-1.5 border-b border-[#1a1a1a] flex-shrink-0">
           <button onClick={() => setTimelineZoom(z => Math.max(1, z - 0.5))} className="p-1 hover:bg-white/10 rounded transition-colors" title="Alejar"><ZoomOut className="w-3.5 h-3.5 text-gray-400" /></button>
           <div className="w-14 flex items-center">
@@ -595,7 +721,8 @@ export function VideoEditor({ initialClips, onBack, onExported, influencerId }: 
             className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium bg-[#1a1a1a] hover:bg-[#252525] text-orange-400 hover:text-orange-300 transition-colors border border-[#333] hover:border-orange-500/30"
             title="Cortar en la posicion del playhead"><Scissors className="w-3.5 h-3.5" />Cortar aqui</button>
           <div className="flex-1" />
-          {selectedClipIndex !== null && clips[selectedClipIndex] && (
+          {/* Video clip selected */}
+          {selectedClipIndex !== null && clips[selectedClipIndex] && selectedTrack !== 'audio' && (
             <div className="flex items-center gap-0.5">
               <span className="text-[10px] text-gray-500 mr-1.5 max-w-28 truncate">{clips[selectedClipIndex].label}</span>
               <button onClick={() => moveClip(selectedClipIndex, -1)} disabled={selectedClipIndex === 0} className="p-1 hover:bg-white/10 rounded disabled:opacity-20 transition-colors"><ChevronLeft className="w-3 h-3 text-gray-400" /></button>
@@ -605,22 +732,46 @@ export function VideoEditor({ initialClips, onBack, onExported, influencerId }: 
               <button onClick={() => removeClip(selectedClipIndex)} disabled={clips.length <= 1} className="p-1 hover:bg-red-500/20 rounded disabled:opacity-20 transition-colors"><Trash2 className="w-3 h-3 text-red-400" /></button>
             </div>
           )}
+          {/* Audio track selected */}
+          {selectedTrack === 'audio' && musicFile && (
+            <div className="flex items-center gap-1">
+              <Music className="w-3 h-3 text-emerald-400" />
+              <span className="text-[10px] text-emerald-300 mr-1 max-w-28 truncate">{musicFile.name}</span>
+              <span className="text-[9px] text-gray-500 font-mono">{fmtTime(musicTrimmedDuration)}</span>
+              <button onClick={() => setShowTrimPanel(!showTrimPanel)}
+                className={'flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors ' + (showTrimPanel ? 'bg-emerald-500/20 text-emerald-300' : 'hover:bg-white/10 text-gray-400')}>Trim</button>
+              <button onClick={handleRemoveMusic} className="p-1 hover:bg-red-500/20 rounded transition-colors"><Trash2 className="w-3 h-3 text-red-400" /></button>
+            </div>
+          )}
         </div>
 
+        {/* Scrollable timeline area */}
         <div ref={timelineScrollRef} className="overflow-x-auto flex-1 min-h-0">
           <div ref={timelineRef} className="relative cursor-pointer select-none min-h-full" style={{ width: (100 * timelineZoom) + '%', minWidth: '100%' }} onClick={handleTimelineClick}>
-            <div className="flex h-14 gap-[2px] px-2 pt-2">
+
+            {/* Time ruler */}
+            <div className="h-5 relative border-b border-[#222] flex-shrink-0">
+              {timeRulerMarks.map((mark, mi) => (
+                <div key={mi} className="absolute top-0" style={{ left: mark.pct + '%' }}>
+                  <div className={'w-px ' + (mark.major ? 'h-3 bg-gray-600' : 'h-2 bg-gray-800')} />
+                  {mark.major && <span className="absolute top-2.5 left-1/2 -translate-x-1/2 text-[7px] text-gray-600 font-mono whitespace-nowrap">{fmtTime(mark.time)}</span>}
+                </div>
+              ))}
+            </div>
+
+            {/* Video track */}
+            <div className="flex h-12 gap-[2px] pt-1" style={{ width: timelineMaxDuration > 0 ? ((totalDuration / timelineMaxDuration) * 100) + '%' : '100%', minWidth: clips.length * 48 }}>
               {clips.map((clip, i) => {
                 const dur = clip.endTime - clip.startTime
                 const wp = totalDuration > 0 ? (dur / totalDuration) * 100 : 0
-                const sel = selectedClipIndex === i
+                const sel = selectedClipIndex === i && selectedTrack !== 'audio'
                 const act = activeClipIndex === i
                 return (
                   <div key={i} className={'relative h-full rounded-md flex items-center justify-center overflow-hidden transition-all cursor-pointer group ' + (sel ? 'ring-2 ring-pink-500 bg-teal-600/40' : act ? 'bg-teal-600/30' : 'bg-teal-700/20 hover:bg-teal-600/25')}
                     style={{ width: wp + '%', minWidth: 48 }}
-                    onClick={e => { e.stopPropagation(); setSelectedClipIndex(i); seekToGlobal(clipTimeMap[i]?.globalStart ?? 0) }}>
+                    onClick={e => { e.stopPropagation(); setSelectedClipIndex(i); setSelectedTrack('video'); seekToGlobal(clipTimeMap[i]?.globalStart ?? 0) }}>
                     {sel && <div className="absolute left-0 top-0 bottom-0 w-2 bg-pink-500 cursor-col-resize z-10 rounded-l-md hover:bg-pink-400 transition-colors" onMouseDown={e => handleTrimMouseDown(i, 'start', e)}><div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-0.5 h-4 bg-white/60 rounded-full" /></div>}
-                    <div className="flex flex-col items-center gap-0.5 px-3">
+                    <div className="flex flex-col items-center gap-0.5 px-2">
                       <span className="text-[10px] font-semibold text-teal-200 whitespace-nowrap">{clip.label.length > 14 ? clip.label.slice(0, 14) + '...' : clip.label}</span>
                       <span className="text-[9px] text-teal-300/60 font-mono">{fmtTime(dur)}</span>
                     </div>
@@ -629,22 +780,53 @@ export function VideoEditor({ initialClips, onBack, onExported, influencerId }: 
                 )
               })}
             </div>
-            <div className="h-7 px-2 mt-0.5">
-              {musicFile ? (
-                <div className="h-full bg-emerald-700/25 rounded-md flex items-center px-3 gap-2 border border-emerald-600/20">
-                  <Music className="w-2.5 h-2.5 text-emerald-400 flex-shrink-0" /><span className="text-[9px] text-emerald-300/80 truncate">{musicFile.name}</span>
+
+            {/* Audio track */}
+            <div className="h-9 mt-1">
+              {musicFile && musicTrimmedDuration > 0 ? (
+                <div className={'relative h-full rounded-md flex items-center overflow-hidden cursor-pointer transition-all ' + (selectedTrack === 'audio' ? 'ring-2 ring-emerald-400 bg-emerald-700/35' : 'bg-emerald-700/20 hover:bg-emerald-700/30')}
+                  style={{ width: ((musicTrimmedDuration / timelineMaxDuration) * 100) + '%', minWidth: 48 }}
+                  onClick={e => { e.stopPropagation(); setSelectedTrack('audio'); setSelectedClipIndex(null) }}>
+                  {selectedTrack === 'audio' && (
+                    <div className="absolute left-0 top-0 bottom-0 w-2 bg-emerald-400 cursor-col-resize z-10 rounded-l-md hover:bg-emerald-300 transition-colors" onMouseDown={e => handleAudioTrimMouseDown('start', e)}>
+                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-0.5 h-3 bg-white/60 rounded-full" />
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 px-3 min-w-0">
+                    <Music className="w-2.5 h-2.5 text-emerald-400 flex-shrink-0" />
+                    <span className="text-[9px] text-emerald-300/80 truncate">{musicFile.name}</span>
+                    <span className="text-[8px] text-emerald-400/50 font-mono flex-shrink-0">{fmtTime(musicTrimmedDuration)}</span>
+                  </div>
+                  {selectedTrack === 'audio' && (
+                    <div className="absolute right-0 top-0 bottom-0 w-2 bg-emerald-400 cursor-col-resize z-10 rounded-r-md hover:bg-emerald-300 transition-colors" onMouseDown={e => handleAudioTrimMouseDown('end', e)}>
+                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-0.5 h-3 bg-white/60 rounded-full" />
+                    </div>
+                  )}
                 </div>
               ) : (
-                <div className="h-full rounded-md border border-dashed border-[#222] flex items-center justify-center"><span className="text-[8px] text-gray-700">Sin musica</span></div>
+                <div className="h-full rounded-md border border-dashed border-[#222] flex items-center justify-center" style={{ width: ((totalDuration / timelineMaxDuration) * 100) + '%', minWidth: 48 }}>
+                  <span className="text-[8px] text-gray-700">Sin musica</span>
+                </div>
               )}
             </div>
-            <div className="absolute top-0 bottom-0 w-0.5 bg-white pointer-events-none z-20" style={{ left: playheadPct + '%' }}>
-              <div className="absolute -top-0.5 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[4px] border-r-[4px] border-t-[5px] border-l-transparent border-r-transparent border-t-white" />
+
+            {/* Playhead — red line with draggable handle */}
+            <div className="absolute top-0 bottom-0 z-30 pointer-events-none" style={{ left: playheadPct + '%' }}>
+              {/* Draggable handle (triangle + hit area) */}
+              <div className={'absolute -top-0.5 left-1/2 -translate-x-1/2 pointer-events-auto z-40 group ' + (isDraggingPlayhead ? 'cursor-grabbing' : 'cursor-grab')}
+                onMouseDown={handlePlayheadMouseDown}>
+                <div className="w-0 h-0 border-l-[7px] border-r-[7px] border-t-[10px] border-l-transparent border-r-transparent border-t-red-500 group-hover:border-t-red-400 transition-colors" />
+                {/* Wider invisible hit area */}
+                <div className="absolute -inset-x-3 -inset-y-1.5" />
+              </div>
+              {/* Vertical line */}
+              <div className="absolute top-2.5 bottom-0 left-1/2 -translate-x-1/2 w-[2px] bg-red-500/90" />
             </div>
           </div>
         </div>
 
-        {showTrimPanel && selectedClipIndex !== null && clips[selectedClipIndex] && (
+        {/* Trim panel — video clip */}
+        {showTrimPanel && selectedClipIndex !== null && clips[selectedClipIndex] && selectedTrack !== 'audio' && (
           <div className="px-3 pb-2 pt-1.5 border-t border-[#1a1a1a] space-y-1 flex-shrink-0">
             <div className="flex items-center gap-3">
               <label className="text-[10px] text-gray-500 w-8">Inicio</label>
@@ -657,6 +839,24 @@ export function VideoEditor({ initialClips, onBack, onExported, influencerId }: 
               <input type="range" min={0} max={clips[selectedClipIndex].duration} step={0.1} value={clips[selectedClipIndex].endTime}
                 onChange={e => { const v = parseFloat(e.target.value); if (v > clips[selectedClipIndex!].startTime + 0.5) updateClip(selectedClipIndex!, { endTime: v }) }} className="flex-1 h-1 accent-teal-500" />
               <span className="text-[10px] text-gray-500 w-8 text-right font-mono">{fmtTime(clips[selectedClipIndex].endTime)}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Trim panel — audio */}
+        {showTrimPanel && selectedTrack === 'audio' && musicFile && musicDuration > 0 && (
+          <div className="px-3 pb-2 pt-1.5 border-t border-[#1a1a1a] space-y-1 flex-shrink-0">
+            <div className="flex items-center gap-3">
+              <label className="text-[10px] text-gray-500 w-8">Inicio</label>
+              <input type="range" min={0} max={musicDuration} step={0.1} value={musicStartTime}
+                onChange={e => { const v = parseFloat(e.target.value); if (v < musicEndTime - 0.5) setMusicStartTime(v) }} className="flex-1 h-1 accent-emerald-500" />
+              <span className="text-[10px] text-gray-500 w-8 text-right font-mono">{fmtTime(musicStartTime)}</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <label className="text-[10px] text-gray-500 w-8">Fin</label>
+              <input type="range" min={0} max={musicDuration} step={0.1} value={musicEndTime}
+                onChange={e => { const v = parseFloat(e.target.value); if (v > musicStartTime + 0.5) setMusicEndTime(v) }} className="flex-1 h-1 accent-emerald-500" />
+              <span className="text-[10px] text-gray-500 w-8 text-right font-mono">{fmtTime(musicEndTime)}</span>
             </div>
           </div>
         )}
