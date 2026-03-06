@@ -10,6 +10,7 @@ import {
   type ImageProviderType,
   type GenerateImageRequest,
 } from '@/lib/image-providers'
+import { generateWithGemini } from '@/lib/image-providers/gemini'
 
 export const maxDuration = 120
 
@@ -144,6 +145,10 @@ export async function POST(request: Request) {
     const productImageUrls = [publicUrl]
 
     // Generate enhanced image
+    // STRATEGY: Gemini direct FIRST — it's the only model that properly preserves
+    // identity when transforming a character into a hyperrealistic photo.
+    // KIE/nano-banana treat image_input as loose "inspiration" and generate random people.
+    // If Gemini fails, fall back to the normal cascade.
     const generateRequest: GenerateImageRequest = {
       provider: selectedProvider,
       modelId,
@@ -153,22 +158,46 @@ export async function POST(request: Request) {
       aspectRatio: '9:16',
     }
 
-    const elapsedMs = Date.now() - startTime
-    let result = await generateImage(generateRequest, apiKeys, {
-      maxTotalMs: Math.max(112000 - elapsedMs, 30000), // Fit in 120s maxDuration
-    })
+    let result: any = null
 
-    // Poll for async providers
-    if (result.success && result.status === 'processing' && result.taskId) {
-      const apiKey = apiKeys[providerKeyMap[selectedProvider]]!
+    // Step 1: Try Gemini direct (best at identity-preserving I2I)
+    if (apiKeys.gemini) {
+      const directModelId = modelConfig?.cascade?.directModelId || 'gemini-3.1-flash-image-preview'
+      console.log(`[Influencer/EnhanceRealism] Trying Gemini direct first: ${directModelId}`)
+      const t0 = Date.now()
+      try {
+        const geminiResult = await generateWithGemini(generateRequest, apiKeys.gemini, directModelId)
+        if (geminiResult.success && geminiResult.imageBase64) {
+          console.log(`[Influencer/EnhanceRealism] Gemini direct succeeded in ${((Date.now() - t0) / 1000).toFixed(1)}s`)
+          result = geminiResult
+        } else {
+          console.warn(`[Influencer/EnhanceRealism] Gemini direct failed: ${geminiResult.error}`)
+        }
+      } catch (err: any) {
+        console.warn(`[Influencer/EnhanceRealism] Gemini direct error: ${err.message}`)
+      }
+    }
+
+    // Step 2: Fall back to cascade if Gemini didn't work
+    if (!result || !result.success) {
+      console.log(`[Influencer/EnhanceRealism] Falling back to cascade`)
       const elapsedMs = Date.now() - startTime
-      const remainingMs = Math.max(115000 - elapsedMs, 30000)
-
-      result = await pollForResult(selectedProvider, result.taskId, apiKey, {
-        maxAttempts: Math.floor(remainingMs / 1000),
-        intervalMs: 1000,
-        timeoutMs: remainingMs,
+      result = await generateImage(generateRequest, apiKeys, {
+        maxTotalMs: Math.max(112000 - elapsedMs, 30000),
       })
+
+      // Poll for async providers
+      if (result.success && result.status === 'processing' && result.taskId) {
+        const apiKey = apiKeys[providerKeyMap[selectedProvider]]!
+        const elapsedMs2 = Date.now() - startTime
+        const remainingMs = Math.max(115000 - elapsedMs2, 30000)
+
+        result = await pollForResult(selectedProvider, result.taskId, apiKey, {
+          maxAttempts: Math.floor(remainingMs / 1000),
+          intervalMs: 1000,
+          timeoutMs: remainingMs,
+        })
+      }
     }
 
     if (!result.success || !result.imageBase64) {
