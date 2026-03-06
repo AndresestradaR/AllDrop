@@ -430,14 +430,28 @@ export function VideoEditor({ initialClips, onBack, onExported, influencerId }: 
         }
       }
 
-      // Trim clips (with re-encode fallback per clip)
+      // Trim clips — always re-encode for consistent codec (ffmpeg.wasm can't copy VP9/H.265)
       for (let i = 0; i < clips.length; i++) {
         const c = clips[i]
-        setExportProgress('Cortando clip ' + (i + 1) + '...')
-        const trimCode = await ff.exec(['-i', 'in' + i + '.mp4', '-ss', c.startTime.toFixed(2), '-to', c.endTime.toFixed(2), '-c', 'copy', '-avoid_negative_ts', '1', 'tr' + i + '.mp4'])
-        if (trimCode !== 0) {
-          // Copy trim failed — re-encode this clip
-          await ff.exec(['-i', 'in' + i + '.mp4', '-ss', c.startTime.toFixed(2), '-to', c.endTime.toFixed(2), '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '28', '-pix_fmt', 'yuv420p', '-an', '-r', '30', 'tr' + i + '.mp4'])
+        setExportProgress('Procesando clip ' + (i + 1) + ' de ' + clips.length + '...')
+        // Re-encode to H.264 + AAC — preserves both video and audio
+        const code = await ff.exec([
+          '-i', 'in' + i + '.mp4',
+          '-ss', c.startTime.toFixed(2), '-to', c.endTime.toFixed(2),
+          '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23', '-pix_fmt', 'yuv420p', '-r', '30',
+          '-c:a', 'aac', '-b:a', '128k', '-ar', '44100', '-ac', '2',
+          '-avoid_negative_ts', '1',
+          'tr' + i + '.mp4'
+        ])
+        if (code !== 0) {
+          // If re-encode with audio failed, try without audio (source might lack audio track)
+          await ff.exec([
+            '-i', 'in' + i + '.mp4',
+            '-ss', c.startTime.toFixed(2), '-to', c.endTime.toFixed(2),
+            '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23', '-pix_fmt', 'yuv420p', '-r', '30',
+            '-an', '-avoid_negative_ts', '1',
+            'tr' + i + '.mp4'
+          ])
         }
       }
 
@@ -532,21 +546,21 @@ export function VideoEditor({ initialClips, onBack, onExported, influencerId }: 
       const storagePath = 'editor/' + Date.now() + '_edited.mp4'
       const { error: upErr } = await supabase.storage.from('landing-images').upload(storagePath, blob, { contentType: 'video/mp4', upsert: true })
 
-      let finalUrl = localUrl
+      // Always use local blob URL for immediate playback/download (fastest, most reliable)
+      // Upload to Storage for persistence (signed URL for pizarra)
       if (!upErr) {
-        const { data: { publicUrl } } = supabase.storage.from('landing-images').getPublicUrl(storagePath)
-        finalUrl = publicUrl
-
-        // Save to pizarra
+        // Save to pizarra with signed URL
         if (influencerId) {
           setExportProgress('Guardando en la pizarra...')
+          const { data: signedData } = await supabase.storage.from('landing-images').createSignedUrl(storagePath, 86400)
+          const signedUrl = signedData?.signedUrl || localUrl
           const saveResp = await fetch('/api/studio/influencer/gallery', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               influencerId,
-              image_url: publicUrl,
-              video_url: publicUrl,
+              image_url: signedUrl,
+              video_url: signedUrl,
               content_type: 'video',
               type: 'solo',
               situation: 'Video editado con Editor',
@@ -560,9 +574,10 @@ export function VideoEditor({ initialClips, onBack, onExported, influencerId }: 
         toast.error('Video listo pero no se pudo subir a la nube')
       }
 
-      setExportedVideoUrl(finalUrl)
+      // Use local blob URL — works instantly, no CORS, no auth needed
+      setExportedVideoUrl(localUrl)
       setShowExportOverlay(true)
-      onExported?.(finalUrl)
+      onExported?.(localUrl)
       toast.success('Video exportado!')
 
       // Cleanup
