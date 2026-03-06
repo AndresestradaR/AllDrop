@@ -162,23 +162,20 @@ export async function POST(request: Request) {
         const mime = imgRes.headers.get('content-type') || 'image/jpeg'
         refImages.push({ data: base64, mimeType: mime })
 
-        // Upload to get public URL (needed for KIE-based providers)
-        const needsPublicUrls = selectedProvider === 'seedream' || (selectedProvider === 'gemini' && apiKeys.kie)
-        if (needsPublicUrls) {
-          const buffer = Buffer.from(base64, 'base64')
-          const ext = mime.includes('png') ? 'png' : 'jpg'
-          const tmpPath = `influencers/${user.id}/tmp_content_ref.${ext}`
+        // Upload to get public URL (needed for ALL cascade steps — KIE, fal.ai, etc.)
+        const refBuffer = Buffer.from(base64, 'base64')
+        const refExt = mime.includes('png') ? 'png' : 'jpg'
+        const tmpPath = `influencers/${user.id}/tmp_content_ref.${refExt}`
 
-          await supabase.storage
-            .from('landing-images')
-            .upload(tmpPath, buffer, { contentType: mime, upsert: true })
+        await supabase.storage
+          .from('landing-images')
+          .upload(tmpPath, refBuffer, { contentType: mime, upsert: true })
 
-          const { data: { publicUrl } } = supabase.storage
-            .from('landing-images')
-            .getPublicUrl(tmpPath)
+        const { data: { publicUrl } } = supabase.storage
+          .from('landing-images')
+          .getPublicUrl(tmpPath)
 
-          productImageUrls = [publicUrl]
-        }
+        productImageUrls = [publicUrl]
       }
     }
 
@@ -186,23 +183,21 @@ export async function POST(request: Request) {
     if (mode === 'with_product' && productImageBase64) {
       refImages.push({ data: productImageBase64, mimeType: productImageMimeType || 'image/jpeg' })
 
-      const needsProductUrl = selectedProvider === 'seedream' || (selectedProvider === 'gemini' && apiKeys.kie)
-      if (needsProductUrl) {
-        const buffer = Buffer.from(productImageBase64, 'base64')
-        const ext = (productImageMimeType || '').includes('png') ? 'png' : 'jpg'
-        const tmpPath = `influencers/${user.id}/tmp_product_ref.${ext}`
+      // Upload product image for ALL cascade steps
+      const prodBuffer = Buffer.from(productImageBase64, 'base64')
+      const prodExt = (productImageMimeType || '').includes('png') ? 'png' : 'jpg'
+      const prodTmpPath = `influencers/${user.id}/tmp_product_ref.${prodExt}`
 
-        await supabase.storage
-          .from('landing-images')
-          .upload(tmpPath, buffer, { contentType: productImageMimeType || 'image/jpeg', upsert: true })
+      await supabase.storage
+        .from('landing-images')
+        .upload(prodTmpPath, prodBuffer, { contentType: productImageMimeType || 'image/jpeg', upsert: true })
 
-        const { data: { publicUrl } } = supabase.storage
-          .from('landing-images')
-          .getPublicUrl(tmpPath)
+      const { data: { publicUrl: prodUrl } } = supabase.storage
+        .from('landing-images')
+        .getPublicUrl(prodTmpPath)
 
-        if (!productImageUrls) productImageUrls = []
-        productImageUrls.push(publicUrl)
-      }
+      if (!productImageUrls) productImageUrls = []
+      productImageUrls.push(prodUrl)
     }
 
     // Generate content image
@@ -253,7 +248,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Error al subir imagen' }, { status: 500 })
     }
 
-    const { data: { publicUrl } } = supabase.storage
+    const { data: { publicUrl: resultUrl } } = supabase.storage
       .from('landing-images')
       .getPublicUrl(storagePath)
 
@@ -265,7 +260,7 @@ export async function POST(request: Request) {
         .insert({
           influencer_id: influencerId,
           user_id: user.id,
-          image_url: publicUrl,
+          image_url: resultUrl,
           type: mode,
           product_name: mode === 'with_product' ? productName : null,
           product_image_url: null,
@@ -285,7 +280,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      imageUrl: publicUrl,
+      imageUrl: resultUrl,
       imageBase64: result.imageBase64,
       mimeType: result.mimeType,
       galleryId,

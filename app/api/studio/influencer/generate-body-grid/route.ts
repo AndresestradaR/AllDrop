@@ -122,24 +122,20 @@ export async function POST(request: Request) {
 
     console.log(`[Influencer/GenerateBodyGrid] User: ${user.id.substring(0, 8)}..., Model: ${modelId}`)
 
-    // Upload reference image to get public URL (needed for KIE-based providers)
-    let productImageUrls: string[] | undefined
-    const needsPublicUrls = selectedProvider === 'seedream' || (selectedProvider === 'gemini' && apiKeys.kie)
-    if (needsPublicUrls) {
-      const buffer = Buffer.from(refBase64, 'base64')
-      const ext = refMime.includes('png') ? 'png' : 'jpg'
-      const tmpPath = `influencers/${user.id}/tmp_body_ref.${ext}`
+    // Upload reference image to get public URL (needed for ALL cascade steps — KIE, fal.ai, etc.)
+    const refBuffer = Buffer.from(refBase64, 'base64')
+    const refExt = refMime.includes('png') ? 'png' : 'jpg'
+    const tmpPath = `influencers/${user.id}/tmp_body_ref.${refExt}`
 
-      await supabase.storage
-        .from('landing-images')
-        .upload(tmpPath, buffer, { contentType: refMime, upsert: true })
+    await supabase.storage
+      .from('landing-images')
+      .upload(tmpPath, refBuffer, { contentType: refMime, upsert: true })
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('landing-images')
-        .getPublicUrl(tmpPath)
+    const { data: { publicUrl } } = supabase.storage
+      .from('landing-images')
+      .getPublicUrl(tmpPath)
 
-      productImageUrls = [publicUrl]
-    }
+    const productImageUrls = [publicUrl]
 
     // Generate body grid (1:1 aspect ratio)
     const generateRequest: GenerateImageRequest = {
@@ -189,7 +185,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Error al subir imagen' }, { status: 500 })
     }
 
-    const { data: { publicUrl } } = supabase.storage
+    const { data: { publicUrl: resultUrl } } = supabase.storage
       .from('landing-images')
       .getPublicUrl(storagePath)
 
@@ -197,7 +193,7 @@ export async function POST(request: Request) {
     await supabase
       .from('influencers')
       .update({
-        body_grid_url: publicUrl,
+        body_grid_url: resultUrl,
         current_step: 5,
         updated_at: new Date().toISOString(),
       })
@@ -209,7 +205,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      imageUrl: publicUrl,
+      imageUrl: resultUrl,
       imageBase64: result.imageBase64,
       mimeType: result.mimeType,
     })
