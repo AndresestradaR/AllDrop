@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils/cn'
 import { Sparkles, Loader2, RefreshCw, Check } from 'lucide-react'
 import { IMAGE_MODELS, STUDIO_COMPANY_GROUPS, type ImageModelId } from '@/lib/image-providers/types'
@@ -42,6 +42,13 @@ export function Step4Body({
   const [gridImage, setGridImage] = useState<string | null>(null)
   const [gridUrl, setGridUrl] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  // Reset state when switching influencers
+  useEffect(() => {
+    setGridImage(null)
+    setGridUrl(null)
+    setError(null)
+  }, [influencerId])
 
   const availableModels = STUDIO_COMPANY_GROUPS.flatMap(g => g.models).filter(m => m.supportsImageInput)
 

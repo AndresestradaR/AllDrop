@@ -112,6 +112,19 @@ export function Step6Gallery({
 
   const availableModels = STUDIO_COMPANY_GROUPS.flatMap(g => g.models)
 
+  // Reset form state when switching influencers
+  useEffect(() => {
+    setMode('solo')
+    setSituation('')
+    setAspectRatio('9:16')
+    setProductName('')
+    setProductPosition('en_la_mano')
+    setProductPreview(null)
+    setProductBase64(null)
+    setError(null)
+    setSelectedImage(null)
+  }, [influencerId])
+
   // Cargar galería existente al montar
   useEffect(() => {
     const loadGallery = async () => {

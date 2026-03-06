@@ -112,6 +112,9 @@ export function InfluencerWizard({ onBack }: { onBack: () => void }) {
 
   const handleContinue = (inf: Influencer) => {
     setActiveInfluencer(inf)
+    // CRITICAL: Reset cached images to prevent bleeding between influencers
+    setBaseImageBase64(null)
+    setRealisticImageBase64(null)
     const step = inf.current_step || 1
 
     if (step >= 6) {

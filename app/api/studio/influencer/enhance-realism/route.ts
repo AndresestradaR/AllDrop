@@ -132,7 +132,7 @@ export async function POST(request: Request) {
     // ALWAYS upload so the cascade can use I2I endpoints regardless of provider
     const buffer = Buffer.from(refBase64, 'base64')
     const ext = refMime.includes('png') ? 'png' : 'jpg'
-    const tmpPath = `influencers/${user.id}/tmp_realism_ref.${ext}`
+    const tmpPath = `influencers/${user.id}/${influencerId}_tmp_realism_ref.${ext}`
 
     await supabase.storage
       .from('landing-images')
@@ -142,7 +142,8 @@ export async function POST(request: Request) {
       .from('landing-images')
       .getPublicUrl(tmpPath)
 
-    const productImageUrls = [publicUrl]
+    // Cache-bust to prevent CDN serving old image from previous generation
+    const productImageUrls = [`${publicUrl}?v=${Date.now()}`]
 
     // Generate enhanced image
     // STRATEGY: Gemini direct FIRST — it's the only model that properly preserves

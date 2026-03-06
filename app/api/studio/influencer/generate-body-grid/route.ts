@@ -125,7 +125,7 @@ export async function POST(request: Request) {
     // Upload reference image to get public URL (needed for ALL cascade steps — KIE, fal.ai, etc.)
     const refBuffer = Buffer.from(refBase64, 'base64')
     const refExt = refMime.includes('png') ? 'png' : 'jpg'
-    const tmpPath = `influencers/${user.id}/tmp_body_ref.${refExt}`
+    const tmpPath = `influencers/${user.id}/${influencerId}_tmp_body_ref.${refExt}`
 
     await supabase.storage
       .from('landing-images')
@@ -135,7 +135,8 @@ export async function POST(request: Request) {
       .from('landing-images')
       .getPublicUrl(tmpPath)
 
-    const productImageUrls = [publicUrl]
+    // Cache-bust to prevent CDN serving old image from previous influencer
+    const productImageUrls = [`${publicUrl}?v=${Date.now()}`]
 
     // Generate body grid (1:1 aspect ratio)
     const generateRequest: GenerateImageRequest = {
