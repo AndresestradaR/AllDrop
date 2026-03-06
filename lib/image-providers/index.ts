@@ -60,8 +60,8 @@ function humanizeOne(raw: string): string {
   if (l.includes('forbidden') || l.includes('403') || l.includes('permission') || l.includes('access'))
     return 'Tu cuenta no tiene permisos. Verifica la configuracion en el proveedor.'
 
-  // Safety block
-  if (l.includes('safety') || l.includes('blocked') || l.includes('harmful') || l.includes('inappropriate'))
+  // Safety block or empty response (Gemini returns 200 but no image — silent safety filter)
+  if (l.includes('safety') || l.includes('blocked') || l.includes('harmful') || l.includes('inappropriate') || l.includes('no devolvio imagen'))
     return 'La imagen fue bloqueada por filtros de seguridad. Prueba con otra plantilla o texto diferente.'
 
   // Server down
@@ -131,8 +131,9 @@ export function getAllProviders() {
  * If a step times out, the remaining time goes to the next step — guarantees
  * the cascade always has time to try fallbacks instead of Vercel killing the function.
  *
- * Budget split (of total ~112s):
- *   KIE:       max 75s (or 65% of budget)  — cheapest, try first (I2I needs 43-69s)
+ * Budget split (dynamic based on total budget):
+ *   KIE:       65% of remaining, cap = max(total*0.5, 75s) — cheapest, try first
+ *              Banner gen (250s) → up to 125s. Studio (112s) → up to 75s.
  *   fal.ai:    max 50s (or remaining - 10s) — reliable fallback
  *   Direct API: remaining time              — most expensive, last resort
  *
@@ -192,12 +193,14 @@ export async function generateImage(
   }
 
   // ── Step 2: KIE — principal, mas barato ──
-  // KIE gets max 75s or 65% of remaining budget — whichever is smaller
-  // I2I operations (nano-banana-2 with image_input) take 43-69s on KIE
+  // KIE gets 65% of remaining budget, capped relative to total budget.
+  // I2I: 43-69s processing + 5-15s image download = up to 84s.
+  // Banner gen (250s budget) → cap 120s. Studio (112s) → cap ~73s.
   // withTimeout guarantees we NEVER exceed the budget even if fetch() hangs
   if (cascade?.kie && apiKeys.kie && hasTime()) {
     const kieModelId = hasImages && cascade.kie.i2i ? cascade.kie.i2i : cascade.kie.t2i
-    const kieBudget = Math.min(remaining() * 0.65, 75000)
+    const kieCap = Math.max(totalBudgetMs * 0.5, 75000)
+    const kieBudget = Math.min(remaining() * 0.65, kieCap)
     const t0 = Date.now()
     console.log(`[Cascade] KIE ${kieModelId} — budget: ${Math.round(kieBudget / 1000)}s, total remaining: ${Math.round(remaining() / 1000)}s`)
     try {
