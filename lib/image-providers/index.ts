@@ -156,7 +156,7 @@ export async function generateImage(
   const modelConfig = IMAGE_MODELS[request.modelId]
   const prompt = request.prompt?.trim() || buildGeminiPrompt(request)
   const cascade = modelConfig?.cascade
-  const hasImages = !!(request.productImageUrls?.length || request.templateUrl)
+  const hasImages = !!(request.productImageUrls?.length || request.productImagesBase64?.length || request.templateUrl)
 
   // ── Time budget tracking ──
   const totalBudgetMs = options?.maxTotalMs || 95000

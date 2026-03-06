@@ -127,24 +127,21 @@ export async function POST(request: Request) {
 
     console.log(`[Influencer/EnhanceRealism] User: ${user.id.substring(0, 8)}..., Model: ${modelId}`)
 
-    // Upload reference image to get public URL (needed for KIE-based providers)
-    let productImageUrls: string[] | undefined
-    const needsPublicUrls = selectedProvider === 'seedream' || (selectedProvider === 'gemini' && apiKeys.kie)
-    if (needsPublicUrls) {
-      const buffer = Buffer.from(refBase64, 'base64')
-      const ext = refMime.includes('png') ? 'png' : 'jpg'
-      const tmpPath = `influencers/${user.id}/tmp_realism_ref.${ext}`
+    // Upload reference image to get public URL (needed for cascade — KIE, fal.ai, etc.)
+    // ALWAYS upload so the cascade can use I2I endpoints regardless of provider
+    const buffer = Buffer.from(refBase64, 'base64')
+    const ext = refMime.includes('png') ? 'png' : 'jpg'
+    const tmpPath = `influencers/${user.id}/tmp_realism_ref.${ext}`
 
-      await supabase.storage
-        .from('landing-images')
-        .upload(tmpPath, buffer, { contentType: refMime, upsert: true })
+    await supabase.storage
+      .from('landing-images')
+      .upload(tmpPath, buffer, { contentType: refMime, upsert: true })
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('landing-images')
-        .getPublicUrl(tmpPath)
+    const { data: { publicUrl } } = supabase.storage
+      .from('landing-images')
+      .getPublicUrl(tmpPath)
 
-      productImageUrls = [publicUrl]
-    }
+    const productImageUrls = [publicUrl]
 
     // Generate enhanced image
     const generateRequest: GenerateImageRequest = {
@@ -182,19 +179,19 @@ export async function POST(request: Request) {
     }
 
     // Upload result to storage
-    const ext = result.mimeType?.includes('png') ? 'png' : 'jpg'
-    const buffer = Buffer.from(result.imageBase64, 'base64')
-    const storagePath = `influencers/${user.id}/${Date.now()}_realistic.${ext}`
+    const resultExt = result.mimeType?.includes('png') ? 'png' : 'jpg'
+    const resultBuffer = Buffer.from(result.imageBase64, 'base64')
+    const storagePath = `influencers/${user.id}/${Date.now()}_realistic.${resultExt}`
 
     const { error: uploadError } = await supabase.storage
       .from('landing-images')
-      .upload(storagePath, buffer, { contentType: result.mimeType || 'image/png', upsert: true })
+      .upload(storagePath, resultBuffer, { contentType: result.mimeType || 'image/png', upsert: true })
 
     if (uploadError) {
       return NextResponse.json({ error: 'Error al subir imagen' }, { status: 500 })
     }
 
-    const { data: { publicUrl } } = supabase.storage
+    const { data: { publicUrl: resultUrl } } = supabase.storage
       .from('landing-images')
       .getPublicUrl(storagePath)
 
@@ -202,7 +199,7 @@ export async function POST(request: Request) {
     await supabase
       .from('influencers')
       .update({
-        realistic_image_url: publicUrl,
+        realistic_image_url: resultUrl,
         current_step: 3,
         updated_at: new Date().toISOString(),
       })
@@ -214,7 +211,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      imageUrl: publicUrl,
+      imageUrl: resultUrl,
       imageBase64: result.imageBase64,
       mimeType: result.mimeType,
     })
