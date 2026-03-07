@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Button, Input, Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui'
-import { Key, ExternalLink, Check, Loader2, Sparkles, Zap, Image as ImageIcon, PlayCircle, X, Globe, Mic, Cloud, Share2 } from 'lucide-react'
+import { Key, ExternalLink, Check, Loader2, Sparkles, Zap, Image as ImageIcon, PlayCircle, Globe, Mic, Cloud, Share2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { createClient } from '@/lib/supabase/client'
 
@@ -18,7 +18,6 @@ interface ApiKeyState {
 
 export default function SettingsPage() {
   const [isLoading, setIsLoading] = useState(true)
-  const [showVideo, setShowVideo] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
 
   // API Keys state
@@ -270,62 +269,22 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      {/* Video Tutorial Banner */}
-      <Card className="mb-6 overflow-hidden border-accent/30 bg-gradient-to-r from-accent/10 to-transparent">
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-full bg-accent/20">
-                <PlayCircle className="w-6 h-6 text-accent" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-text-primary">¿No sabes cómo obtener las API Keys?</h3>
-                <p className="text-sm text-text-secondary">Mira este tutorial de 4 minutos</p>
-              </div>
-            </div>
-            <Button
-              onClick={() => setShowVideo(true)}
-              size="sm"
-              className="shrink-0"
-            >
-              <PlayCircle className="w-4 h-4 mr-2" />
-              Ver Tutorial
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Video Modal */}
-      {showVideo && (
-        <div 
-          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
-          onClick={() => setShowVideo(false)}
-        >
-          <div 
-            className="relative w-full max-w-4xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              onClick={() => setShowVideo(false)}
-              className="absolute -top-12 right-0 p-2 text-white/70 hover:text-white transition-colors"
-            >
-              <X className="w-8 h-8" />
-            </button>
-            <div className="rounded-xl overflow-hidden shadow-2xl">
-              <iframe
-                src="https://www.youtube.com/embed/ahwMh6GpuAg?rel=0&autoplay=1"
-                title="Tutorial API Keys"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                className="w-full aspect-video bg-black"
-              />
-            </div>
-            <p className="text-center text-white/50 text-sm mt-4">
-              Click afuera o presiona la X para cerrar
-            </p>
-          </div>
+      {/* Video Tutorial Embebido */}
+      <div className="mb-6">
+        <h3 className="font-semibold text-text-primary mb-2 flex items-center gap-2">
+          <PlayCircle className="w-5 h-5 text-accent" />
+          Tutorial: Cómo obtener tus API Keys
+        </h3>
+        <div className="rounded-xl overflow-hidden border border-accent/30">
+          <iframe
+            src="https://www.youtube.com/embed/ahwMh6GpuAg?rel=0"
+            title="Tutorial API Keys"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+            className="w-full aspect-video bg-black"
+          />
         </div>
-      )}
+      </div>
 
       {/* Section: Generación de Imágenes */}
       <div className="mb-6">
