@@ -1,18 +1,27 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { CheckCircle2, Copy, Mail, AlertCircle, Shield, Users, Zap, X, MessageCircle } from 'lucide-react'
+import { CheckCircle2, Copy, Mail, AlertCircle, Shield, Users, Zap, X, MessageCircle, UserPlus, ArrowRight, Globe } from 'lucide-react'
 
 const YOUTUBE_VIDEO_ID = 'nEHrlt4qZig'
-
 const WHATSAPP_LINK = 'https://wa.link/foyivm'
+
+const DROPI_LINKS = [
+  { country: 'Colombia', flag: '\u{1F1E8}\u{1F1F4}', url: 'http://app.dropi.co/estrategas' },
+  { country: 'Mexico', flag: '\u{1F1F2}\u{1F1FD}', url: 'http://app.dropi.mx/estrategasIA' },
+  { country: 'Peru', flag: '\u{1F1F5}\u{1F1EA}', url: 'http://app.dropi.pe/estrategas' },
+  { country: 'Chile', flag: '\u{1F1E8}\u{1F1F1}', url: 'http://app.dropi.cl/estrategas' },
+  { country: 'Ecuador', flag: '\u{1F1EA}\u{1F1E8}', url: 'http://app.dropi.ec/estrategas' },
+  { country: 'Panama', flag: '\u{1F1F5}\u{1F1E6}', url: 'http://app.dropi.pa/estrategas' },
+  { country: 'Paraguay', flag: '\u{1F1F5}\u{1F1FE}', url: 'http://app.dropi.com.py/estrategas' },
+]
 
 const PAISES = [
   'Colombia', 'Mexico', 'Peru', 'Chile', 'Ecuador', 'Panama',
-  'Costa Rica', 'Republica Dominicana', 'Guatemala', 'Bolivia', 'Otro',
+  'Costa Rica', 'Republica Dominicana', 'Guatemala', 'Bolivia', 'Paraguay', 'Otro',
 ]
 
-type Step = 'video' | 'form' | 'template'
+type Step = 'video' | 'choose' | 'form' | 'template' | 'register'
 
 export default function ComunidadPage() {
   const [step, setStep] = useState<Step>('video')
@@ -28,7 +37,7 @@ export default function ComunidadPage() {
   const [copied, setCopied] = useState(false)
   const templateRef = useRef<HTMLDivElement>(null)
 
-  const handleAccept = () => setStep('form')
+  const handleAccept = () => setStep('choose')
 
   const handleReject = () => {
     window.location.href = 'https://estrategasia.com'
@@ -66,7 +75,6 @@ MOTIVO: ${form.motivo}`
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch {
-      // Fallback
       const textarea = document.createElement('textarea')
       textarea.value = templateText
       document.body.appendChild(textarea)
@@ -77,8 +85,6 @@ MOTIVO: ${form.motivo}`
       setTimeout(() => setCopied(false), 2000)
     }
   }
-
-  const whatsappUrl = WHATSAPP_LINK
 
   return (
     <div className="min-h-screen bg-[#0a0a0a]">
@@ -137,7 +143,7 @@ MOTIVO: ${form.motivo}`
           ))}
         </div>
 
-        {/* STEP: Accept/Reject buttons */}
+        {/* STEP: Accept/Reject */}
         {step === 'video' && (
           <div className="flex flex-col items-center gap-4">
             <style jsx>{`
@@ -164,12 +170,106 @@ MOTIVO: ${form.motivo}`
           </div>
         )}
 
-        {/* STEP: Form */}
+        {/* STEP: Choose — new or existing */}
+        {step === 'choose' && (
+          <div className="max-w-xl mx-auto space-y-4">
+            <div className="flex items-center gap-2 py-3 px-4 rounded-xl bg-teal-500/5 border border-teal-500/20 text-teal-400 text-sm mb-2">
+              <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+              Politicas aceptadas
+            </div>
+
+            <button
+              onClick={() => setStep('form')}
+              className="w-full flex items-center gap-4 p-5 rounded-2xl bg-[#111] border border-[#222] hover:border-teal-500/40 transition-all text-left group"
+            >
+              <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-teal-500/10 flex items-center justify-center group-hover:bg-teal-500/20 transition-colors">
+                <Users className="w-6 h-6 text-teal-400" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-white font-bold text-sm sm:text-base">Ya tengo comunidad en Dropi</h3>
+                <p className="text-[#777] text-xs mt-0.5">Quiero cambiarme a EstrategasIA</p>
+              </div>
+              <ArrowRight className="w-5 h-5 text-[#555] group-hover:text-teal-400 transition-colors" />
+            </button>
+
+            <button
+              onClick={() => setStep('register')}
+              className="w-full flex items-center gap-4 p-5 rounded-2xl bg-[#111] border border-[#222] hover:border-amber-500/40 transition-all text-left group"
+            >
+              <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center group-hover:bg-amber-500/20 transition-colors">
+                <UserPlus className="w-6 h-6 text-amber-400" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-white font-bold text-sm sm:text-base">Soy nuevo y no tengo comunidad</h3>
+                <p className="text-[#777] text-xs mt-0.5">Quiero registrarme en Dropi con EstrategasIA</p>
+              </div>
+              <ArrowRight className="w-5 h-5 text-[#555] group-hover:text-amber-400 transition-colors" />
+            </button>
+          </div>
+        )}
+
+        {/* STEP: Register — new users */}
+        {step === 'register' && (
+          <div className="max-w-xl mx-auto space-y-6">
+            <div className="bg-[#111] border border-[#222] rounded-2xl p-6 sm:p-8">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
+                  <Globe className="w-5 h-5 text-amber-400" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-white" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                    Registrate en Dropi
+                  </h2>
+                  <p className="text-xs text-[#777]">
+                    Selecciona tu pais y registrate con nuestro enlace
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                {DROPI_LINKS.map((link) => (
+                  <a
+                    key={link.country}
+                    href={link.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 py-3 px-4 rounded-xl bg-[#0a0a0a] border border-[#1a1a1a] hover:border-teal-500/30 transition-all group"
+                  >
+                    <span className="text-2xl">{link.flag}</span>
+                    <span className="flex-1 text-white text-sm font-medium">{link.country}</span>
+                    <span className="text-[10px] text-[#555] group-hover:text-teal-400 transition-colors font-mono truncate max-w-[200px]">
+                      {link.url.replace('http://', '')}
+                    </span>
+                    <ArrowRight className="w-4 h-4 text-[#555] group-hover:text-teal-400 transition-colors flex-shrink-0" />
+                  </a>
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-5 text-center">
+              <p className="text-amber-200/80 text-sm mb-1">
+                Cuando te hayas registrado en Dropi, escribele a Andres para confirmar tu ingreso a la comunidad.
+              </p>
+            </div>
+
+            <a
+              href={WHATSAPP_LINK}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full flex items-center justify-center gap-2 py-4 rounded-xl bg-[#25D366] hover:bg-[#20BD5A] text-white font-bold text-sm transition-all"
+            >
+              <MessageCircle className="w-5 h-5" />
+              Ya me registre — Escribir a Andres por WhatsApp
+            </a>
+          </div>
+        )}
+
+        {/* STEP: Form — existing users */}
         {step === 'form' && (
-          <div className="bg-[#111] border border-[#222] rounded-2xl p-6 sm:p-8 animate-in fade-in duration-500">
+          <div className="bg-[#111] border border-[#222] rounded-2xl p-6 sm:p-8">
             <div className="flex items-center gap-2 py-3 px-4 rounded-xl bg-teal-500/5 border border-teal-500/20 text-teal-400 text-sm mb-6">
               <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
-              Politicas aceptadas — completa tus datos para generar la plantilla
+              Completa tus datos para generar la plantilla del correo
             </div>
 
             <form onSubmit={handleGenerateTemplate} className="space-y-4">
@@ -266,7 +366,7 @@ MOTIVO: ${form.motivo}`
 
         {/* STEP: Template */}
         {step === 'template' && (
-          <div ref={templateRef} className="space-y-6 animate-in fade-in duration-500">
+          <div ref={templateRef} className="space-y-6">
             {/* Big warning */}
             <div className="bg-amber-500/10 border-2 border-amber-500/40 rounded-2xl p-6 text-center">
               <div className="w-14 h-14 rounded-full bg-amber-500/20 flex items-center justify-center mx-auto mb-4">
@@ -342,7 +442,7 @@ MOTIVO: ${form.motivo}`
               </div>
 
               <a
-                href={whatsappUrl}
+                href={WHATSAPP_LINK}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-full flex items-center justify-center gap-2 py-4 rounded-xl bg-[#25D366] hover:bg-[#20BD5A] text-white font-bold text-sm transition-all"
