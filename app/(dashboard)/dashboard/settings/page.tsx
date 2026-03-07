@@ -312,14 +312,13 @@ export default function SettingsPage() {
               <X className="w-8 h-8" />
             </button>
             <div className="rounded-xl overflow-hidden shadow-2xl">
-              <video
-                src="https://papfcbiswvdgalfteujm.supabase.co/storage/v1/object/public/Videos/Tutorial%20Apis%20keys%202.mp4"
-                controls
-                autoPlay
+              <iframe
+                src="https://www.youtube.com/embed/ahwMh6GpuAg?rel=0&autoplay=1"
+                title="Tutorial API Keys"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
                 className="w-full aspect-video bg-black"
-              >
-                Tu navegador no soporta videos HTML5.
-              </video>
+              />
             </div>
             <p className="text-center text-white/50 text-sm mt-4">
               Click afuera o presiona la X para cerrar
