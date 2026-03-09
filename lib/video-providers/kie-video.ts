@@ -215,7 +215,11 @@ async function generateVeoVideo(
     } else if (request.veoGenerationType === 'REFERENCE_2_VIDEO') {
       // 1-3 images for reference (only veo3_fast)
       if (kieModel !== 'veo3_fast') {
-        throw new Error('REFERENCE_2_VIDEO solo funciona con Veo 3 Fast')
+        return {
+          success: false,
+          error: 'REFERENCE_2_VIDEO solo funciona con Veo 3 Fast',
+          provider: 'kie-veo',
+        }
       }
       if (request.imageUrls && request.imageUrls.length > 0) {
         body.imageUrls = request.imageUrls.slice(0, 3)
@@ -254,16 +258,30 @@ async function generateVeoVideo(
   try {
     data = JSON.parse(responseText)
   } catch (e) {
-    throw new Error(`Invalid JSON response: ${responseText.substring(0, 200)}`)
+    return {
+      success: false,
+      error: `Invalid JSON response from KIE Veo: ${responseText.substring(0, 200)}`,
+      provider: 'kie-veo',
+    }
   }
 
   if (data.code !== 200) {
-    throw new Error(`Veo API error: ${data.msg || data.message || JSON.stringify(data)}`)
+    const errorMsg = data.msg || data.message || JSON.stringify(data)
+    console.error(`[Video/Veo] KIE error (code ${data.code}): ${errorMsg}`)
+    return {
+      success: false,
+      error: errorMsg,
+      provider: 'kie-veo',
+    }
   }
 
   const taskId = data.data?.taskId
   if (!taskId) {
-    throw new Error(`No taskId in Veo response`)
+    return {
+      success: false,
+      error: 'No taskId in Veo response',
+      provider: 'kie-veo',
+    }
   }
 
   return {
@@ -502,16 +520,30 @@ async function generateStandardVideo(
   try {
     data = JSON.parse(responseText)
   } catch (e) {
-    throw new Error(`Invalid JSON: ${responseText.substring(0, 200)}`)
+    return {
+      success: false,
+      error: `Invalid JSON response from KIE: ${responseText.substring(0, 200)}`,
+      provider: 'kie',
+    }
   }
 
   if (data.code !== 200 && data.code !== 0) {
-    throw new Error(`KIE API error: ${data.msg || data.message || JSON.stringify(data)}`)
+    const errorMsg = data.msg || data.message || JSON.stringify(data)
+    console.error(`[Video] KIE error (code ${data.code}): ${errorMsg}`)
+    return {
+      success: false,
+      error: errorMsg,
+      provider: 'kie',
+    }
   }
 
   const taskId = data.data?.taskId || data.taskId
   if (!taskId) {
-    throw new Error(`No taskId in response`)
+    return {
+      success: false,
+      error: 'No taskId in response',
+      provider: 'kie',
+    }
   }
 
   return {

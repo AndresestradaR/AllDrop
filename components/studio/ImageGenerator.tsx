@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
+import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils/cn'
 import {
   IMAGE_COMPANY_GROUPS,
@@ -24,6 +25,7 @@ import {
   X,
   Check,
   Type,
+  Trash2,
   Image as ImageLucide,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -91,6 +93,66 @@ export function ImageGenerator() {
   const styleInputRef = useRef<HTMLInputElement>(null)
   const characterInputRef = useRef<HTMLInputElement>(null)
   const uploadInputRef = useRef<HTMLInputElement>(null)
+
+  // Load previously generated images from database on mount
+  useEffect(() => {
+    const loadSavedImages = async () => {
+      try {
+        const supabase = createClient()
+        const { data } = await supabase
+          .from('generations')
+          .select('id, product_name, original_prompt, generated_image_url, created_at')
+          .like('product_name', 'Studio:%')
+          .not('generated_image_url', 'is', null)
+          .order('created_at', { ascending: false })
+          .limit(50)
+
+        if (data?.length) {
+          // Resolve image URLs: R2 URLs load directly, storage paths get signed URLs
+          const saved = await Promise.all(
+            data.map(async (gen) => {
+              let url = gen.generated_image_url
+
+              // Format: "storage:studio/userId/file.png" → create signed URL
+              if (url?.startsWith('storage:')) {
+                const path = url.replace('storage:', '')
+                const { data: signed } = await supabase.storage
+                  .from('landing-images')
+                  .createSignedUrl(path, 86400) // 24h — refreshed on each page load
+                url = signed?.signedUrl || null
+              }
+              // Legacy: old entries with full Supabase Storage URL
+              else if (url?.includes('/landing-images/') && url?.includes('supabase')) {
+                const path = url.split('/landing-images/')[1]
+                if (path) {
+                  const { data: signed } = await supabase.storage
+                    .from('landing-images')
+                    .createSignedUrl(path, 86400)
+                  if (signed?.signedUrl) url = signed.signedUrl
+                }
+              }
+              // Otherwise: R2 URL or other external URL → use directly
+
+              if (!url) return null
+              return {
+                id: gen.id,
+                url,
+                prompt: gen.original_prompt || '',
+                model: gen.product_name?.replace('Studio: ', '') || 'Unknown',
+                timestamp: new Date(gen.created_at),
+                isFavorite: false,
+                aspectRatio: '1:1' as AspectRatio,
+              }
+            })
+          )
+          setGeneratedImages(saved.filter(Boolean) as GeneratedImage[])
+        }
+      } catch (err) {
+        console.warn('[Studio] Failed to load saved images:', err)
+      }
+    }
+    loadSavedImages()
+  }, [])
 
   const currentModel = IMAGE_MODELS[selectedModel]
   
@@ -172,6 +234,8 @@ export function ImageGenerator() {
       }
 
       if (data.success && data.imageBase64) {
+        // Always use base64 for immediate display (guaranteed to work)
+        // persistedUrl is only used when loading saved images from DB on mount
         const newImage: GeneratedImage = {
           id: crypto.randomUUID(),
           url: `data:${data.mimeType || 'image/png'};base64,${data.imageBase64}`,
@@ -234,17 +298,38 @@ export function ImageGenerator() {
     toast.error('Tiempo de espera agotado')
   }
 
-  const handleDownload = (image: GeneratedImage) => {
-    const link = document.createElement('a')
-    link.href = image.url
-    link.download = `estudio-ia-${Date.now()}.png`
-    link.click()
+  const handleDownload = async (image: GeneratedImage) => {
+    try {
+      const response = await fetch(image.url)
+      const blob = await response.blob()
+      const blobUrl = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = blobUrl
+      link.download = `estudio-ia-${Date.now()}.png`
+      link.click()
+      URL.revokeObjectURL(blobUrl)
+    } catch {
+      // Fallback: open in new tab if fetch fails (e.g. CORS)
+      window.open(image.url, '_blank')
+      toast.error('No se pudo descargar directamente. Se abrio en nueva pestaña.')
+    }
   }
 
   const toggleFavorite = (id: string) => {
     setGeneratedImages((prev) =>
       prev.map((img) => (img.id === id ? { ...img, isFavorite: !img.isFavorite } : img))
     )
+  }
+
+  const handleDelete = async (image: GeneratedImage) => {
+    // Remove from UI immediately
+    setGeneratedImages((prev) => prev.filter((img) => img.id !== image.id))
+    // Delete from DB (fire-and-forget)
+    const supabase = createClient()
+    supabase.from('generations').delete().eq('id', image.id).then(({ error }) => {
+      if (error) console.warn('[Studio] Delete failed:', error.message)
+    })
+    toast.success('Imagen eliminada')
   }
 
   const handleFileSelect = (
@@ -655,7 +740,22 @@ export function ImageGenerator() {
                     src={image.url}
                     alt={image.prompt}
                     className="w-full h-full object-cover"
+                    onError={(e) => {
+                      // Hide broken images — show placeholder instead
+                      const target = e.currentTarget
+                      target.style.display = 'none'
+                      const placeholder = target.nextElementSibling as HTMLElement
+                      if (placeholder?.dataset.placeholder) placeholder.style.display = 'flex'
+                    }}
                   />
+                  <div
+                    data-placeholder="true"
+                    className="w-full h-full items-center justify-center bg-surface-elevated text-text-secondary text-xs text-center p-2"
+                    style={{ display: 'none' }}
+                  >
+                    <ImageIcon className="w-6 h-6 mb-1 opacity-50" />
+                    <span>Imagen no disponible</span>
+                  </div>
                   {/* Overlay */}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
                     <div className="absolute bottom-0 left-0 right-0 p-3">
@@ -697,6 +797,13 @@ export function ImageGenerator() {
                           title="Usar prompt"
                         >
                           <Copy className="w-4 h-4 text-white" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(image)}
+                          className="p-2 bg-red-500/70 hover:bg-red-500 rounded-lg transition-colors ml-auto"
+                          title="Eliminar"
+                        >
+                          <Trash2 className="w-4 h-4 text-white" />
                         </button>
                       </div>
                     </div>

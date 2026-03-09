@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
 import { decrypt } from '@/lib/services/encryption'
 import {
   generateImage,
@@ -214,7 +215,7 @@ export async function POST(request: Request) {
     // Generate image
     const elapsedMs = Date.now() - startTime
     let result = await generateImage(generateRequest, apiKeys, {
-      maxTotalMs: Math.max(95000 - elapsedMs, 30000),
+      maxTotalMs: Math.max(112000 - elapsedMs, 30000),
     })
 
     // For async providers (KIE, BFL), poll for result
@@ -223,7 +224,7 @@ export async function POST(request: Request) {
       console.log(`[Studio] Async task created: ${result.taskId}, polling...`)
 
       const providerKeyMap: Record<ImageProviderType, keyof typeof apiKeys> = {
-        gemini: 'gemini', openai: 'openai', seedream: 'kie', flux: 'bfl', fal: 'fal',
+        gemini: 'gemini', openai: 'openai', seedream: 'kie', flux: 'bfl',
       }
       const apiKey = apiKeys[providerKeyMap[selectedProvider]]!
       const elapsedMs = Date.now() - startTime
@@ -249,16 +250,51 @@ export async function POST(request: Request) {
 
     console.log(`[Studio] ✓ Image generated successfully in ${totalTime}s with ${selectedProvider}`)
 
-    // Try R2 upload (optional, non-blocking)
     const resultMime = result.mimeType || 'image/png'
     const ext = resultMime.includes('png') ? 'png' : resultMime.includes('webp') ? 'webp' : 'jpg'
-    const r2Url = await tryUploadToR2(
-      user.id,
-      Buffer.from(result.imageBase64, 'base64'),
-      `images/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${ext}`,
-      resultMime
-    )
+
+    // ── Persist image: R2 (primary) + Supabase Storage (guaranteed fallback) ──
+    const buffer = Buffer.from(result.imageBase64, 'base64')
+    let r2Url: string | null = null
+    let storagePath: string | null = null
+
+    // 1. Try R2 upload first (user's own Cloudflare — preferred)
+    const r2Key = `images/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${ext}`
+    r2Url = await tryUploadToR2(user.id, buffer, r2Key, resultMime)
     if (r2Url) console.log(`[Studio] ✓ Image saved to R2: ${r2Url}`)
+
+    // 2. Always upload to Supabase Storage as fallback (signed URLs always work)
+    storagePath = `studio/${user.id}/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${ext}`
+    const { error: storageErr } = await supabase.storage
+      .from('landing-images')
+      .upload(storagePath, buffer, { contentType: resultMime, upsert: true })
+
+    if (storageErr) {
+      console.warn(`[Studio] Storage upload failed:`, storageErr.message)
+      storagePath = null
+    } else {
+      console.log(`[Studio] ✓ Image saved to Storage: ${storagePath}`)
+    }
+
+    // 3. Save to generations table (non-blocking — don't fail the request)
+    // Store R2 URL if available, otherwise store storage path prefixed with "storage:"
+    // Frontend knows how to handle both: R2 URLs load directly, storage paths get signed URLs
+    const imageRef = r2Url || (storagePath ? `storage:${storagePath}` : null)
+    const serviceClient = await createServiceClient()
+    serviceClient
+      .from('generations')
+      .insert({
+        user_id: user.id,
+        product_name: `Studio: ${modelConfig.name}`,
+        original_prompt: prompt,
+        enhanced_prompt: prompt,
+        status: 'completed',
+        generated_image_url: imageRef,
+      })
+      .then(({ error: dbErr }) => {
+        if (dbErr) console.warn('[Studio] DB save failed:', dbErr.message)
+        else console.log('[Studio] ✓ Saved to generations table')
+      })
 
     // Cleanup temp images from storage (fire-and-forget)
     if (productImageUrls?.length) {

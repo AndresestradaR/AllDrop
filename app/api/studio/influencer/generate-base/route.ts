@@ -103,10 +103,17 @@ export async function POST(request: Request) {
     if (profile?.bfl_api_key) apiKeys.bfl = decrypt(profile.bfl_api_key)
     if (profile?.fal_api_key) apiKeys.fal = decrypt(profile.fal_api_key)
 
+    // Environment variable fallbacks (platform keys)
+    if (!apiKeys.openai && process.env.OPENAI_API_KEY) apiKeys.openai = process.env.OPENAI_API_KEY
+    if (!apiKeys.kie && process.env.KIE_API_KEY) apiKeys.kie = process.env.KIE_API_KEY
+    if (!apiKeys.bfl && process.env.BFL_API_KEY) apiKeys.bfl = process.env.BFL_API_KEY
+    if (!apiKeys.fal && process.env.FAL_API_KEY) apiKeys.fal = process.env.FAL_API_KEY
+    if (!apiKeys.gemini && process.env.GEMINI_API_KEY) apiKeys.gemini = process.env.GEMINI_API_KEY
+
     const selectedProvider = modelIdToProviderType(modelId)
 
     const providerKeyMap: Record<ImageProviderType, keyof typeof apiKeys> = {
-      gemini: 'gemini', openai: 'openai', seedream: 'kie', flux: 'bfl', fal: 'fal',
+      gemini: 'gemini', openai: 'openai', seedream: 'kie', flux: 'bfl',
     }
 
     // For Gemini: accept either Google key OR KIE key (KIE provides Gemini models)
@@ -116,7 +123,7 @@ export async function POST(request: Request) {
 
     if (!hasRequiredKey) {
       const keyNames: Record<ImageProviderType, string> = {
-        gemini: 'Google (Gemini) o KIE.ai', openai: 'OpenAI', seedream: 'KIE.ai', flux: 'Black Forest Labs', fal: 'fal.ai',
+        gemini: 'Google (Gemini) o KIE.ai', openai: 'OpenAI', seedream: 'KIE.ai', flux: 'Black Forest Labs',
       }
       return NextResponse.json({
         error: `Configura tu API key de ${keyNames[selectedProvider]} en Settings`,
@@ -139,14 +146,14 @@ export async function POST(request: Request) {
 
     const genElapsed = Date.now() - startTime
     let result = await generateImage(generateRequest, apiKeys, {
-      maxTotalMs: Math.max(95000 - genElapsed, 30000),
+      maxTotalMs: Math.max(112000 - genElapsed, 30000),
     })
 
     // Poll for async providers
     if (result.success && result.status === 'processing' && result.taskId) {
       const apiKey = apiKeys[providerKeyMap[selectedProvider]]!
       const elapsedMs = Date.now() - startTime
-      const remainingMs = Math.max(100000 - elapsedMs, 30000)
+      const remainingMs = Math.max(115000 - elapsedMs, 30000)
 
       result = await pollForResult(selectedProvider, result.taskId, apiKey, {
         maxAttempts: Math.floor(remainingMs / 1000),

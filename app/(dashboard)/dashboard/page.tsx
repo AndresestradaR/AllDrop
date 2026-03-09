@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { Button, Card, CardHeader, CardTitle, CardContent } from '@/components/ui'
 import { Clock, Images, Store, ArrowRight } from 'lucide-react'
+import BalanceCards from '@/components/dashboard/BalanceCards'
 
 export const dynamic = 'force-dynamic'
 
@@ -85,6 +86,9 @@ export default async function DashboardPage() {
         </CardContent>
       </Card>
 
+      {/* API Balances */}
+      <BalanceCards />
+
       {/* Recent generations */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
@@ -96,28 +100,41 @@ export default async function DashboardPage() {
         <CardContent>
           {generations && generations.length > 0 ? (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {generations.map((gen) => (
-                <div key={gen.id} className="group relative aspect-[9/16] bg-border rounded-lg overflow-hidden">
-                  {gen.generated_image_url ? (
-                    <img 
-                      src={gen.generated_image_url} 
-                      alt={gen.product_name}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <span className="text-text-secondary text-xs">
-                        {gen.status === 'processing' ? 'Procesando...' : 'Error'}
-                      </span>
-                    </div>
-                  )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
-                    <div className="absolute bottom-0 left-0 right-0 p-3">
-                      <p className="text-white text-sm font-medium truncate">{gen.product_name}</p>
+              {generations.map((gen) => {
+                const isVideo = gen.product_name?.startsWith('Video:')
+                return (
+                  <div key={gen.id} className="group relative aspect-[9/16] bg-border rounded-lg overflow-hidden">
+                    {gen.generated_image_url ? (
+                      isVideo ? (
+                        <video
+                          src={gen.generated_image_url}
+                          className="w-full h-full object-cover"
+                          muted
+                          playsInline
+                          preload="metadata"
+                        />
+                      ) : (
+                        <img
+                          src={gen.generated_image_url}
+                          alt={gen.product_name}
+                          className="w-full h-full object-cover"
+                        />
+                      )
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <span className="text-text-secondary text-xs">
+                          {gen.status === 'processing' ? 'Procesando...' : 'Error'}
+                        </span>
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                      <div className="absolute bottom-0 left-0 right-0 p-3">
+                        <p className="text-white text-sm font-medium truncate">{gen.product_name}</p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           ) : (
             <div className="text-center py-12">

@@ -16,6 +16,23 @@ import { generateViaFal, falImageToBase64 } from './fal'
 import { logAI } from '../services/ai-monitor'
 
 /**
+ * Hard timeout wrapper — guarantees a promise resolves/rejects within `ms`.
+ * Unlike soft timeouts (polling loops), this kills the step even if fetch() hangs.
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error(`${label}: tiempo agotado (${Math.round(ms / 1000)}s)`)),
+      ms
+    )
+    promise.then(
+      (val) => { clearTimeout(timer); resolve(val) },
+      (err) => { clearTimeout(timer); reject(err) }
+    )
+  })
+}
+
+/**
  * Convert raw error messages to friendly Spanish that anyone can understand.
  * No JSON, no technical jargon, no model IDs — just plain language.
  */
@@ -43,8 +60,8 @@ function humanizeOne(raw: string): string {
   if (l.includes('forbidden') || l.includes('403') || l.includes('permission') || l.includes('access'))
     return 'Tu cuenta no tiene permisos. Verifica la configuracion en el proveedor.'
 
-  // Safety block
-  if (l.includes('safety') || l.includes('blocked') || l.includes('harmful') || l.includes('inappropriate'))
+  // Safety block or empty response (Gemini returns 200 but no image — silent safety filter)
+  if (l.includes('safety') || l.includes('blocked') || l.includes('harmful') || l.includes('inappropriate') || l.includes('no devolvio imagen'))
     return 'La imagen fue bloqueada por filtros de seguridad. Prueba con otra plantilla o texto diferente.'
 
   // Server down
@@ -110,14 +127,20 @@ export function getAllProviders() {
 /**
  * Generate image with UNIVERSAL cascade driven by model config.
  *
+ * TIME-BUDGET-AWARE: each cascade step gets a portion of the total time budget.
+ * If a step times out, the remaining time goes to the next step — guarantees
+ * the cascade always has time to try fallbacks instead of Vercel killing the function.
+ *
+ * Budget split (dynamic based on total budget):
+ *   KIE:       65% of remaining, cap = max(total*0.5, 75s) — cheapest, try first
+ *              Banner gen (250s) → up to 125s. Studio (112s) → up to 75s.
+ *   fal.ai:    max 50s (or remaining - 10s) — reliable fallback
+ *   Direct API: remaining time              — most expensive, last resort
+ *
  * Each model defines its own `cascade` config in types.ts:
  *   cascade.kie   → KIE model IDs for T2I and I2I
  *   cascade.fal   → fal.ai paths for T2I and I2I
  *   cascade.directApi → final fallback ('gemini' | 'openai' | 'bfl')
- *
- * Mode detection: hasImages → I2I path, else → T2I path.
- * OpenAI: tries direct API FIRST, then cascade.
- * FLUX: same flow (flux-2-max has no KIE, skips to fal.ai → BFL direct).
  */
 export async function generateImage(
   request: GenerateImageRequest,
@@ -134,97 +157,145 @@ export async function generateImage(
   const modelConfig = IMAGE_MODELS[request.modelId]
   const prompt = request.prompt?.trim() || buildGeminiPrompt(request)
   const cascade = modelConfig?.cascade
-  const hasImages = !!(request.productImageUrls?.length || request.templateUrl)
+  const hasImages = !!(request.productImageUrls?.length || request.productImagesBase64?.length || request.templateUrl)
 
-  console.log(`[Cascade] START model=${request.modelId}, hasImages=${hasImages}, keys: kie=${!!apiKeys.kie} fal=${!!apiKeys.fal} gemini=${!!apiKeys.gemini} openai=${!!apiKeys.openai} bfl=${!!apiKeys.bfl}`)
-  console.log(`[Cascade] cascade config: kie=${!!cascade?.kie} fal=${!!cascade?.fal} directApi=${cascade?.directApi || 'none'}`)
+  // ── Time budget tracking ──
+  const totalBudgetMs = options?.maxTotalMs || 112000
+  const cascadeStart = Date.now()
+  const elapsed = () => Date.now() - cascadeStart
+  const remaining = () => Math.max(totalBudgetMs - elapsed(), 0)
+  const hasTime = (minMs: number = 8000) => remaining() > minMs
+
+  console.log(`[Cascade] START model=${request.modelId}, hasImages=${hasImages}, budget=${Math.round(totalBudgetMs / 1000)}s`)
+  console.log(`[Cascade] keys: kie=${!!apiKeys.kie} fal=${!!apiKeys.fal} gemini=${!!apiKeys.gemini} openai=${!!apiKeys.openai} bfl=${!!apiKeys.bfl}`)
+  console.log(`[Cascade] config: kie=${!!cascade?.kie} fal=${!!cascade?.fal} directApi=${cascade?.directApi || 'none'}`)
 
   // ── Step 1: OpenAI direct FIRST (solo para modelos GPT Image) ──
-  if (cascade?.directApi === 'openai' && apiKeys.openai) {
+  if (cascade?.directApi === 'openai' && apiKeys.openai && hasTime()) {
     const t0 = Date.now()
-    const result = await getProvider('openai')!.generate(request, apiKeys.openai)
-    if (result.success) {
-      logAI({ service: 'image', provider: 'openai', status: 'success', response_ms: Date.now() - t0, model: request.modelId })
-      return { ...result, usedProvider: 'openai-direct' }
+    const openAiBudget = Math.min(remaining() * 0.35, 30000)
+    try {
+      const result = await withTimeout(
+        getProvider('openai')!.generate(request, apiKeys.openai),
+        openAiBudget, 'OpenAI'
+      )
+      if (result.success) {
+        logAI({ service: 'image', provider: 'openai', status: 'success', response_ms: Date.now() - t0, model: request.modelId })
+        return { ...result, usedProvider: 'openai-direct' }
+      }
+      logAI({ service: 'image', provider: 'openai', status: 'error', response_ms: Date.now() - t0, model: request.modelId, error_message: result.error })
+      cascadeErrors.push(result.error || 'OpenAI fallo')
+    } catch (err: any) {
+      logAI({ service: 'image', provider: 'openai', status: 'error', response_ms: Date.now() - t0, model: request.modelId, error_message: err.message })
+      cascadeErrors.push(err.message || 'OpenAI fallo')
     }
-    logAI({ service: 'image', provider: 'openai', status: 'error', response_ms: Date.now() - t0, model: request.modelId, error_message: result.error })
-    cascadeErrors.push(result.error || 'OpenAI fallo')
-    console.warn(`[Cascade] OpenAI direct failed, continuing cascade...`)
+    console.warn(`[Cascade] OpenAI direct failed (${Math.round((Date.now() - t0) / 1000)}s), continuing... ${Math.round(remaining() / 1000)}s left`)
   }
 
   // ── Step 2: KIE — principal, mas barato ──
-  if (cascade?.kie && apiKeys.kie) {
+  // KIE gets 65% of remaining budget, capped relative to total budget.
+  // I2I: 43-69s processing + 5-15s image download = up to 84s.
+  // Banner gen (250s budget) → cap 120s. Studio (112s) → cap ~73s.
+  // withTimeout guarantees we NEVER exceed the budget even if fetch() hangs
+  if (cascade?.kie && apiKeys.kie && hasTime()) {
     const kieModelId = hasImages && cascade.kie.i2i ? cascade.kie.i2i : cascade.kie.t2i
+    const kieCap = Math.max(totalBudgetMs * 0.5, 75000)
+    const kieBudget = Math.min(remaining() * 0.65, kieCap)
     const t0 = Date.now()
-    const kieResult = await generateViaKie(
-      request, apiKeys.kie,
-      { model: kieModelId, mode: cascade.kie.mode },
-      options?.maxTotalMs || 80000
-    )
-    if (kieResult.success) {
-      logAI({ service: 'image', provider: 'kie', status: 'success', response_ms: Date.now() - t0, model: kieModelId, was_fallback: cascadeErrors.length > 0 })
-      return { ...kieResult, provider: request.provider, usedProvider: `kie:${kieModelId}` }
+    console.log(`[Cascade] KIE ${kieModelId} — budget: ${Math.round(kieBudget / 1000)}s, total remaining: ${Math.round(remaining() / 1000)}s`)
+    try {
+      const kieResult = await withTimeout(
+        generateViaKie(request, apiKeys.kie, { model: kieModelId, mode: cascade.kie.mode }, kieBudget),
+        kieBudget + 2000, // 2s grace for cleanup
+        'KIE'
+      )
+      if (kieResult.success) {
+        logAI({ service: 'image', provider: 'kie', status: 'success', response_ms: Date.now() - t0, model: kieModelId, was_fallback: cascadeErrors.length > 0 })
+        return { ...kieResult, provider: request.provider, usedProvider: `kie:${kieModelId}` }
+      }
+      logAI({ service: 'image', provider: 'kie', status: 'error', response_ms: Date.now() - t0, model: kieModelId, error_message: kieResult.error, was_fallback: cascadeErrors.length > 0 })
+      cascadeErrors.push(kieResult.error || 'KIE fallo')
+    } catch (err: any) {
+      logAI({ service: 'image', provider: 'kie', status: 'error', response_ms: Date.now() - t0, model: kieModelId, error_message: err.message, was_fallback: cascadeErrors.length > 0 })
+      cascadeErrors.push(err.message || 'KIE fallo')
     }
-    logAI({ service: 'image', provider: 'kie', status: 'error', response_ms: Date.now() - t0, model: kieModelId, error_message: kieResult.error, was_fallback: cascadeErrors.length > 0 })
-    cascadeErrors.push(kieResult.error || 'KIE fallo')
-    console.warn(`[Cascade] KIE ${kieModelId} failed, trying fal.ai...`)
+    console.warn(`[Cascade] KIE ${kieModelId} failed (${Math.round((Date.now() - t0) / 1000)}s), ${Math.round(remaining() / 1000)}s left`)
   }
 
   // ── Step 3: fal.ai — fallback de KIE ──
-  if (cascade?.fal && apiKeys.fal) {
+  // fal.ai gets remaining time minus 15s buffer for direct API
+  // withTimeout guarantees hard cutoff
+  if (cascade?.fal && apiKeys.fal && hasTime()) {
     const falPath = hasImages && cascade.fal.i2i ? cascade.fal.i2i : cascade.fal.t2i
     const t0 = Date.now()
     // Collect all image URLs (template + product) — same order as KIE
     const falImageUrls: string[] = []
     if (request.templateUrl?.startsWith('http')) falImageUrls.push(request.templateUrl)
     if (request.productImageUrls?.length) falImageUrls.push(...request.productImageUrls)
-    console.log(`[Cascade:fal] templateUrl: ${request.templateUrl?.substring(0, 60) || 'NONE'}`)
-    console.log(`[Cascade:fal] productImageUrls: ${request.productImageUrls?.length || 0}`)
-    console.log(`[Cascade:fal] falImageUrls total: ${falImageUrls.length}`)
 
-    // Seedream /edit endpoints are slower — give them 90s, others 45s
-    const falTimeout = falPath.includes('seedream') ? 90000 : 45000
+    // Budget: remaining minus 15s for potential direct API fallback, capped at 50s
+    const hasDirectFallback = cascade.directApi && (
+      (cascade.directApi === 'gemini' && apiKeys.gemini) ||
+      (cascade.directApi === 'bfl' && apiKeys.bfl)
+    )
+    const directReserve = hasDirectFallback ? 10000 : 0
+    const falBudget = Math.max(Math.min(remaining() - directReserve, 50000), 15000)
+    console.log(`[Cascade] fal.ai ${falPath} — budget: ${Math.round(falBudget / 1000)}s, images: ${falImageUrls.length}, remaining: ${Math.round(remaining() / 1000)}s`)
+
     // Seedream on fal.ai also has text length limits — truncate
     const falPrompt = falPath.includes('seedream') && prompt.length > 800
       ? prompt.substring(0, 800)
       : prompt
-    const falResult = await generateViaFal(apiKeys.fal, falPath, {
-      prompt: falPrompt,
-      imageUrls: falImageUrls.length > 0 ? falImageUrls : undefined,
-      aspectRatio: request.aspectRatio || '9:16',
-      timeoutMs: falTimeout,
-    })
 
-    if (falResult.success && falResult.imageUrl) {
-      const imageData = await falImageToBase64(falResult.imageUrl)
-      if (imageData) {
-        logAI({ service: 'image', provider: 'fal', status: 'success', response_ms: Date.now() - t0, model: falPath, was_fallback: cascadeErrors.length > 0 })
-        console.log(`[Cascade] fal.ai succeeded${cascadeErrors.length > 0 ? ' (fallback)' : ''}`)
-        return {
-          success: true,
-          imageBase64: imageData.base64,
-          mimeType: imageData.mimeType,
-          provider: request.provider,
-          usedProvider: `fal:${falPath}`,
+    try {
+      const falResult = await withTimeout(
+        generateViaFal(apiKeys.fal, falPath, {
+          prompt: falPrompt,
+          imageUrls: falImageUrls.length > 0 ? falImageUrls : undefined,
+          aspectRatio: request.aspectRatio || '9:16',
+          timeoutMs: falBudget,
+        }),
+        falBudget + 2000, // 2s grace
+        'fal.ai'
+      )
+
+      if (falResult.success && falResult.imageUrl) {
+        const imageData = await falImageToBase64(falResult.imageUrl)
+        if (imageData) {
+          logAI({ service: 'image', provider: 'fal', status: 'success', response_ms: Date.now() - t0, model: falPath, was_fallback: cascadeErrors.length > 0 })
+          console.log(`[Cascade] fal.ai succeeded (${Math.round((Date.now() - t0) / 1000)}s)${cascadeErrors.length > 0 ? ' — fallback' : ''}`)
+          return {
+            success: true,
+            imageBase64: imageData.base64,
+            mimeType: imageData.mimeType,
+            provider: request.provider,
+            usedProvider: `fal:${falPath}`,
+          }
         }
+        console.error(`[Cascade] fal.ai generated image but download failed: ${falResult.imageUrl.substring(0, 80)}`)
+        cascadeErrors.push('fal.ai: imagen generada pero no se pudo descargar')
       }
-      // fal.ai generated the image but we couldn't download it
-      console.error(`[Cascade] fal.ai generated image but download failed: ${falResult.imageUrl.substring(0, 80)}`)
-      cascadeErrors.push('fal.ai: imagen generada pero no se pudo descargar')
+      logAI({ service: 'image', provider: 'fal', status: 'error', response_ms: Date.now() - t0, model: falPath, error_message: falResult.error, was_fallback: cascadeErrors.length > 0 })
+      cascadeErrors.push(falResult.error || 'fal.ai fallo')
+    } catch (err: any) {
+      logAI({ service: 'image', provider: 'fal', status: 'error', response_ms: Date.now() - t0, model: falPath, error_message: err.message, was_fallback: cascadeErrors.length > 0 })
+      cascadeErrors.push(err.message || 'fal.ai fallo')
     }
-
-    logAI({ service: 'image', provider: 'fal', status: 'error', response_ms: Date.now() - t0, model: falPath, error_message: falResult.error, was_fallback: cascadeErrors.length > 0 })
-    cascadeErrors.push(falResult.error || 'fal.ai fallo')
-    console.warn(`[Cascade] fal.ai ${falPath} failed`)
+    console.warn(`[Cascade] fal.ai ${falPath} failed (${Math.round((Date.now() - t0) / 1000)}s), ${Math.round(remaining() / 1000)}s left`)
   }
 
-  // ── Step 4: Direct API ultimo fallback (Gemini o BFL — mas caro) ──
-  if (cascade?.directApi === 'gemini' && apiKeys.gemini) {
+  // ── Step 4: Direct API ultimo fallback (Gemini o BFL — usa todo el tiempo restante) ──
+  // withTimeout on remaining budget to guarantee no 504
+  if (cascade?.directApi === 'gemini' && apiKeys.gemini && hasTime()) {
     const googleModelId = cascade.directModelId || modelConfig.apiModelId
-    console.log(`[Cascade] Google direct fallback with ${googleModelId}`)
+    const googleBudget = Math.max(remaining() - 2000, 10000)
+    console.log(`[Cascade] Google direct fallback with ${googleModelId}, budget: ${Math.round(googleBudget / 1000)}s`)
     const t0 = Date.now()
     try {
-      const result = await generateWithGemini(request, apiKeys.gemini, googleModelId)
+      const result = await withTimeout(
+        generateWithGemini(request, apiKeys.gemini, googleModelId),
+        googleBudget, 'Google'
+      )
       if (result.success) {
         logAI({ service: 'image', provider: 'google', status: 'success', response_ms: Date.now() - t0, model: googleModelId, was_fallback: true })
         return { ...result, provider: request.provider, usedProvider: `google:${googleModelId}` }
@@ -237,19 +308,30 @@ export async function generateImage(
     }
   }
 
-  if (cascade?.directApi === 'bfl' && apiKeys.bfl) {
+  if (cascade?.directApi === 'bfl' && apiKeys.bfl && hasTime()) {
+    const bflBudget = Math.max(remaining() - 2000, 10000)
+    console.log(`[Cascade] BFL direct fallback, budget: ${Math.round(bflBudget / 1000)}s`)
     const t0 = Date.now()
-    const result = await getProvider('flux')!.generate(request, apiKeys.bfl)
-    if (result.success) {
-      logAI({ service: 'image', provider: 'bfl', status: 'success', response_ms: Date.now() - t0, model: request.modelId, was_fallback: cascadeErrors.length > 0 })
-      return { ...result, usedProvider: `bfl:${request.modelId}` }
+    try {
+      const result = await withTimeout(
+        getProvider('flux')!.generate(request, apiKeys.bfl),
+        bflBudget, 'BFL'
+      )
+      if (result.success) {
+        logAI({ service: 'image', provider: 'bfl', status: 'success', response_ms: Date.now() - t0, model: request.modelId, was_fallback: cascadeErrors.length > 0 })
+        return { ...result, usedProvider: `bfl:${request.modelId}` }
+      }
+      logAI({ service: 'image', provider: 'bfl', status: 'error', response_ms: Date.now() - t0, model: request.modelId, error_message: result.error, was_fallback: cascadeErrors.length > 0 })
+      cascadeErrors.push(result.error || 'BFL fallo')
+    } catch (err: any) {
+      logAI({ service: 'image', provider: 'bfl', status: 'error', response_ms: Date.now() - t0, model: request.modelId, error_message: err.message, was_fallback: cascadeErrors.length > 0 })
+      cascadeErrors.push(err.message || 'BFL fallo')
     }
-    logAI({ service: 'image', provider: 'bfl', status: 'error', response_ms: Date.now() - t0, model: request.modelId, error_message: result.error, was_fallback: cascadeErrors.length > 0 })
-    cascadeErrors.push(result.error || 'BFL fallo')
     console.warn(`[Cascade] BFL direct failed`)
   }
 
   // ── All failed — show FRIENDLY error to user ──
+  console.error(`[Cascade] ALL STEPS FAILED after ${Math.round(elapsed() / 1000)}s — ${cascadeErrors.length} errors`)
   if (cascadeErrors.length === 0) {
     return {
       success: false,

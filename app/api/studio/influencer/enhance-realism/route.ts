@@ -10,6 +10,7 @@ import {
   type ImageProviderType,
   type GenerateImageRequest,
 } from '@/lib/image-providers'
+import { generateWithGemini } from '@/lib/image-providers/gemini'
 
 export const maxDuration = 120
 
@@ -71,10 +72,17 @@ export async function POST(request: Request) {
     if (profile?.bfl_api_key) apiKeys.bfl = decrypt(profile.bfl_api_key)
     if (profile?.fal_api_key) apiKeys.fal = decrypt(profile.fal_api_key)
 
+    // Environment variable fallbacks (platform keys)
+    if (!apiKeys.openai && process.env.OPENAI_API_KEY) apiKeys.openai = process.env.OPENAI_API_KEY
+    if (!apiKeys.kie && process.env.KIE_API_KEY) apiKeys.kie = process.env.KIE_API_KEY
+    if (!apiKeys.bfl && process.env.BFL_API_KEY) apiKeys.bfl = process.env.BFL_API_KEY
+    if (!apiKeys.fal && process.env.FAL_API_KEY) apiKeys.fal = process.env.FAL_API_KEY
+    if (!apiKeys.gemini && process.env.GEMINI_API_KEY) apiKeys.gemini = process.env.GEMINI_API_KEY
+
     const selectedProvider = modelIdToProviderType(modelId)
 
     const providerKeyMap: Record<ImageProviderType, keyof typeof apiKeys> = {
-      gemini: 'gemini', openai: 'openai', seedream: 'kie', flux: 'bfl', fal: 'fal',
+      gemini: 'gemini', openai: 'openai', seedream: 'kie', flux: 'bfl',
     }
 
     // For Gemini: accept either Google key OR KIE key (KIE provides Gemini models)
@@ -84,7 +92,7 @@ export async function POST(request: Request) {
 
     if (!hasRequiredKey) {
       const keyNames: Record<ImageProviderType, string> = {
-        gemini: 'Google (Gemini) o KIE.ai', openai: 'OpenAI', seedream: 'KIE.ai', flux: 'Black Forest Labs', fal: 'fal.ai',
+        gemini: 'Google (Gemini) o KIE.ai', openai: 'OpenAI', seedream: 'KIE.ai', flux: 'Black Forest Labs',
       }
       return NextResponse.json({
         error: `Configura tu API key de ${keyNames[selectedProvider]} en Settings`,
@@ -120,26 +128,28 @@ export async function POST(request: Request) {
 
     console.log(`[Influencer/EnhanceRealism] User: ${user.id.substring(0, 8)}..., Model: ${modelId}`)
 
-    // Upload reference image to get public URL (needed for KIE-based providers)
-    let productImageUrls: string[] | undefined
-    const needsPublicUrls = selectedProvider === 'seedream' || (selectedProvider === 'gemini' && apiKeys.kie)
-    if (needsPublicUrls) {
-      const buffer = Buffer.from(refBase64, 'base64')
-      const ext = refMime.includes('png') ? 'png' : 'jpg'
-      const tmpPath = `influencers/${user.id}/tmp_realism_ref.${ext}`
+    // Upload reference image to get public URL (needed for cascade — KIE, fal.ai, etc.)
+    // ALWAYS upload so the cascade can use I2I endpoints regardless of provider
+    const buffer = Buffer.from(refBase64, 'base64')
+    const ext = refMime.includes('png') ? 'png' : 'jpg'
+    const tmpPath = `influencers/${user.id}/${influencerId}_tmp_realism_ref.${ext}`
 
-      await supabase.storage
-        .from('landing-images')
-        .upload(tmpPath, buffer, { contentType: refMime, upsert: true })
+    await supabase.storage
+      .from('landing-images')
+      .upload(tmpPath, buffer, { contentType: refMime, upsert: true })
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('landing-images')
-        .getPublicUrl(tmpPath)
+    const { data: { publicUrl } } = supabase.storage
+      .from('landing-images')
+      .getPublicUrl(tmpPath)
 
-      productImageUrls = [publicUrl]
-    }
+    // Cache-bust to prevent CDN serving old image from previous generation
+    const productImageUrls = [`${publicUrl}?v=${Date.now()}`]
 
     // Generate enhanced image
+    // STRATEGY: Gemini direct FIRST — it's the only model that properly preserves
+    // identity when transforming a character into a hyperrealistic photo.
+    // KIE/nano-banana treat image_input as loose "inspiration" and generate random people.
+    // If Gemini fails, fall back to the normal cascade.
     const generateRequest: GenerateImageRequest = {
       provider: selectedProvider,
       modelId,
@@ -149,22 +159,46 @@ export async function POST(request: Request) {
       aspectRatio: '9:16',
     }
 
-    const elapsedMs = Date.now() - startTime
-    let result = await generateImage(generateRequest, apiKeys, {
-      maxTotalMs: Math.max(95000 - elapsedMs, 30000), // Fit in 120s maxDuration
-    })
+    let result: any = null
 
-    // Poll for async providers
-    if (result.success && result.status === 'processing' && result.taskId) {
-      const apiKey = apiKeys[providerKeyMap[selectedProvider]]!
+    // Step 1: Try Gemini direct (best at identity-preserving I2I)
+    if (apiKeys.gemini) {
+      const directModelId = modelConfig?.cascade?.directModelId || 'gemini-3.1-flash-image-preview'
+      console.log(`[Influencer/EnhanceRealism] Trying Gemini direct first: ${directModelId}`)
+      const t0 = Date.now()
+      try {
+        const geminiResult = await generateWithGemini(generateRequest, apiKeys.gemini, directModelId)
+        if (geminiResult.success && geminiResult.imageBase64) {
+          console.log(`[Influencer/EnhanceRealism] Gemini direct succeeded in ${((Date.now() - t0) / 1000).toFixed(1)}s`)
+          result = geminiResult
+        } else {
+          console.warn(`[Influencer/EnhanceRealism] Gemini direct failed: ${geminiResult.error}`)
+        }
+      } catch (err: any) {
+        console.warn(`[Influencer/EnhanceRealism] Gemini direct error: ${err.message}`)
+      }
+    }
+
+    // Step 2: Fall back to cascade if Gemini didn't work
+    if (!result || !result.success) {
+      console.log(`[Influencer/EnhanceRealism] Falling back to cascade`)
       const elapsedMs = Date.now() - startTime
-      const remainingMs = Math.max(100000 - elapsedMs, 30000)
-
-      result = await pollForResult(selectedProvider, result.taskId, apiKey, {
-        maxAttempts: Math.floor(remainingMs / 1000),
-        intervalMs: 1000,
-        timeoutMs: remainingMs,
+      result = await generateImage(generateRequest, apiKeys, {
+        maxTotalMs: Math.max(112000 - elapsedMs, 30000),
       })
+
+      // Poll for async providers
+      if (result.success && result.status === 'processing' && result.taskId) {
+        const apiKey = apiKeys[providerKeyMap[selectedProvider]]!
+        const elapsedMs2 = Date.now() - startTime
+        const remainingMs = Math.max(115000 - elapsedMs2, 30000)
+
+        result = await pollForResult(selectedProvider, result.taskId, apiKey, {
+          maxAttempts: Math.floor(remainingMs / 1000),
+          intervalMs: 1000,
+          timeoutMs: remainingMs,
+        })
+      }
     }
 
     if (!result.success || !result.imageBase64) {
@@ -175,19 +209,19 @@ export async function POST(request: Request) {
     }
 
     // Upload result to storage
-    const ext = result.mimeType?.includes('png') ? 'png' : 'jpg'
-    const buffer = Buffer.from(result.imageBase64, 'base64')
-    const storagePath = `influencers/${user.id}/${Date.now()}_realistic.${ext}`
+    const resultExt = result.mimeType?.includes('png') ? 'png' : 'jpg'
+    const resultBuffer = Buffer.from(result.imageBase64, 'base64')
+    const storagePath = `influencers/${user.id}/${Date.now()}_realistic.${resultExt}`
 
     const { error: uploadError } = await supabase.storage
       .from('landing-images')
-      .upload(storagePath, buffer, { contentType: result.mimeType || 'image/png', upsert: true })
+      .upload(storagePath, resultBuffer, { contentType: result.mimeType || 'image/png', upsert: true })
 
     if (uploadError) {
       return NextResponse.json({ error: 'Error al subir imagen' }, { status: 500 })
     }
 
-    const { data: { publicUrl } } = supabase.storage
+    const { data: { publicUrl: resultUrl } } = supabase.storage
       .from('landing-images')
       .getPublicUrl(storagePath)
 
@@ -195,7 +229,7 @@ export async function POST(request: Request) {
     await supabase
       .from('influencers')
       .update({
-        realistic_image_url: publicUrl,
+        realistic_image_url: resultUrl,
         current_step: 3,
         updated_at: new Date().toISOString(),
       })
@@ -207,7 +241,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      imageUrl: publicUrl,
+      imageUrl: resultUrl,
       imageBase64: result.imageBase64,
       mimeType: result.mimeType,
     })

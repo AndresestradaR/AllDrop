@@ -2,8 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import { Button, Input, Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui'
-import { Key, ExternalLink, Check, Loader2, Sparkles, Zap, Image as ImageIcon, Cpu, PlayCircle, X, Globe, Mic, Cloud, Share2 } from 'lucide-react'
+import { Key, ExternalLink, Check, Loader2, Sparkles, Zap, Image as ImageIcon, PlayCircle, Globe, Mic, Cloud, Share2 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { createClient } from '@/lib/supabase/client'
+
+const ADMIN_EMAIL = 'trucosecomydrop@gmail.com'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,7 +18,7 @@ interface ApiKeyState {
 
 export default function SettingsPage() {
   const [isLoading, setIsLoading] = useState(true)
-  const [showVideo, setShowVideo] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
 
   // API Keys state
   const [googleKey, setGoogleKey] = useState<ApiKeyState>({ value: '', hasKey: false, isSaving: false })
@@ -46,6 +49,9 @@ export default function SettingsPage() {
 
   useEffect(() => {
     fetchKeys()
+    createClient().auth.getUser().then(({ data }) => {
+      if (data.user?.email === ADMIN_EMAIL) setIsAdmin(true)
+    })
   }, [])
 
   const fetchKeys = async () => {
@@ -263,63 +269,22 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      {/* Video Tutorial Banner */}
-      <Card className="mb-6 overflow-hidden border-accent/30 bg-gradient-to-r from-accent/10 to-transparent">
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-full bg-accent/20">
-                <PlayCircle className="w-6 h-6 text-accent" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-text-primary">¿No sabes cómo obtener las API Keys?</h3>
-                <p className="text-sm text-text-secondary">Mira este tutorial de 4 minutos</p>
-              </div>
-            </div>
-            <Button
-              onClick={() => setShowVideo(true)}
-              size="sm"
-              className="shrink-0"
-            >
-              <PlayCircle className="w-4 h-4 mr-2" />
-              Ver Tutorial
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Video Modal */}
-      {showVideo && (
-        <div 
-          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
-          onClick={() => setShowVideo(false)}
-        >
-          <div 
-            className="relative w-full max-w-4xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              onClick={() => setShowVideo(false)}
-              className="absolute -top-12 right-0 p-2 text-white/70 hover:text-white transition-colors"
-            >
-              <X className="w-8 h-8" />
-            </button>
-            <div className="rounded-xl overflow-hidden shadow-2xl">
-              <video
-                src="https://papfcbiswvdgalfteujm.supabase.co/storage/v1/object/public/Videos/Tutorial%20Apis%20keys%202.mp4"
-                controls
-                autoPlay
-                className="w-full aspect-video bg-black"
-              >
-                Tu navegador no soporta videos HTML5.
-              </video>
-            </div>
-            <p className="text-center text-white/50 text-sm mt-4">
-              Click afuera o presiona la X para cerrar
-            </p>
-          </div>
+      {/* Video Tutorial Embebido */}
+      <div className="mb-6">
+        <h3 className="font-semibold text-text-primary mb-2 flex items-center gap-2">
+          <PlayCircle className="w-5 h-5 text-accent" />
+          Tutorial: Cómo obtener tus API Keys
+        </h3>
+        <div className="rounded-xl overflow-hidden border border-accent/30">
+          <iframe
+            src="https://www.youtube.com/embed/ahwMh6GpuAg?rel=0"
+            title="Tutorial API Keys"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+            className="w-full aspect-video bg-black"
+          />
         </div>
-      )}
+      </div>
 
       {/* Section: Generación de Imágenes */}
       <div className="mb-6">
@@ -467,52 +432,6 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* BFL API Key */}
-      <Card className="mb-4">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <div className="p-2 rounded-lg bg-gradient-to-br from-pink-500 to-rose-500 text-white">
-              <Cpu className="w-4 h-4" />
-            </div>
-            Black Forest Labs (FLUX)
-            {bflKey.hasKey && (
-              <span className="flex items-center gap-1 text-xs text-success ml-auto">
-                <Check className="w-3 h-3" />
-                Configurada
-              </span>
-            )}
-          </CardTitle>
-          <CardDescription>
-            Para: FLUX Pro 1.1 (~$0.04/img) - Generación ultra rápida
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex gap-2">
-            <Input
-              type="password"
-              placeholder="bfl_..."
-              value={bflKey.value}
-              onChange={(e) => setBflKey(prev => ({ ...prev, value: e.target.value }))}
-              className="flex-1"
-            />
-            <Button
-              onClick={() => handleSaveKey('bfl')}
-              isLoading={bflKey.isSaving}
-            >
-              Guardar
-            </Button>
-          </div>
-          <a
-            href="https://api.bfl.ai/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-xs text-accent hover:text-accent-hover transition-colors"
-          >
-            Obtener API Key <ExternalLink className="w-3 h-3" />
-          </a>
-        </CardContent>
-      </Card>
-
       {/* fal.ai API Key */}
       <Card className="mb-4">
         <CardHeader>
@@ -613,51 +532,53 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Browserless API Key */}
-      <Card className="mb-4">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <div className="p-2 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-500 text-white">
-              <Globe className="w-4 h-4" />
+      {/* Browserless API Key — admin only */}
+      {isAdmin && (
+        <Card className="mb-4">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <div className="p-2 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-500 text-white">
+                <Globe className="w-4 h-4" />
+              </div>
+              Browserless (Web Scraping)
+              {browserlessKey.hasKey && (
+                <span className="flex items-center gap-1 text-xs text-success ml-auto">
+                  <Check className="w-3 h-3" />
+                  Configurada
+                </span>
+              )}
+            </CardTitle>
+            <CardDescription>
+              Para: Extraer precios de landing pages (~$0.01/pagina)
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex gap-2">
+              <Input
+                type="password"
+                placeholder="..."
+                value={browserlessKey.value}
+                onChange={(e) => setBrowserlessKey(prev => ({ ...prev, value: e.target.value }))}
+                className="flex-1"
+              />
+              <Button
+                onClick={() => handleSaveKey('browserless')}
+                isLoading={browserlessKey.isSaving}
+              >
+                Guardar
+              </Button>
             </div>
-            Browserless (Web Scraping)
-            {browserlessKey.hasKey && (
-              <span className="flex items-center gap-1 text-xs text-success ml-auto">
-                <Check className="w-3 h-3" />
-                Configurada
-              </span>
-            )}
-          </CardTitle>
-          <CardDescription>
-            Para: Extraer precios de landing pages (~$0.01/pagina)
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex gap-2">
-            <Input
-              type="password"
-              placeholder="..."
-              value={browserlessKey.value}
-              onChange={(e) => setBrowserlessKey(prev => ({ ...prev, value: e.target.value }))}
-              className="flex-1"
-            />
-            <Button
-              onClick={() => handleSaveKey('browserless')}
-              isLoading={browserlessKey.isSaving}
+            <a
+              href="https://www.browserless.io/dashboard"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-xs text-accent hover:text-accent-hover transition-colors"
             >
-              Guardar
-            </Button>
-          </div>
-          <a
-            href="https://www.browserless.io/dashboard"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-xs text-accent hover:text-accent-hover transition-colors"
-          >
-            Obtener API Key <ExternalLink className="w-3 h-3" />
-          </a>
-        </CardContent>
-      </Card>
+              Obtener API Key <ExternalLink className="w-3 h-3" />
+            </a>
+          </CardContent>
+        </Card>
+      )}
 
       {/* ElevenLabs API Key */}
       <Card className="mb-4">
@@ -900,20 +821,12 @@ export default function SettingsPage() {
               <span><strong>Seedream</strong> - Ideal para editar y combinar imágenes</span>
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-pink-500">•</span>
-              <span><strong>FLUX</strong> - Generacion rapida con buenos resultados</span>
-            </li>
-            <li className="flex items-start gap-2">
               <span className="text-violet-500">•</span>
               <span><strong>ElevenLabs</strong> - Voces ultra realistas para tus videos</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-cyan-500">•</span>
               <span><strong>Apify</strong> - Busca anuncios de competidores en Meta Ads</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-emerald-500">•</span>
-              <span><strong>Browserless</strong> - Extrae precios de landing pages</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-orange-500">•</span>

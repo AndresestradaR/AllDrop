@@ -23,6 +23,7 @@ import {
   BookOpen,
   Bot,
   Activity,
+  School,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -33,6 +34,7 @@ const mainNavigation = [
 ]
 
 const creatorNavigation = [
+  { name: 'Academia', href: '/dashboard/academia', icon: School, isNew: true },
   { name: 'Coaching', href: '/dashboard/coaching', icon: GraduationCap, isNew: true },
   { name: 'Crea tu Landing', href: '/dashboard/landing', icon: LayoutTemplate },
   { name: 'Landing Code', href: '/dashboard/landing-ia', icon: Zap, isNew: true },
@@ -205,7 +207,9 @@ export default function DashboardLayout({
                 Herramientas
               </p>
               <div className="space-y-1">
-                {creatorNavigation.map((item) => (
+                {creatorNavigation
+                  .filter(item => item.name !== 'Landing Code' || isAdmin)
+                  .map((item) => (
                   <NavLink key={item.name} item={item} />
                 ))}
               </div>

@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
+import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils/cn'
 import {
   Video,
@@ -25,6 +26,7 @@ import {
   Hash,
   Plus,
   Trash2,
+  FastForward,
   UserCircle,
 } from 'lucide-react'
 import { PublisherModal } from './PublisherModal'
@@ -76,6 +78,7 @@ interface GeneratedVideo {
   timestamp: Date
   duration: string
   aspectRatio: string
+  taskId?: string // KIE task ID — needed for Veo extend
 }
 
 // Tag styling config
@@ -116,6 +119,46 @@ export function VideoGenerator() {
   const [generatedVideos, setGeneratedVideos] = useState<GeneratedVideo[]>([])
   const [publishVideoUrl, setPublishVideoUrl] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [extendingVideoId, setExtendingVideoId] = useState<string | null>(null)
+
+  // Load saved videos from database on mount
+  useEffect(() => {
+    const loadSavedVideos = async () => {
+      try {
+        const supabase = createClient()
+        const { data } = await supabase
+          .from('generations')
+          .select('id, product_name, original_prompt, enhanced_prompt, generated_image_url, created_at')
+          .like('product_name', 'Video:%')
+          .not('generated_image_url', 'is', null)
+          .order('created_at', { ascending: false })
+          .limit(50)
+
+        if (data?.length) {
+          const saved = data.map((gen) => {
+            // Parse metadata from enhanced_prompt (format: "ar:9:16|tid:abc123")
+            const meta = gen.enhanced_prompt || ''
+            const arMatch = meta.match(/ar:([^|]+)/)
+            const tidMatch = meta.match(/tid:([^|]+)/)
+            return {
+              id: gen.id,
+              url: gen.generated_image_url!,
+              prompt: gen.original_prompt || '',
+              model: gen.product_name?.replace('Video: ', '') || 'Video',
+              timestamp: new Date(gen.created_at),
+              duration: '',
+              aspectRatio: arMatch?.[1] || '16:9',
+              taskId: tidMatch?.[1] || undefined,
+            }
+          })
+          setGeneratedVideos(saved)
+        }
+      } catch (err) {
+        console.warn('[Studio] Failed to load saved videos:', err)
+      }
+    }
+    loadSavedVideos()
+  }, [])
 
   // Kling 3.0 multi-shot state
   const [multiShotEnabled, setMultiShotEnabled] = useState(false)
@@ -143,19 +186,20 @@ export function VideoGenerator() {
   const currentModel = VIDEO_MODELS[selectedModel]
 
   // Poll for video status
-  const pollForStatus = async (taskId: string): Promise<{ success: boolean; videoUrl?: string; error?: string }> => {
+  const pollForStatus = async (taskId: string, modelName?: string, promptText?: string, videoAspectRatio?: string): Promise<{ success: boolean; videoUrl?: string; error?: string; taskId?: string }> => {
     const maxAttempts = 200 // ~10 minutes at 3s intervals
     const interval = 3000 // 3 seconds
+    const extraParams = `&modelName=${encodeURIComponent(modelName || '')}&prompt=${encodeURIComponent((promptText || '').substring(0, 500))}&aspectRatio=${encodeURIComponent(videoAspectRatio || '16:9')}`
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       try {
         setGeneratingStatus(`Procesando video... (${Math.floor(attempt * 3 / 60)}:${String((attempt * 3) % 60).padStart(2, '0')})`)
 
-        const response = await fetch(`/api/studio/video-status?taskId=${taskId}`)
+        const response = await fetch(`/api/studio/video-status?taskId=${taskId}${extraParams}`)
         const data = await response.json()
 
         if (data.status === 'completed' && data.videoUrl) {
-          return { success: true, videoUrl: data.videoUrl }
+          return { success: true, videoUrl: data.videoUrl, taskId }
         }
 
         if (data.status === 'failed') {
@@ -172,6 +216,62 @@ export function VideoGenerator() {
     }
 
     return { success: false, error: 'Timeout: el video tardó demasiado en generarse' }
+  }
+
+  // Extend a Veo video (adds more seconds from last frame)
+  // Uses current prompt field if filled, otherwise original video prompt
+  const handleExtend = async (video: GeneratedVideo) => {
+    if (!video.taskId || extendingVideoId) return
+
+    setExtendingVideoId(video.id)
+    setError(null)
+
+    try {
+      const veoModel = video.model.toLowerCase().includes('fast') ? 'veo3_fast' : 'veo3'
+      // Use current prompt if user typed something new, otherwise keep original
+      const extendPrompt = prompt.trim() || video.prompt
+
+      const response = await fetch('/api/studio/extend-video', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taskId: video.taskId,
+          prompt: extendPrompt,
+          model: veoModel,
+        }),
+      })
+
+      const data = await response.json()
+      if (!data.success || !data.taskId) {
+        throw new Error(data.error || 'No se pudo extender el video')
+      }
+
+      // Poll for the extended video
+      const result = await pollForStatus(data.taskId, video.model, extendPrompt, video.aspectRatio)
+
+      if (!result.success) {
+        throw new Error(result.error || 'Error al extender video')
+      }
+
+      // Add extended video to gallery
+      setGeneratedVideos((prev) => [
+        {
+          id: Date.now().toString(),
+          url: result.videoUrl!,
+          prompt: extendPrompt,
+          model: `${video.model} (ext)`,
+          timestamp: new Date(),
+          duration: '',
+          aspectRatio: video.aspectRatio,
+          taskId: result.taskId,
+        },
+        ...prev,
+      ])
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setExtendingVideoId(null)
+    }
   }
 
   const handleGenerate = async () => {
@@ -262,7 +362,7 @@ export function VideoGenerator() {
 
       // Poll for result from frontend
       setGeneratingStatus('Video en cola, esperando...')
-      const result = await pollForStatus(data.taskId)
+      const result = await pollForStatus(data.taskId, currentModel.name, prompt, aspectRatio)
 
       if (!result.success) {
         throw new Error(result.error || 'Error al generar video')
@@ -278,6 +378,7 @@ export function VideoGenerator() {
           timestamp: new Date(),
           duration: `${duration}s`,
           aspectRatio,
+          taskId: result.taskId,
         },
         ...prev,
       ])
@@ -1092,58 +1193,110 @@ export function VideoGenerator() {
           </div>
         ) : (
           <div className="flex-1 overflow-y-auto">
-            <div className="grid grid-cols-2 gap-4">
-              {generatedVideos.map((video) => (
+            <div className="flex flex-wrap gap-4">
+              {generatedVideos.map((video) => {
+                const isVertical = video.aspectRatio === '9:16'
+                const isSquare = video.aspectRatio === '1:1'
+                return (
                 <div
                   key={video.id}
-                  className="group relative rounded-xl overflow-hidden bg-surface-elevated"
-                  style={{
-                    aspectRatio:
-                      video.aspectRatio === '16:9'
-                        ? '16/9'
-                        : video.aspectRatio === '9:16'
-                        ? '9/16'
-                        : '1/1',
-                  }}
+                  className={cn(
+                    'rounded-xl overflow-hidden bg-surface-elevated',
+                    isVertical ? 'w-[45%] max-w-[200px]' : isSquare ? 'w-[48%]' : 'w-full'
+                  )}
                 >
-                  <video
-                    src={video.url}
-                    className="w-full h-full object-cover"
-                    controls
-                    poster=""
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                    <div className="absolute bottom-0 left-0 right-0 p-3">
-                      <p className="text-xs text-white/80 line-clamp-2">
+                  <div
+                    className="relative"
+                    style={{
+                      aspectRatio:
+                        video.aspectRatio === '16:9'
+                          ? '16/9'
+                          : video.aspectRatio === '9:16'
+                          ? '9/16'
+                          : '1/1',
+                    }}
+                  >
+                    <video
+                      src={video.url}
+                      className="w-full h-full object-contain bg-black rounded-t-xl"
+                      controls
+                      poster=""
+                    />
+                  </div>
+                  <div className="p-2.5 flex items-center justify-between">
+                    <div className="min-w-0 flex-1 mr-2">
+                      <p className="text-xs text-text-secondary truncate">
                         {video.prompt}
                       </p>
-                      <p className="text-[10px] text-white/60 mt-1">
+                      <p className="text-[10px] text-text-tertiary mt-0.5">
                         {video.model} · {video.duration}
                       </p>
                     </div>
-                  </div>
-                  <div className="absolute top-2 right-2 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={() => setPublishVideoUrl(video.url)}
-                      className="p-2 bg-indigo-500/80 hover:bg-indigo-500 rounded-lg transition-colors"
-                      title="Publicar en redes"
-                    >
-                      <Share2 className="w-4 h-4 text-white" />
-                    </button>
-                    <button
-                      onClick={() => {
-                        const a = document.createElement('a')
-                        a.href = video.url
-                        a.download = `video-${video.id}.mp4`
-                        a.click()
-                      }}
-                      className="p-2 bg-black/50 rounded-lg hover:bg-black/70 transition-colors"
-                    >
-                      <Download className="w-4 h-4 text-white" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setPublishVideoUrl(video.url)}
+                        className="p-1.5 text-text-secondary hover:text-indigo-400 hover:bg-indigo-500/10 rounded-lg transition-colors"
+                        title="Publicar en redes"
+                      >
+                        <Share2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={async () => {
+                          try {
+                            const response = await fetch(video.url)
+                            const blob = await response.blob()
+                            const blobUrl = URL.createObjectURL(blob)
+                            const a = document.createElement('a')
+                            a.href = blobUrl
+                            a.download = `video-${video.id}.mp4`
+                            a.click()
+                            URL.revokeObjectURL(blobUrl)
+                          } catch {
+                            window.open(video.url, '_blank')
+                          }
+                        }}
+                        className="p-1.5 text-text-secondary hover:text-accent hover:bg-accent/10 rounded-lg transition-colors"
+                        title="Descargar"
+                      >
+                        <Download className="w-4 h-4" />
+                      </button>
+                      {video.taskId && video.model.toLowerCase().includes('veo') && (
+                        <button
+                          onClick={() => handleExtend(video)}
+                          disabled={extendingVideoId === video.id || isGenerating}
+                          className={cn(
+                            'p-1.5 rounded-lg transition-colors',
+                            extendingVideoId === video.id
+                              ? 'text-accent animate-pulse'
+                              : 'text-text-secondary hover:text-accent hover:bg-accent/10'
+                          )}
+                          title="Extender video (+segundos)"
+                        >
+                          {extendingVideoId === video.id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <FastForward className="w-4 h-4" />
+                          )}
+                        </button>
+                      )}
+                      <button
+                        onClick={() => {
+                          setGeneratedVideos((prev) => prev.filter((v) => v.id !== video.id))
+                          const supabase = createClient()
+                          supabase.from('generations').delete().eq('id', video.id).then(({ error: dbErr }) => {
+                            if (dbErr) console.warn('[Studio] Video delete failed:', dbErr.message)
+                          })
+                        }}
+                        className="p-1.5 text-text-secondary hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                        title="Eliminar"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         )}

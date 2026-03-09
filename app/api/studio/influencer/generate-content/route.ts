@@ -60,6 +60,7 @@ export async function POST(request: Request) {
       productImageMimeType,
       promptDescriptor: fallbackDescriptor,
       realisticImageUrl: fallbackRealisticUrl,
+      aspectRatio: requestedAR,
     } = body as {
       influencerId: string
       modelId: ImageModelId
@@ -71,7 +72,10 @@ export async function POST(request: Request) {
       productImageMimeType?: string
       promptDescriptor?: string
       realisticImageUrl?: string
+      aspectRatio?: '9:16' | '16:9' | '1:1' | '4:5'
     }
+
+    const aspectRatio = requestedAR || '9:16'
 
     if (!influencerId || !modelId || !situation) {
       return NextResponse.json({ error: 'influencerId, modelId y situation son requeridos' }, { status: 400 })
@@ -107,10 +111,17 @@ export async function POST(request: Request) {
     if (profile?.bfl_api_key) apiKeys.bfl = decrypt(profile.bfl_api_key)
     if (profile?.fal_api_key) apiKeys.fal = decrypt(profile.fal_api_key)
 
+    // Environment variable fallbacks (platform keys)
+    if (!apiKeys.openai && process.env.OPENAI_API_KEY) apiKeys.openai = process.env.OPENAI_API_KEY
+    if (!apiKeys.kie && process.env.KIE_API_KEY) apiKeys.kie = process.env.KIE_API_KEY
+    if (!apiKeys.bfl && process.env.BFL_API_KEY) apiKeys.bfl = process.env.BFL_API_KEY
+    if (!apiKeys.fal && process.env.FAL_API_KEY) apiKeys.fal = process.env.FAL_API_KEY
+    if (!apiKeys.gemini && process.env.GEMINI_API_KEY) apiKeys.gemini = process.env.GEMINI_API_KEY
+
     const selectedProvider = modelIdToProviderType(modelId)
 
     const providerKeyMap: Record<ImageProviderType, keyof typeof apiKeys> = {
-      gemini: 'gemini', openai: 'openai', seedream: 'kie', flux: 'bfl', fal: 'fal',
+      gemini: 'gemini', openai: 'openai', seedream: 'kie', flux: 'bfl',
     }
 
     // For Gemini: accept either Google key OR KIE key (KIE provides Gemini models)
@@ -120,7 +131,7 @@ export async function POST(request: Request) {
 
     if (!hasRequiredKey) {
       const keyNames: Record<ImageProviderType, string> = {
-        gemini: 'Google (Gemini) o KIE.ai', openai: 'OpenAI', seedream: 'KIE.ai', flux: 'Black Forest Labs', fal: 'fal.ai',
+        gemini: 'Google (Gemini) o KIE.ai', openai: 'OpenAI', seedream: 'KIE.ai', flux: 'Black Forest Labs',
       }
       return NextResponse.json({
         error: `Configura tu API key de ${keyNames[selectedProvider]} en Settings`,
@@ -151,23 +162,21 @@ export async function POST(request: Request) {
         const mime = imgRes.headers.get('content-type') || 'image/jpeg'
         refImages.push({ data: base64, mimeType: mime })
 
-        // Upload to get public URL (needed for KIE-based providers)
-        const needsPublicUrls = selectedProvider === 'seedream' || (selectedProvider === 'gemini' && apiKeys.kie)
-        if (needsPublicUrls) {
-          const buffer = Buffer.from(base64, 'base64')
-          const ext = mime.includes('png') ? 'png' : 'jpg'
-          const tmpPath = `influencers/${user.id}/tmp_content_ref.${ext}`
+        // Upload to get public URL (needed for ALL cascade steps — KIE, fal.ai, etc.)
+        const refBuffer = Buffer.from(base64, 'base64')
+        const refExt = mime.includes('png') ? 'png' : 'jpg'
+        const tmpPath = `influencers/${user.id}/${influencerId}_tmp_content_ref.${refExt}`
 
-          await supabase.storage
-            .from('landing-images')
-            .upload(tmpPath, buffer, { contentType: mime, upsert: true })
+        await supabase.storage
+          .from('landing-images')
+          .upload(tmpPath, refBuffer, { contentType: mime, upsert: true })
 
-          const { data: { publicUrl } } = supabase.storage
-            .from('landing-images')
-            .getPublicUrl(tmpPath)
+        const { data: { publicUrl } } = supabase.storage
+          .from('landing-images')
+          .getPublicUrl(tmpPath)
 
-          productImageUrls = [publicUrl]
-        }
+        // Cache-bust to prevent CDN serving old image from previous influencer
+        productImageUrls = [`${publicUrl}?v=${Date.now()}`]
       }
     }
 
@@ -175,23 +184,22 @@ export async function POST(request: Request) {
     if (mode === 'with_product' && productImageBase64) {
       refImages.push({ data: productImageBase64, mimeType: productImageMimeType || 'image/jpeg' })
 
-      const needsProductUrl = selectedProvider === 'seedream' || (selectedProvider === 'gemini' && apiKeys.kie)
-      if (needsProductUrl) {
-        const buffer = Buffer.from(productImageBase64, 'base64')
-        const ext = (productImageMimeType || '').includes('png') ? 'png' : 'jpg'
-        const tmpPath = `influencers/${user.id}/tmp_product_ref.${ext}`
+      // Upload product image for ALL cascade steps
+      const prodBuffer = Buffer.from(productImageBase64, 'base64')
+      const prodExt = (productImageMimeType || '').includes('png') ? 'png' : 'jpg'
+      const prodTmpPath = `influencers/${user.id}/${influencerId}_tmp_product_ref.${prodExt}`
 
-        await supabase.storage
-          .from('landing-images')
-          .upload(tmpPath, buffer, { contentType: productImageMimeType || 'image/jpeg', upsert: true })
+      await supabase.storage
+        .from('landing-images')
+        .upload(prodTmpPath, prodBuffer, { contentType: productImageMimeType || 'image/jpeg', upsert: true })
 
-        const { data: { publicUrl } } = supabase.storage
-          .from('landing-images')
-          .getPublicUrl(tmpPath)
+      const { data: { publicUrl: prodUrl } } = supabase.storage
+        .from('landing-images')
+        .getPublicUrl(prodTmpPath)
 
-        if (!productImageUrls) productImageUrls = []
-        productImageUrls.push(publicUrl)
-      }
+      if (!productImageUrls) productImageUrls = []
+      // Cache-bust to prevent CDN serving old image
+      productImageUrls.push(`${prodUrl}?v=${Date.now()}`)
     }
 
     // Generate content image
@@ -201,19 +209,19 @@ export async function POST(request: Request) {
       prompt,
       productImagesBase64: refImages.length > 0 ? refImages : undefined,
       productImageUrls,
-      aspectRatio: '9:16',
+      aspectRatio,
     }
 
     const elapsedMs = Date.now() - startTime
     let result = await generateImage(generateRequest, apiKeys, {
-      maxTotalMs: Math.max(95000 - elapsedMs, 30000),
+      maxTotalMs: Math.max(112000 - elapsedMs, 30000),
     })
 
     // Poll for async providers
     if (result.success && result.status === 'processing' && result.taskId) {
       const apiKey = apiKeys[providerKeyMap[selectedProvider]]!
       const elapsedMs = Date.now() - startTime
-      const remainingMs = Math.max(100000 - elapsedMs, 30000)
+      const remainingMs = Math.max(115000 - elapsedMs, 30000)
 
       result = await pollForResult(selectedProvider, result.taskId, apiKey, {
         maxAttempts: Math.floor(remainingMs / 1000),
@@ -242,7 +250,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Error al subir imagen' }, { status: 500 })
     }
 
-    const { data: { publicUrl } } = supabase.storage
+    const { data: { publicUrl: resultUrl } } = supabase.storage
       .from('landing-images')
       .getPublicUrl(storagePath)
 
@@ -254,12 +262,13 @@ export async function POST(request: Request) {
         .insert({
           influencer_id: influencerId,
           user_id: user.id,
-          image_url: publicUrl,
+          image_url: resultUrl,
           type: mode,
           product_name: mode === 'with_product' ? productName : null,
           product_image_url: null,
           prompt_used: prompt,
           situation,
+          aspect_ratio: aspectRatio,
         })
         .select('id')
         .single()
@@ -273,7 +282,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      imageUrl: publicUrl,
+      imageUrl: resultUrl,
       imageBase64: result.imageBase64,
       mimeType: result.mimeType,
       galleryId,

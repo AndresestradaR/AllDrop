@@ -14,6 +14,7 @@ import { Step6Gallery } from './Step6Gallery'
 import { Step7Video } from './Step7Video'
 import { InfluencerSummary } from './InfluencerSummary'
 import { InfluencerBoard } from './InfluencerBoard'
+import { VideoEditor } from '@/components/studio/video-prompt/VideoEditor'
 import type { ImageModelId } from '@/lib/image-providers/types'
 
 interface Influencer {
@@ -45,7 +46,7 @@ interface Influencer {
   created_at: string
 }
 
-type WizardView = 'list' | 'wizard' | 'summary' | 'board'
+type WizardView = 'list' | 'wizard' | 'summary' | 'board' | 'editor'
 
 export function InfluencerWizard({ onBack }: { onBack: () => void }) {
   const [view, setView] = useState<WizardView>('list')
@@ -65,6 +66,10 @@ export function InfluencerWizard({ onBack }: { onBack: () => void }) {
 
   // Model selection (persists across steps)
   const [modelId, setModelId] = useState<ImageModelId>('gemini-3-pro-image')
+
+  // Video editor clips (from gallery selection)
+  const [editorClips, setEditorClips] = useState<{ url: string; label: string }[] | null>(null)
+  const [editorReturnView, setEditorReturnView] = useState<WizardView>('summary')
 
   // Fetch influencers on mount
   useEffect(() => {
@@ -107,6 +112,9 @@ export function InfluencerWizard({ onBack }: { onBack: () => void }) {
 
   const handleContinue = (inf: Influencer) => {
     setActiveInfluencer(inf)
+    // CRITICAL: Reset cached images to prevent bleeding between influencers
+    setBaseImageBase64(null)
+    setRealisticImageBase64(null)
     const step = inf.current_step || 1
 
     if (step >= 6) {
@@ -208,6 +216,12 @@ export function InfluencerWizard({ onBack }: { onBack: () => void }) {
     setCompletedSteps(7)
     setCurrentStep(7)
     setView('wizard')
+  }
+
+  const handleSendToEditor = (clips: { url: string; label: string }[], fromView: WizardView) => {
+    setEditorClips(clips)
+    setEditorReturnView(fromView)
+    setView('editor')
   }
 
   // HEADER for wizard view
@@ -381,6 +395,7 @@ export function InfluencerWizard({ onBack }: { onBack: () => void }) {
               onViewBoard={() => setView('board')}
               onEditName={handleEditName}
               onBack={() => { setView('list'); fetchInfluencers() }}
+              onSendToEditor={(clips) => handleSendToEditor(clips, 'summary')}
             />
           </div>
         </div>
@@ -396,7 +411,24 @@ export function InfluencerWizard({ onBack }: { onBack: () => void }) {
         onBack={() => setView('summary')}
         onCreateContent={handleGoToGallery}
         onCreateVideo={handleGoToVideo}
+        onSendToEditor={(clips) => handleSendToEditor(clips, 'board')}
       />
+    )
+  }
+
+  // ============ EDITOR VIEW ============
+  if (view === 'editor' && editorClips && editorClips.length > 0) {
+    return (
+      <div className="h-[calc(100vh-200px)] min-h-[600px]">
+        <VideoEditor
+          initialClips={editorClips}
+          influencerId={activeInfluencer?.id}
+          onBack={() => {
+            setEditorClips(null)
+            setView(editorReturnView)
+          }}
+        />
+      </div>
     )
   }
 
@@ -531,6 +563,8 @@ export function InfluencerWizard({ onBack }: { onBack: () => void }) {
               promptDescriptor={activeInfluencer.prompt_descriptor || ''}
               realisticImageUrl={activeInfluencer.realistic_image_url || ''}
               onBack={() => setView('summary')}
+              onSendToEditor={(clips) => handleSendToEditor(clips, 'wizard')}
+              onGoToBoard={() => setView('board')}
             />
           )}
         </div>

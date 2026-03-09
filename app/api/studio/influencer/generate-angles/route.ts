@@ -68,10 +68,17 @@ export async function POST(request: Request) {
     if (profile?.bfl_api_key) apiKeys.bfl = decrypt(profile.bfl_api_key)
     if (profile?.fal_api_key) apiKeys.fal = decrypt(profile.fal_api_key)
 
+    // Environment variable fallbacks (platform keys)
+    if (!apiKeys.openai && process.env.OPENAI_API_KEY) apiKeys.openai = process.env.OPENAI_API_KEY
+    if (!apiKeys.kie && process.env.KIE_API_KEY) apiKeys.kie = process.env.KIE_API_KEY
+    if (!apiKeys.bfl && process.env.BFL_API_KEY) apiKeys.bfl = process.env.BFL_API_KEY
+    if (!apiKeys.fal && process.env.FAL_API_KEY) apiKeys.fal = process.env.FAL_API_KEY
+    if (!apiKeys.gemini && process.env.GEMINI_API_KEY) apiKeys.gemini = process.env.GEMINI_API_KEY
+
     const selectedProvider = modelIdToProviderType(modelId)
 
     const providerKeyMap: Record<ImageProviderType, keyof typeof apiKeys> = {
-      gemini: 'gemini', openai: 'openai', seedream: 'kie', flux: 'bfl', fal: 'fal',
+      gemini: 'gemini', openai: 'openai', seedream: 'kie', flux: 'bfl',
     }
 
     // For Gemini: accept either Google key OR KIE key (KIE provides Gemini models)
@@ -81,7 +88,7 @@ export async function POST(request: Request) {
 
     if (!hasRequiredKey) {
       const keyNames: Record<ImageProviderType, string> = {
-        gemini: 'Google (Gemini) o KIE.ai', openai: 'OpenAI', seedream: 'KIE.ai', flux: 'Black Forest Labs', fal: 'fal.ai',
+        gemini: 'Google (Gemini) o KIE.ai', openai: 'OpenAI', seedream: 'KIE.ai', flux: 'Black Forest Labs',
       }
       return NextResponse.json({
         error: `Configura tu API key de ${keyNames[selectedProvider]} en Settings`,
@@ -115,24 +122,21 @@ export async function POST(request: Request) {
 
     console.log(`[Influencer/GenerateAngles] User: ${user.id.substring(0, 8)}..., Model: ${modelId}`)
 
-    // Upload reference image to get public URL (needed for KIE-based providers)
-    let productImageUrls: string[] | undefined
-    const needsPublicUrls = selectedProvider === 'seedream' || (selectedProvider === 'gemini' && apiKeys.kie)
-    if (needsPublicUrls) {
-      const buffer = Buffer.from(refBase64, 'base64')
-      const ext = refMime.includes('png') ? 'png' : 'jpg'
-      const tmpPath = `influencers/${user.id}/tmp_angles_ref.${ext}`
+    // Upload reference image to get public URL (needed for ALL cascade steps — KIE, fal.ai, etc.)
+    const refBuffer = Buffer.from(refBase64, 'base64')
+    const refExt = refMime.includes('png') ? 'png' : 'jpg'
+    const tmpPath = `influencers/${user.id}/${influencerId}_tmp_angles_ref.${refExt}`
 
-      await supabase.storage
-        .from('landing-images')
-        .upload(tmpPath, buffer, { contentType: refMime, upsert: true })
+    await supabase.storage
+      .from('landing-images')
+      .upload(tmpPath, refBuffer, { contentType: refMime, upsert: true })
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('landing-images')
-        .getPublicUrl(tmpPath)
+    const { data: { publicUrl } } = supabase.storage
+      .from('landing-images')
+      .getPublicUrl(tmpPath)
 
-      productImageUrls = [publicUrl]
-    }
+    // Cache-bust to prevent CDN serving old image from previous influencer
+    const productImageUrls = [`${publicUrl}?v=${Date.now()}`]
 
     // Generate angles grid (1:1 aspect ratio)
     const generateRequest: GenerateImageRequest = {
@@ -146,14 +150,14 @@ export async function POST(request: Request) {
 
     const genElapsed = Date.now() - startTime
     let result = await generateImage(generateRequest, apiKeys, {
-      maxTotalMs: Math.max(95000 - genElapsed, 30000),
+      maxTotalMs: Math.max(112000 - genElapsed, 30000),
     })
 
     // Poll for async providers
     if (result.success && result.status === 'processing' && result.taskId) {
       const apiKey = apiKeys[providerKeyMap[selectedProvider]]!
       const elapsedMs = Date.now() - startTime
-      const remainingMs = Math.max(100000 - elapsedMs, 30000)
+      const remainingMs = Math.max(115000 - elapsedMs, 30000)
 
       result = await pollForResult(selectedProvider, result.taskId, apiKey, {
         maxAttempts: Math.floor(remainingMs / 1000),
@@ -182,7 +186,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Error al subir imagen' }, { status: 500 })
     }
 
-    const { data: { publicUrl } } = supabase.storage
+    const { data: { publicUrl: resultUrl } } = supabase.storage
       .from('landing-images')
       .getPublicUrl(storagePath)
 
@@ -190,7 +194,7 @@ export async function POST(request: Request) {
     await supabase
       .from('influencers')
       .update({
-        angles_grid_url: publicUrl,
+        angles_grid_url: resultUrl,
         current_step: 4,
         updated_at: new Date().toISOString(),
       })
@@ -202,7 +206,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      imageUrl: publicUrl,
+      imageUrl: resultUrl,
       imageBase64: result.imageBase64,
       mimeType: result.mimeType,
     })

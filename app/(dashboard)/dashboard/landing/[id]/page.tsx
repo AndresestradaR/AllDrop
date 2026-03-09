@@ -30,10 +30,12 @@ import {
   Lightbulb,
   Target,
   RefreshCw,
-  Plus
+  Plus,
+  Bookmark
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import ModelSelector from '@/components/generator/ModelSelector'
+import { SavedAnglesPanel } from '@/components/studio/SavedAnglesPanel'
 import CountrySelector from '@/components/generator/CountrySelector'
 import PricingControls, { PricingData, getDefaultPricingData } from '@/components/generator/PricingControls'
 import { ImageModelId, modelIdToProviderType } from '@/lib/image-providers/types'
@@ -183,6 +185,10 @@ export default function ProductGeneratePage() {
   }>>([])
   const [selectedAngleIds, setSelectedAngleIds] = useState<Set<string>>(new Set())
   const [anglesAiMeta, setAnglesAiMeta] = useState<{ provider: string; fallbacks?: string[] } | null>(null)
+
+  // Saved angles
+  const [isSavingAngles, setIsSavingAngles] = useState(false)
+  const [showSavedAngles, setShowSavedAngles] = useState(false)
 
   // Manual angle creation
   const [showAddAngleForm, setShowAddAngleForm] = useState(false)
@@ -762,6 +768,31 @@ export default function ProductGeneratePage() {
     toast.success(`Angulo "${manualAngle.name}" agregado`)
   }
 
+  const handleSaveAngles = async () => {
+    if (generatedAngles.length === 0 || !product?.name) return
+    setIsSavingAngles(true)
+    try {
+      const res = await fetch('/api/studio/saved-angles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productName: product.name,
+          angles: generatedAngles,
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success(`${data.count} angulos guardados para "${product.name}"`)
+      } else {
+        toast.error(data.error || 'Error al guardar angulos')
+      }
+    } catch {
+      toast.error('Error al guardar angulos')
+    } finally {
+      setIsSavingAngles(false)
+    }
+  }
+
   const renderAddAngleForm = () => (
     <div className="p-3 rounded-xl border-2 border-dashed border-amber-500/40 bg-amber-500/5 space-y-2">
       <input
@@ -921,17 +952,24 @@ export default function ProductGeneratePage() {
   }
 
   const uploadToCanva = async (imageUrl: string, sectionId: string, name?: string) => {
-    const response = await fetch('/api/canva/upload', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        imageUrl,
-        sectionId,
-        productName: name,
-      }),
-    })
+    let data: any
+    try {
+      const response = await fetch('/api/canva/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageUrl,
+          sectionId,
+          productName: name,
+        }),
+      })
 
-    const data = await response.json()
+      data = await response.json()
+      console.log('[Canva] upload response:', response.status, data)
+    } catch (fetchErr) {
+      console.error('[Canva] fetch failed:', fetchErr)
+      throw new Error('No se pudo conectar con el servidor de Canva')
+    }
 
     if (data.needsAuth) {
       // Store pending data for retry after OAuth
@@ -941,10 +979,11 @@ export default function ProductGeneratePage() {
       // Redirect to OAuth with return URL
       toast.loading('Autenticando con Canva...', { id: 'canva' })
       window.location.href = `/api/canva/auth?returnUrl=${encodeURIComponent(window.location.pathname)}`
-      return null
+      // Wait for navigation to complete so caller doesn't proceed
+      await new Promise(() => {})
     }
 
-    if (!response.ok) {
+    if (!data.success) {
       throw new Error(data.error || 'Error al conectar con Canva')
     }
 
@@ -977,23 +1016,9 @@ export default function ProductGeneratePage() {
         canvaWindow?.close()
       }
     } catch (error: any) {
-      console.error('Canva error:', error)
+      console.error('Canva upload error:', error?.message || error)
       canvaWindow?.close()
-      toast.error('Error con Canva. Descargando imagen...', { id: 'canva' })
-
-      // Fallback: Download image and open Canva manually
-      const link = document.createElement('a')
-      link.href = section.generated_image_url
-      link.download = `${product?.name || 'banner'}-canva-${Date.now()}.png`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-
-      window.open('https://www.canva.com/create/custom-size', '_blank')
-
-      toast.success('Imagen descargada. Sube la imagen en Canva.', {
-        duration: 5000,
-      })
+      toast.error(`Error con Canva: ${error?.message || 'Intenta de nuevo'}`, { id: 'canva', duration: 5000 })
     } finally {
       setIsOpeningCanva(false)
     }
@@ -1981,8 +2006,39 @@ export default function ProductGeneratePage() {
                       Agregar angulo manual
                     </button>
                   )}
+
+                  {/* Save angles button */}
+                  <button
+                    onClick={handleSaveAngles}
+                    disabled={isSavingAngles || generatedAngles.length === 0}
+                    className="mt-2 w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-teal-500/15 text-teal-500 text-sm font-medium hover:bg-teal-500/25 border border-teal-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isSavingAngles ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Bookmark className="w-3.5 h-3.5" />
+                    )}
+                    {isSavingAngles ? 'Guardando...' : 'Guardar Angulos'}
+                  </button>
                 </div>
               )}
+
+              {/* Saved Angles Panel */}
+              <div className="pt-4 border-t border-border">
+                <button
+                  onClick={() => setShowSavedAngles(!showSavedAngles)}
+                  className="w-full flex items-center justify-between text-sm font-medium text-text-primary mb-2"
+                >
+                  <span className="flex items-center gap-2">
+                    <Bookmark className="w-4 h-4 text-teal-500" />
+                    Angulos Guardados
+                  </span>
+                  {showSavedAngles ? <ChevronDown className="w-4 h-4 text-text-muted" /> : <ChevronRight className="w-4 h-4 text-text-muted" />}
+                </button>
+                {showSavedAngles && (
+                  <SavedAnglesPanel selectable={false} filterByProduct={product?.name} />
+                )}
+              </div>
 
               {/* Add manual angle when no AI angles exist yet */}
               {generatedAngles.length === 0 && (

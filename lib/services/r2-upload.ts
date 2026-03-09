@@ -71,7 +71,9 @@ export async function uploadToR2(
     return `${base}/${fullKey}`
   }
 
-  return `https://${creds.bucketName}.${creds.accountId}.r2.cloudflarestorage.com/${fullKey}`
+  // No public URL configured — S3 API endpoint requires auth and NEVER works in browsers.
+  // File IS uploaded for backup, but we can't generate a usable public URL.
+  throw new Error('R2 configurado pero sin Public URL. Configura tu dominio público en Settings.')
 }
 
 export async function uploadUrlToR2(
@@ -136,7 +138,9 @@ export async function tryUploadToR2(
       const base = creds.publicUrl.endsWith('/') ? creds.publicUrl.slice(0, -1) : creds.publicUrl
       return `${base}/${fullKey}`
     }
-    return `https://${creds.bucketName}.${creds.accountId}.r2.cloudflarestorage.com/${fullKey}`
+    // No public URL → file uploaded for backup but URL not usable in browser
+    console.warn('[R2] Uploaded OK but no public URL configured — falling back to Storage')
+    return null
   } catch (err: any) {
     console.warn('[R2] Optional upload failed, continuing:', err.message)
     return null

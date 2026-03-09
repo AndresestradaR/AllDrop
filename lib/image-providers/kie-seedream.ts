@@ -385,8 +385,12 @@ export const seedreamProvider: ImageProvider = {
         
         if (resultUrls.length > 0) {
           const imageUrl = resultUrls[0]
-          const imageResponse = await fetch(imageUrl)
+          // Timeout for image download — KIE CDN can be slow for large PNGs
+          const downloadController = new AbortController()
+          const downloadTimeout = setTimeout(() => downloadController.abort(), 20000)
+          const imageResponse = await fetch(imageUrl, { signal: downloadController.signal })
           const imageBuffer = await imageResponse.arrayBuffer()
+          clearTimeout(downloadTimeout)
           const imageBase64 = Buffer.from(imageBuffer).toString('base64')
           const mimeType = imageResponse.headers.get('content-type') || 'image/png'
 
