@@ -21,7 +21,7 @@ interface AngleGroup {
 }
 
 interface SavedAnglesPanelProps {
-  onSelectAngle?: (angle: AngleData) => void
+  onSelectAngle?: (angle: AngleData, productName?: string) => void
   selectable?: boolean
   selectedAngleId?: string | null
   filterByProduct?: string       // Show only this product's angles (no accordion)
@@ -115,9 +115,9 @@ Publico Objetivo: ${angle.avatarSuggestion}`
     setTimeout(() => setCopiedAngleId(null), 2000)
   }
 
-  const handleAngleClick = (angle: AngleData, e: React.MouseEvent) => {
+  const handleAngleClick = (angle: AngleData, e: React.MouseEvent, productName?: string) => {
     if (selectable) {
-      onSelectAngle?.(angle)
+      onSelectAngle?.(angle, productName)
     } else {
       // Toggle accordion
       setExpandedAngle(prev => prev === angle.id ? null : angle.id)
@@ -232,7 +232,7 @@ Publico Objetivo: ${angle.avatarSuggestion}`
                     >
                       {/* Angle Header — always visible */}
                       <div
-                        onClick={(e) => handleAngleClick(angle, e)}
+                        onClick={(e) => handleAngleClick(angle, e, group.productName)}
                         className={`flex items-center justify-between px-3 py-2 ${selectable ? 'cursor-pointer' : 'cursor-pointer hover:bg-[#222]'} transition-colors`}
                       >
                         <div className="flex items-center gap-2 min-w-0 flex-1">

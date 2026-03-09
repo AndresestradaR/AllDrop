@@ -49,8 +49,34 @@ export function SceneScriptGenerator({
 
   // Step 2: Config
   const [productDescription, setProductDescription] = useState('')
+  const [isLoadingContext, setIsLoadingContext] = useState(false)
   const [voiceGender, setVoiceGender] = useState<'femenina' | 'masculina'>('femenina')
   const [numberOfScenes, setNumberOfScenes] = useState(4)
+
+  // Auto-load product context when angle is selected with a product name
+  const loadProductContext = async (productName: string) => {
+    setIsLoadingContext(true)
+    try {
+      const res = await fetch(`/api/products/context?productName=${encodeURIComponent(productName)}`)
+      const data = await res.json()
+      if (data.context) {
+        const ctx = data.context
+        const parts: string[] = []
+        if (ctx.description) parts.push(ctx.description)
+        if (ctx.benefits) parts.push(`Beneficios: ${ctx.benefits}`)
+        if (ctx.problems) parts.push(`Problemas que resuelve: ${ctx.problems}`)
+        if (ctx.ingredients) parts.push(`Ingredientes/Componentes: ${ctx.ingredients}`)
+        if (ctx.differentiator) parts.push(`Diferenciador: ${ctx.differentiator}`)
+        if (parts.length > 0) {
+          setProductDescription(parts.join('\n'))
+        }
+      }
+    } catch {
+      // Silent — user can still fill manually
+    } finally {
+      setIsLoadingContext(false)
+    }
+  }
 
   // Step 3: Generated scenes
   const [scenes, setScenes] = useState<SceneData[]>([])
@@ -148,9 +174,12 @@ export function SceneScriptGenerator({
                 selectable
                 showProductFilter
                 selectedAngleId={null}
-                onSelectAngle={(angle) => {
+                onSelectAngle={(angle, productName) => {
                   setSelectedAngle(angle)
                   setShowAngleSelector(false)
+                  if (productName && !productDescription.trim()) {
+                    loadProductContext(productName)
+                  }
                 }}
               />
             )}
@@ -162,14 +191,15 @@ export function SceneScriptGenerator({
       <div className="mb-4 space-y-3">
         <div>
           <label className="block text-xs font-semibold text-[#e5e5e5] uppercase tracking-wide mb-1">
-            2. Descripcion del Producto
+            2. Descripcion del Producto {isLoadingContext && <span className="text-teal-400 text-[10px] font-normal ml-1">Cargando contexto...</span>}
           </label>
           <textarea
             value={productDescription}
             onChange={(e) => setProductDescription(e.target.value)}
             placeholder="Describe el producto: que es, que hace, para quien es, precio..."
             rows={3}
-            className="w-full px-3 py-2 bg-[#1a1a1a] border border-[#333] rounded-lg text-sm text-[#e5e5e5] placeholder:text-[#666] resize-none focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+            disabled={isLoadingContext}
+            className="w-full px-3 py-2 bg-[#1a1a1a] border border-[#333] rounded-lg text-sm text-[#e5e5e5] placeholder:text-[#666] resize-none focus:outline-none focus:ring-2 focus:ring-teal-500/50 disabled:opacity-50"
           />
         </div>
 

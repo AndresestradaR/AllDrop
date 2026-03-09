@@ -15,16 +15,23 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url)
     const productId = searchParams.get('productId')
-    if (!productId) {
-      return NextResponse.json({ error: 'productId requerido' }, { status: 400 })
+    const productName = searchParams.get('productName')
+    if (!productId && !productName) {
+      return NextResponse.json({ error: 'productId o productName requerido' }, { status: 400 })
     }
 
-    const { data: product } = await supabase
+    let query = supabase
       .from('products')
-      .select('id, product_context')
-      .eq('id', productId)
+      .select('id, name, product_context')
       .eq('user_id', user.id)
-      .single()
+
+    if (productId) {
+      query = query.eq('id', productId)
+    } else {
+      query = query.eq('name', productName!)
+    }
+
+    const { data: product } = await query.single()
 
     if (!product) {
       return NextResponse.json({ error: 'Producto no encontrado' }, { status: 404 })
