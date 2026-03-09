@@ -74,17 +74,21 @@ export function SceneScriptGenerator({
     fetch('/api/products/context?list=true')
       .then(r => r.json())
       .then(data => {
+        console.log('[SceneScript] Products loaded:', JSON.stringify(data.products?.map((p: any) => ({ name: p.name, hasContext: !!p.context, contextKeys: p.context ? Object.keys(p.context) : [] }))))
         if (data.products?.length) {
           setProducts(data.products)
           // Auto-select first product and fill if has context
           const first = data.products[0]
           setSelectedProductId(first.id)
           if (first.context) {
+            console.log('[SceneScript] Auto-filling from:', first.name, first.context)
             fillDescriptionFromContext(first.context)
+          } else {
+            console.log('[SceneScript] First product has no context:', first.name)
           }
         }
       })
-      .catch(() => {})
+      .catch((e) => console.error('[SceneScript] Load error:', e))
       .finally(() => setIsLoadingProducts(false))
   }, [])
 
