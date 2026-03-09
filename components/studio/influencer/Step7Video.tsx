@@ -3,8 +3,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { cn } from '@/lib/utils/cn'
 import { VIDEO_MODELS, VIDEO_COMPANY_GROUPS, type VideoModelId } from '@/lib/video-providers/types'
-import { Video, Loader2, Copy, Check, Wand2, Image as ImageIcon, Heart, X, Package, Info, Plus, Trash2, ChevronDown, ChevronUp, Volume2, VolumeX, Film } from 'lucide-react'
+import { Video, Loader2, Copy, Check, Wand2, Image as ImageIcon, Heart, X, Package, Info, Plus, Trash2, ChevronDown, ChevronUp, Volume2, VolumeX, Film, Sparkles } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { ViralTransformationMode } from './ViralTransformationMode'
 
 interface Step7VideoProps {
   influencerId: string
@@ -33,6 +34,9 @@ export function Step7Video({
   onBack,
 }: Step7VideoProps) {
   console.log('[Step7Video] Props received:', { promptDescriptor: promptDescriptor?.substring(0, 30), influencerId, realisticImageUrl: !!realisticImageUrl })
+
+  // Video creation mode: 'standard' (existing UGC) or 'viral' (transformation)
+  const [creationMode, setCreationMode] = useState<'standard' | 'viral'>('standard')
 
   // Resolved descriptor (loads from DB if prop is empty)
   const [resolvedDescriptor, setResolvedDescriptor] = useState(promptDescriptor)
@@ -758,6 +762,46 @@ export function Step7Video({
         </div>
       </div>
 
+      {/* ============ MODE TOGGLE: Standard vs Viral ============ */}
+      <div className="mb-5">
+        <div className="flex rounded-xl border border-border overflow-hidden">
+          <button
+            onClick={() => setCreationMode('standard')}
+            className={cn(
+              'flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-semibold transition-all',
+              creationMode === 'standard'
+                ? 'bg-accent/15 text-accent border-r border-accent/30'
+                : 'bg-surface-elevated text-text-muted hover:text-text-secondary border-r border-border'
+            )}
+          >
+            <Video className="w-3.5 h-3.5" />
+            Video UGC
+          </button>
+          <button
+            onClick={() => setCreationMode('viral')}
+            className={cn(
+              'flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-semibold transition-all',
+              creationMode === 'viral'
+                ? 'bg-accent/15 text-accent'
+                : 'bg-surface-elevated text-text-muted hover:text-text-secondary'
+            )}
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            Transformación Viral
+          </button>
+        </div>
+      </div>
+
+      {/* ============ VIRAL TRANSFORMATION MODE ============ */}
+      {creationMode === 'viral' ? (
+        <ViralTransformationMode
+          influencerId={selectedInfluencerId}
+          influencerName={selectedInfluencerName}
+          promptDescriptor={resolvedDescriptor}
+          realisticImageUrl={selectedInfluencerImage}
+        />
+      ) : (
+      <>
       {/* ============ MODELO DE VIDEO ============ */}
       <div className="mb-4">
         <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">Modelo de IA</label>
@@ -1522,6 +1566,8 @@ export function Step7Video({
             </div>
           </div>
         </div>
+      )}
+      </>
       )}
     </div>
   )
