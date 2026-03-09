@@ -271,11 +271,15 @@ export default function ProductGeneratePage() {
 
     if (contextSaveTimer.current) clearTimeout(contextSaveTimer.current)
     contextSaveTimer.current = setTimeout(() => {
+      console.log('[ProductContext] Auto-saving...', { productId, context: productContext })
       fetch('/api/products/context', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ productId, context: productContext }),
-      }).catch(() => {}) // Fire-and-forget
+      })
+        .then(r => r.json())
+        .then(d => console.log('[ProductContext] Save result:', d))
+        .catch(e => console.error('[ProductContext] Save error:', e))
     }, 1500)
 
     return () => { if (contextSaveTimer.current) clearTimeout(contextSaveTimer.current) }
@@ -703,6 +707,20 @@ export default function ProductGeneratePage() {
     if (!productPhotos.some(p => p !== null)) {
       toast.error('Sube al menos una foto del producto')
       return
+    }
+
+    // Force-save product context before generating angles
+    const ctxToSave = showProductContext ? productContext : {}
+    const hasCtx = Object.values(ctxToSave).some(v => typeof v === 'string' && v.trim() !== '')
+    if (hasCtx) {
+      try {
+        await fetch('/api/products/context', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ productId, context: ctxToSave }),
+        })
+        console.log('[ProductContext] Forced save before angle generation')
+      } catch {}
     }
 
     setIsGeneratingAngles(true)

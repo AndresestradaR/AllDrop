@@ -233,7 +233,7 @@ export function SceneScriptGenerator({
             {!selectedAngle && (
               <SavedAnglesPanel
                 selectable
-                showProductFilter
+                filterByProduct={products.find(p => p.id === selectedProductId)?.name}
                 selectedAngleId={null}
                 onSelectAngle={(angle) => {
                   setSelectedAngle(angle)
