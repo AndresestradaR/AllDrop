@@ -554,6 +554,20 @@ export default function ProductGeneratePage() {
       })
       setShowCreativeControls(true)
 
+      // Auto-save product context if empty — so video tools can reuse it
+      const hasExistingContext = Object.values(productContext).some(v => v.trim() !== '')
+      if (!hasExistingContext && data.suggestions.productDetails) {
+        const autoContext = {
+          description: data.suggestions.productDetails || '',
+          benefits: '',
+          problems: '',
+          ingredients: '',
+          differentiator: '',
+        }
+        setProductContext(autoContext)
+        setShowProductContext(true)
+      }
+
       toast.success('¡Campos completados con IA!', { id: 'enhance' })
     } catch (error: any) {
       toast.error(error.message || 'Error al mejorar', { id: 'enhance' })
