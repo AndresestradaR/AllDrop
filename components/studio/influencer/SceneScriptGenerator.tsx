@@ -69,16 +69,19 @@ export function SceneScriptGenerator({
   const [voiceGender, setVoiceGender] = useState<'femenina' | 'masculina'>('femenina')
   const [numberOfScenes, setNumberOfScenes] = useState(4)
 
-  // Load all products with context on mount
+  // Load all products on mount
   useEffect(() => {
     fetch('/api/products/context?list=true')
       .then(r => r.json())
       .then(data => {
         if (data.products?.length) {
           setProducts(data.products)
-          // Auto-select first product
-          setSelectedProductId(data.products[0].id)
-          fillDescriptionFromContext(data.products[0].context)
+          // Auto-select first product and fill if has context
+          const first = data.products[0]
+          setSelectedProductId(first.id)
+          if (first.context) {
+            fillDescriptionFromContext(first.context)
+          }
         }
       })
       .catch(() => {})
@@ -196,7 +199,7 @@ export function SceneScriptGenerator({
           </select>
         ) : (
           <p className="text-[11px] text-text-muted px-3 py-2 bg-[#1a1a1a] border border-[#333] rounded-lg">
-            No hay productos con contexto. Ve al Banner Generator y llena el &quot;Contexto del Producto&quot;.
+            No hay productos. Crea una landing primero en &quot;Crea tu Landing&quot;.
           </p>
         )}
       </div>

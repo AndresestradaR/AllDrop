@@ -18,20 +18,19 @@ export async function GET(request: Request) {
     const productName = searchParams.get('productName')
     const listAll = searchParams.get('list')
 
-    // List all products with context
+    // List all products (with or without context)
     if (listAll === 'true') {
       const { data: products } = await supabase
         .from('products')
         .select('id, name, product_context')
         .eq('user_id', user.id)
-        .not('product_context', 'is', null)
         .order('created_at', { ascending: false })
 
       return NextResponse.json({
         products: (products || []).map(p => ({
           id: p.id,
           name: p.name,
-          context: p.product_context,
+          context: p.product_context || null,
         })),
       })
     }
