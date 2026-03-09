@@ -1,0 +1,77 @@
+import { NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+
+/**
+ * GET /api/products/context?productId=xxx
+ * Load persisted product context for Banner Generator / Video Viral.
+ */
+export async function GET(request: Request) {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
+    const { searchParams } = new URL(request.url)
+    const productId = searchParams.get('productId')
+    if (!productId) {
+      return NextResponse.json({ error: 'productId requerido' }, { status: 400 })
+    }
+
+    const { data: product } = await supabase
+      .from('products')
+      .select('id, product_context')
+      .eq('id', productId)
+      .eq('user_id', user.id)
+      .single()
+
+    if (!product) {
+      return NextResponse.json({ error: 'Producto no encontrado' }, { status: 404 })
+    }
+
+    return NextResponse.json({
+      productId: product.id,
+      context: product.product_context || null,
+    })
+  } catch (error: any) {
+    console.error('[ProductContext GET] Error:', error.message)
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+}
+
+/**
+ * PUT /api/products/context
+ * Persist product context (auto-saved from Banner Generator).
+ * Body: { productId, context: { description, benefits, problems, ingredients, differentiator } }
+ */
+export async function PUT(request: Request) {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
+    const { productId, context } = await request.json()
+    if (!productId) {
+      return NextResponse.json({ error: 'productId requerido' }, { status: 400 })
+    }
+
+    const { error } = await supabase
+      .from('products')
+      .update({ product_context: context })
+      .eq('id', productId)
+      .eq('user_id', user.id)
+
+    if (error) {
+      console.error('[ProductContext PUT] Supabase error:', error.message)
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    return NextResponse.json({ success: true })
+  } catch (error: any) {
+    console.error('[ProductContext PUT] Error:', error.message)
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+}

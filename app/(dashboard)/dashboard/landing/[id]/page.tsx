@@ -244,7 +244,36 @@ export default function ProductGeneratePage() {
     fetchTemplates()
     fetchGeneratedSections()
     fetchApiKeyStatus()
+    // Load persisted product context
+    fetch(`/api/products/context?productId=${productId}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.context) {
+          setProductContext(data.context)
+          setShowProductContext(true)
+        }
+      })
+      .catch(() => {}) // Silently fail — column might not exist yet
   }, [productId])
+
+  // Auto-save product context with debounce (1.5s after last change)
+  const contextSaveTimer = useRef<NodeJS.Timeout | null>(null)
+  useEffect(() => {
+    // Skip if all fields are empty (initial state)
+    const hasContent = Object.values(productContext).some(v => v.trim() !== '')
+    if (!hasContent) return
+
+    if (contextSaveTimer.current) clearTimeout(contextSaveTimer.current)
+    contextSaveTimer.current = setTimeout(() => {
+      fetch('/api/products/context', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productId, context: productContext }),
+      }).catch(() => {}) // Fire-and-forget
+    }, 1500)
+
+    return () => { if (contextSaveTimer.current) clearTimeout(contextSaveTimer.current) }
+  }, [productContext, productId])
 
   // Retry Canva upload after OAuth callback
   useEffect(() => {

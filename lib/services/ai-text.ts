@@ -14,10 +14,17 @@ export interface AIImageInput {
   base64: string // raw base64 without data: prefix
 }
 
+export interface AIMultimodalPart {
+  text?: string
+  fileData?: { fileUri: string; mimeType: string }
+  inlineData?: { data: string; mimeType: string }
+}
+
 export interface AITextOptions {
   systemPrompt?: string
-  userMessage: string
+  userMessage: string // Required for KIE/OpenAI. Can be empty string when using multimodalParts (Google only).
   images?: AIImageInput[]
+  multimodalParts?: AIMultimodalPart[] // For video/image URLs + text (Google only, bypasses KIE/OpenAI)
   temperature?: number
   jsonMode?: boolean
   kieModel?: string    // default: 'gemini-2.5-flash'
@@ -59,7 +66,8 @@ export async function generateAIText(
     }
   }
 
-  if (keys.openaiApiKey) {
+  // Skip OpenAI when multimodal parts are present (video URLs only work with Google)
+  if (keys.openaiApiKey && !options.multimodalParts?.length) {
     const t0 = Date.now()
     const wasFallback = fallbacks.length > 0
     try {
@@ -298,13 +306,26 @@ async function callGoogle(apiKey: string, options: AITextOptions): Promise<strin
 
   const parts: any[] = []
 
-  if (options.images?.length) {
-    for (const img of options.images) {
-      parts.push({ inline_data: { mime_type: img.mimeType, data: img.base64 } })
+  // Multimodal parts (video URLs, image URLs, text) — used by viral video analysis
+  if (options.multimodalParts?.length) {
+    for (const part of options.multimodalParts) {
+      if (part.fileData) {
+        parts.push({ file_data: { file_uri: part.fileData.fileUri, mime_type: part.fileData.mimeType } })
+      } else if (part.inlineData) {
+        parts.push({ inline_data: { mime_type: part.inlineData.mimeType, data: part.inlineData.data } })
+      } else if (part.text) {
+        parts.push({ text: part.text })
+      }
     }
+  } else {
+    // Legacy path: base64 images + text message
+    if (options.images?.length) {
+      for (const img of options.images) {
+        parts.push({ inline_data: { mime_type: img.mimeType, data: img.base64 } })
+      }
+    }
+    parts.push({ text: options.userMessage })
   }
-
-  parts.push({ text: options.userMessage })
 
   const body: any = {
     contents: [{ parts }],
@@ -323,9 +344,10 @@ async function callGoogle(apiKey: string, options: AITextOptions): Promise<strin
     body.generationConfig.responseMimeType = 'application/json'
   }
 
-  // Safety timeout: 90s (matches KIE/OpenAI timeouts)
+  // Safety timeout: 90s for text, 110s for multimodal with video (video analysis takes longer)
+  const timeoutMs = options.multimodalParts?.some(p => p.fileData?.mimeType?.startsWith('video/')) ? 110000 : 90000
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 90000)
+  const timeout = setTimeout(() => controller.abort(), timeoutMs)
   const signal = options.signal
     ? anySignal([options.signal, controller.signal])
     : controller.signal
