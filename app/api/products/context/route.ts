@@ -16,6 +16,26 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const productId = searchParams.get('productId')
     const productName = searchParams.get('productName')
+    const listAll = searchParams.get('list')
+
+    // List all products with context
+    if (listAll === 'true') {
+      const { data: products } = await supabase
+        .from('products')
+        .select('id, name, product_context')
+        .eq('user_id', user.id)
+        .not('product_context', 'is', null)
+        .order('created_at', { ascending: false })
+
+      return NextResponse.json({
+        products: (products || []).map(p => ({
+          id: p.id,
+          name: p.name,
+          context: p.product_context,
+        })),
+      })
+    }
+
     if (!productId && !productName) {
       return NextResponse.json({ error: 'productId o productName requerido' }, { status: 400 })
     }

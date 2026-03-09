@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { Loader2, Film, Play, Sparkles, ChevronDown, ChevronUp } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Loader2, Film, Play, Sparkles, ChevronDown, ChevronUp, Package } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { SavedAnglesPanel } from '@/components/studio/SavedAnglesPanel'
 
@@ -34,6 +34,18 @@ interface SceneScriptGeneratorProps {
   onStartSequential: (scenes: SceneData[]) => void
 }
 
+interface ProductWithContext {
+  id: string
+  name: string
+  context: {
+    description?: string
+    benefits?: string
+    problems?: string
+    ingredients?: string
+    differentiator?: string
+  }
+}
+
 export function SceneScriptGenerator({
   influencerId,
   influencerName,
@@ -43,38 +55,56 @@ export function SceneScriptGenerator({
   onGenerateAll,
   onStartSequential,
 }: SceneScriptGeneratorProps) {
+  // Product selector (loads from Banner Generator context)
+  const [products, setProducts] = useState<ProductWithContext[]>([])
+  const [selectedProductId, setSelectedProductId] = useState('')
+  const [isLoadingProducts, setIsLoadingProducts] = useState(true)
+
   // Step 1: Angle selection
   const [selectedAngle, setSelectedAngle] = useState<AngleData | null>(null)
   const [showAngleSelector, setShowAngleSelector] = useState(true)
 
   // Step 2: Config
   const [productDescription, setProductDescription] = useState('')
-  const [isLoadingContext, setIsLoadingContext] = useState(false)
   const [voiceGender, setVoiceGender] = useState<'femenina' | 'masculina'>('femenina')
   const [numberOfScenes, setNumberOfScenes] = useState(4)
 
-  // Auto-load product context when angle is selected with a product name
-  const loadProductContext = async (productName: string) => {
-    setIsLoadingContext(true)
-    try {
-      const res = await fetch(`/api/products/context?productName=${encodeURIComponent(productName)}`)
-      const data = await res.json()
-      if (data.context) {
-        const ctx = data.context
-        const parts: string[] = []
-        if (ctx.description) parts.push(ctx.description)
-        if (ctx.benefits) parts.push(`Beneficios: ${ctx.benefits}`)
-        if (ctx.problems) parts.push(`Problemas que resuelve: ${ctx.problems}`)
-        if (ctx.ingredients) parts.push(`Ingredientes/Componentes: ${ctx.ingredients}`)
-        if (ctx.differentiator) parts.push(`Diferenciador: ${ctx.differentiator}`)
-        if (parts.length > 0) {
-          setProductDescription(parts.join('\n'))
+  // Load all products with context on mount
+  useEffect(() => {
+    fetch('/api/products/context?list=true')
+      .then(r => r.json())
+      .then(data => {
+        if (data.products?.length) {
+          setProducts(data.products)
+          // Auto-select first product
+          setSelectedProductId(data.products[0].id)
+          fillDescriptionFromContext(data.products[0].context)
         }
-      }
-    } catch {
-      // Silent — user can still fill manually
-    } finally {
-      setIsLoadingContext(false)
+      })
+      .catch(() => {})
+      .finally(() => setIsLoadingProducts(false))
+  }, [])
+
+  // When product changes, fill description
+  const handleProductChange = (productId: string) => {
+    setSelectedProductId(productId)
+    const product = products.find(p => p.id === productId)
+    if (product?.context) {
+      fillDescriptionFromContext(product.context)
+    } else {
+      setProductDescription('')
+    }
+  }
+
+  const fillDescriptionFromContext = (ctx: ProductWithContext['context']) => {
+    const parts: string[] = []
+    if (ctx.description) parts.push(ctx.description)
+    if (ctx.benefits) parts.push(`Beneficios: ${ctx.benefits}`)
+    if (ctx.problems) parts.push(`Problemas que resuelve: ${ctx.problems}`)
+    if (ctx.ingredients) parts.push(`Ingredientes/Componentes: ${ctx.ingredients}`)
+    if (ctx.differentiator) parts.push(`Diferenciador: ${ctx.differentiator}`)
+    if (parts.length > 0) {
+      setProductDescription(parts.join('\n'))
     }
   }
 
@@ -143,6 +173,34 @@ export function SceneScriptGenerator({
         Guion por Escenas (Veo 3.1)
       </h3>
 
+      {/* Product Selector — auto-loads context from Banner Generator */}
+      <div className="mb-4">
+        <label className="block text-xs font-semibold text-[#e5e5e5] uppercase tracking-wide mb-1 flex items-center gap-1.5">
+          <Package className="w-3.5 h-3.5 text-teal-400" />
+          Producto
+        </label>
+        {isLoadingProducts ? (
+          <div className="flex items-center gap-2 px-3 py-2 bg-[#1a1a1a] border border-[#333] rounded-lg">
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-teal-400" />
+            <span className="text-xs text-text-muted">Cargando productos...</span>
+          </div>
+        ) : products.length > 0 ? (
+          <select
+            value={selectedProductId}
+            onChange={(e) => handleProductChange(e.target.value)}
+            className="w-full px-3 py-2 bg-[#1a1a1a] border border-[#333] rounded-lg text-sm text-[#e5e5e5] focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+          >
+            {products.map(p => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        ) : (
+          <p className="text-[11px] text-text-muted px-3 py-2 bg-[#1a1a1a] border border-[#333] rounded-lg">
+            No hay productos con contexto. Ve al Banner Generator y llena el &quot;Contexto del Producto&quot;.
+          </p>
+        )}
+      </div>
+
       {/* Step 1: Angle Selector */}
       <div className="mb-4">
         <button
@@ -174,12 +232,9 @@ export function SceneScriptGenerator({
                 selectable
                 showProductFilter
                 selectedAngleId={null}
-                onSelectAngle={(angle, productName) => {
+                onSelectAngle={(angle) => {
                   setSelectedAngle(angle)
                   setShowAngleSelector(false)
-                  if (productName && !productDescription.trim()) {
-                    loadProductContext(productName)
-                  }
                 }}
               />
             )}
@@ -187,19 +242,18 @@ export function SceneScriptGenerator({
         )}
       </div>
 
-      {/* Step 2: Config */}
+      {/* Step 2: Product Description (auto-filled, editable) */}
       <div className="mb-4 space-y-3">
         <div>
           <label className="block text-xs font-semibold text-[#e5e5e5] uppercase tracking-wide mb-1">
-            2. Descripcion del Producto {isLoadingContext && <span className="text-teal-400 text-[10px] font-normal ml-1">Cargando contexto...</span>}
+            2. Descripcion del Producto {productDescription && <span className="text-teal-400 text-[10px] font-normal ml-1">(del Banner Generator — editable)</span>}
           </label>
           <textarea
             value={productDescription}
             onChange={(e) => setProductDescription(e.target.value)}
-            placeholder="Describe el producto: que es, que hace, para quien es, precio..."
+            placeholder="Selecciona un producto arriba o describe manualmente..."
             rows={3}
-            disabled={isLoadingContext}
-            className="w-full px-3 py-2 bg-[#1a1a1a] border border-[#333] rounded-lg text-sm text-[#e5e5e5] placeholder:text-[#666] resize-none focus:outline-none focus:ring-2 focus:ring-teal-500/50 disabled:opacity-50"
+            className="w-full px-3 py-2 bg-[#1a1a1a] border border-[#333] rounded-lg text-sm text-[#e5e5e5] placeholder:text-[#666] resize-none focus:outline-none focus:ring-2 focus:ring-teal-500/50"
           />
         </div>
 
