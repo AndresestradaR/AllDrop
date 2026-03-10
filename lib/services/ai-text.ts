@@ -310,7 +310,25 @@ async function callGoogle(apiKey: string, options: AITextOptions): Promise<strin
   if (options.multimodalParts?.length) {
     for (const part of options.multimodalParts) {
       if (part.fileData) {
-        parts.push({ file_data: { file_uri: part.fileData.fileUri, mime_type: part.fileData.mimeType } })
+        // Gemini file_data only works with gs:// or Google Files API URLs.
+        // For external URLs (Supabase, etc.), download and send as inline_data (base64).
+        const uri = part.fileData.fileUri
+        if (uri.startsWith('gs://')) {
+          parts.push({ file_data: { file_uri: uri, mime_type: part.fileData.mimeType } })
+        } else {
+          try {
+            console.log(`[AI Text] Downloading file for inline: ${uri.substring(0, 80)}...`)
+            const fileRes = await fetch(uri)
+            if (!fileRes.ok) throw new Error(`Download failed: ${fileRes.status}`)
+            const buffer = await fileRes.arrayBuffer()
+            const base64 = Buffer.from(buffer).toString('base64')
+            console.log(`[AI Text] File downloaded: ${(buffer.byteLength / 1024 / 1024).toFixed(1)}MB`)
+            parts.push({ inline_data: { mime_type: part.fileData.mimeType, data: base64 } })
+          } catch (dlErr: any) {
+            console.error(`[AI Text] Failed to download file: ${dlErr.message}`)
+            // Skip this part if download fails
+          }
+        }
       } else if (part.inlineData) {
         parts.push({ inline_data: { mime_type: part.inlineData.mimeType, data: part.inlineData.data } })
       } else if (part.text) {
