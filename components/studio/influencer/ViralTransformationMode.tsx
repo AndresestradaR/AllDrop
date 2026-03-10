@@ -26,6 +26,7 @@ interface ViralScene {
   complexity: string
   usesInfluencer: boolean
   usesProductPhoto: boolean
+  startsAtSecond?: number
 }
 
 interface ViralScriptResult {
@@ -936,6 +937,11 @@ export function ViralTransformationMode({
               >
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-bold text-text-primary">Escena {scene.sceneNumber}</span>
+                  {scene.startsAtSecond != null && (
+                    <span className="text-[10px] px-1.5 py-0.5 bg-surface border border-border rounded text-text-muted font-mono">
+                      {scene.startsAtSecond}s–{scene.startsAtSecond + scene.duration}s
+                    </span>
+                  )}
                   <span className={cn('text-[10px] px-2 py-0.5 rounded-full border', sceneTypeBadge(scene.sceneType))}>
                     {sceneTypeLabel(scene.sceneType)}
                   </span>
@@ -1126,7 +1132,10 @@ export function ViralTransformationMode({
                     )}
                   >
                     <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-[10px] font-bold text-text-primary">Escena {scene.sceneNumber}</span>
+                      <span className="text-[10px] font-bold text-text-primary">
+                        Escena {scene.sceneNumber}
+                        {scene.startsAtSecond != null && <span className="font-mono text-text-muted ml-1">({scene.startsAtSecond}s–{scene.startsAtSecond + scene.duration}s)</span>}
+                      </span>
                       {status === 'generating-image' && (
                         <div className="flex items-center gap-1">
                           <Loader2 className="w-3 h-3 text-purple-400 animate-spin" />

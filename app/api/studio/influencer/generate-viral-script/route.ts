@@ -105,20 +105,21 @@ OUTPUT FORMAT — Respond with valid JSON only. No markdown, no backticks, no ex
 }
 
 SCENE TYPES:
-- "transformation": Product actively transforming something (70%+ of scenes MUST be this type)
-- "influencer": Influencer interacting with the product (hook, reaction, CTA)
-- "beauty-shot": Final product showcase (ALWAYS uses real product photo as reference)
+- "transformation": Product actively transforming something or showing results
+- "influencer": Influencer speaking to camera, showing the product, reacting
+- "beauty-shot": Product showcase (close-up of the real product)
 
-SCENE MIX RULES:
-- 70%+ of scenes MUST show active transformation (sceneType: "transformation")
-- The influencer should appear in 1-2 scenes maximum (hook and/or CTA)
-- Final scene should ALWAYS be a beauty-shot with usesProductPhoto: true
-- Total video: 15-30 seconds (4-6 scenes of 5 seconds each)
-- Same camera angle for before/after in each scene — critical for comparison
-- Lighting consistency — before and after share the same lighting setup
+SCENE MIX RULES — FOLLOW THE REFERENCE VIDEO:
+- If a reference video is provided, MATCH its structure: if it shows the influencer in 80% of scenes, YOUR output should too
+- If the reference shows the influencer holding the product and talking, mark those scenes usesInfluencer: true AND usesProductPhoto: true
+- If no reference video, default to: influencer in 60% of scenes, product-only in 30%, beauty-shot final 10%
+- usesInfluencer: true means the influencer's face/body MUST appear in this scene's imagePrompt
+- usesProductPhoto: true means the real product MUST appear in this scene's imagePrompt
+- These flags are CRITICAL because they determine which reference photos are used to generate the scene image
+- Lighting consistency across scenes — maintain the same look throughout
 
 IMPORTANT:
-- The reference video might be of a COMPLETELY DIFFERENT product. Extract the STYLE and STRUCTURE, not the specific product content.
+- The reference video might be of a COMPLETELY DIFFERENT product. Extract the STYLE, STRUCTURE, and TIMING — adapt the content to the new product and influencer.
 - If the reference video is in English, that's fine — all output dialogue must be in Latin American Spanish.
 - If no reference video is provided, create the production guide based on the product info and sales angle alone.
 - Every animation prompt must follow the 6-part formula. No exceptions.
@@ -193,7 +194,8 @@ export async function POST(request: Request) {
     // 3. Text prompt with all context
     const targetScenes = Math.max(3, Math.min(6, sceneCount || 5))
 
-    const userMessage = `REFERENCE VIDEO: ${referenceVideoUrl ? 'Attached above. Analyze its structure, transitions, pacing, and transformation style. Learn HOW it creates viral impact — then apply that style to the NEW product below.' : 'No reference video provided. Create the production guide based on product info and sales angle.'}
+    const sceneDuration = 8 // Veo 3.1 generates ~8s clips
+    const userMessage = `REFERENCE VIDEO: ${referenceVideoUrl ? `Attached above. CRITICAL: Analyze this video SECOND BY SECOND. Map out exactly what happens at each moment — who appears, what product is shown, camera angles, transitions, pacing, dialogue, music, and emotional beats. You must understand the COMPLETE timeline because we are recreating this as ONE CONTINUOUS VIDEO split into ${targetScenes} clips of ${sceneDuration} seconds each (due to AI video generation limits of ${sceneDuration}s max per clip).` : 'No reference video provided. Create the production guide based on product info and sales angle.'}
 
 PRODUCT INFORMATION:
 ${productDescription}
@@ -205,18 +207,25 @@ INFLUENCER:
 ${promptDescriptor ? `Visual descriptor: ${promptDescriptor}` : 'No influencer specified — focus on product-only transformation scenes.'}
 ${influencerName ? `Name: ${influencerName}` : ''}
 
-PRODUCT PHOTOS: ${productImageUrls && productImageUrls.length > 0 ? `${productImageUrls.length} product photos attached above. Use the LAST scene as a beauty-shot referencing these real product photos.` : 'No product photos provided.'}
+PRODUCT PHOTOS: ${productImageUrls && productImageUrls.length > 0 ? `${productImageUrls.length} product photos attached above. These are the REAL product — every scene showing the product must match these photos.` : 'No product photos provided.'}
 
-INSTRUCTIONS:
-- Generate exactly ${targetScenes} scenes
-- Total video duration: ${targetScenes * 5} seconds (${targetScenes} scenes × 5 seconds each)
+CRITICAL INSTRUCTIONS — THIS IS ONE CONTINUOUS VIDEO:
+- This is ONE video of ${targetScenes * sceneDuration} seconds, split into ${targetScenes} scenes of ${sceneDuration}s each
+- Scene 1 covers seconds 0-${sceneDuration}, Scene 2 covers seconds ${sceneDuration}-${sceneDuration * 2}, Scene 3 covers seconds ${sceneDuration * 2}-${sceneDuration * 3}, etc.
+- Each scene's imagePrompt will be used to generate a STARTING FRAME image (the first frame of that ${sceneDuration}s clip)
+- Each scene's animationPrompt will animate that starting frame for ${sceneDuration} seconds
+- CONTINUITY IS CRITICAL: the end of scene N must flow naturally into the start of scene N+1
+- If the reference video shows the influencer for the first 10 seconds, then scenes 1-2 should have usesInfluencer: true
+- If the reference video shows only the product from second 10-20, those scenes should have usesProductPhoto: true and usesInfluencer: false
+- Mark usesInfluencer: true ONLY for scenes where the influencer physically appears
+- Mark usesProductPhoto: true ONLY for scenes where the product is visible
+- The imagePrompt describes the EXACT visual of the first frame of each clip — it must match what would be at that exact second in the reference video's timeline, adapted to OUR product and influencer
+- Each scene duration MUST be exactly ${sceneDuration} seconds
 - Follow ALL 10 production rules
 - Use the 6-part animation prompt formula for EVERY animationPrompt
-- 70%+ scenes must be active transformation
-- Final scene: beauty-shot with the real product
-- All dialogue in Latin American Spanish
+- All dialogue in Latin American Spanish (influencerDialogue field)
 - All image/animation prompts in English
-- Push transformations to maximum dramatic impact
+- Generate exactly ${targetScenes} scenes
 
 Generate the complete viral production guide as JSON.`
 
@@ -254,7 +263,8 @@ Generate the complete viral production guide as JSON.`
       )
     }
 
-    // Enforce constraints on each scene
+    // Enforce constraints on each scene — force 8s per scene (Veo 3.1 clip length)
+    const SCENE_DURATION = 8
     result.scenes = result.scenes.slice(0, 7).map((s: any, i: number) => ({
       sceneNumber: i + 1,
       sceneType: String(s.sceneType || 'transformation'),
@@ -262,22 +272,13 @@ Generate the complete viral production guide as JSON.`
       imagePrompt: String(s.imagePrompt || '').substring(0, 500),
       animationPrompt: String(s.animationPrompt || '').substring(0, 400),
       influencerDialogue: s.influencerDialogue ? String(s.influencerDialogue) : null,
-      duration: Math.max(3, Math.min(8, Math.round(Number(s.duration) || 5))),
-      static: Boolean(s.static),
+      duration: SCENE_DURATION, // Fixed: every scene is exactly 8s (Veo limit)
+      static: false, // Never static — all scenes generate video
       complexity: String(s.complexity || 'low'),
       usesInfluencer: Boolean(s.usesInfluencer),
       usesProductPhoto: Boolean(s.usesProductPhoto),
+      startsAtSecond: i * SCENE_DURATION, // Timeline position
     }))
-
-    // Ensure total duration is within bounds (15-40s)
-    const totalDuration = result.scenes.reduce((sum: number, s: any) => sum + s.duration, 0)
-    if (totalDuration > 40) {
-      const scale = 40 / totalDuration
-      result.scenes = result.scenes.map((s: any) => ({
-        ...s,
-        duration: Math.max(3, Math.round(s.duration * scale)),
-      }))
-    }
 
     result.totalDuration = result.scenes.reduce((sum: number, s: any) => sum + s.duration, 0)
     result.videoTitle = String(result.videoTitle || 'Video Viral de Transformación')
