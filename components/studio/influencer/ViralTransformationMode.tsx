@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils/cn'
 import { VIDEO_MODELS, VIDEO_COMPANY_GROUPS, type VideoModelId } from '@/lib/video-providers/types'
 import { Loader2, Upload, Sparkles, Film, Trash2, ChevronDown, ChevronUp, Copy, Check, Play, AlertCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { createBrowserClient } from '@supabase/ssr'
 
 interface ViralTransformationModeProps {
   influencerId: string
@@ -161,34 +162,37 @@ export function ViralTransformationMode({
     setError(null)
 
     try {
-      // Upload to Supabase Storage (temporary)
-      const formData = new FormData()
-      formData.append('file', file)
-      formData.append('path', `temp/viral-ref/${Date.now()}-${file.name}`)
+      // Upload directly from browser to Supabase Storage (bypasses Vercel 4.5MB limit)
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      )
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('No autorizado')
 
-      const res = await fetch('/api/studio/upload-temp', {
-        method: 'POST',
-        body: formData,
-      })
+      const ext = file.name.split('.').pop() || 'mp4'
+      const fileName = `${Date.now()}-${crypto.randomUUID().substring(0, 8)}.${ext}`
+      const storagePath = `temp/${user.id}/${fileName}`
 
-      if (!res.ok) {
-        // Fallback: try generic upload
-        const res2 = await fetch('/api/upload', {
-          method: 'POST',
-          body: formData,
+      const { error: uploadError } = await supabase.storage
+        .from('landing-images')
+        .upload(storagePath, file, {
+          contentType: file.type || 'video/mp4',
+          upsert: false,
         })
-        const data2 = await res2.json()
-        if (data2.url) {
-          setReferenceVideoUrl(data2.url)
-          toast.success('Video subido')
-          return
-        }
-        throw new Error('Error al subir el video')
+
+      if (uploadError) {
+        throw new Error(uploadError.message)
       }
 
-      const data = await res.json()
-      if (data.url) {
-        setReferenceVideoUrl(data.url)
+      // Get signed URL (1 hour — enough for Gemini to download)
+      const { data: signedData } = await supabase.storage
+        .from('landing-images')
+        .createSignedUrl(storagePath, 3600)
+
+      const url = signedData?.signedUrl
+      if (url) {
+        setReferenceVideoUrl(url)
         toast.success('Video de referencia subido')
       } else {
         throw new Error('No se obtuvo URL del video')
