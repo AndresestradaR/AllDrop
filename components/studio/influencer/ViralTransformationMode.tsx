@@ -7,6 +7,30 @@ import { Loader2, Upload, Sparkles, Film, Trash2, ChevronDown, ChevronUp, Copy, 
 import toast from 'react-hot-toast'
 import { createBrowserClient } from '@supabase/ssr'
 
+/**
+ * Upload base64 image to Supabase Storage from browser.
+ * Returns a public URL. Used to avoid sending large base64 in POST body (Vercel 4.5MB limit).
+ */
+async function uploadBase64ToStorage(base64Data: string, userId: string, index: number): Promise<string> {
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+  const base64Clean = base64Data.includes(',') ? base64Data.split(',')[1] : base64Data
+  const bytes = Uint8Array.from(atob(base64Clean), c => c.charCodeAt(0))
+  const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}.jpg`
+  const storagePath = `studio/video/${userId}/${fileName}`
+
+  const { error } = await supabase.storage
+    .from('landing-images')
+    .upload(storagePath, bytes, { contentType: 'image/jpeg', upsert: true })
+
+  if (error) throw new Error(`Upload failed: ${error.message}`)
+
+  const { data } = supabase.storage.from('landing-images').getPublicUrl(storagePath)
+  return data.publicUrl
+}
+
 interface ViralTransformationModeProps {
   influencerId: string
   influencerName: string
@@ -344,20 +368,48 @@ export function ViralTransformationMode({
         }
       }
 
-      const videoBody: any = {
-        modelId: videoModelId,
-        prompt: videoPrompt,
-        duration: sceneDuration,
-        aspectRatio,
-        enableAudio: true,
-        resolution: '720p',
-        imageBase64: imageBase64ForVideo,
-      }
+      // Upload images to Storage from browser to avoid Vercel 4.5MB body limit
+      // Then send only URLs to generate-video endpoint
+      const supabaseForUpload = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      )
+      const { data: { user: uploadUser } } = await supabaseForUpload.auth.getUser()
+      if (!uploadUser) throw new Error('No autorizado')
 
-      // Use first-last-frame mode for transformation scenes with end frame (Veo only)
+      let imageUrl: string
       if (imageBase64End && isVeo) {
-        videoBody.imageBase64End = imageBase64End
-        videoBody.veoGenerationType = 'FIRST_AND_LAST_FRAMES_2_VIDEO'
+        // Transformation: upload both in parallel
+        const [startUrl, endUrl] = await Promise.all([
+          uploadBase64ToStorage(imageBase64ForVideo, uploadUser.id, 0),
+          uploadBase64ToStorage(imageBase64End, uploadUser.id, 1),
+        ])
+        imageUrl = startUrl
+
+        var videoBody: any = {
+          modelId: videoModelId,
+          prompt: videoPrompt,
+          duration: sceneDuration,
+          aspectRatio,
+          enableAudio: true,
+          resolution: '720p',
+          imageUrl: startUrl,
+          imageUrlEnd: endUrl,
+          veoGenerationType: 'FIRST_AND_LAST_FRAMES_2_VIDEO',
+        }
+      } else {
+        // Regular scene: upload single image
+        imageUrl = await uploadBase64ToStorage(imageBase64ForVideo, uploadUser.id, 0)
+
+        var videoBody: any = {
+          modelId: videoModelId,
+          prompt: videoPrompt,
+          duration: sceneDuration,
+          aspectRatio,
+          enableAudio: true,
+          resolution: '720p',
+          imageUrl,
+        }
       }
 
       const videoRes = await fetch('/api/studio/generate-video', {

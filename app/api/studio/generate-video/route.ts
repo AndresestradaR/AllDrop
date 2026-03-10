@@ -81,6 +81,7 @@ export async function POST(request: Request) {
       klingElements,
       klingMode,
       imageUrl,
+      imageUrlEnd,
     } = body as {
       modelId: VideoModelId
       prompt: string
@@ -102,6 +103,7 @@ export async function POST(request: Request) {
       }>
       klingMode?: 'pro' | 'std'
       imageUrl?: string
+      imageUrlEnd?: string // Pre-uploaded end frame URL (avoids 4.5MB body limit)
     }
 
     const isVeoModel = modelId.startsWith('veo')
@@ -177,10 +179,14 @@ export async function POST(request: Request) {
         imageUrls.push(url)
       }
     }
-    // Handle direct public URL (skip base64 upload round-trip)
+    // Handle pre-uploaded URLs (from frontend — avoids 4.5MB body limit)
     else if (imageUrl && modelConfig.supportsStartEndFrames) {
       console.log('[Video] Using provided imageUrl directly')
       imageUrls.push(imageUrl)
+      if (imageUrlEnd) {
+        console.log('[Video] Using provided imageUrlEnd directly')
+        imageUrls.push(imageUrlEnd)
+      }
     }
 
     console.log(`[Video] Image URLs: ${imageUrls.length}`)
