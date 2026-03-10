@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { cn } from '@/lib/utils/cn'
 import { VIDEO_COMPANY_GROUPS, type VideoModelId } from '@/lib/video-providers/types'
-import { Loader2, Upload, Sparkles, Film, Trash2, ChevronDown, ChevronUp, Copy, Check, Play, AlertCircle, RefreshCw, Zap } from 'lucide-react'
+import { Loader2, Upload, Sparkles, Film, Trash2, ChevronDown, ChevronUp, Copy, Check, Play, AlertCircle, RefreshCw, Zap, Scissors } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { createBrowserClient } from '@supabase/ssr'
 
@@ -12,6 +12,7 @@ interface ViralTransformationModeProps {
   influencerName: string
   promptDescriptor: string
   realisticImageUrl: string
+  onSendToEditor?: (clips: { url: string; label: string }[]) => void
 }
 
 interface ViralScene {
@@ -45,6 +46,7 @@ export function ViralTransformationMode({
   influencerName,
   promptDescriptor,
   realisticImageUrl,
+  onSendToEditor,
 }: ViralTransformationModeProps) {
   // Product context (loaded from persisted data)
   const [productDescription, setProductDescription] = useState('')
@@ -1263,6 +1265,25 @@ export function ViralTransformationMode({
                 >
                   <AlertCircle className="w-3.5 h-3.5" />
                   Cancelar
+                </button>
+              )}
+              {/* Send completed videos to editor — in scene order */}
+              {onSendToEditor && Array.from(sceneVideoStates.values()).some(s => s.status === 'completed') && (
+                <button
+                  onClick={() => {
+                    const clips: { url: string; label: string }[] = []
+                    scriptResult.scenes.forEach((scene, i) => {
+                      const state = sceneVideoStates.get(i)
+                      if (state?.status === 'completed' && state.videoUrl) {
+                        clips.push({ url: state.videoUrl, label: `Escena ${scene.sceneNumber} (${scene.startsAtSecond ?? 0}s–${(scene.startsAtSecond ?? 0) + scene.duration}s)` })
+                      }
+                    })
+                    if (clips.length > 0) onSendToEditor(clips)
+                  }}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-teal-600 hover:bg-teal-500 text-white rounded-xl text-xs font-bold transition-colors"
+                >
+                  <Scissors className="w-3.5 h-3.5" />
+                  Enviar al Editor ({Array.from(sceneVideoStates.values()).filter(s => s.status === 'completed').length})
                 </button>
               )}
             </div>

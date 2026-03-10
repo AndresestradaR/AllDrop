@@ -1000,6 +1000,7 @@ export function Step7Video({
           influencerName={selectedInfluencerName}
           promptDescriptor={resolvedDescriptor}
           realisticImageUrl={selectedInfluencerImage}
+          onSendToEditor={onSendToEditor}
         />
       ) : (
       <>
