@@ -170,57 +170,125 @@ export function ViralTransformationMode({
   }, [updateSceneVideo, influencerId, scriptResult])
 
   // ═══════════════════════════════════════════════════════════════════
-  // 2-STEP PIPELINE: Generate Image (first frame) → Generate Video (animate)
+  // 2-STEP PIPELINE: Get/Generate first frame → Animate with video model
+  //
+  // Strategy per scene type:
+  //   influencer scenes → use realisticImageUrl directly (the REAL influencer photo)
+  //   beauty-shot       → use product photo if available, else generate
+  //   transformation    → generate image with influencer as reference + product context
   // ═══════════════════════════════════════════════════════════════════
+
+  // Helper: fetch an image URL and return base64
+  const fetchImageAsBase64 = useCallback(async (url: string): Promise<{ data: string; mimeType: string } | null> => {
+    try {
+      const res = await fetch(url)
+      if (!res.ok) return null
+      const blob = await res.blob()
+      const buffer = await blob.arrayBuffer()
+      const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)))
+      return { data: base64, mimeType: blob.type || 'image/jpeg' }
+    } catch {
+      return null
+    }
+  }, [])
+
   const generateSceneVideo = useCallback(async (index: number, scene: ViralScene) => {
     if (cancelledRef.current) return
     activeGenerationsRef.current++
     updateSceneVideo(index, { status: 'generating-image', taskId: null, videoUrl: null, imagePreview: null, error: null, pollCount: 0 })
 
     try {
-      // ── STEP 1: Generate first-frame image from imagePrompt ──
-      // For influencer scenes, include the influencer descriptor in the prompt
-      let fullImagePrompt = scene.imagePrompt
-      if (scene.usesInfluencer && promptDescriptor) {
-        fullImagePrompt = `${scene.imagePrompt}. The person in the scene: ${promptDescriptor}`
-      }
+      let imageBase64ForVideo: string | null = null
+      let imagePreviewUrl: string | null = null
 
-      const imgRes = await fetch('/api/studio/generate-image', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          modelId: imageModelId,
-          prompt: fullImagePrompt,
-          aspectRatio,
-          // For influencer scenes, pass the realistic image as reference
-          ...(scene.usesInfluencer && realisticImageUrl ? {
-            referenceImages: [] // descriptor is in the prompt, realistic image can't be passed as URL here
-          } : {}),
-        }),
-      })
-      const imgData = await imgRes.json()
+      // ── STEP 1: Get or generate the first frame ──
 
-      if (cancelledRef.current) { activeGenerationsRef.current--; return }
+      if (scene.usesInfluencer && realisticImageUrl) {
+        // INFLUENCER SCENES: Use the actual influencer photo as starting frame
+        // This ensures the person in the video IS the influencer, not a random AI face
+        updateSceneVideo(index, { status: 'generating-image', imagePreview: realisticImageUrl })
+        const influencerImg = await fetchImageAsBase64(realisticImageUrl)
+        if (!influencerImg) throw new Error('No se pudo cargar la imagen del influencer')
+        imageBase64ForVideo = influencerImg.data
+        imagePreviewUrl = realisticImageUrl
 
-      if (!imgData.success || !imgData.imageBase64) {
-        throw new Error(imgData.error || 'Error al generar imagen de la escena')
+      } else if (scene.usesProductPhoto && productImageUrls.length > 0) {
+        // BEAUTY-SHOT / PRODUCT SCENES: Use actual product photo
+        const productUrl = productImageUrls[0]
+        updateSceneVideo(index, { status: 'generating-image', imagePreview: productUrl })
+        const productImg = await fetchImageAsBase64(productUrl)
+        if (!productImg) throw new Error('No se pudo cargar la foto del producto')
+        imageBase64ForVideo = productImg.data
+        imagePreviewUrl = productUrl
+
+      } else {
+        // TRANSFORMATION / OTHER SCENES: Generate image from imagePrompt
+        // Pass influencer photo as reference so AI maintains visual consistency
+        const referenceImages: { data: string; mimeType: string }[] = []
+
+        // Add influencer image as reference for visual consistency
+        if (realisticImageUrl) {
+          const influencerImg = await fetchImageAsBase64(realisticImageUrl)
+          if (influencerImg) referenceImages.push(influencerImg)
+        }
+
+        // Add product image as reference
+        if (productImageUrls.length > 0) {
+          const productImg = await fetchImageAsBase64(productImageUrls[0])
+          if (productImg) referenceImages.push(productImg)
+        }
+
+        // Enrich the prompt with product context
+        let fullImagePrompt = scene.imagePrompt
+        if (promptDescriptor) {
+          fullImagePrompt += `. The person (if shown): ${promptDescriptor}`
+        }
+
+        const imgRes = await fetch('/api/studio/generate-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            modelId: imageModelId,
+            prompt: fullImagePrompt,
+            aspectRatio,
+            ...(referenceImages.length > 0 ? { referenceImages } : {}),
+          }),
+        })
+        const imgData = await imgRes.json()
+
+        if (cancelledRef.current) { activeGenerationsRef.current--; return }
+
+        if (!imgData.success || !imgData.imageBase64) {
+          throw new Error(imgData.error || 'Error al generar imagen de la escena')
+        }
+
+        imageBase64ForVideo = imgData.imageBase64
+        imagePreviewUrl = `data:${imgData.mimeType || 'image/png'};base64,${imgData.imageBase64}`
       }
 
       // Show image preview
-      updateSceneVideo(index, { status: 'generating-video', imagePreview: `data:${imgData.mimeType || 'image/png'};base64,${imgData.imageBase64}` })
+      updateSceneVideo(index, { status: 'generating-video', imagePreview: imagePreviewUrl })
 
-      // ── STEP 2: Generate video using the image as first frame ──
+      if (cancelledRef.current) { activeGenerationsRef.current--; return }
+
+      // ── STEP 2: Animate the first frame using the video model ──
+      // Build a richer video prompt that includes dialogue context
+      let videoPrompt = scene.animationPrompt
+      if (scene.influencerDialogue) {
+        videoPrompt += ` The person speaks to camera saying: "${scene.influencerDialogue}"`
+      }
+
       const videoRes = await fetch('/api/studio/generate-video', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           modelId: videoModelId,
-          prompt: scene.animationPrompt,
+          prompt: videoPrompt,
           duration: Math.min(scene.duration, 8),
           aspectRatio,
           enableAudio: true,
           resolution: '720p',
-          imageBase64: imgData.imageBase64, // First frame from step 1
+          imageBase64: imageBase64ForVideo,
         }),
       })
       const videoData = await videoRes.json()
@@ -242,7 +310,7 @@ export function ViralTransformationMode({
       updateSceneVideo(index, { status: 'error', error: err.message || 'Error desconocido' })
       activeGenerationsRef.current--
     }
-  }, [videoModelId, imageModelId, aspectRatio, realisticImageUrl, promptDescriptor, updateSceneVideo, pollSceneVideo])
+  }, [videoModelId, imageModelId, aspectRatio, realisticImageUrl, productImageUrls, promptDescriptor, updateSceneVideo, pollSceneVideo, fetchImageAsBase64])
 
   // Generate ALL scenes in parallel with semaphore
   const generateAllParallel = useCallback(async () => {
@@ -920,7 +988,7 @@ export function ViralTransformationMode({
             </div>
 
             <p className="text-[10px] text-text-muted">
-              Paso 1: genera la imagen del primer fotograma (imagePrompt) — Paso 2: anima esa imagen (animationPrompt)
+              Escenas influencer: usa tu foto realista como frame inicial. Transformación: genera imagen con referencia del influencer y producto. Luego anima cada frame.
             </p>
 
             {/* Model selectors: Image + Video side by side */}
@@ -1015,18 +1083,26 @@ export function ViralTransformationMode({
                       </div>
                     )}
 
-                    {/* Completed: show video */}
+                    {/* Completed: show video + dialogue */}
                     {status === 'completed' && state?.videoUrl && (
-                      <video
-                        src={state.videoUrl}
-                        className={cn(
-                          'w-full rounded-lg object-contain bg-black mt-1',
-                          aspectRatio === '9:16' ? 'aspect-[9/16] max-h-[300px]' : 'aspect-video'
+                      <>
+                        <video
+                          src={state.videoUrl}
+                          className={cn(
+                            'w-full rounded-lg object-contain bg-black mt-1',
+                            aspectRatio === '9:16' ? 'aspect-[9/16] max-h-[300px]' : 'aspect-video'
+                          )}
+                          controls
+                          muted
+                          playsInline
+                        />
+                        {scene.influencerDialogue && (
+                          <div className="mt-1.5 p-2 bg-blue-500/5 border border-blue-500/20 rounded-lg">
+                            <p className="text-[9px] text-blue-400 font-medium mb-0.5">Diálogo:</p>
+                            <p className="text-[10px] text-text-secondary italic">&ldquo;{scene.influencerDialogue}&rdquo;</p>
+                          </div>
                         )}
-                        controls
-                        muted
-                        playsInline
-                      />
+                      </>
                     )}
 
                     {/* Error: show message + retry */}
