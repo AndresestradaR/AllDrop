@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { cn } from '@/lib/utils/cn'
-import { VIDEO_MODELS, VIDEO_COMPANY_GROUPS, type VideoModelId } from '@/lib/video-providers/types'
+import { VIDEO_COMPANY_GROUPS, type VideoModelId } from '@/lib/video-providers/types'
 import { Loader2, Upload, Sparkles, Film, Trash2, ChevronDown, ChevronUp, Copy, Check, Play, AlertCircle, RefreshCw, Scissors, LayoutGrid, Zap } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { createBrowserClient } from '@supabase/ssr'
@@ -894,17 +894,13 @@ export function ViralTransformationMode({
               onChange={(e) => setVideoModelId(e.target.value as VideoModelId)}
               className="w-full px-3 py-1.5 bg-surface border border-border rounded-lg text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-accent/50"
             >
-              {Object.entries(VIDEO_COMPANY_GROUPS).map(([company, modelIds]) => (
-                <optgroup key={company} label={company}>
-                  {modelIds.map(id => {
-                    const model = VIDEO_MODELS.find(m => m.id === id)
-                    if (!model) return null
-                    return (
-                      <option key={id} value={id}>
-                        {model.name}
-                      </option>
-                    )
-                  })}
+              {VIDEO_COMPANY_GROUPS.map(group => (
+                <optgroup key={group.id} label={group.name}>
+                  {group.models.map(model => (
+                    <option key={model.id} value={model.id}>
+                      {model.name}
+                    </option>
+                  ))}
                 </optgroup>
               ))}
             </select>
