@@ -67,12 +67,18 @@ Think of it as a photograph of what the viewer sees at the exact second this cli
 - Including the influencer (if usesInfluencer: true) with their EXACT appearance descriptor
 - Including the product (if usesProductPhoto: true) matching the real product photos
 
-CRITICAL FOR TRANSFORMATION SCENES — The imagePrompt must show the transformation ALREADY IN PROGRESS:
-- NEVER generate a 100% "before" state (all dirty, all stained, all broken)
-- Instead, show the surface ALREADY PARTIALLY TRANSFORMED: one half dirty, one half clean, with a visible boundary where the product has already worked
-- Example: "Dirty oven grill with heavy grease buildup on the right side. The left side is already gleaming clean stainless steel where the steam cleaner has passed. A white handheld steam cleaner points at the boundary between dirty and clean areas, steam visible."
-- This gives the AI video model a DIRECTION — it will expand the clean area across the surface
-- Without this, the video model sees "dirty surface" and keeps it dirty or makes it worse
+CRITICAL FOR TRANSFORMATION SCENES — Use FIRST FRAME + LAST FRAME approach:
+AI video models CANNOT remove things (dirt, stains, etc.) from an image. They preserve what they see.
+To show a transformation (dirty→clean), we use TWO images: first frame (before) and last frame (after).
+The video model will INTERPOLATE between them, creating a smooth transition.
+
+- imagePrompt: The BEFORE state — dirty surface with the product in position, about to work
+- imagePromptEnd: The AFTER state — same surface now CLEAN, product still visible. SAME camera angle, SAME composition, SAME lighting — only the surface state changes.
+- Example imagePrompt: "Close-up of a greasy oven grill covered in dark burnt-on grease and food residue. A white handheld steam cleaner with black nozzle is positioned at the left edge, steam just beginning to flow. Warm oven light from above."
+- Example imagePromptEnd: "Close-up of the same oven grill now gleaming clean with shiny silver metal bars. A white handheld steam cleaner with black nozzle rests at the right edge. Warm oven light from above. The grill looks brand new."
+- The animationPrompt should describe the TRANSITION: "Steam flows across the grill surface from left to right. The grease melts and dissolves as the steam passes, revealing shiny clean metal underneath. Steam billows upward. Camera static. 8 seconds."
+- BOTH images must have identical composition, angle, lighting — ONLY the surface state changes
+- imagePromptEnd is ONLY for transformation scenes. For UGC/influencer/product-demo scenes, set it to null.
 
 RULE 8 — animationPrompt describes the MOTION for the clip.
 Use this formula:
@@ -88,11 +94,10 @@ For PRODUCT CLOSE-UP scenes:
 "Close-up of [product description] on [surface/setting]. [Specific action: product slowly rotates / hand picks up product / lid opens]. Soft lighting highlights the product label. Camera static with slight focus pull. 8 seconds."
 
 For TRANSFORMATION scenes (cleaning, before/after, etc.):
-- imagePrompt: MUST show the surface ALREADY MID-TRANSFORMATION (half dirty, half clean — see Rule 7)
-- animationPrompt: Describe the CLEAN AREA EXPANDING, not "dirt being removed". The AI video model is good at expanding what exists, bad at removing things.
-- Example: "The gleaming clean area on the oven grill steadily expands from left to right as the steam cleaner moves across the surface. Grease and grime give way to shining metal. Steam billows where the nozzle meets the surface. The clean section grows to cover the entire grill. Camera static. 8 seconds."
-- NEVER say "dirt disappears" or "stains are removed" — instead say "the clean surface expands" or "the shining area spreads"
-- Focus on what APPEARS (clean, bright, shining) not what DISAPPEARS (dirt, grime, stains)
+- imagePrompt: Shows the BEFORE state (dirty/stained surface with product ready)
+- imagePromptEnd: Shows the AFTER state (clean surface, same composition)
+- animationPrompt: Describe the transition from before to after. Focus on what the product DOES and the RESULT appearing.
+- Example: "Steam flows across the grill from left to right. The grease melts and dissolves, revealing gleaming clean metal underneath. Steam billows upward. The transformation spreads steadily across the entire surface. Camera static. 8 seconds."
 
 LANGUAGE RULES:
 - influencerDialogue: ALWAYS in Latin American Spanish (casual, natural, like the reference video's tone)
@@ -120,6 +125,7 @@ OUTPUT FORMAT — Respond with valid JSON only. No markdown, no backticks, no ex
       "sceneType": "influencer | transformation | beauty-shot | product-demo",
       "sceneDescription": "What happens in this clip and how it connects to the previous/next (Spanish)",
       "imagePrompt": "First frame of this clip — must match what would be at this exact second in the reference video, adapted to our product and influencer (English, 200-400 chars)",
+      "imagePromptEnd": "ONLY for transformation scenes: the LAST frame showing the END RESULT (clean, fixed, transformed). null for non-transformation scenes. (English, 200-400 chars)",
       "animationPrompt": "Motion description following the formula above, matching the reference video's action at this timestamp (English, max 400 chars)",
       "influencerDialogue": "What the influencer says during this clip (Spanish Latino) — part of ONE continuous speech. null only if no one speaks in this section of the reference.",
       "duration": 8,
@@ -308,6 +314,7 @@ Generate the complete production guide as JSON.`
       sceneType: String(s.sceneType || 'influencer'),
       sceneDescription: String(s.sceneDescription || ''),
       imagePrompt: String(s.imagePrompt || '').substring(0, 500),
+      imagePromptEnd: s.imagePromptEnd ? String(s.imagePromptEnd).substring(0, 500) : null, // Last frame for transformation
       animationPrompt: String(s.animationPrompt || '').substring(0, 400),
       influencerDialogue: s.influencerDialogue ? String(s.influencerDialogue) : null,
       duration: SCENE_DURATION, // Fixed: every scene is exactly 8s (Veo limit)

@@ -17,9 +17,10 @@ interface ViralTransformationModeProps {
 
 interface ViralScene {
   sceneNumber: number
-  sceneType: 'transformation' | 'influencer' | 'beauty-shot'
+  sceneType: 'transformation' | 'influencer' | 'beauty-shot' | 'product-demo'
   sceneDescription: string
   imagePrompt: string
+  imagePromptEnd?: string | null // Last frame for transformation scenes (first-last-frame video)
   animationPrompt: string
   influencerDialogue: string | null
   duration: number
@@ -290,25 +291,62 @@ export function ViralTransformationMode({
 
       if (cancelledRef.current) { activeGenerationsRef.current--; return }
 
-      // ── STEP 2: Animate the first frame using the video model ──
-      // Build a richer video prompt that includes dialogue context
+      // ── STEP 1.5: For transformation scenes, generate the END frame (last frame) ──
+      let imageBase64End: string | undefined
+      if (scene.imagePromptEnd && scene.sceneType === 'transformation') {
+        let fullEndPrompt = scene.imagePromptEnd
+        if (scene.usesProductPhoto && productImageUrls.length > 0) {
+          fullEndPrompt += `. The product shown must match the reference product photo exactly.`
+        }
+
+        const endImgRes = await fetch('/api/studio/generate-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            modelId: imageModelId,
+            prompt: fullEndPrompt,
+            aspectRatio,
+            ...(sceneRefs.length > 0 ? { referenceImages: sceneRefs } : {}),
+          }),
+        })
+        const endImgData = await endImgRes.json()
+
+        if (cancelledRef.current) { activeGenerationsRef.current--; return }
+
+        if (endImgData.success && endImgData.imageBase64) {
+          imageBase64End = endImgData.imageBase64
+        }
+        // If end frame fails, continue with just the start frame (graceful fallback)
+      }
+
+      // ── STEP 2: Animate using the video model ──
+      // For transformation: first-last-frame mode (interpolates between before/after)
+      // For other scenes: standard image-to-video (animates the first frame)
       let videoPrompt = scene.animationPrompt
       if (scene.influencerDialogue) {
         videoPrompt += ` The person speaks to camera saying: "${scene.influencerDialogue}"`
       }
 
+      const videoBody: any = {
+        modelId: videoModelId,
+        prompt: videoPrompt,
+        duration: Math.min(scene.duration, 8),
+        aspectRatio,
+        enableAudio: true,
+        resolution: '720p',
+        imageBase64: imageBase64ForVideo,
+      }
+
+      // Use first-last-frame mode for transformation scenes with end frame
+      if (imageBase64End) {
+        videoBody.imageBase64End = imageBase64End
+        videoBody.veoGenerationType = 'FIRST_AND_LAST_FRAMES_2_VIDEO'
+      }
+
       const videoRes = await fetch('/api/studio/generate-video', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          modelId: videoModelId,
-          prompt: videoPrompt,
-          duration: Math.min(scene.duration, 8),
-          aspectRatio,
-          enableAudio: true,
-          resolution: '720p',
-          imageBase64: imageBase64ForVideo,
-        }),
+        body: JSON.stringify(videoBody),
       })
       const videoData = await videoRes.json()
 
@@ -1024,6 +1062,30 @@ export function ViralTransformationMode({
                     />
                     <p className="text-[10px] text-text-muted text-right mt-0.5">{scene.imagePrompt.length}/500</p>
                   </div>
+
+                  {/* End frame prompt (transformation scenes only) */}
+                  {scene.imagePromptEnd && (
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[10px] font-medium text-rose-400 uppercase tracking-wide">
+                          Last Frame (Resultado Final)
+                        </label>
+                        <button
+                          onClick={() => handleCopy(scene.imagePromptEnd!, `imgend-${i}`)}
+                          className="text-text-muted hover:text-accent transition-colors"
+                        >
+                          {copiedField === `imgend-${i}` ? <Check className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3" />}
+                        </button>
+                      </div>
+                      <textarea
+                        value={scene.imagePromptEnd}
+                        onChange={(e) => updateScene(i, 'imagePromptEnd', e.target.value.substring(0, 500))}
+                        rows={3}
+                        className="w-full px-2.5 py-1.5 bg-surface-elevated border border-rose-500/30 rounded-lg text-xs text-text-primary resize-none focus:outline-none focus:ring-1 focus:ring-rose-500/50"
+                      />
+                      <p className="text-[10px] text-rose-400/60 mt-0.5">Se generará un video que interpola del primer al último frame (sucio→limpio)</p>
+                    </div>
+                  )}
 
                   {/* Animation prompt */}
                   <div>
