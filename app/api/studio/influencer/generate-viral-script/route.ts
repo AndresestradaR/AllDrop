@@ -280,7 +280,7 @@ Generate the complete production guide as JSON.`
       temperature: 0.8,
       jsonMode: true,
       skipKIE: hasMultimodal, // Only skip KIE when multimodal (video/images) — text-only uses full cascade
-      googleModel: 'gemini-2.5-pro',
+      googleModel: 'gemini-3.1-pro-preview',
     })
 
     // Parse JSON response
