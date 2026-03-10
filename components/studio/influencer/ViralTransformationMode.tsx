@@ -167,10 +167,6 @@ export function ViralTransformationMode({
   // Generate video for a single scene
   const generateSceneVideo = useCallback(async (index: number, scene: ViralScene) => {
     if (cancelledRef.current) return
-    if (scene.static) {
-      updateSceneVideo(index, { status: 'error', error: 'Escena estática — no requiere video' })
-      return
-    }
     activeGenerationsRef.current++
     updateSceneVideo(index, { status: 'generating', taskId: null, videoUrl: null, error: null, pollCount: 0 })
     try {
@@ -223,10 +219,9 @@ export function ViralTransformationMode({
     })
     setSceneVideoStates(newStates)
 
-    // Queue-based parallel generation
+    // Queue-based parallel generation (all scenes, including static beauty-shots)
     const queue = scriptResult.scenes
       .map((scene, i) => ({ scene, index: i }))
-      .filter(({ scene }) => !scene.static)
 
     const runNext = async (): Promise<void> => {
       if (cancelledRef.current || queue.length === 0) return
@@ -962,7 +957,7 @@ export function ViralTransformationMode({
                     )}
 
                     {/* Idle or no status: show generate button */}
-                    {status === 'idle' && !scene.static && !isGeneratingAll && (
+                    {status === 'idle' && !isGeneratingAll && (
                       <button
                         onClick={() => generateSceneVideo(i, scene)}
                         className="mt-1 w-full flex items-center justify-center gap-1 px-2 py-1 bg-accent/10 hover:bg-accent/20 text-accent rounded-lg text-[10px] font-medium transition-colors"
@@ -970,9 +965,6 @@ export function ViralTransformationMode({
                         <Play className="w-3 h-3" />
                         Generar
                       </button>
-                    )}
-                    {scene.static && status === 'idle' && (
-                      <p className="text-[9px] text-text-muted italic mt-1">Estática — sin video</p>
                     )}
                   </div>
                 )
@@ -1003,7 +995,7 @@ export function ViralTransformationMode({
             {/* Completed videos summary */}
             {Array.from(sceneVideoStates.values()).some(s => s.status === 'completed') && (
               <p className="text-[10px] text-green-400 text-center">
-                {Array.from(sceneVideoStates.values()).filter(s => s.status === 'completed').length} / {scriptResult.scenes.filter(s => !s.static).length} videos completados
+                {Array.from(sceneVideoStates.values()).filter(s => s.status === 'completed').length} / {scriptResult.scenes.length} videos completados
               </p>
             )}
           </div>
