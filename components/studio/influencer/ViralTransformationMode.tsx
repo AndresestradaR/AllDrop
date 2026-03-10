@@ -32,7 +32,9 @@ interface ViralScene {
 interface ViralScriptResult {
   videoTitle: string
   videoConcept: string
+  detectedStyle?: string
   referenceAnalysis: string
+  fullScript?: string
   totalDuration: number
   scenes: ViralScene[]
   productionNotes: string
@@ -584,6 +586,7 @@ export function ViralTransformationMode({
     switch (type) {
       case 'transformation': return 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
       case 'influencer': return 'bg-blue-500/15 text-blue-400 border-blue-500/30'
+      case 'product-demo': return 'bg-purple-500/15 text-purple-400 border-purple-500/30'
       case 'beauty-shot': return 'bg-amber-500/15 text-amber-400 border-amber-500/30'
       default: return 'bg-text-muted/10 text-text-muted border-border'
     }
@@ -593,6 +596,7 @@ export function ViralTransformationMode({
     switch (type) {
       case 'transformation': return 'Transformación'
       case 'influencer': return 'Influencer'
+      case 'product-demo': return 'Demo Producto'
       case 'beauty-shot': return 'Beauty Shot'
       default: return type
     }
@@ -913,12 +917,28 @@ export function ViralTransformationMode({
           <div className="p-4 bg-surface-elevated border border-border rounded-xl">
             <h3 className="text-sm font-bold text-text-primary mb-1">{scriptResult.videoTitle}</h3>
             <p className="text-xs text-text-secondary">{scriptResult.videoConcept}</p>
+            {scriptResult.detectedStyle && (
+              <p className="text-[11px] text-accent mt-1">Estilo detectado: <strong>{scriptResult.detectedStyle}</strong></p>
+            )}
             {scriptResult.referenceAnalysis && (
-              <div className="mt-2 pt-2 border-t border-border">
-                <p className="text-[11px] text-text-muted">
-                  <strong>Análisis de referencia:</strong> {scriptResult.referenceAnalysis}
+              <details className="mt-2 pt-2 border-t border-border">
+                <summary className="text-[11px] text-text-muted cursor-pointer hover:text-text-secondary">
+                  Ver análisis del video de referencia
+                </summary>
+                <p className="text-[11px] text-text-muted mt-1 whitespace-pre-wrap">
+                  {scriptResult.referenceAnalysis}
                 </p>
-              </div>
+              </details>
+            )}
+            {scriptResult.fullScript && (
+              <details className="mt-2 pt-2 border-t border-border">
+                <summary className="text-[11px] text-text-muted cursor-pointer hover:text-text-secondary">
+                  Ver guión completo
+                </summary>
+                <p className="text-[11px] text-text-primary mt-1 whitespace-pre-wrap">
+                  {scriptResult.fullScript}
+                </p>
+              </details>
             )}
             <div className="flex gap-2 mt-2">
               <span className="text-[10px] px-2 py-0.5 bg-accent/15 text-accent rounded-full">
