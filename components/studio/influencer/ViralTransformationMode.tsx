@@ -186,7 +186,10 @@ export function ViralTransformationMode({
       if (!res.ok) return null
       const blob = await res.blob()
       const buffer = await blob.arrayBuffer()
-      const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)))
+      const bytes = new Uint8Array(buffer)
+      let binary = ''
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
+      const base64 = btoa(binary)
       return { data: base64, mimeType: blob.type || 'image/jpeg' }
     } catch {
       return null
