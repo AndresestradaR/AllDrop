@@ -415,14 +415,32 @@ async function generateStandardVideo(
   }
 
   // Duration - model specific handling
-  // ALL these models require duration as STRING
+  // ALL these models require duration as STRING and only accept specific values
   if (request.duration) {
     if (isSora) {
       // Sora uses n_frames as string ("10" or "15")
       input.n_frames = request.duration.toString()
     } else if (isKling || isHailuo || isSeedance || isWan) {
-      // Kling, Hailuo, Seedance, and Wan ALL require duration as STRING
-      input.duration = request.duration.toString()
+      // Normalize duration to nearest valid value per model
+      let validDuration = request.duration
+      if (isKling) {
+        // Kling accepts: 5, 10
+        validDuration = request.duration <= 7 ? 5 : 10
+      } else if (isWan26) {
+        // Wan 2.6 accepts: 5, 10, 15
+        validDuration = request.duration <= 7 ? 5 : request.duration <= 12 ? 10 : 15
+      } else if (isWan25) {
+        // Wan 2.5 accepts: 5, 10
+        validDuration = request.duration <= 7 ? 5 : 10
+      } else if (isHailuo) {
+        // Hailuo accepts: 6, 10
+        validDuration = request.duration <= 8 ? 6 : 10
+      }
+      // Seedance durations handled below in their specific blocks
+      if (validDuration !== request.duration) {
+        console.log(`[Video] Duration normalized: ${request.duration}s → ${validDuration}s for ${request.modelId}`)
+      }
+      input.duration = validDuration.toString()
     } else {
       // Fallback - use as provided
       input.duration = request.duration

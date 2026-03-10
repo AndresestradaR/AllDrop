@@ -375,6 +375,48 @@ Donde es posible, cascade completa multi-proveedor via servicios centralizados.
         - Overlay fijo con resultado: player, descargar, copiar URL
       - Navegacion: InfluencerWizard maneja vista 'editor', volver regresa a vista anterior
 
+    Video Viral (Step 7 — ViralTransformationMode.tsx):
+      Modo "Viral" en Step 7 del Influencer Wizard.
+      Sube video de referencia (TikTok/Reels viral) → Gemini 3.1 Pro analiza segundo a segundo
+      → genera guión escena por escena → genera imagen de primer frame por escena
+      → anima cada frame en clip de 8s via Veo → todos los clips forman UN video continuo.
+
+      Archivos clave:
+        - System prompt + API: app/api/studio/influencer/generate-viral-script/route.ts
+        - Componente UI: components/studio/influencer/ViralTransformationMode.tsx
+        - Video generation: app/api/studio/generate-video/route.ts + lib/video-providers/kie-video.ts
+        - Image generation: app/api/studio/generate-image/route.ts + lib/image-providers/index.ts
+        - AI text: lib/services/ai-text.ts (cascade KIE→OpenAI→Google)
+
+      Pipeline por escena (2 pasos normales, 3 para transformación):
+        Normal: genera imagen (imagePrompt + referenceImages) → anima imagen → video 8s via Veo
+        Transformación (dirty→clean): genera imagen BEFORE (imagePrompt) → genera imagen AFTER
+          (imagePromptEnd) → usa FIRST_AND_LAST_FRAMES_2_VIDEO de Veo → interpola entre before/after
+
+      System prompt es ADAPTATIVO — detecta estilo del video de referencia:
+        - UGC (talking head), transformación (before/after), demo, etc.
+        - Replica estructura EXACTA del video de referencia
+        - NO TOCAR el system prompt — el usuario está contento con resultados
+
+      Interfaces:
+        ViralScene: { sceneNumber, sceneType ('transformation'|'influencer'|'beauty-shot'|'product-demo'),
+          sceneDescription, imagePrompt, imagePromptEnd? (solo transformación — last frame),
+          animationPrompt, influencerDialogue, duration (8s), static (false), complexity,
+          usesInfluencer, usesProductPhoto, startsAtSecond? }
+        ViralScriptResult: { videoTitle, videoConcept, detectedStyle?, referenceAnalysis,
+          fullScript?, totalDuration, scenes: ViralScene[], productionNotes }
+
+      Modelos usados:
+        - Análisis video: gemini-3.1-pro-preview (Google direct, con thinking para video)
+        - Imagen primer frame: nano-banana-2 (default, usuario puede cambiar)
+        - Video animación: veo-3.1-fast (default, más barato que veo-3.1)
+        - Text cascade: skipKIE cuando hay multimodal → Google directo
+
+      UI: análisis de referencia y guión completo colapsables, campos editables por escena,
+        campo rosa "Last Frame (Resultado Final)" en escenas de transformación,
+        semáforo MAX_CONCURRENT = 2 para generación paralela,
+        botón "Enviar al Editor" cuando hay videos completados
+
     InfluencerWizard.tsx — Flujo de vistas:
       - Views: 'list' | 'wizard' | 'summary' | 'board' | 'editor'
       - handleSendToEditor: recibe clips de Summary/Board → navega a vista 'editor'
@@ -902,4 +944,51 @@ Key entries: cron schedule for `/api/cron/automations`, function maxDuration set
 
 ---
 
-*Last updated: 2026-03-05 — Hub de angulos guardados, guion por escenas, generacion paralela video, video cascade throw→return fix, env var fallbacks para video y resena-ugc*
+---
+
+## 13. TRABAJO EN PROGRESO — Video Viral (2026-03-10)
+
+### ⚠️ PUSH PENDIENTE — EJECUTAR PRIMERO
+```bash
+cd C:/Users/Asus/Downloads/estrategas-landing-generator && git push origin developers
+```
+Commit `9e5ddb1` (first-last-frame para transformaciones) NO se pudo pushear por caída de internet.
+
+### Qué se hizo en la última sesión (5 commits)
+
+| # | Commit | Descripción | Estado |
+|---|--------|-------------|--------|
+| 1 | `646017c` | Rewrite system prompt adaptativo (detecta estilo UGC/transformación/demo) | ✅ PUSHEADO |
+| 2 | `b116357` | Botón "Enviar al Editor" — clips en orden al VideoEditor | ✅ PUSHEADO |
+| 3 | `cd1b5cb` | Default Veo Fast + intento fix mid-transformation (NO funcionó) | ✅ PUSHEADO |
+| 4 | `61deced` | Upgrade análisis video a Gemini 3.1 Pro | ✅ PUSHEADO |
+| 5 | `9e5ddb1` | **First-last-frame para transformaciones** — genera 2 imgs (before+after), usa `FIRST_AND_LAST_FRAMES_2_VIDEO` de Veo | ⚠️ **NO PUSHEADO** |
+
+### Problema técnico que se resolvió
+Veo image-to-video toma UNA imagen y le agrega MOVIMIENTO. NO puede quitar texturas.
+Si la imagen tiene grasa negra, el video tendrá grasa negra — Veo no sabe qué es "limpio".
+**Solución**: darle DOS imágenes (sucio + limpio) y que INTERPOLE entre ellas = `FIRST_AND_LAST_FRAMES_2_VIDEO`.
+
+### Lo que funciona bien
+- Videos UGC (gomitas Resveratrol + Camila) → resultado "brutal"
+- Análisis de video segundo a segundo con Gemini
+- Generación de imágenes con references (influencer + producto)
+- Pipeline paralelo con semáforo (MAX_CONCURRENT = 2)
+- Botón enviar al editor
+- Selección de producto + ángulo de venta + contexto extra
+
+### Lo que falta probar / hacer
+- [ ] Probar first-last-frame para transformaciones (commit sin pushear)
+- [ ] Probar con más videos de referencia de diferentes estilos
+- [ ] Audio/voiceover (TTS desde influencerDialogue) — NO implementado aún
+- [ ] El usuario quiere probar con otro video diferente después del fix
+
+### Reglas del usuario
+- **NO tocar el system prompt** sin que él lo pida — está contento con el resultado
+- Siempre commit + push después de cada cambio
+- Hablar en español
+- Default Veo 3.1 Fast (no Pro, es muy caro)
+
+---
+
+*Last updated: 2026-03-10 — Video Viral mode (ViralTransformationMode), system prompt adaptativo, first-last-frame para transformaciones (PUSH PENDIENTE), botón enviar al editor*
