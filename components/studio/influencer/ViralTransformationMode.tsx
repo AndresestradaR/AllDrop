@@ -335,7 +335,13 @@ export function ViralTransformationMode({
         videoPrompt += ` ${sceneDuration} seconds.`
       }
       if (scene.influencerDialogue) {
-        videoPrompt += ` The person speaks to camera saying: "${scene.influencerDialogue}"`
+        if (isVeo) {
+          // Veo handles multilingual dialogue well with English instruction
+          videoPrompt += ` The person speaks to camera saying: "${scene.influencerDialogue}"`
+        } else {
+          // Kling/Sora: force Spanish audio — use Spanish instruction + explicit language directive
+          videoPrompt += ` La persona habla a cámara diciendo en español latino con voz femenina joven: "${scene.influencerDialogue}". Audio must be in Latin American Spanish, female voice.`
+        }
       }
 
       const videoBody: any = {
