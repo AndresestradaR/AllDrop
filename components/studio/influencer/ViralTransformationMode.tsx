@@ -81,7 +81,7 @@ export function ViralTransformationMode({
   const [copiedField, setCopiedField] = useState<string | null>(null)
 
   // Video model for generation
-  const [videoModelId, setVideoModelId] = useState<VideoModelId>('veo-3.1')
+  const [videoModelId, setVideoModelId] = useState<VideoModelId>('veo-3.1-fast')
   const [aspectRatio, setAspectRatio] = useState<'9:16' | '16:9' | '1:1'>('9:16')
 
   // Per-scene video generation state

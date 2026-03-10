@@ -67,6 +67,13 @@ Think of it as a photograph of what the viewer sees at the exact second this cli
 - Including the influencer (if usesInfluencer: true) with their EXACT appearance descriptor
 - Including the product (if usesProductPhoto: true) matching the real product photos
 
+CRITICAL FOR TRANSFORMATION SCENES — The imagePrompt must show the transformation ALREADY IN PROGRESS:
+- NEVER generate a 100% "before" state (all dirty, all stained, all broken)
+- Instead, show the surface ALREADY PARTIALLY TRANSFORMED: one half dirty, one half clean, with a visible boundary where the product has already worked
+- Example: "Dirty oven grill with heavy grease buildup on the right side. The left side is already gleaming clean stainless steel where the steam cleaner has passed. A white handheld steam cleaner points at the boundary between dirty and clean areas, steam visible."
+- This gives the AI video model a DIRECTION — it will expand the clean area across the surface
+- Without this, the video model sees "dirty surface" and keeps it dirty or makes it worse
+
 RULE 8 — animationPrompt describes the MOTION for the clip.
 Use this formula:
 1. Subject and setting — Who/what is in frame and where
@@ -80,8 +87,12 @@ For TALKING-HEAD / UGC scenes (person speaking to camera):
 For PRODUCT CLOSE-UP scenes:
 "Close-up of [product description] on [surface/setting]. [Specific action: product slowly rotates / hand picks up product / lid opens]. Soft lighting highlights the product label. Camera static with slight focus pull. 8 seconds."
 
-For TRANSFORMATION scenes (only if the reference video actually shows transformations):
-"[Surface/area] with visible [problem]. [Product] is applied and [specific change] becomes visible. The [result] spreads steadily. Camera static. 8 seconds."
+For TRANSFORMATION scenes (cleaning, before/after, etc.):
+- imagePrompt: MUST show the surface ALREADY MID-TRANSFORMATION (half dirty, half clean — see Rule 7)
+- animationPrompt: Describe the CLEAN AREA EXPANDING, not "dirt being removed". The AI video model is good at expanding what exists, bad at removing things.
+- Example: "The gleaming clean area on the oven grill steadily expands from left to right as the steam cleaner moves across the surface. Grease and grime give way to shining metal. Steam billows where the nozzle meets the surface. The clean section grows to cover the entire grill. Camera static. 8 seconds."
+- NEVER say "dirt disappears" or "stains are removed" — instead say "the clean surface expands" or "the shining area spreads"
+- Focus on what APPEARS (clean, bright, shining) not what DISAPPEARS (dirt, grime, stains)
 
 LANGUAGE RULES:
 - influencerDialogue: ALWAYS in Latin American Spanish (casual, natural, like the reference video's tone)
