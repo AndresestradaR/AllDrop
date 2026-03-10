@@ -14,6 +14,7 @@ import { GenerateVideoResult } from './types'
 export interface FalVideoOptions {
   prompt: string
   imageUrl?: string
+  lastImageUrl?: string // End frame for first-last-frame interpolation
   aspectRatio?: string
   duration?: number
   timeoutMs?: number
@@ -43,6 +44,11 @@ export async function generateVideoViaFal(
   // Image input (reference/start frame)
   if (options.imageUrl) {
     input.image_url = options.imageUrl
+  }
+
+  // Last frame image (for first-last-frame interpolation)
+  if (options.lastImageUrl) {
+    input.last_frame_image_url = options.lastImageUrl
   }
 
   // Aspect ratio

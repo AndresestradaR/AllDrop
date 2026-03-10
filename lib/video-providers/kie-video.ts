@@ -83,6 +83,7 @@ export async function generateVideo(
       const falConfig = modelConfig.fal
       if (falApiKey && falConfig) {
         const hasImage = !!(request.imageUrls && request.imageUrls.length > 0)
+        const hasLastFrame = hasImage && request.imageUrls!.length > 1
         const falPath = hasImage ? (falConfig.i2v || falConfig.t2v) : falConfig.t2v
         if (falPath) {
           console.warn(`[Video/Veo] KIE failed (${veoResult.error}), trying fal.ai: ${falPath}`)
@@ -90,6 +91,7 @@ export async function generateVideo(
           const falResult = await generateVideoViaFal(falApiKey, falPath, {
             prompt: request.prompt,
             imageUrl: hasImage ? request.imageUrls?.[0] : undefined,
+            lastImageUrl: hasLastFrame ? request.imageUrls?.[1] : undefined,
             aspectRatio: request.aspectRatio,
             duration: request.duration,
             timeoutMs: 120000,

@@ -365,7 +365,16 @@ export function ViralTransformationMode({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(videoBody),
       })
-      const videoData = await videoRes.json()
+
+      // Handle non-JSON responses (Vercel timeout returns plain text)
+      let videoData: any
+      const contentType = videoRes.headers.get('content-type') || ''
+      if (contentType.includes('application/json')) {
+        videoData = await videoRes.json()
+      } else {
+        const text = await videoRes.text()
+        throw new Error(videoRes.status === 504 ? 'Timeout: la generación tardó demasiado. Intenta de nuevo.' : `Error del servidor: ${text.substring(0, 100)}`)
+      }
 
       if (cancelledRef.current) { activeGenerationsRef.current--; return }
 

@@ -163,14 +163,18 @@ export async function POST(request: Request) {
     }
     // Handle regular image-to-video
     else if (imageBase64 && modelConfig.supportsStartEndFrames) {
-      console.log('[Video] Uploading start image...')
-      const url = await uploadImageToStorage(supabase, imageBase64, userId, 0)
-      imageUrls.push(url)
-
       if (imageBase64End) {
-        console.log('[Video] Uploading end image...')
-        const urlEnd = await uploadImageToStorage(supabase, imageBase64End, userId, 1)
-        imageUrls.push(urlEnd)
+        // Upload both images in PARALLEL to save time (avoids Vercel timeout)
+        console.log('[Video] Uploading start + end images in parallel...')
+        const [url, urlEnd] = await Promise.all([
+          uploadImageToStorage(supabase, imageBase64, userId, 0),
+          uploadImageToStorage(supabase, imageBase64End, userId, 1),
+        ])
+        imageUrls.push(url, urlEnd)
+      } else {
+        console.log('[Video] Uploading start image...')
+        const url = await uploadImageToStorage(supabase, imageBase64, userId, 0)
+        imageUrls.push(url)
       }
     }
     // Handle direct public URL (skip base64 upload round-trip)
