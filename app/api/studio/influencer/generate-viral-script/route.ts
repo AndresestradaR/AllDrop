@@ -222,15 +222,17 @@ Generate the complete viral production guide as JSON.`
 
     parts.push({ text: userMessage })
 
-    // Call Gemini 3 Pro with multimodal content (video + images + text)
+    // Call with multimodal content (video + images + text) when available
+    // Only skip KIE when we have actual video/image multimodal parts (KIE can't handle those)
+    // When it's text-only, let the full cascade work: KIE → OpenAI → Google
     const hasMultimodal = parts.length > 1 // More than just the text part
     const responseText = await generateAIText(keys, {
       systemPrompt: VIRAL_TRANSFORMATION_SYSTEM,
       userMessage, // Always pass text (used by fallback if Google fails)
-      multimodalParts: hasMultimodal ? parts : undefined, // Video + images + text for Google
+      multimodalParts: hasMultimodal ? parts : undefined,
       temperature: 0.8,
       jsonMode: true,
-      skipKIE: true, // Skip KIE — doesn't support video input
+      skipKIE: hasMultimodal, // Only skip KIE when multimodal (video/images) — text-only uses full cascade
       googleModel: 'gemini-2.5-pro',
     })
 
