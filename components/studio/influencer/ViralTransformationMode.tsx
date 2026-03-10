@@ -192,24 +192,31 @@ export function ViralTransformationMode({
     }
   }, [])
 
-  // Cache fetched reference images so we don't re-download for every scene
-  const referenceImagesCache = useRef<{ data: string; mimeType: string }[] | null>(null)
+  // Cache fetched reference images (base64) so we don't re-download for every scene
+  const referenceImagesCache = useRef<{
+    influencer: { data: string; mimeType: string } | null
+    products: { data: string; mimeType: string }[]
+  } | null>(null)
 
-  const loadReferenceImages = useCallback(async (): Promise<{ data: string; mimeType: string }[]> => {
+  const loadReferenceImagesCache = useCallback(async () => {
     if (referenceImagesCache.current) return referenceImagesCache.current
-    const refs: { data: string; mimeType: string }[] = []
-    // Influencer image as reference (for face consistency)
+
+    let influencerRef: { data: string; mimeType: string } | null = null
+    const productRefs: { data: string; mimeType: string }[] = []
+
+    // Load influencer image
     if (realisticImageUrl) {
-      const img = await fetchImageAsBase64(realisticImageUrl)
-      if (img) refs.push(img)
+      influencerRef = await fetchImageAsBase64(realisticImageUrl)
     }
-    // Product image as reference
-    if (productImageUrls.length > 0) {
-      const img = await fetchImageAsBase64(productImageUrls[0])
-      if (img) refs.push(img)
+    // Load ALL product images (up to 3)
+    for (const url of productImageUrls.slice(0, 3)) {
+      const img = await fetchImageAsBase64(url)
+      if (img) productRefs.push(img)
     }
-    referenceImagesCache.current = refs
-    return refs
+
+    const cache = { influencer: influencerRef, products: productRefs }
+    referenceImagesCache.current = cache
+    return cache
   }, [realisticImageUrl, productImageUrls, fetchImageAsBase64])
 
   const generateSceneVideo = useCallback(async (index: number, scene: ViralScene) => {
@@ -218,12 +225,29 @@ export function ViralTransformationMode({
     updateSceneVideo(index, { status: 'generating-image', taskId: null, videoUrl: null, imagePreview: null, error: null, pollCount: 0 })
 
     try {
-      // ── STEP 1: ALWAYS generate a new image for the scene ──
-      // imagePrompt has the scene setting/context from reference video
-      // referenceImages have the influencer face + product for consistency
-      const referenceImages = await loadReferenceImages()
+      // ── STEP 1: Generate scene image using imagePrompt + SCENE-SPECIFIC references ──
+      // imagePrompt has the setting/scenario from the reference video analysis.
+      // We only pass the references that THIS scene actually needs:
+      //   usesInfluencer → influencer photo as reference
+      //   usesProductPhoto → product photos as reference
+      //   both → both
+      //   neither → no references (pure scene generation from prompt)
+      const cache = await loadReferenceImagesCache()
+      const sceneRefs: { data: string; mimeType: string }[] = []
 
-      // Build the full prompt: imagePrompt + influencer descriptor for face accuracy
+      if (scene.usesInfluencer && cache.influencer) {
+        sceneRefs.push(cache.influencer)
+      }
+      if (scene.usesProductPhoto && cache.products.length > 0) {
+        sceneRefs.push(...cache.products)
+      }
+      // If scene doesn't specify, but we have product images, still pass them
+      // for visual context (the product should be recognizable across scenes)
+      if (!scene.usesInfluencer && !scene.usesProductPhoto && cache.products.length > 0) {
+        sceneRefs.push(cache.products[0]) // Just the main product photo for context
+      }
+
+      // Build prompt: imagePrompt (scene setting from reference video) + descriptors
       let fullImagePrompt = scene.imagePrompt
       if (scene.usesInfluencer && promptDescriptor) {
         fullImagePrompt += `. The person in this scene must look exactly like the reference person: ${promptDescriptor}`
@@ -239,7 +263,7 @@ export function ViralTransformationMode({
           modelId: imageModelId,
           prompt: fullImagePrompt,
           aspectRatio,
-          ...(referenceImages.length > 0 ? { referenceImages } : {}),
+          ...(sceneRefs.length > 0 ? { referenceImages: sceneRefs } : {}),
         }),
       })
       const imgData = await imgRes.json()
@@ -297,7 +321,7 @@ export function ViralTransformationMode({
       updateSceneVideo(index, { status: 'error', error: err.message || 'Error desconocido' })
       activeGenerationsRef.current--
     }
-  }, [videoModelId, imageModelId, aspectRatio, realisticImageUrl, productImageUrls, promptDescriptor, updateSceneVideo, pollSceneVideo, fetchImageAsBase64])
+  }, [videoModelId, imageModelId, aspectRatio, productImageUrls, promptDescriptor, updateSceneVideo, pollSceneVideo, loadReferenceImagesCache])
 
   // Generate ALL scenes in parallel with semaphore
   const generateAllParallel = useCallback(async () => {
@@ -734,6 +758,75 @@ export function ViralTransformationMode({
             e.target.value = ''
           }}
         />
+      </div>
+
+      {/* ============ FOTOS DEL PRODUCTO ============ */}
+      <div>
+        <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">
+          Fotos del Producto (para referencia visual)
+        </label>
+        <p className="text-[11px] text-text-muted mb-2">
+          Sube fotos reales del producto. Se usarán como referencia visual para que el AI genere escenas con el producto correcto.
+        </p>
+
+        <div className="flex flex-wrap gap-2 mb-2">
+          {productImageUrls.map((url, i) => (
+            <div key={i} className="relative group w-20 h-20 rounded-lg overflow-hidden border border-border">
+              <img src={url} alt={`Producto ${i + 1}`} className="w-full h-full object-cover" />
+              <button
+                onClick={() => {
+                  setProductImageUrls(prev => prev.filter((_, idx) => idx !== i))
+                  referenceImagesCache.current = null // Invalidate cache
+                }}
+                className="absolute top-0.5 right-0.5 p-0.5 bg-black/60 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <Trash2 className="w-3 h-3 text-white" />
+              </button>
+            </div>
+          ))}
+
+          {productImageUrls.length < 3 && (
+            <label className="w-20 h-20 rounded-lg border-2 border-dashed border-border hover:border-accent/50 flex flex-col items-center justify-center cursor-pointer transition-colors">
+              <Upload className="w-4 h-4 text-text-muted" />
+              <span className="text-[9px] text-text-muted mt-0.5">Agregar</span>
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0]
+                  if (!file) return
+                  e.target.value = ''
+                  try {
+                    const supabase = createBrowserClient(
+                      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+                    )
+                    const { data: { user } } = await supabase.auth.getUser()
+                    if (!user) return
+                    const ext = file.name.split('.').pop() || 'jpg'
+                    const path = `temp/${user.id}/product-${Date.now()}.${ext}`
+                    await supabase.storage.from('landing-images').upload(path, file, { contentType: file.type, upsert: false })
+                    const { data: signedData } = await supabase.storage.from('landing-images').createSignedUrl(path, 7200)
+                    if (signedData?.signedUrl) {
+                      setProductImageUrls(prev => [...prev, signedData.signedUrl])
+                      referenceImagesCache.current = null // Invalidate cache
+                      toast.success('Foto del producto agregada')
+                    }
+                  } catch {
+                    toast.error('Error al subir la imagen')
+                  }
+                }}
+              />
+            </label>
+          )}
+        </div>
+
+        {productImageUrls.length === 0 && (
+          <p className="text-[10px] text-amber-400/70">
+            Sin fotos del producto. Las escenas se generarán solo con el prompt de texto.
+          </p>
+        )}
       </div>
 
       {/* ============ MODELO + ESCENAS ============ */}
