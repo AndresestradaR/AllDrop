@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { cn } from '@/lib/utils/cn'
 import { VIDEO_COMPANY_GROUPS, type VideoModelId } from '@/lib/video-providers/types'
-import { Loader2, Upload, Sparkles, Film, Trash2, ChevronDown, ChevronUp, Copy, Check, Play, AlertCircle, RefreshCw, Scissors, LayoutGrid, Zap } from 'lucide-react'
+import { Loader2, Upload, Sparkles, Film, Trash2, ChevronDown, ChevronUp, Copy, Check, Play, AlertCircle, RefreshCw, Zap } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { createBrowserClient } from '@supabase/ssr'
 
@@ -80,18 +80,22 @@ export function ViralTransformationMode({
   const [aspectRatio, setAspectRatio] = useState<'9:16' | '16:9' | '1:1'>('9:16')
 
   // Per-scene video generation state
-  type SceneVideoStatus = 'idle' | 'generating' | 'polling' | 'completed' | 'error'
+  // Pipeline: 'idle' → 'generating-image' → 'generating-video' → 'polling' → 'completed'
+  type SceneVideoStatus = 'idle' | 'generating-image' | 'generating-video' | 'polling' | 'completed' | 'error'
   const [sceneVideoStates, setSceneVideoStates] = useState<Map<number, {
     status: SceneVideoStatus
     taskId: string | null
     videoUrl: string | null
+    imagePreview: string | null // base64 of generated first frame
     error: string | null
     pollCount: number
   }>>(new Map())
   const [isGeneratingAll, setIsGeneratingAll] = useState(false)
   const activeGenerationsRef = useRef(0)
   const cancelledRef = useRef(false)
-  const MAX_CONCURRENT = 3
+  // Image model for first frame generation
+  const [imageModelId, setImageModelId] = useState<string>('nano-banana-2')
+  const MAX_CONCURRENT = 2 // Lower: 2 steps per scene (image + video)
   const MAX_POLLS = 60
   const POLL_INTERVAL = 5000
 
@@ -99,12 +103,13 @@ export function ViralTransformationMode({
     status: SceneVideoStatus
     taskId: string | null
     videoUrl: string | null
+    imagePreview: string | null
     error: string | null
     pollCount: number
   }>) => {
     setSceneVideoStates(prev => {
       const next = new Map(prev)
-      const current = next.get(index) || { status: 'idle' as SceneVideoStatus, taskId: null, videoUrl: null, error: null, pollCount: 0 }
+      const current = next.get(index) || { status: 'idle' as SceneVideoStatus, taskId: null, videoUrl: null, imagePreview: null, error: null, pollCount: 0 }
       next.set(index, { ...current, ...update })
       return next
     })
@@ -164,13 +169,48 @@ export function ViralTransformationMode({
     return poll()
   }, [updateSceneVideo, influencerId, scriptResult])
 
-  // Generate video for a single scene
+  // ═══════════════════════════════════════════════════════════════════
+  // 2-STEP PIPELINE: Generate Image (first frame) → Generate Video (animate)
+  // ═══════════════════════════════════════════════════════════════════
   const generateSceneVideo = useCallback(async (index: number, scene: ViralScene) => {
     if (cancelledRef.current) return
     activeGenerationsRef.current++
-    updateSceneVideo(index, { status: 'generating', taskId: null, videoUrl: null, error: null, pollCount: 0 })
+    updateSceneVideo(index, { status: 'generating-image', taskId: null, videoUrl: null, imagePreview: null, error: null, pollCount: 0 })
+
     try {
-      const res = await fetch('/api/studio/generate-video', {
+      // ── STEP 1: Generate first-frame image from imagePrompt ──
+      // For influencer scenes, include the influencer descriptor in the prompt
+      let fullImagePrompt = scene.imagePrompt
+      if (scene.usesInfluencer && promptDescriptor) {
+        fullImagePrompt = `${scene.imagePrompt}. The person in the scene: ${promptDescriptor}`
+      }
+
+      const imgRes = await fetch('/api/studio/generate-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          modelId: imageModelId,
+          prompt: fullImagePrompt,
+          aspectRatio,
+          // For influencer scenes, pass the realistic image as reference
+          ...(scene.usesInfluencer && realisticImageUrl ? {
+            referenceImages: [] // descriptor is in the prompt, realistic image can't be passed as URL here
+          } : {}),
+        }),
+      })
+      const imgData = await imgRes.json()
+
+      if (cancelledRef.current) { activeGenerationsRef.current--; return }
+
+      if (!imgData.success || !imgData.imageBase64) {
+        throw new Error(imgData.error || 'Error al generar imagen de la escena')
+      }
+
+      // Show image preview
+      updateSceneVideo(index, { status: 'generating-video', imagePreview: `data:${imgData.mimeType || 'image/png'};base64,${imgData.imageBase64}` })
+
+      // ── STEP 2: Generate video using the image as first frame ──
+      const videoRes = await fetch('/api/studio/generate-video', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -180,26 +220,29 @@ export function ViralTransformationMode({
           aspectRatio,
           enableAudio: true,
           resolution: '720p',
-          // Use influencer image for scenes that use the influencer
-          ...(scene.usesInfluencer && realisticImageUrl ? { imageUrl: realisticImageUrl } : {}),
+          imageBase64: imgData.imageBase64, // First frame from step 1
         }),
       })
-      const data = await res.json()
-      if (!res.ok || (!data.success && !data.taskId)) {
-        throw new Error(data.error || 'Error al generar video')
+      const videoData = await videoRes.json()
+
+      if (cancelledRef.current) { activeGenerationsRef.current--; return }
+
+      if (!videoRes.ok || (!videoData.success && !videoData.taskId)) {
+        throw new Error(videoData.error || 'Error al generar video')
       }
-      if (data.taskId) {
-        updateSceneVideo(index, { status: 'polling', taskId: data.taskId })
-        await pollSceneVideo(index, data.taskId)
-      } else if (data.videoUrl) {
-        updateSceneVideo(index, { status: 'completed', videoUrl: data.videoUrl })
+
+      if (videoData.taskId) {
+        updateSceneVideo(index, { status: 'polling', taskId: videoData.taskId })
+        await pollSceneVideo(index, videoData.taskId)
+      } else if (videoData.videoUrl) {
+        updateSceneVideo(index, { status: 'completed', videoUrl: videoData.videoUrl })
         activeGenerationsRef.current--
       }
     } catch (err: any) {
       updateSceneVideo(index, { status: 'error', error: err.message || 'Error desconocido' })
       activeGenerationsRef.current--
     }
-  }, [videoModelId, aspectRatio, realisticImageUrl, updateSceneVideo, pollSceneVideo])
+  }, [videoModelId, imageModelId, aspectRatio, realisticImageUrl, promptDescriptor, updateSceneVideo, pollSceneVideo])
 
   // Generate ALL scenes in parallel with semaphore
   const generateAllParallel = useCallback(async () => {
@@ -208,20 +251,15 @@ export function ViralTransformationMode({
     setIsGeneratingAll(true)
     activeGenerationsRef.current = 0
 
-    // Initialize all non-static scenes as pending
-    const newStates = new Map<number, { status: SceneVideoStatus; taskId: string | null; videoUrl: string | null; error: string | null; pollCount: number }>()
-    scriptResult.scenes.forEach((scene, i) => {
-      if (scene.static) {
-        newStates.set(i, { status: 'idle', taskId: null, videoUrl: null, error: null, pollCount: 0 })
-      } else {
-        newStates.set(i, { status: 'idle', taskId: null, videoUrl: null, error: null, pollCount: 0 })
-      }
+    // Initialize all scenes
+    const newStates = new Map<number, { status: SceneVideoStatus; taskId: string | null; videoUrl: string | null; imagePreview: string | null; error: string | null; pollCount: number }>()
+    scriptResult.scenes.forEach((_, i) => {
+      newStates.set(i, { status: 'idle', taskId: null, videoUrl: null, imagePreview: null, error: null, pollCount: 0 })
     })
     setSceneVideoStates(newStates)
 
-    // Queue-based parallel generation (all scenes, including static beauty-shots)
-    const queue = scriptResult.scenes
-      .map((scene, i) => ({ scene, index: i }))
+    // Queue-based parallel generation
+    const queue = scriptResult.scenes.map((scene, i) => ({ scene, index: i }))
 
     const runNext = async (): Promise<void> => {
       if (cancelledRef.current || queue.length === 0) return
@@ -231,7 +269,6 @@ export function ViralTransformationMode({
       return runNext()
     }
 
-    // Start MAX_CONCURRENT workers
     const workers = Array.from({ length: Math.min(MAX_CONCURRENT, queue.length) }, () => runNext())
     await Promise.all(workers)
     setIsGeneratingAll(false)
@@ -857,14 +894,13 @@ export function ViralTransformationMode({
             </div>
           )}
 
-          {/* ============ VIDEO GENERATION ============ */}
+          {/* ============ VIDEO GENERATION (2-step: Image → Video) ============ */}
           <div className="p-4 bg-surface-elevated border border-border rounded-xl space-y-3">
             <div className="flex items-center justify-between">
               <h4 className="text-xs font-bold text-text-primary flex items-center gap-1.5">
                 <Film className="w-3.5 h-3.5 text-accent" />
-                Generar Videos
+                Generar Videos (Imagen + Animación)
               </h4>
-              {/* Aspect Ratio selector */}
               <div className="flex items-center gap-1.5">
                 {(['9:16', '16:9', '1:1'] as const).map(ar => (
                   <button
@@ -883,25 +919,48 @@ export function ViralTransformationMode({
               </div>
             </div>
 
-            {/* Model selector */}
-            <select
-              value={videoModelId}
-              onChange={(e) => setVideoModelId(e.target.value as VideoModelId)}
-              className="w-full px-3 py-1.5 bg-surface border border-border rounded-lg text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-accent/50"
-            >
-              {VIDEO_COMPANY_GROUPS.map(group => (
-                <optgroup key={group.id} label={group.name}>
-                  {group.models.map(model => (
-                    <option key={model.id} value={model.id}>
-                      {model.name}
-                    </option>
+            <p className="text-[10px] text-text-muted">
+              Paso 1: genera la imagen del primer fotograma (imagePrompt) — Paso 2: anima esa imagen (animationPrompt)
+            </p>
+
+            {/* Model selectors: Image + Video side by side */}
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-[10px] text-text-muted mb-1">Modelo Imagen (fotograma)</label>
+                <select
+                  value={imageModelId}
+                  onChange={(e) => setImageModelId(e.target.value)}
+                  className="w-full px-2 py-1.5 bg-surface border border-border rounded-lg text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-accent/50"
+                >
+                  <option value="nano-banana-2">Nano Banana 2 (rápido)</option>
+                  <option value="gemini-3-pro">Gemini 3 Pro</option>
+                  <option value="gpt-image-1.5">GPT Image 1.5</option>
+                  <option value="seedream-5">Seedream 5</option>
+                  <option value="flux-2-pro">Flux 2 Pro</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] text-text-muted mb-1">Modelo Video (animación)</label>
+                <select
+                  value={videoModelId}
+                  onChange={(e) => setVideoModelId(e.target.value as VideoModelId)}
+                  className="w-full px-2 py-1.5 bg-surface border border-border rounded-lg text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-accent/50"
+                >
+                  {VIDEO_COMPANY_GROUPS.map(group => (
+                    <optgroup key={group.id} label={group.name}>
+                      {group.models.map(model => (
+                        <option key={model.id} value={model.id}>
+                          {model.name}
+                        </option>
+                      ))}
+                    </optgroup>
                   ))}
-                </optgroup>
-              ))}
-            </select>
+                </select>
+              </div>
+            </div>
 
             {/* Per-scene status grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {scriptResult.scenes.map((scene, i) => {
                 const state = sceneVideoStates.get(i)
                 const status = state?.status || 'idle'
@@ -909,33 +968,61 @@ export function ViralTransformationMode({
                   <div
                     key={i}
                     className={cn(
-                      'rounded-xl border p-2.5 transition-all',
+                      'rounded-xl border p-3 transition-all',
                       status === 'idle' && 'border-border bg-surface',
-                      status === 'generating' && 'border-amber-500/40 bg-amber-500/5',
+                      status === 'generating-image' && 'border-purple-500/40 bg-purple-500/5',
+                      status === 'generating-video' && 'border-amber-500/40 bg-amber-500/5',
                       status === 'polling' && 'border-blue-500/40 bg-blue-500/5',
                       status === 'completed' && 'border-green-500/40 bg-green-500/5',
                       status === 'error' && 'border-red-500/40 bg-red-500/5',
                     )}
                   >
-                    <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center justify-between mb-1.5">
                       <span className="text-[10px] font-bold text-text-primary">Escena {scene.sceneNumber}</span>
-                      {status === 'generating' && <Loader2 className="w-3 h-3 text-amber-400 animate-spin" />}
+                      {status === 'generating-image' && (
+                        <div className="flex items-center gap-1">
+                          <Loader2 className="w-3 h-3 text-purple-400 animate-spin" />
+                          <span className="text-[9px] text-purple-400">Imagen...</span>
+                        </div>
+                      )}
+                      {status === 'generating-video' && (
+                        <div className="flex items-center gap-1">
+                          <Loader2 className="w-3 h-3 text-amber-400 animate-spin" />
+                          <span className="text-[9px] text-amber-400">Video...</span>
+                        </div>
+                      )}
                       {status === 'polling' && (
                         <div className="flex items-center gap-1">
                           <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse" />
-                          <span className="text-[9px] text-blue-400">#{state?.pollCount}</span>
+                          <span className="text-[9px] text-blue-400">Procesando #{state?.pollCount}</span>
                         </div>
                       )}
                       {status === 'completed' && <Check className="w-3.5 h-3.5 text-green-400" />}
                       {status === 'error' && <AlertCircle className="w-3 h-3 text-red-400" />}
                     </div>
-                    <p className="text-[10px] text-text-muted line-clamp-2 mb-1.5">{scene.sceneDescription}</p>
+
+                    <p className="text-[10px] text-text-muted line-clamp-2 mb-2">{scene.sceneDescription}</p>
+
+                    {/* Image preview (generated first frame) */}
+                    {state?.imagePreview && status !== 'completed' && (
+                      <div className="mb-2">
+                        <p className="text-[9px] text-purple-400 mb-1">Fotograma generado:</p>
+                        <img
+                          src={state.imagePreview}
+                          alt={`Escena ${scene.sceneNumber} frame`}
+                          className="w-full rounded-lg object-cover"
+                        />
+                      </div>
+                    )}
 
                     {/* Completed: show video */}
                     {status === 'completed' && state?.videoUrl && (
                       <video
                         src={state.videoUrl}
-                        className="w-full rounded-lg aspect-video object-contain bg-black mt-1"
+                        className={cn(
+                          'w-full rounded-lg object-contain bg-black mt-1',
+                          aspectRatio === '9:16' ? 'aspect-[9/16] max-h-[300px]' : 'aspect-video'
+                        )}
                         controls
                         muted
                         playsInline
@@ -945,7 +1032,7 @@ export function ViralTransformationMode({
                     {/* Error: show message + retry */}
                     {status === 'error' && (
                       <div className="mt-1">
-                        <p className="text-[9px] text-red-400 line-clamp-2 mb-1">{state?.error}</p>
+                        <p className="text-[9px] text-red-400 line-clamp-3 mb-1">{state?.error}</p>
                         <button
                           onClick={() => generateSceneVideo(i, scene)}
                           className="flex items-center gap-1 text-[10px] text-red-400 hover:text-red-300 transition-colors"
@@ -956,14 +1043,14 @@ export function ViralTransformationMode({
                       </div>
                     )}
 
-                    {/* Idle or no status: show generate button */}
+                    {/* Idle: show generate button */}
                     {status === 'idle' && !isGeneratingAll && (
                       <button
                         onClick={() => generateSceneVideo(i, scene)}
-                        className="mt-1 w-full flex items-center justify-center gap-1 px-2 py-1 bg-accent/10 hover:bg-accent/20 text-accent rounded-lg text-[10px] font-medium transition-colors"
+                        className="mt-1 w-full flex items-center justify-center gap-1.5 px-2 py-1.5 bg-accent/10 hover:bg-accent/20 text-accent rounded-lg text-[10px] font-medium transition-colors"
                       >
                         <Play className="w-3 h-3" />
-                        Generar
+                        Generar (Imagen + Video)
                       </button>
                     )}
                   </div>
@@ -992,11 +1079,19 @@ export function ViralTransformationMode({
               )}
             </div>
 
-            {/* Completed videos summary */}
-            {Array.from(sceneVideoStates.values()).some(s => s.status === 'completed') && (
-              <p className="text-[10px] text-green-400 text-center">
-                {Array.from(sceneVideoStates.values()).filter(s => s.status === 'completed').length} / {scriptResult.scenes.length} videos completados
-              </p>
+            {/* Progress summary */}
+            {Array.from(sceneVideoStates.values()).some(s => s.status !== 'idle') && (
+              <div className="text-center space-y-0.5">
+                <p className="text-[10px] text-green-400">
+                  {Array.from(sceneVideoStates.values()).filter(s => s.status === 'completed').length} / {scriptResult.scenes.length} videos completados
+                </p>
+                {Array.from(sceneVideoStates.values()).some(s => s.status === 'generating-image') && (
+                  <p className="text-[10px] text-purple-400">Generando imágenes de fotograma...</p>
+                )}
+                {Array.from(sceneVideoStates.values()).some(s => s.status === 'generating-video' || s.status === 'polling') && (
+                  <p className="text-[10px] text-blue-400">Animando escenas...</p>
+                )}
+              </div>
             )}
           </div>
         </div>
