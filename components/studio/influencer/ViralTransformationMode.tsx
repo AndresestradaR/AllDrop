@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { cn } from '@/lib/utils/cn'
 import { VIDEO_MODELS, VIDEO_COMPANY_GROUPS, type VideoModelId } from '@/lib/video-providers/types'
-import { Loader2, Upload, Sparkles, Film, Trash2, ChevronDown, ChevronUp, Copy, Check, Play, AlertCircle } from 'lucide-react'
+import { Loader2, Upload, Sparkles, Film, Trash2, ChevronDown, ChevronUp, Copy, Check, Play, AlertCircle, RefreshCw, Scissors, LayoutGrid, Zap } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { createBrowserClient } from '@supabase/ssr'
 
@@ -77,6 +77,177 @@ export function ViralTransformationMode({
 
   // Video model for generation
   const [videoModelId, setVideoModelId] = useState<VideoModelId>('veo-3.1')
+  const [aspectRatio, setAspectRatio] = useState<'9:16' | '16:9' | '1:1'>('9:16')
+
+  // Per-scene video generation state
+  type SceneVideoStatus = 'idle' | 'generating' | 'polling' | 'completed' | 'error'
+  const [sceneVideoStates, setSceneVideoStates] = useState<Map<number, {
+    status: SceneVideoStatus
+    taskId: string | null
+    videoUrl: string | null
+    error: string | null
+    pollCount: number
+  }>>(new Map())
+  const [isGeneratingAll, setIsGeneratingAll] = useState(false)
+  const activeGenerationsRef = useRef(0)
+  const cancelledRef = useRef(false)
+  const MAX_CONCURRENT = 3
+  const MAX_POLLS = 60
+  const POLL_INTERVAL = 5000
+
+  const updateSceneVideo = useCallback((index: number, update: Partial<{
+    status: SceneVideoStatus
+    taskId: string | null
+    videoUrl: string | null
+    error: string | null
+    pollCount: number
+  }>) => {
+    setSceneVideoStates(prev => {
+      const next = new Map(prev)
+      const current = next.get(index) || { status: 'idle' as SceneVideoStatus, taskId: null, videoUrl: null, error: null, pollCount: 0 }
+      next.set(index, { ...current, ...update })
+      return next
+    })
+  }, [])
+
+  // Poll a scene's video status
+  const pollSceneVideo = useCallback(async (index: number, taskId: string): Promise<void> => {
+    let pollCount = 0
+    const poll = async (): Promise<void> => {
+      if (cancelledRef.current || pollCount >= MAX_POLLS) {
+        if (pollCount >= MAX_POLLS) {
+          updateSceneVideo(index, { status: 'error', error: 'Timeout: el video tardó demasiado' })
+        }
+        activeGenerationsRef.current--
+        return
+      }
+      pollCount++
+      updateSceneVideo(index, { pollCount })
+      try {
+        const res = await fetch(`/api/studio/video-status?taskId=${taskId}`)
+        const data = await res.json()
+        if (cancelledRef.current) { activeGenerationsRef.current--; return }
+        if (data.status === 'completed' && data.videoUrl) {
+          updateSceneVideo(index, { status: 'completed', videoUrl: data.videoUrl })
+          // Save to gallery
+          try {
+            await fetch('/api/studio/influencer/gallery', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                influencerId,
+                image_url: data.videoUrl,
+                video_url: data.videoUrl,
+                content_type: 'video',
+                type: 'solo',
+                situation: `Viral Escena ${index + 1}`,
+                prompt_used: scriptResult?.scenes[index]?.animationPrompt || '',
+              }),
+            })
+          } catch {} // silent
+          activeGenerationsRef.current--
+          return
+        }
+        if (data.status === 'failed') {
+          updateSceneVideo(index, { status: 'error', error: data.error || 'Video falló' })
+          activeGenerationsRef.current--
+          return
+        }
+        await new Promise(r => setTimeout(r, POLL_INTERVAL))
+        return poll()
+      } catch {
+        await new Promise(r => setTimeout(r, 8000))
+        return poll()
+      }
+    }
+    await new Promise(r => setTimeout(r, 3000))
+    return poll()
+  }, [updateSceneVideo, influencerId, scriptResult])
+
+  // Generate video for a single scene
+  const generateSceneVideo = useCallback(async (index: number, scene: ViralScene) => {
+    if (cancelledRef.current) return
+    if (scene.static) {
+      updateSceneVideo(index, { status: 'error', error: 'Escena estática — no requiere video' })
+      return
+    }
+    activeGenerationsRef.current++
+    updateSceneVideo(index, { status: 'generating', taskId: null, videoUrl: null, error: null, pollCount: 0 })
+    try {
+      const res = await fetch('/api/studio/generate-video', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          modelId: videoModelId,
+          prompt: scene.animationPrompt,
+          duration: Math.min(scene.duration, 8),
+          aspectRatio,
+          enableAudio: true,
+          resolution: '720p',
+          // Use influencer image for scenes that use the influencer
+          ...(scene.usesInfluencer && realisticImageUrl ? { imageUrl: realisticImageUrl } : {}),
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok || (!data.success && !data.taskId)) {
+        throw new Error(data.error || 'Error al generar video')
+      }
+      if (data.taskId) {
+        updateSceneVideo(index, { status: 'polling', taskId: data.taskId })
+        await pollSceneVideo(index, data.taskId)
+      } else if (data.videoUrl) {
+        updateSceneVideo(index, { status: 'completed', videoUrl: data.videoUrl })
+        activeGenerationsRef.current--
+      }
+    } catch (err: any) {
+      updateSceneVideo(index, { status: 'error', error: err.message || 'Error desconocido' })
+      activeGenerationsRef.current--
+    }
+  }, [videoModelId, aspectRatio, realisticImageUrl, updateSceneVideo, pollSceneVideo])
+
+  // Generate ALL scenes in parallel with semaphore
+  const generateAllParallel = useCallback(async () => {
+    if (!scriptResult) return
+    cancelledRef.current = false
+    setIsGeneratingAll(true)
+    activeGenerationsRef.current = 0
+
+    // Initialize all non-static scenes as pending
+    const newStates = new Map<number, { status: SceneVideoStatus; taskId: string | null; videoUrl: string | null; error: string | null; pollCount: number }>()
+    scriptResult.scenes.forEach((scene, i) => {
+      if (scene.static) {
+        newStates.set(i, { status: 'idle', taskId: null, videoUrl: null, error: null, pollCount: 0 })
+      } else {
+        newStates.set(i, { status: 'idle', taskId: null, videoUrl: null, error: null, pollCount: 0 })
+      }
+    })
+    setSceneVideoStates(newStates)
+
+    // Queue-based parallel generation
+    const queue = scriptResult.scenes
+      .map((scene, i) => ({ scene, index: i }))
+      .filter(({ scene }) => !scene.static)
+
+    const runNext = async (): Promise<void> => {
+      if (cancelledRef.current || queue.length === 0) return
+      const item = queue.shift()
+      if (!item) return
+      await generateSceneVideo(item.index, item.scene)
+      return runNext()
+    }
+
+    // Start MAX_CONCURRENT workers
+    const workers = Array.from({ length: Math.min(MAX_CONCURRENT, queue.length) }, () => runNext())
+    await Promise.all(workers)
+    setIsGeneratingAll(false)
+    toast.success('Generación completada')
+  }, [scriptResult, generateSceneVideo])
+
+  // Cancel all generations
+  const cancelAll = useCallback(() => {
+    cancelledRef.current = true
+    setIsGeneratingAll(false)
+  }, [])
 
   // Load products list
   useEffect(() => {
@@ -691,13 +862,154 @@ export function ViralTransformationMode({
             </div>
           )}
 
-          {/* TODO: Generation buttons (Parallel / Sequential) will be added in Phase 3 */}
-          <div className="p-4 bg-surface-elevated border border-border rounded-xl text-center">
-            <p className="text-xs text-text-muted">
-              <Film className="w-4 h-4 inline-block mr-1 -mt-0.5" />
-              La generación de videos por escena estará disponible próximamente.
-              Por ahora, copia los prompts y úsalos en el generador de video principal.
-            </p>
+          {/* ============ VIDEO GENERATION ============ */}
+          <div className="p-4 bg-surface-elevated border border-border rounded-xl space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-bold text-text-primary flex items-center gap-1.5">
+                <Film className="w-3.5 h-3.5 text-accent" />
+                Generar Videos
+              </h4>
+              {/* Aspect Ratio selector */}
+              <div className="flex items-center gap-1.5">
+                {(['9:16', '16:9', '1:1'] as const).map(ar => (
+                  <button
+                    key={ar}
+                    onClick={() => setAspectRatio(ar)}
+                    className={cn(
+                      'px-2 py-0.5 rounded text-[10px] border transition-colors',
+                      aspectRatio === ar
+                        ? 'bg-accent/15 border-accent text-accent'
+                        : 'bg-surface border-border text-text-muted hover:border-text-muted'
+                    )}
+                  >
+                    {ar}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Model selector */}
+            <select
+              value={videoModelId}
+              onChange={(e) => setVideoModelId(e.target.value as VideoModelId)}
+              className="w-full px-3 py-1.5 bg-surface border border-border rounded-lg text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-accent/50"
+            >
+              {Object.entries(VIDEO_COMPANY_GROUPS).map(([company, modelIds]) => (
+                <optgroup key={company} label={company}>
+                  {modelIds.map(id => {
+                    const model = VIDEO_MODELS.find(m => m.id === id)
+                    if (!model) return null
+                    return (
+                      <option key={id} value={id}>
+                        {model.name}
+                      </option>
+                    )
+                  })}
+                </optgroup>
+              ))}
+            </select>
+
+            {/* Per-scene status grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {scriptResult.scenes.map((scene, i) => {
+                const state = sceneVideoStates.get(i)
+                const status = state?.status || 'idle'
+                return (
+                  <div
+                    key={i}
+                    className={cn(
+                      'rounded-xl border p-2.5 transition-all',
+                      status === 'idle' && 'border-border bg-surface',
+                      status === 'generating' && 'border-amber-500/40 bg-amber-500/5',
+                      status === 'polling' && 'border-blue-500/40 bg-blue-500/5',
+                      status === 'completed' && 'border-green-500/40 bg-green-500/5',
+                      status === 'error' && 'border-red-500/40 bg-red-500/5',
+                    )}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[10px] font-bold text-text-primary">Escena {scene.sceneNumber}</span>
+                      {status === 'generating' && <Loader2 className="w-3 h-3 text-amber-400 animate-spin" />}
+                      {status === 'polling' && (
+                        <div className="flex items-center gap-1">
+                          <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse" />
+                          <span className="text-[9px] text-blue-400">#{state?.pollCount}</span>
+                        </div>
+                      )}
+                      {status === 'completed' && <Check className="w-3.5 h-3.5 text-green-400" />}
+                      {status === 'error' && <AlertCircle className="w-3 h-3 text-red-400" />}
+                    </div>
+                    <p className="text-[10px] text-text-muted line-clamp-2 mb-1.5">{scene.sceneDescription}</p>
+
+                    {/* Completed: show video */}
+                    {status === 'completed' && state?.videoUrl && (
+                      <video
+                        src={state.videoUrl}
+                        className="w-full rounded-lg aspect-video object-contain bg-black mt-1"
+                        controls
+                        muted
+                        playsInline
+                      />
+                    )}
+
+                    {/* Error: show message + retry */}
+                    {status === 'error' && (
+                      <div className="mt-1">
+                        <p className="text-[9px] text-red-400 line-clamp-2 mb-1">{state?.error}</p>
+                        <button
+                          onClick={() => generateSceneVideo(i, scene)}
+                          className="flex items-center gap-1 text-[10px] text-red-400 hover:text-red-300 transition-colors"
+                        >
+                          <RefreshCw className="w-3 h-3" />
+                          Reintentar
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Idle or no status: show generate button */}
+                    {status === 'idle' && !scene.static && !isGeneratingAll && (
+                      <button
+                        onClick={() => generateSceneVideo(i, scene)}
+                        className="mt-1 w-full flex items-center justify-center gap-1 px-2 py-1 bg-accent/10 hover:bg-accent/20 text-accent rounded-lg text-[10px] font-medium transition-colors"
+                      >
+                        <Play className="w-3 h-3" />
+                        Generar
+                      </button>
+                    )}
+                    {scene.static && status === 'idle' && (
+                      <p className="text-[9px] text-text-muted italic mt-1">Estática — sin video</p>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex gap-2">
+              {!isGeneratingAll ? (
+                <button
+                  onClick={generateAllParallel}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-accent hover:bg-accent/90 text-white rounded-xl text-xs font-bold transition-colors"
+                >
+                  <Zap className="w-3.5 h-3.5" />
+                  Generar Todo en Paralelo
+                </button>
+              ) : (
+                <button
+                  onClick={cancelAll}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-bold transition-colors"
+                >
+                  <AlertCircle className="w-3.5 h-3.5" />
+                  Cancelar
+                </button>
+              )}
+            </div>
+
+            {/* Completed videos summary */}
+            {Array.from(sceneVideoStates.values()).some(s => s.status === 'completed') && (
+              <p className="text-[10px] text-green-400 text-center">
+                {Array.from(sceneVideoStates.values()).filter(s => s.status === 'completed').length} / {scriptResult.scenes.filter(s => !s.static).length} videos completados
+              </p>
+            )}
           </div>
         </div>
       )}
