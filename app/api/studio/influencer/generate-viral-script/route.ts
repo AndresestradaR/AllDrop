@@ -231,7 +231,7 @@ Generate the complete viral production guide as JSON.`
       temperature: 0.8,
       jsonMode: true,
       skipKIE: true, // Skip KIE — doesn't support video input
-      googleModel: 'gemini-3-pro',
+      googleModel: 'gemini-2.5-pro',
     })
 
     // Parse JSON response
