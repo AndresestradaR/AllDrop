@@ -345,12 +345,14 @@ async function callGoogle(apiKey: string, options: AITextOptions): Promise<strin
     parts.push({ text: options.userMessage })
   }
 
+  // Video analysis requires thinking mode — gemini-2.5-pro rejects thinkingBudget:0 with video
+  const hasVideo = options.multimodalParts?.some(p => p.fileData?.mimeType?.startsWith('video/'))
   const body: any = {
     contents: [{ parts }],
     generationConfig: {
       temperature: options.temperature ?? 0.7,
-      // Disable thinking mode to prevent 100s+ responses (Gemini has thinking ON by default)
-      thinkingConfig: { thinkingBudget: 0 },
+      // Disable thinking for text-only (prevents 100s+ responses), allow for video analysis
+      ...(!hasVideo && { thinkingConfig: { thinkingBudget: 0 } }),
     },
   }
 
