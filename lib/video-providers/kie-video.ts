@@ -421,8 +421,10 @@ async function generateStandardVideo(
   // ALL these models require duration as STRING and only accept specific values
   if (request.duration) {
     if (isSora) {
-      // Sora uses n_frames as string ("10" or "15")
-      input.n_frames = request.duration.toString()
+      // Sora uses n_frames as string ("10" or "15") — these are seconds, not actual frame counts
+      const validFrames = request.duration <= 12 ? 10 : 15
+      input.n_frames = validFrames.toString()
+      input.remove_watermark = true
     } else if (isKling || isHailuo || isSeedance || isWan || isGrok) {
       // Normalize duration to nearest valid value per model
       let validDuration = request.duration

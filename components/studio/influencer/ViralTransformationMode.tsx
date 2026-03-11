@@ -462,6 +462,98 @@ export function ViralTransformationMode({
     }
   }, [videoModelId, imageModelId, aspectRatio, productImageUrls, promptDescriptor, updateSceneVideo, pollSceneVideo, loadReferenceImagesCache])
 
+  // Retry ONLY the video step — skips image generation entirely
+  // Used when image was generated successfully but video failed
+  const retryVideoOnly = useCallback(async (index: number, scene: ViralScene) => {
+    if (cancelledRef.current) return
+    const state = sceneVideoStates.get(index)
+    if (!state?.imagePreview) {
+      // No image saved — fall back to full pipeline
+      return generateSceneVideo(index, scene)
+    }
+
+    activeGenerationsRef.current++
+    updateSceneVideo(index, { status: 'generating-video', error: null, taskId: null, videoUrl: null, pollCount: 0 })
+
+    try {
+      // Extract raw base64 from the data URL stored in imagePreview
+      const base64Match = state.imagePreview.match(/^data:[^;]+;base64,(.+)$/)
+      if (!base64Match) throw new Error('No se pudo leer la imagen guardada')
+      const imageBase64ForVideo = base64Match[1]
+
+      // Duration per model
+      const isVeo = videoModelId.startsWith('veo')
+      const isKling = videoModelId.startsWith('kling')
+      const isSora = videoModelId === 'sora-2'
+      const isGrok = videoModelId === 'grok-imagine'
+      const sceneDuration = isVeo ? 8 : isKling ? 10 : isSora ? 10 : isGrok ? 10 : 8
+
+      let videoPrompt = scene.animationPrompt
+      if (!isVeo) {
+        videoPrompt += ` ${sceneDuration} seconds.`
+      }
+      if (scene.influencerDialogue) {
+        if (isVeo) {
+          videoPrompt += ` The person speaks to camera saying: "${scene.influencerDialogue}"`
+        } else {
+          videoPrompt += ` La persona habla a cámara diciendo en español latino con voz femenina joven: "${scene.influencerDialogue}". Audio must be in Latin American Spanish, female voice.`
+        }
+      }
+
+      // Upload image to Storage
+      const supabaseForUpload = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      )
+      const { data: { user: uploadUser } } = await supabaseForUpload.auth.getUser()
+      if (!uploadUser) throw new Error('No autorizado')
+
+      const imageUrl = await uploadBase64ToStorage(imageBase64ForVideo, uploadUser.id, 0)
+
+      const videoBody: any = {
+        modelId: videoModelId,
+        prompt: videoPrompt,
+        duration: sceneDuration,
+        aspectRatio,
+        enableAudio: true,
+        resolution: '720p',
+        imageUrl,
+      }
+
+      const videoRes = await fetch('/api/studio/generate-video', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(videoBody),
+      })
+
+      let videoData: any
+      const contentType = videoRes.headers.get('content-type') || ''
+      if (contentType.includes('application/json')) {
+        videoData = await videoRes.json()
+      } else {
+        const text = await videoRes.text()
+        throw new Error(videoRes.status === 504 ? 'Timeout: la generación tardó demasiado. Intenta de nuevo.' : `Error del servidor: ${text.substring(0, 100)}`)
+      }
+
+      if (cancelledRef.current) { activeGenerationsRef.current--; return }
+
+      if (!videoRes.ok || (!videoData.success && !videoData.taskId)) {
+        throw new Error(videoData.error || 'Error al generar video')
+      }
+
+      if (videoData.taskId) {
+        updateSceneVideo(index, { status: 'polling', taskId: videoData.taskId })
+        await pollSceneVideo(index, videoData.taskId)
+      } else if (videoData.videoUrl) {
+        updateSceneVideo(index, { status: 'completed', videoUrl: videoData.videoUrl })
+        activeGenerationsRef.current--
+      }
+    } catch (err: any) {
+      updateSceneVideo(index, { status: 'error', error: err.message || 'Error desconocido' })
+      activeGenerationsRef.current--
+    }
+  }, [videoModelId, aspectRatio, sceneVideoStates, generateSceneVideo, updateSceneVideo, pollSceneVideo])
+
   // Generate ALL scenes in parallel with semaphore
   const generateAllParallel = useCallback(async () => {
     if (!scriptResult) return
@@ -1390,17 +1482,28 @@ export function ViralTransformationMode({
                       </>
                     )}
 
-                    {/* Error: show message + retry */}
+                    {/* Error: show message + retry (video only if image exists) */}
                     {status === 'error' && (
                       <div className="mt-1">
                         <p className="text-[9px] text-red-400 line-clamp-3 mb-1">{state?.error}</p>
-                        <button
-                          onClick={() => generateSceneVideo(i, scene)}
-                          className="flex items-center gap-1 text-[10px] text-red-400 hover:text-red-300 transition-colors"
-                        >
-                          <RefreshCw className="w-3 h-3" />
-                          Reintentar
-                        </button>
+                        <div className="flex gap-2">
+                          {state?.imagePreview && (
+                            <button
+                              onClick={() => retryVideoOnly(i, scene)}
+                              className="flex items-center gap-1 text-[10px] text-blue-400 hover:text-blue-300 transition-colors"
+                            >
+                              <RefreshCw className="w-3 h-3" />
+                              Reintentar video
+                            </button>
+                          )}
+                          <button
+                            onClick={() => generateSceneVideo(i, scene)}
+                            className="flex items-center gap-1 text-[10px] text-red-400 hover:text-red-300 transition-colors"
+                          >
+                            <RefreshCw className="w-3 h-3" />
+                            {state?.imagePreview ? 'Regenerar todo' : 'Reintentar'}
+                          </button>
+                        </div>
                       </div>
                     )}
 
