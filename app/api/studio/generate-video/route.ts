@@ -82,6 +82,7 @@ export async function POST(request: Request) {
       klingMode,
       imageUrl,
       imageUrlEnd,
+      forceFal,
     } = body as {
       modelId: VideoModelId
       prompt: string
@@ -104,6 +105,7 @@ export async function POST(request: Request) {
       klingMode?: 'pro' | 'std'
       imageUrl?: string
       imageUrlEnd?: string // Pre-uploaded end frame URL (avoids 4.5MB body limit)
+      forceFal?: boolean // Skip KIE, go straight to fal.ai (after KIE polling failures)
     }
 
     const isVeoModel = modelId.startsWith('veo')
@@ -240,7 +242,7 @@ export async function POST(request: Request) {
 
     // Create video task (returns taskId for async processing)
     // Pass falApiKey for cascade fallback (KIE -> fal.ai)
-    const result = await generateVideo(generationParams, kieApiKey, falApiKey)
+    const result = await generateVideo(generationParams, kieApiKey, falApiKey, forceFal)
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
 

@@ -56,7 +56,8 @@ function convertResolutionForHailuo(resolution: string | undefined): string {
 export async function generateVideo(
   request: GenerateVideoRequest,
   apiKey: string,
-  falApiKey?: string
+  falApiKey?: string,
+  forceFal?: boolean
 ): Promise<GenerateVideoResult> {
   const t0 = Date.now()
   try {
@@ -69,8 +70,26 @@ export async function generateVideo(
     const apiModelId = getVideoApiModelId(request.modelId, hasImage)
 
     console.log(`[Video] Model: ${request.modelId} -> API model: ${apiModelId}`)
-    console.log(`[Video] Has image: ${hasImage}`)
+    console.log(`[Video] Has image: ${hasImage}, forceFal: ${!!forceFal}`)
     console.log(`[Video] Request imageUrls:`, request.imageUrls)
+
+    // forceFal: skip KIE entirely, go straight to fal.ai (used after KIE polling failures)
+    if (forceFal && falApiKey) {
+      const falConfig = modelConfig.fal
+      const falPath = falConfig ? (hasImage ? (falConfig.i2v || falConfig.t2v) : falConfig.t2v) : modelConfig.falModelId
+      if (falPath) {
+        console.log(`[Video] forceFal=true, going directly to fal.ai: ${falPath}`)
+        const falResult = await generateVideoViaFal(falApiKey, falPath, {
+          prompt: request.prompt,
+          imageUrl: hasImage ? request.imageUrls?.[0] : undefined,
+          aspectRatio: request.aspectRatio,
+          duration: request.duration,
+          timeoutMs: 120000,
+        })
+        logAI({ service: 'video', provider: 'fal', status: falResult.success ? 'success' : 'error', response_ms: Date.now() - t0, model: falPath })
+        return falResult
+      }
+    }
 
     // Veo models use different endpoint, with fal.ai fallback
     if (modelConfig.useVeoEndpoint) {

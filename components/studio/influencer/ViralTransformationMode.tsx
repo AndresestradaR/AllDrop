@@ -411,7 +411,8 @@ export function ViralTransformationMode({
 
   // Retry ONLY the video step — skips image generation entirely
   // Used when image was generated successfully but video failed
-  const retryVideoOnly = useCallback(async (index: number, scene: ViralScene) => {
+  // forceFal: skip KIE entirely, go straight to fal.ai (after KIE service failures)
+  const retryVideoOnly = useCallback(async (index: number, scene: ViralScene, forceFal?: boolean) => {
     if (cancelledRef.current) return
     const state = sceneVideoStates.get(index)
     if (!state?.imagePreview) {
@@ -465,6 +466,11 @@ export function ViralTransformationMode({
         enableAudio: true,
         resolution: '720p',
         imageUrl,
+        ...(forceFal ? { forceFal: true } : {}),
+      }
+
+      if (forceFal) {
+        updateSceneVideo(index, { status: 'generating-video', error: null })
       }
 
       const videoRes = await fetch('/api/studio/generate-video', {
@@ -1433,7 +1439,7 @@ export function ViralTransformationMode({
                     {status === 'error' && (
                       <div className="mt-1">
                         <p className="text-[9px] text-red-400 line-clamp-3 mb-1">{state?.error}</p>
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2">
                           {state?.imagePreview && (
                             <button
                               onClick={() => retryVideoOnly(i, scene)}
@@ -1441,6 +1447,15 @@ export function ViralTransformationMode({
                             >
                               <RefreshCw className="w-3 h-3" />
                               Reintentar video
+                            </button>
+                          )}
+                          {state?.imagePreview && state?.error && (state.error.includes('heavy load') || state.error.includes('not responding') || state.error.includes('overloaded')) && (
+                            <button
+                              onClick={() => retryVideoOnly(i, scene, true)}
+                              className="flex items-center gap-1 text-[10px] text-amber-400 hover:text-amber-300 transition-colors"
+                            >
+                              <RefreshCw className="w-3 h-3" />
+                              Usar fal.ai
                             </button>
                           )}
                           <button
