@@ -125,9 +125,9 @@ export function ViralTransformationMode({
   const cancelledRef = useRef(false)
   // Image model for first frame generation
   const [imageModelId, setImageModelId] = useState<string>('nano-banana-2')
-  const MAX_CONCURRENT = 2 // Lower: 2 steps per scene (image + video)
-  const MAX_POLLS = 60
-  const POLL_INTERVAL = 5000
+  const MAX_CONCURRENT = 2 // 2 scenes generating simultaneously (each: image + video)
+  const MAX_POLLS = 120 // 120 × 4s = 8 min max per scene
+  const POLL_INTERVAL = 4000
 
   const updateSceneVideo = useCallback((index: number, update: Partial<{
     status: SceneVideoStatus
