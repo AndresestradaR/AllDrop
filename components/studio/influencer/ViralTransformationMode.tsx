@@ -315,37 +315,11 @@ export function ViralTransformationMode({
 
       if (cancelledRef.current) { activeGenerationsRef.current--; return }
 
-      // ── STEP 1.5: For transformation scenes, generate the END frame (last frame) ──
-      let imageBase64End: string | undefined
-      if (scene.imagePromptEnd && scene.sceneType === 'transformation') {
-        let fullEndPrompt = scene.imagePromptEnd
-        if (scene.usesProductPhoto && productImageUrls.length > 0) {
-          fullEndPrompt += `. The product shown must match the reference product photo exactly.`
-        }
-
-        const endImgRes = await fetch('/api/studio/generate-image', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            modelId: imageModelId,
-            prompt: fullEndPrompt,
-            aspectRatio,
-            ...(sceneRefs.length > 0 ? { referenceImages: sceneRefs } : {}),
-          }),
-        })
-        const endImgData = await endImgRes.json()
-
-        if (cancelledRef.current) { activeGenerationsRef.current--; return }
-
-        if (endImgData.success && endImgData.imageBase64) {
-          imageBase64End = endImgData.imageBase64
-        }
-        // If end frame fails, continue with just the start frame (graceful fallback)
-      }
-
       // ── STEP 2: Animate using the video model ──
-      // For transformation: first-last-frame mode (interpolates between before/after)
-      // For other scenes: standard image-to-video (animates the first frame)
+      // ALL scenes use standard image-to-video: start image + rich prompt
+      // For transformations: the prompt describes the action (cleaning, transforming)
+      // and the model intelligently animates it. This works MUCH better than
+      // FIRST_AND_LAST_FRAMES_2_VIDEO which just morphs pixels between frames.
 
       // Duration per model: Veo accepts 4/6/8, Kling accepts 5/10, Sora accepts 10/15
       const isVeo = videoModelId.startsWith('veo')
@@ -355,6 +329,11 @@ export function ViralTransformationMode({
       const sceneDuration = isVeo ? 8 : isKling ? 10 : isSora ? 10 : isGrok ? 10 : 8
 
       let videoPrompt = scene.animationPrompt
+      // For transformation scenes: inject the end-state description into the prompt
+      // so the model knows WHERE to animate towards (e.g., "grease disappears, surface becomes clean")
+      if (scene.sceneType === 'transformation' && scene.imagePromptEnd) {
+        videoPrompt += ` The scene transforms to reach this final state: ${scene.imagePromptEnd}`
+      }
       // Inject duration into prompt so the model knows the target length
       if (!isVeo) {
         videoPrompt += ` ${sceneDuration} seconds.`
@@ -369,8 +348,7 @@ export function ViralTransformationMode({
         }
       }
 
-      // Upload images to Storage from browser to avoid Vercel 4.5MB body limit
-      // Then send only URLs to generate-video endpoint
+      // Upload image to Storage from browser to avoid Vercel 4.5MB body limit
       const supabaseForUpload = createBrowserClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -378,53 +356,17 @@ export function ViralTransformationMode({
       const { data: { user: uploadUser } } = await supabaseForUpload.auth.getUser()
       if (!uploadUser) throw new Error('No autorizado')
 
-      let imageUrl: string
-      if (imageBase64End && isVeo) {
-        // Veo transformation: use FIRST_AND_LAST_FRAMES_2_VIDEO (interpolates between before/after)
-        const [startUrl, endUrl] = await Promise.all([
-          uploadBase64ToStorage(imageBase64ForVideo, uploadUser.id, 0),
-          uploadBase64ToStorage(imageBase64End, uploadUser.id, 1),
-        ])
-        imageUrl = startUrl
+      // ALL scenes use standard image-to-video: one start image + descriptive prompt
+      const imageUrl = await uploadBase64ToStorage(imageBase64ForVideo, uploadUser.id, 0)
 
-        var videoBody: any = {
-          modelId: videoModelId,
-          prompt: videoPrompt,
-          duration: sceneDuration,
-          aspectRatio,
-          enableAudio: true,
-          resolution: '720p',
-          imageUrl: startUrl,
-          imageUrlEnd: endUrl,
-          veoGenerationType: 'FIRST_AND_LAST_FRAMES_2_VIDEO',
-        }
-      } else if (imageBase64End && !isVeo) {
-        // Non-Veo transformation: use the AFTER image as start frame
-        // Shows the clean/transformed result animating — more useful than animating the dirty state
-        imageUrl = await uploadBase64ToStorage(imageBase64End, uploadUser.id, 0)
-
-        var videoBody: any = {
-          modelId: videoModelId,
-          prompt: videoPrompt,
-          duration: sceneDuration,
-          aspectRatio,
-          enableAudio: true,
-          resolution: '720p',
-          imageUrl,
-        }
-      } else {
-        // Regular scene: upload single image
-        imageUrl = await uploadBase64ToStorage(imageBase64ForVideo, uploadUser.id, 0)
-
-        var videoBody: any = {
-          modelId: videoModelId,
-          prompt: videoPrompt,
-          duration: sceneDuration,
-          aspectRatio,
-          enableAudio: true,
-          resolution: '720p',
-          imageUrl,
-        }
+      const videoBody: any = {
+        modelId: videoModelId,
+        prompt: videoPrompt,
+        duration: sceneDuration,
+        aspectRatio,
+        enableAudio: true,
+        resolution: '720p',
+        imageUrl,
       }
 
       const videoRes = await fetch('/api/studio/generate-video', {
