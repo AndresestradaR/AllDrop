@@ -454,15 +454,31 @@ export function ViralTransformationMode({
     setIsGeneratingAll(true)
     activeGenerationsRef.current = 0
 
-    // Initialize all scenes
-    const newStates = new Map<number, { status: SceneVideoStatus; taskId: string | null; videoUrl: string | null; imagePreview: string | null; error: string | null; pollCount: number }>()
-    scriptResult.scenes.forEach((_, i) => {
-      newStates.set(i, { status: 'idle', taskId: null, videoUrl: null, imagePreview: null, error: null, pollCount: 0 })
+    // Only reset non-completed scenes — preserve completed videos
+    setSceneVideoStates(prev => {
+      const next = new Map(prev)
+      scriptResult.scenes.forEach((_, i) => {
+        const current = next.get(i)
+        if (!current || current.status !== 'completed') {
+          next.set(i, { status: 'idle', taskId: null, videoUrl: null, imagePreview: null, error: null, pollCount: 0 })
+        }
+      })
+      return next
     })
-    setSceneVideoStates(newStates)
 
-    // Queue-based parallel generation
-    const queue = scriptResult.scenes.map((scene, i) => ({ scene, index: i }))
+    // Queue only non-completed scenes
+    const queue = scriptResult.scenes
+      .map((scene, i) => ({ scene, index: i }))
+      .filter(({ index }) => {
+        const state = sceneVideoStates.get(index)
+        return !state || state.status !== 'completed'
+      })
+
+    if (queue.length === 0) {
+      setIsGeneratingAll(false)
+      toast.success('Todas las escenas ya están completadas')
+      return
+    }
 
     const runNext = async (): Promise<void> => {
       if (cancelledRef.current || queue.length === 0) return
@@ -476,7 +492,7 @@ export function ViralTransformationMode({
     await Promise.all(workers)
     setIsGeneratingAll(false)
     toast.success('Generación completada')
-  }, [scriptResult, generateSceneVideo])
+  }, [scriptResult, generateSceneVideo, sceneVideoStates])
 
   // Cancel all generations
   const cancelAll = useCallback(() => {
