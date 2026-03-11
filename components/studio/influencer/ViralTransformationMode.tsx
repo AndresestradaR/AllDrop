@@ -351,7 +351,8 @@ export function ViralTransformationMode({
       const isVeo = videoModelId.startsWith('veo')
       const isKling = videoModelId.startsWith('kling')
       const isSora = videoModelId === 'sora-2'
-      const sceneDuration = isVeo ? 8 : isKling ? 10 : isSora ? 10 : 8
+      const isGrok = videoModelId === 'grok-imagine'
+      const sceneDuration = isVeo ? 8 : isKling ? 10 : isSora ? 10 : isGrok ? 10 : 8
 
       let videoPrompt = scene.animationPrompt
       // Inject duration into prompt so the model knows the target length
@@ -379,7 +380,7 @@ export function ViralTransformationMode({
 
       let imageUrl: string
       if (imageBase64End && isVeo) {
-        // Transformation: upload both in parallel
+        // Veo transformation: use FIRST_AND_LAST_FRAMES_2_VIDEO (interpolates between before/after)
         const [startUrl, endUrl] = await Promise.all([
           uploadBase64ToStorage(imageBase64ForVideo, uploadUser.id, 0),
           uploadBase64ToStorage(imageBase64End, uploadUser.id, 1),
@@ -396,6 +397,20 @@ export function ViralTransformationMode({
           imageUrl: startUrl,
           imageUrlEnd: endUrl,
           veoGenerationType: 'FIRST_AND_LAST_FRAMES_2_VIDEO',
+        }
+      } else if (imageBase64End && !isVeo) {
+        // Non-Veo transformation: use the AFTER image as start frame
+        // Shows the clean/transformed result animating — more useful than animating the dirty state
+        imageUrl = await uploadBase64ToStorage(imageBase64End, uploadUser.id, 0)
+
+        var videoBody: any = {
+          modelId: videoModelId,
+          prompt: videoPrompt,
+          duration: sceneDuration,
+          aspectRatio,
+          enableAudio: true,
+          resolution: '720p',
+          imageUrl,
         }
       } else {
         // Regular scene: upload single image
@@ -982,7 +997,7 @@ export function ViralTransformationMode({
             onChange={(e) => setVideoModelId(e.target.value as VideoModelId)}
             className="w-full px-3 py-2 bg-surface-elevated border border-border rounded-xl text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50"
           >
-            {VIDEO_COMPANY_GROUPS.filter(g => ['google', 'kuaishou', 'openai'].includes(g.id)).map(group => (
+            {VIDEO_COMPANY_GROUPS.filter(g => ['google', 'kuaishou', 'openai', 'xai'].includes(g.id)).map(group => (
               <optgroup key={group.id} label={group.name}>
                 {group.models.map(m => (
                   <option key={m.id} value={m.id}>
@@ -1281,7 +1296,7 @@ export function ViralTransformationMode({
                   onChange={(e) => setVideoModelId(e.target.value as VideoModelId)}
                   className="w-full px-2 py-1.5 bg-surface border border-border rounded-lg text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-accent/50"
                 >
-                  {VIDEO_COMPANY_GROUPS.filter(g => ['google', 'kuaishou', 'openai'].includes(g.id)).map(group => (
+                  {VIDEO_COMPANY_GROUPS.filter(g => ['google', 'kuaishou', 'openai', 'xai'].includes(g.id)).map(group => (
                     <optgroup key={group.id} label={group.name}>
                       {group.models.map(model => (
                         <option key={model.id} value={model.id}>
