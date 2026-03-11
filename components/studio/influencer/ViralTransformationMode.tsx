@@ -184,7 +184,12 @@ export function ViralTransformationMode({
           return
         }
         if (data.status === 'failed') {
-          updateSceneVideo(index, { status: 'error', error: data.error || 'Video falló' })
+          const errorMsg = data.error || 'Video falló'
+          const isServiceDown = errorMsg.toLowerCase().includes('heavy load') || errorMsg.toLowerCase().includes('not responding') || errorMsg.toLowerCase().includes('overloaded')
+          const userError = isServiceDown
+            ? `${errorMsg}. Prueba con otro modelo (Veo Fast o Grok).`
+            : errorMsg
+          updateSceneVideo(index, { status: 'error', error: userError })
           activeGenerationsRef.current--
           return
         }
