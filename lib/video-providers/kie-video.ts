@@ -363,12 +363,13 @@ async function generateStandardVideo(
   const isSeedance15 = request.modelId === 'seedance-1.5-pro'
   const isSeedance10 = request.modelId === 'seedance-1.0-fast'
   const isSeedance = isSeedance2 || isSeedance15 || isSeedance10
+  const isGrok = request.modelId === 'grok-imagine'
 
-  console.log(`[Video] Model detection: isKling30=${isKling30}, isWan26=${isWan26}, isWan25=${isWan25}, isKling26=${isKling26}, isSora=${isSora}, isHailuo=${isHailuo}, isSeedance2=${isSeedance2}, isSeedance15=${isSeedance15}, isSeedance10=${isSeedance10}`)
+  console.log(`[Video] Model detection: isKling30=${isKling30}, isWan26=${isWan26}, isWan25=${isWan25}, isKling26=${isKling26}, isSora=${isSora}, isHailuo=${isHailuo}, isSeedance2=${isSeedance2}, isSeedance15=${isSeedance15}, isSeedance10=${isSeedance10}, isGrok=${isGrok}`)
 
   // Image URLs - DIFFERENT MODELS USE DIFFERENT FIELD NAMES!
   if (request.imageUrls && request.imageUrls.length > 0) {
-    if (isKling30 || isKling26 || isSora || isWan26 || isSeedance2) {
+    if (isKling30 || isKling26 || isSora || isWan26 || isSeedance2 || isGrok) {
       // Kling 3.0, Kling 2.6, Sora 2, Wan 2.6, and Seedance 2 use image_urls (plural array)
       input.image_urls = request.imageUrls
       console.log(`[Video] Using image_urls (array) for ${request.modelId}`)
@@ -422,7 +423,7 @@ async function generateStandardVideo(
     if (isSora) {
       // Sora uses n_frames as string ("10" or "15")
       input.n_frames = request.duration.toString()
-    } else if (isKling || isHailuo || isSeedance || isWan) {
+    } else if (isKling || isHailuo || isSeedance || isWan || isGrok) {
       // Normalize duration to nearest valid value per model
       let validDuration = request.duration
       if (isKling) {
@@ -437,6 +438,9 @@ async function generateStandardVideo(
       } else if (isHailuo) {
         // Hailuo accepts: 6, 10
         validDuration = request.duration <= 8 ? 6 : 10
+      } else if (isGrok) {
+        // Grok accepts: 6, 10, 15
+        validDuration = request.duration <= 8 ? 6 : request.duration <= 12 ? 10 : 15
       }
       // Seedance durations handled below in their specific blocks
       if (validDuration !== request.duration) {
@@ -464,6 +468,10 @@ async function generateStandardVideo(
     if (modelConfig.supportsAudio) {
       input.generate_audio = request.enableAudio ?? false
     }
+  }
+  // Grok Imagine: mode parameter (fun, normal, spicy — spicy not available with external images)
+  if (isGrok) {
+    input.mode = 'normal'
   }
   // Note: Wan image-to-video doesn't have audio param
   // Note: Kling v2.5, Hailuo, Sora, and Seedance 1.0 don't support audio
