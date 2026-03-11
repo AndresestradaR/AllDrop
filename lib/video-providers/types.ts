@@ -1,7 +1,7 @@
 // Video Provider Types for Estudio IA
 // Model IDs from KIE.ai (January 2026)
 
-export type VideoProviderCompany = 'google' | 'kuaishou' | 'openai' | 'minimax' | 'seedance' | 'wan'
+export type VideoProviderCompany = 'google' | 'kuaishou' | 'openai' | 'minimax' | 'seedance' | 'wan' | 'xai'
 
 export type VideoModelId =
   // Google Veo 3.1 (special endpoint)
@@ -23,6 +23,8 @@ export type VideoModelId =
   // Wan
   | 'wan-2.6'
   | 'wan-2.5'
+  // xAI Grok Imagine
+  | 'grok-imagine'
 
 export type VideoModelTag = 'NEW' | 'FAST' | 'PREMIUM' | 'AUDIO' | 'REFERENCES' | 'MULTI_SHOTS' | 'RECOMENDADO' | 'IMG2VID'
 
@@ -331,6 +333,27 @@ export const VIDEO_MODELS: Record<VideoModelId, VideoModelConfig> = {
     supportsMultiShots: false,
     tags: ['AUDIO'],
   },
+
+  // ============ XAI GROK IMAGINE ============
+  'grok-imagine': {
+    id: 'grok-imagine',
+    apiModelId: 'grok-imagine/image-to-video',
+    apiModelIdText: 'grok-imagine/text-to-video',
+    name: 'Grok Imagine',
+    description: 'xAI multimodal con audio sincronizado. Muy económico.',
+    company: 'xai',
+    companyName: 'xAI',
+    priceRange: '$0.05-0.20',
+    durationRange: '6-15s',
+    resolutions: ['480p', '720p'],
+    defaultResolution: '720p',
+    supportsAudio: true,
+    supportsReferences: false,
+    supportsStartEndFrames: false,
+    supportsMultiShots: false,
+    tags: ['NEW', 'FAST', 'AUDIO'],
+    recommended: true,
+  },
 }
 
 // Group models by company for UI
@@ -394,6 +417,15 @@ export const VIDEO_COMPANY_GROUPS: VideoCompanyGroup[] = [
     models: [
       VIDEO_MODELS['wan-2.6'],
       VIDEO_MODELS['wan-2.5'],
+    ],
+  },
+  {
+    id: 'xai',
+    name: 'xAI',
+    icon: 'Bot',
+    color: 'from-gray-700 to-gray-900',
+    models: [
+      VIDEO_MODELS['grok-imagine'],
     ],
   },
 ]
