@@ -91,6 +91,30 @@ export async function generateVideo(
       }
     }
 
+    // Sora 2: fal.ai FIRST, KIE as backup (KIE accepts tasks but fails during polling)
+    if (request.modelId === 'sora-2' && falApiKey) {
+      const falConfig = modelConfig.fal
+      const falPath = falConfig ? (hasImage ? (falConfig.i2v || falConfig.t2v) : falConfig.t2v) : modelConfig.falModelId
+      if (falPath) {
+        console.log(`[Video/Sora2] Trying fal.ai FIRST: ${falPath}`)
+        const t0Fal = Date.now()
+        const falResult = await generateVideoViaFal(falApiKey, falPath, {
+          prompt: request.prompt,
+          imageUrl: hasImage ? request.imageUrls?.[0] : undefined,
+          aspectRatio: request.aspectRatio,
+          duration: request.duration,
+          timeoutMs: 120000,
+        })
+        if (falResult.success) {
+          logAI({ service: 'video', provider: 'fal', status: 'success', response_ms: Date.now() - t0Fal, model: falPath })
+          return falResult
+        }
+        console.warn(`[Video/Sora2] fal.ai failed (${falResult.error}), falling back to KIE`)
+        logAI({ service: 'video', provider: 'fal', status: 'error', response_ms: Date.now() - t0Fal, model: falPath, error_message: falResult.error })
+      }
+      // Fall through to standard KIE flow below
+    }
+
     // Veo models use different endpoint, with fal.ai fallback
     if (modelConfig.useVeoEndpoint) {
       const veoResult = await generateVeoVideo(request, apiKey, request.modelId)
