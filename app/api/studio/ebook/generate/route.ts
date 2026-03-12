@@ -67,7 +67,8 @@ async function generateIllustration(
   keyword: string,
   ebookTitle: string,
   apiKeys: any,
-  modelId: ImageModelId = 'nano-banana-2'
+  modelId: ImageModelId = 'nano-banana-2',
+  timeoutMs: number = 25000
 ): Promise<string | null> {
   try {
     const prompt = `Professional ebook illustration: ${keyword}. Clean, modern, editorial style. High quality, detailed, suitable for a professional digital guide about "${ebookTitle}". No text overlay.`
@@ -80,7 +81,7 @@ async function generateIllustration(
         aspectRatio: '16:9',
       },
       apiKeys,
-      { maxTotalMs: 50000 }
+      { maxTotalMs: timeoutMs }
     )
 
     if (result.success && result.imageBase64) {
@@ -140,7 +141,7 @@ export async function POST(request: Request) {
     // Choose image model based on available keys
     const imageModel: ImageModelId = 'nano-banana-2' // cascade handles fallbacks automatically
 
-    const totalSteps = outline.chapters.length * 2 + 3 // chapters*(text+image) + cover + compile + upload
+    const totalSteps = outline.chapters.length + 4 // chapters + cover + compile + upload + done
     let currentStep = 0
 
     // SSE Stream
@@ -153,7 +154,7 @@ export async function POST(request: Request) {
         }
 
         try {
-          // ---- STEP 1: Generate cover image ----
+          // ---- STEP 1: Generate cover image (non-blocking) ----
           currentStep++
           sendProgress({
             type: 'cover',
@@ -161,20 +162,16 @@ export async function POST(request: Request) {
             progress: Math.round((currentStep / totalSteps) * 100),
           })
 
-          let coverImageUrl: string | null = null
-          try {
-            const coverPrompt = `Professional ebook cover illustration for "${outline.title}". Modern, premium, editorial design. Subject: ${productName}. Style: clean, sophisticated, suitable for a digital guide cover. No text.`
-            coverImageUrl = await generateIllustration(
-              coverPrompt,
-              outline.title,
-              imageKeys,
-              imageModel
-            )
-          } catch (err) {
-            console.warn('[Ebook] Cover generation failed, continuing without cover image')
-          }
+          // Start cover generation in background — don't wait
+          const coverPromise = generateIllustration(
+            `Professional ebook cover illustration for "${outline.title}". Modern, premium, editorial design. Subject: ${productName}. Style: clean, sophisticated, suitable for a digital guide cover. No text.`,
+            outline.title,
+            imageKeys,
+            imageModel,
+            30000
+          ).catch(() => null)
 
-          // ---- STEP 2: Generate chapter content + images ----
+          // ---- STEP 2: Generate ALL chapter text + images in parallel per chapter ----
           const chaptersWithContent = [...outline.chapters]
 
           for (let i = 0; i < chaptersWithContent.length; i++) {
@@ -182,46 +179,25 @@ export async function POST(request: Request) {
 
             // Check time budget — leave 60s for PDF compilation + upload
             const elapsed = Date.now() - startTime
-            if (elapsed > 220000) {
-              console.warn(`[Ebook] Time budget exceeded at chapter ${i + 1}, skipping remaining images`)
-              // Generate remaining text only, skip images
-              for (let j = i; j < chaptersWithContent.length; j++) {
-                if (!chaptersWithContent[j].content) {
-                  currentStep++
-                  sendProgress({
-                    type: 'chapter-text',
-                    chapter: j + 1,
-                    totalChapters: chaptersWithContent.length,
-                    message: `Escribiendo capitulo ${j + 1}: ${chaptersWithContent[j].title}...`,
-                    progress: Math.round((currentStep / totalSteps) * 100),
-                  })
+            const skipImages = elapsed > 180000
 
-                  const chapterContent = await generateAIText(textKeys, {
-                    systemPrompt: CHAPTER_SYSTEM_PROMPT,
-                    userMessage: `Escribe el capítulo "${chaptersWithContent[j].title}" para el ebook "${outline.title}".
-Contexto del capítulo: ${chaptersWithContent[j].summary}
-Producto relacionado: ${productName}`,
-                    temperature: 0.7,
-                  })
-
-                  chaptersWithContent[j] = { ...chaptersWithContent[j], content: chapterContent }
-                  currentStep++ // skip image step
-                }
-              }
-              break
+            if (skipImages && i > 0) {
+              console.warn(`[Ebook] Time budget tight at chapter ${i + 1}, text-only mode`)
             }
 
-            // Generate chapter text
             currentStep++
             sendProgress({
               type: 'chapter-text',
               chapter: i + 1,
               totalChapters: chaptersWithContent.length,
-              message: `Escribiendo capitulo ${i + 1}: ${chapter.title}...`,
+              message: skipImages
+                ? `Escribiendo capitulo ${i + 1}: ${chapter.title} (modo rapido)...`
+                : `Escribiendo e ilustrando capitulo ${i + 1}: ${chapter.title}...`,
               progress: Math.round((currentStep / totalSteps) * 100),
             })
 
-            const chapterContent = await generateAIText(textKeys, {
+            // Run text + image IN PARALLEL for each chapter
+            const textPromise = generateAIText(textKeys, {
               systemPrompt: CHAPTER_SYSTEM_PROMPT,
               userMessage: `Escribe el capítulo "${chapter.title}" para el ebook "${outline.title}".
 Contexto del capítulo: ${chapter.summary}
@@ -231,32 +207,27 @@ ${i === chaptersWithContent.length - 1 ? 'Este es el último capítulo — cierr
               temperature: 0.7,
             })
 
-            chaptersWithContent[i] = { ...chaptersWithContent[i], content: chapterContent }
+            const imagePromise = skipImages
+              ? Promise.resolve(null)
+              : generateIllustration(
+                  chapter.imageKeyword,
+                  outline.title,
+                  imageKeys,
+                  imageModel,
+                  25000
+                ).catch(() => null)
 
-            // Generate chapter illustration
-            currentStep++
-            sendProgress({
-              type: 'chapter-image',
-              chapter: i + 1,
-              totalChapters: chaptersWithContent.length,
-              message: `Ilustrando capitulo ${i + 1}...`,
-              progress: Math.round((currentStep / totalSteps) * 100),
-            })
+            const [chapterContent, imgUrl] = await Promise.all([textPromise, imagePromise])
 
-            try {
-              const imgUrl = await generateIllustration(
-                chapter.imageKeyword,
-                outline.title,
-                imageKeys,
-                imageModel
-              )
-              if (imgUrl) {
-                chaptersWithContent[i] = { ...chaptersWithContent[i], imageUrl: imgUrl }
-              }
-            } catch {
-              console.warn(`[Ebook] Image for chapter ${i + 1} failed, continuing`)
+            chaptersWithContent[i] = {
+              ...chaptersWithContent[i],
+              content: chapterContent,
+              ...(imgUrl ? { imageUrl: imgUrl } : {}),
             }
           }
+
+          // Wait for cover image
+          const coverImageUrl = await coverPromise
 
           // ---- STEP 3: Compile PDF ----
           currentStep++

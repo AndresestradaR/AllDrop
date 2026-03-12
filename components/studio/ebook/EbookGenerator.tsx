@@ -174,6 +174,7 @@ export default function EbookGenerator({ onBack }: EbookGeneratorProps) {
 
       const decoder = new TextDecoder()
       let buffer = ''
+      let gotResult = false
 
       while (true) {
         const { done, value } = await reader.read()
@@ -192,7 +193,7 @@ export default function EbookGenerator({ onBack }: EbookGeneratorProps) {
             const event = JSON.parse(jsonStr)
 
             if (event.type === 'result') {
-              // Final result
+              gotResult = true
               setEbookId(event.id)
               setEbookTitle(event.title)
               setEbookChapters(event.chaptersCount)
@@ -212,6 +213,16 @@ export default function EbookGenerator({ onBack }: EbookGeneratorProps) {
             // ignore parse errors
           }
         }
+      }
+
+      // Stream ended without result — server likely timed out
+      if (!gotResult) {
+        toast.error('La generacion tardo demasiado. Intenta con menos capitulos.')
+        setCurrentGenStep({
+          type: 'error',
+          message: 'El servidor agoto el tiempo. Intenta con menos capitulos (5-6).',
+          progress: 0,
+        })
       }
     } catch (err: any) {
       if (err.name === 'AbortError') return
