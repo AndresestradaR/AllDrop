@@ -202,9 +202,8 @@ export async function POST(request: Request) {
       userMessage: userPrompt,
       temperature: 0.7,
       jsonMode: true,
-      // flash en KIE (rapido, 90s budget), pro solo en Google direct (fallback final)
-      // gemini-2.5-pro en KIE es demasiado lento y consume todo el timeout
-      googleModel: 'gemini-2.5-pro',
+      skipKIE: true,
+      googleModel: 'gemini-3.1-pro-preview',
     })
 
     let parsed: any
