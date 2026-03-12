@@ -60,7 +60,7 @@ generateAIText(keys, options) -> string
   Consumidores principales en Studio:
     copy-optimize (Textos IA): kieModel='gemini-2.5-pro', maxDuration=120
     prompt-generate (Prompt Video): default flash, maxDuration=30
-    prompt-bot (Prompt Bot): default flash, maxDuration=30
+    prompt-bot (Prompt Bot): skipKIE=true, googleModel='gemini-3.1-pro-preview', maxDuration=120
     resena-ugc (Resena UGC): default flash, maxDuration=120
 ```
 **15+ API routes depend on this service.** Change = test everything.
@@ -258,7 +258,7 @@ KIE/fal.ai necesitan URLs publicas → upload temp a Supabase Storage si Gemini 
   | Lip Sync         | KIE user key → KIE platform key (solo KIE soporta)   |
   | Deep Face        | KIE user key → KIE platform key (solo KIE soporta)   |
   | Prompt Video     | ai-text cascade KIE→OpenAI→Google (ADMIN ONLY)       |
-  | Prompt Bot       | ai-text cascade KIE→OpenAI→Google (ADMIN ONLY)       |
+  | Prompt Bot       | ai-text skipKIE→OpenAI→Google gemini-3.1-pro (ADMIN ONLY) + Amazon reviews via Apify |
   | Descriptor       | ai-text cascade x2 paralelo (gemini-2.5-pro)         |
 
   Timeouts: Gemini 90s, KIE poll 60s, fal.ai poll 45s. maxDuration: 120s (vercel.json).

@@ -17,6 +17,10 @@ import {
   ShoppingCart,
   HelpCircle,
   Shield,
+  Image,
+  Video,
+  Plus,
+  Trash2,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -51,6 +55,22 @@ interface BotResult {
   analysis: AnalysisData
 }
 
+interface MediaItem {
+  id: string
+  url: string
+  type: 'image' | 'video'
+  moment: string
+}
+
+const MEDIA_MOMENTS = [
+  { id: 'interaccion-3', label: 'Interaccion 3 — Al presentar el producto' },
+  { id: 'interaccion-4', label: 'Interaccion 4 — Prueba social / resenas' },
+  { id: 'interaccion-5', label: 'Interaccion 5 — Al presentar la oferta' },
+  { id: 'catalogo', label: 'Cuando pida colores/tallas — Catalogo' },
+  { id: 'saludo', label: 'Interaccion 1 — En el saludo inicial' },
+  { id: 'custom', label: 'Personalizado (escribir momento)' },
+]
+
 const TONES = [
   { id: 'amigable', label: 'Amigable' },
   { id: 'profesional', label: 'Profesional' },
@@ -83,6 +103,10 @@ export function PromptBotGenerator({ onBack }: { onBack: () => void }) {
   const [shippingInfo, setShippingInfo] = useState('')
   const [guarantee, setGuarantee] = useState('')
   const [existingPrompt, setExistingPrompt] = useState('')
+
+  // Media
+  const [mediaItems, setMediaItems] = useState<MediaItem[]>([])
+  const [showMedia, setShowMedia] = useState(false)
 
   // Amazon
   const [amazonUrl, setAmazonUrl] = useState('')
@@ -123,6 +147,25 @@ export function PromptBotGenerator({ onBack }: { onBack: () => void }) {
     }
   }
 
+  const addMediaItem = () => {
+    setMediaItems(prev => [...prev, {
+      id: crypto.randomUUID(),
+      url: '',
+      type: 'image',
+      moment: 'interaccion-3',
+    }])
+  }
+
+  const updateMediaItem = (id: string, field: keyof MediaItem, value: string) => {
+    setMediaItems(prev => prev.map(item =>
+      item.id === id ? { ...item, [field]: value } : item
+    ))
+  }
+
+  const removeMediaItem = (id: string) => {
+    setMediaItems(prev => prev.filter(item => item.id !== id))
+  }
+
   const handleGenerate = async () => {
     if (!productName.trim()) return
     setIsGenerating(true)
@@ -146,6 +189,7 @@ export function PromptBotGenerator({ onBack }: { onBack: () => void }) {
           guarantee: guarantee || undefined,
           existing_prompt: existingPrompt || undefined,
           amazon_reviews: amazonData || undefined,
+          media_items: mediaItems.filter(m => m.url.trim()) || undefined,
         }),
       })
       const data = await response.json()
@@ -384,6 +428,96 @@ export function PromptBotGenerator({ onBack }: { onBack: () => void }) {
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* Media Section (collapsible) */}
+            <div className="p-4 bg-blue-500/5 border border-blue-500/20 rounded-xl">
+              <button
+                onClick={() => {
+                  setShowMedia(!showMedia)
+                  if (!showMedia && mediaItems.length === 0) addMediaItem()
+                }}
+                className="w-full flex items-center justify-between text-sm font-medium text-blue-400"
+              >
+                <span className="flex items-center gap-2">
+                  <Image className="w-4 h-4" />
+                  Imagenes y videos del producto
+                  {mediaItems.filter(m => m.url.trim()).length > 0 && (
+                    <span className="text-[10px] bg-blue-500/20 px-1.5 py-0.5 rounded-full">
+                      {mediaItems.filter(m => m.url.trim()).length}
+                    </span>
+                  )}
+                </span>
+                {showMedia ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </button>
+              {showMedia && (
+                <div className="mt-3 space-y-3">
+                  <p className="text-xs text-text-muted">
+                    Agrega las URLs de imagenes o videos y elige en que momento el bot las debe enviar. El prompt final saldra con todo listo.
+                  </p>
+                  {mediaItems.map((item, idx) => (
+                    <div key={item.id} className="p-3 bg-surface rounded-lg border border-border space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-text-muted font-medium w-4">{idx + 1}</span>
+                        {/* Type toggle */}
+                        <button
+                          onClick={() => updateMediaItem(item.id, 'type', item.type === 'image' ? 'video' : 'image')}
+                          className={cn(
+                            'flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium border transition-colors',
+                            item.type === 'image'
+                              ? 'border-blue-500/30 bg-blue-500/10 text-blue-400'
+                              : 'border-purple-500/30 bg-purple-500/10 text-purple-400'
+                          )}
+                        >
+                          {item.type === 'image' ? <Image className="w-3 h-3" /> : <Video className="w-3 h-3" />}
+                          {item.type === 'image' ? 'Imagen' : 'Video'}
+                        </button>
+                        {/* URL input */}
+                        <input
+                          value={item.url}
+                          onChange={(e) => updateMediaItem(item.id, 'url', e.target.value)}
+                          placeholder="https://... URL de la imagen o video"
+                          className="flex-1 px-2.5 py-1.5 bg-surface-elevated border border-border rounded-lg text-text-primary placeholder:text-text-muted text-xs focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+                        />
+                        <button
+                          onClick={() => removeMediaItem(item.id)}
+                          className="p-1 text-text-muted hover:text-red-400 transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      {/* Moment selector */}
+                      <div className="flex items-center gap-2 ml-6">
+                        <span className="text-[10px] text-text-muted flex-shrink-0">Enviar en:</span>
+                        <select
+                          value={item.moment.startsWith('custom:') ? 'custom' : item.moment}
+                          onChange={(e) => updateMediaItem(item.id, 'moment', e.target.value === 'custom' ? 'custom:' : e.target.value)}
+                          className="flex-1 px-2 py-1 bg-surface-elevated border border-border rounded-md text-text-primary text-xs focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+                        >
+                          {MEDIA_MOMENTS.map(m => (
+                            <option key={m.id} value={m.id}>{m.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      {(item.moment === 'custom' || item.moment.startsWith('custom:')) && (
+                        <input
+                          value={item.moment.startsWith('custom:') ? item.moment.replace('custom:', '') : ''}
+                          onChange={(e) => updateMediaItem(item.id, 'moment', `custom:${e.target.value}`)}
+                          placeholder="Ej: Despues de que el cliente diga que le interesa..."
+                          className="ml-6 w-[calc(100%-24px)] px-2.5 py-1.5 bg-surface-elevated border border-border rounded-lg text-text-primary placeholder:text-text-muted text-xs focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+                        />
+                      )}
+                    </div>
+                  ))}
+                  <button
+                    onClick={addMediaItem}
+                    className="w-full flex items-center justify-center gap-1.5 py-2 border border-dashed border-blue-500/30 rounded-lg text-xs text-blue-400 hover:bg-blue-500/5 transition-colors"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Agregar {mediaItems.length === 0 ? 'imagen o video' : 'otro'}
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Existing Prompt (collapsible) */}

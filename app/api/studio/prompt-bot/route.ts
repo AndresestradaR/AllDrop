@@ -70,6 +70,15 @@ Cuando recibas un analisis de reviews de Amazon, DEBES usar esa informacion para
 - Los TESTIMONIOS/PRUEBA SOCIAL deben reflejar el sentimiento real de los compradores
 - La interaccion 2 (descubrimiento del dolor) debe tocar los dolores MAS COMUNES de las reviews
 
+## IMAGENES Y VIDEOS DEL PRODUCTO (si se proporcionan URLs):
+Cuando recibas URLs de imagenes o videos con sus momentos de envio, DEBES:
+- Integrar CADA URL en el prompt final como instruccion exacta: [Enviar imagen: URL] o [Enviar video: URL]
+- Colocar cada instruccion de envio en el MOMENTO EXACTO indicado (interaccion correspondiente)
+- Si una imagen va en la interaccion 3, la instruccion [Enviar imagen: URL] debe estar DENTRO del texto de la interaccion 3
+- Si un video va en la interaccion 4, la instruccion [Enviar video: URL] debe estar DENTRO del texto de la interaccion 4
+- NUNCA inventar URLs — solo usar las que se proporcionan
+- Si NO se proporcionan URLs, usar las instrucciones genericas como [Enviar imagen del producto] o [Enviar foto de resenas]
+
 ## FORMATO DE RESPUESTA:
 Responde SOLO en JSON valido con esta estructura:
 {
@@ -111,6 +120,7 @@ export async function POST(request: Request) {
       guarantee,
       existing_prompt,
       amazon_reviews,
+      media_items,
     } = body as {
       product_name: string
       product_benefits?: string
@@ -123,6 +133,11 @@ export async function POST(request: Request) {
       shipping_info?: string
       guarantee?: string
       existing_prompt?: string
+      media_items?: Array<{
+        url: string
+        type: 'image' | 'video'
+        moment: string
+      }>
       amazon_reviews?: {
         total_reviews: number
         avg_rating: string
@@ -163,6 +178,31 @@ export async function POST(request: Request) {
 
     if (existing_prompt) {
       parts.push(`\n## PROMPT EXISTENTE (de Chatea Pro o Lucid) — MEJORALO con la estructura avanzada:\n${existing_prompt}`)
+    }
+
+    // Add media items if provided
+    if (media_items && media_items.length > 0) {
+      const MOMENT_LABELS: Record<string, string> = {
+        'interaccion-3': 'En la Interaccion 3 (al presentar el producto)',
+        'interaccion-4': 'En la Interaccion 4 (prueba social / resenas)',
+        'interaccion-5': 'En la Interaccion 5 (al presentar la oferta)',
+        'catalogo': 'Cuando el cliente pregunte por colores/tallas (enviar catalogo)',
+        'saludo': 'En la Interaccion 1 (saludo inicial)',
+      }
+
+      parts.push(`\n## IMAGENES Y VIDEOS DEL PRODUCTO (URLs reales — INTEGRAR en el prompt final)`)
+      parts.push(`[CRITICO] El prompt final DEBE incluir estas URLs exactas como instrucciones [enviar imagen: URL] o [enviar video: URL] en el momento indicado. NO inventar URLs — usar las que se proporcionan aqui.`)
+
+      media_items.forEach((item, i) => {
+        const momentLabel = item.moment.startsWith('custom:')
+          ? item.moment.replace('custom:', '').trim() || 'Momento personalizado'
+          : MOMENT_LABELS[item.moment] || item.moment
+
+        parts.push(`${i + 1}. ${item.type === 'image' ? 'IMAGEN' : 'VIDEO'}: ${item.url}`)
+        parts.push(`   → Enviar en: ${momentLabel}`)
+      })
+
+      parts.push(`\nEl prompt resultante debe tener instrucciones claras como: [Enviar imagen: URL] o [Enviar video: URL] en los momentos exactos indicados arriba.`)
     }
 
     // Add Amazon reviews analysis if available
