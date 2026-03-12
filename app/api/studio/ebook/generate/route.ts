@@ -138,8 +138,8 @@ export async function POST(request: Request) {
     // Get image API keys
     const imageKeys = await getImageApiKeys(supabase, user.id)
 
-    // Choose image model — gemini-3-pro for higher quality illustrations
-    const imageModel: ImageModelId = 'gemini-3-pro-image' // cascade: KIE → fal.ai → Gemini direct
+    // nano-banana-2: más rápido, misma calidad, más barato
+    const imageModel: ImageModelId = 'nano-banana-2' // cascade: KIE → fal.ai → Gemini direct
 
     const totalSteps = outline.chapters.length + 4 // chapters + cover + compile + upload + done
     let currentStep = 0
