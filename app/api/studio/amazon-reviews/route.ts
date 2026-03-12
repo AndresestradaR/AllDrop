@@ -4,13 +4,30 @@ import { createClient } from '@/lib/supabase/server'
 export const maxDuration = 120
 
 // Extract ASIN from Amazon URL or return as-is if already an ASIN
+// Handles: direct URLs, URL-encoded redirects (/ap/signin?...return_to=...%2Fdp%2FASIN), raw ASIN
 function extractASIN(input: string): string | null {
   const trimmed = input.trim()
 
   // Already an ASIN (10 alphanumeric chars starting with B0)
   if (/^[A-Z0-9]{10}$/i.test(trimmed)) return trimmed.toUpperCase()
 
-  // Extract from URL patterns: /dp/ASIN, /product/ASIN, /gp/product/ASIN
+  // URL-decode the full input to handle Amazon redirect/signin URLs
+  // e.g. /ap/signin?openid.return_to=https%3A%2F%2Fwww.amazon.com%2F...%2Fdp%2FB0DGQ7L856
+  let decoded = trimmed
+  try {
+    // Decode up to 3 times to handle double/triple encoding
+    for (let i = 0; i < 3; i++) {
+      const next = decodeURIComponent(decoded)
+      if (next === decoded) break
+      decoded = next
+    }
+  } catch {
+    // ignore decode errors
+  }
+
+  // Search in both original and decoded versions
+  const candidates = [trimmed, decoded]
+
   const urlPatterns = [
     /\/dp\/([A-Z0-9]{10})/i,
     /\/product\/([A-Z0-9]{10})/i,
@@ -18,9 +35,11 @@ function extractASIN(input: string): string | null {
     /\/ASIN\/([A-Z0-9]{10})/i,
   ]
 
-  for (const pattern of urlPatterns) {
-    const match = trimmed.match(pattern)
-    if (match) return match[1].toUpperCase()
+  for (const text of candidates) {
+    for (const pattern of urlPatterns) {
+      const match = text.match(pattern)
+      if (match) return match[1].toUpperCase()
+    }
   }
 
   return null
