@@ -32,6 +32,7 @@ interface AmazonData {
   asin: string
   marketplace: string
   total_reviews: number
+  total_amazon_ratings?: number
   avg_rating: string
   rating_distribution: Record<number, number>
   reviews: ReviewData[]
@@ -227,7 +228,12 @@ export function PromptBotGenerator({ onBack }: { onBack: () => void }) {
               {amazonData && (
                 <div className="mt-3 p-3 bg-surface rounded-lg border border-border">
                   <div className="flex items-center gap-3 text-sm">
-                    <span className="text-text-primary font-medium">{amazonData.total_reviews} reviews</span>
+                    <span className="text-text-primary font-medium">
+                      {amazonData.total_reviews} reviews
+                      {amazonData.total_amazon_ratings && amazonData.total_amazon_ratings > amazonData.total_reviews && (
+                        <span className="text-text-muted font-normal"> de {amazonData.total_amazon_ratings}</span>
+                      )}
+                    </span>
                     <span className="flex items-center gap-1 text-amber-400">
                       <Star className="w-3.5 h-3.5 fill-current" />
                       {amazonData.avg_rating}/5

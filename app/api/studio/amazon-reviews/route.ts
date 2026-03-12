@@ -26,36 +26,53 @@ function extractASIN(input: string): string | null {
   return null
 }
 
-// Detect Amazon marketplace from URL
+// Detect Amazon marketplace from URL — longer domains MUST come first
 function detectMarketplace(input: string): string {
-  const domainMap: Record<string, string> = {
-    'amazon.com': 'com',
-    'amazon.com.mx': 'com.mx',
-    'amazon.es': 'es',
-    'amazon.co.uk': 'co.uk',
-    'amazon.de': 'de',
-    'amazon.com.br': 'com.br',
-    'amazon.ca': 'ca',
-    'amazon.it': 'it',
-    'amazon.fr': 'fr',
-    'amazon.co.jp': 'co.jp',
-  }
+  const domainMap: [string, string][] = [
+    ['amazon.com.mx', 'com.mx'],
+    ['amazon.com.br', 'com.br'],
+    ['amazon.co.uk', 'co.uk'],
+    ['amazon.co.jp', 'co.jp'],
+    ['amazon.com', 'com'],
+    ['amazon.es', 'es'],
+    ['amazon.de', 'de'],
+    ['amazon.ca', 'ca'],
+    ['amazon.it', 'it'],
+    ['amazon.fr', 'fr'],
+  ]
 
-  for (const [domain, code] of Object.entries(domainMap)) {
+  for (const [domain, code] of domainMap) {
     if (input.includes(domain)) return code
   }
 
-  return 'com' // default
+  return 'com'
 }
 
-// Parse rating from various formats: number, "4.0", "4.0 out of 5 stars", etc.
-function parseRating(val: any): number {
-  if (typeof val === 'number') return val
-  if (typeof val === 'string') {
-    const match = val.match(/([\d.]+)/)
-    if (match) return parseFloat(match[1])
+// Scrape reviews for one star filter using junglee actor
+async function scrapeReviews(
+  apifyApiKey: string,
+  cleanAmazonUrl: string,
+  filterByRating?: string,
+): Promise<any[]> {
+  const url = `https://api.apify.com/v2/acts/junglee~amazon-reviews-scraper/run-sync-get-dataset-items?token=${apifyApiKey}&timeout=60`
+
+  const body: any = {
+    productUrls: [{ url: cleanAmazonUrl }],
+    maxReviews: 30,
+    proxy: { useApifyProxy: true },
   }
-  return 0
+  if (filterByRating) body.filterByRating = filterByRating
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+
+  if (!res.ok) return []
+
+  const data = await res.json()
+  return Array.isArray(data) ? data : []
 }
 
 export async function POST(request: Request) {
@@ -80,10 +97,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { amazon_url, max_pages = 3 } = body as {
-      amazon_url: string
-      max_pages?: number
-    }
+    const { amazon_url } = body as { amazon_url: string }
 
     if (!amazon_url?.trim()) {
       return NextResponse.json(
@@ -101,64 +115,53 @@ export async function POST(request: Request) {
     }
 
     const marketplace = detectMarketplace(amazon_url)
-    const pages = Math.min(Math.max(Number(max_pages) || 3, 1), 10)
-
-    // Build a clean Amazon URL from ASIN for the scraper
     const cleanAmazonUrl = `https://www.amazon.${marketplace}/dp/${asin}`
 
-    console.log(`[AmazonReviews] User: ${user.id.substring(0, 8)}..., ASIN: ${asin}, Marketplace: ${marketplace}, Pages: ${pages}, URL: ${cleanAmazonUrl}`)
+    console.log(`[AmazonReviews] ASIN: ${asin}, Marketplace: ${marketplace}`)
 
-    // Call Apify actor: junglee/amazon-reviews-scraper (most popular, accepts URLs directly)
-    const maxReviews = Math.min(pages * 50, 200)
-    const apifyUrl = `https://api.apify.com/v2/acts/junglee~amazon-reviews-scraper/run-sync-get-dataset-items?token=${apifyApiKey}&timeout=100`
+    // Strategy: 2 parallel calls — "top reviews" + "one_star" — to get both positive AND negative
+    // junglee actor returns ~8 reviews per call (Amazon page limit)
+    // Combining top (mostly positive) + negative gives the AI the best material for:
+    //   - Pain points & objections (from negative reviews)
+    //   - Sales angles & benefits (from positive reviews)
+    const [topReviews, negativeReviews] = await Promise.all([
+      scrapeReviews(apifyApiKey, cleanAmazonUrl),
+      scrapeReviews(apifyApiKey, cleanAmazonUrl, 'one_star'),
+    ])
 
-    const apifyResponse = await fetch(apifyUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        productUrls: [{ url: cleanAmazonUrl }],
-        maxReviews,
-        proxy: { useApifyProxy: true },
-      }),
-    })
-
-    console.log(`[AmazonReviews] Apify status: ${apifyResponse.status}, maxReviews requested: ${maxReviews}`)
-
-    if (!apifyResponse.ok) {
-      const errorText = await apifyResponse.text()
-      console.error('[AmazonReviews] Apify error:', apifyResponse.status, errorText.substring(0, 500))
-      return NextResponse.json({
-        error: `Error de Apify (${apifyResponse.status}): ${errorText.substring(0, 200)}`,
-      }, { status: 502 })
+    // Deduplicate by reviewId
+    const seen = new Set<string>()
+    const allRaw: any[] = []
+    for (const r of [...topReviews, ...negativeReviews]) {
+      const id = r.reviewId || `${r.reviewTitle}-${r.ratingScore}`
+      if (!seen.has(id)) {
+        seen.add(id)
+        allRaw.push(r)
+      }
     }
 
-    const rawReviews = await apifyResponse.json()
-
-    if (!Array.isArray(rawReviews) || rawReviews.length === 0) {
+    if (allRaw.length === 0) {
       return NextResponse.json({
         error: 'No se encontraron reviews para este producto. Verifica el ASIN o intenta con otro producto.',
       }, { status: 404 })
     }
 
-    // Log first raw review to debug field names
-    if (rawReviews[0]) {
-      console.log(`[AmazonReviews] Sample raw keys: ${Object.keys(rawReviews[0]).join(', ')}`)
-      console.log(`[AmazonReviews] Sample raw review:`, JSON.stringify(rawReviews[0]).substring(0, 500))
-    }
+    // Total ratings on Amazon (metadata from junglee actor)
+    const totalAmazonRatings = allRaw[0]?.totalCategoryRatings || allRaw.length
 
-    // Normalize reviews — junglee actor output format
-    const reviews = rawReviews.slice(0, 200).map((r: any) => ({
-      title: r.reviewTitle || r.title || r.ReviewTitle || '',
-      content: r.reviewBody || r.reviewDescription || r.text || r.ReviewContent || '',
-      rating: parseRating(r.reviewRating ?? r.ratingScore ?? r.rating ?? r.stars ?? r.RatingScore),
-      verified: r.isVerified ?? r.Verified ?? (r.reviewedIn?.includes('Verified') || false),
+    // Normalize — field names verified by local testing against junglee actor
+    const reviews = allRaw.map((r: any) => ({
+      title: r.reviewTitle || '',
+      content: r.reviewDescription || '',
+      rating: typeof r.ratingScore === 'number' ? r.ratingScore : 0,
+      verified: r.isVerified ?? false,
       helpful: typeof r.reviewReaction === 'string'
         ? parseInt(r.reviewReaction.replace(/\D/g, '') || '0', 10)
-        : (r.helpfulVotes || r.HelpfulCounts || 0),
-      date: r.reviewedIn || r.date || r.ReviewDate || '',
+        : 0,
+      date: r.date || '',
     })).filter((r: any) => r.content && r.content.length > 10)
 
-    // Calculate summary stats
+    // Stats
     const totalReviews = reviews.length
     const avgRating = totalReviews > 0
       ? (reviews.reduce((sum: number, r: any) => sum + r.rating, 0) / totalReviews).toFixed(1)
@@ -169,12 +172,13 @@ export async function POST(request: Request) {
       if (star >= 1 && star <= 5) ratingDistribution[star]++
     })
 
-    console.log(`[AmazonReviews] Found ${totalReviews} reviews, avg rating: ${avgRating}`)
+    console.log(`[AmazonReviews] ${totalReviews} reviews scraped (${totalAmazonRatings} total on Amazon), avg: ${avgRating}`)
 
     return NextResponse.json({
       asin,
       marketplace,
       total_reviews: totalReviews,
+      total_amazon_ratings: totalAmazonRatings,
       avg_rating: avgRating,
       rating_distribution: ratingDistribution,
       reviews,
