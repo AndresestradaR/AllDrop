@@ -169,8 +169,11 @@ export async function POST(request: Request) {
             outline.title,
             imageKeys,
             imageModel,
-            30000
-          ).catch(() => null)
+            50000
+          ).catch((err: any) => {
+            console.error('[Ebook] Cover image failed:', err?.message || err)
+            return null
+          })
 
           // ---- STEP 2: Generate ALL chapter text + images in parallel per chapter ----
           const chaptersWithContent = [...outline.chapters]
@@ -242,6 +245,7 @@ ${i === chaptersWithContent.length - 1 ? 'Este es el último capítulo — cierr
 
           // Wait for cover image
           const coverImageUrl = await coverPromise
+          console.log(`[Ebook] Cover image: ${coverImageUrl ? 'OK' : 'FAILED'}`)
 
           // ---- STEP 3: Compile PDF ----
           currentStep++
