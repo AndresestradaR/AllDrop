@@ -138,8 +138,8 @@ export async function POST(request: Request) {
     // Get image API keys
     const imageKeys = await getImageApiKeys(supabase, user.id)
 
-    // Choose image model based on available keys
-    const imageModel: ImageModelId = 'nano-banana-2' // cascade handles fallbacks automatically
+    // Choose image model — gemini-3-pro for higher quality illustrations
+    const imageModel: ImageModelId = 'gemini-3-pro-image' // cascade: KIE → fal.ai → Gemini direct
 
     const totalSteps = outline.chapters.length + 4 // chapters + cover + compile + upload + done
     let currentStep = 0
@@ -205,6 +205,8 @@ Producto relacionado: ${productName}
 ${i === 0 ? 'Este es el primer capítulo — introduce los conceptos de forma accesible.' : ''}
 ${i === chaptersWithContent.length - 1 ? 'Este es el último capítulo — cierra con consejos finales y motivación.' : ''}`,
               temperature: 0.7,
+              googleFirst: true,
+              googleModel: 'gemini-3.1-pro-preview',
             })
 
             const imagePromise = skipImages

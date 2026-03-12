@@ -126,7 +126,8 @@ export async function POST(request: Request) {
       userMessage,
       jsonMode: true,
       temperature: 0.7,
-      kieModel: 'gemini-2.5-flash',
+      googleFirst: true,
+      googleModel: 'gemini-3.1-pro-preview',
     })
 
     const parsed = JSON.parse(extractJSON(responseText))

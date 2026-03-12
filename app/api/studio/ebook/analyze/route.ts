@@ -176,6 +176,8 @@ export async function POST(request: Request) {
       images: images.length > 0 ? images : undefined,
       temperature: 0.8,
       jsonMode: true,
+      googleFirst: true,
+      googleModel: 'gemini-3.1-pro-preview',
     })
 
     let parsed: any

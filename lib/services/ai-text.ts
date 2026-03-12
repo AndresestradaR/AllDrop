@@ -32,6 +32,7 @@ export interface AITextOptions {
   signal?: AbortSignal
   reasoningEffort?: 'none' | 'low' | 'medium' // default: 'none'. Use 'low' for structured JSON output
   skipKIE?: boolean    // true = skip KIE, go straight to OpenAI/Google (use for strict JSON schema)
+  googleFirst?: boolean // true = try Google FIRST, then KIE, then OpenAI (use when you want Gemini 3.1 Pro as primary)
   onSuccess?: (meta: { provider: AIProvider; fallbacks: string[] }) => void
 }
 
@@ -50,16 +51,33 @@ export async function generateAIText(
   const errors: string[] = []
   const fallbacks: string[] = []
 
+  // googleFirst: try Google FIRST (e.g. Gemini 3.1 Pro), then fall back to KIE/OpenAI
+  if (options.googleFirst && keys.googleApiKey) {
+    const t0 = Date.now()
+    try {
+      const text = await callGoogle(keys.googleApiKey, options)
+      logAI({ service: 'text', provider: 'google', status: 'success', response_ms: Date.now() - t0, model: options.googleModel || 'gemini-2.5-flash', was_fallback: false })
+      options.onSuccess?.({ provider: 'google', fallbacks })
+      return text
+    } catch (err: any) {
+      logAI({ service: 'text', provider: 'google', status: 'error', response_ms: Date.now() - t0, model: options.googleModel || 'gemini-2.5-flash', error_message: err.message, was_fallback: false })
+      errors.push(`Google: ${err.message}`)
+      fallbacks.push(`Google: ${err.message}`)
+      console.error('[AI Text] Google (first) failed:', err.message)
+    }
+  }
+
   // Skip KIE when route needs strict JSON schema (KIE doesn't support responseMimeType)
   if (keys.kieApiKey && !options.skipKIE) {
     const t0 = Date.now()
+    const wasFallback = fallbacks.length > 0
     try {
       const text = await callKIE(keys.kieApiKey, options)
-      logAI({ service: 'text', provider: 'kie', status: 'success', response_ms: Date.now() - t0, model: options.kieModel || 'gemini-2.5-flash', was_fallback: false })
+      logAI({ service: 'text', provider: 'kie', status: 'success', response_ms: Date.now() - t0, model: options.kieModel || 'gemini-2.5-flash', was_fallback: wasFallback })
       options.onSuccess?.({ provider: 'kie', fallbacks })
       return text
     } catch (err: any) {
-      logAI({ service: 'text', provider: 'kie', status: 'error', response_ms: Date.now() - t0, model: options.kieModel || 'gemini-2.5-flash', error_message: err.message, was_fallback: false })
+      logAI({ service: 'text', provider: 'kie', status: 'error', response_ms: Date.now() - t0, model: options.kieModel || 'gemini-2.5-flash', error_message: err.message, was_fallback: wasFallback })
       errors.push(`KIE: ${err.message}`)
       fallbacks.push(`KIE: ${err.message}`)
       console.error('[AI Text] KIE failed:', err.message)
@@ -83,7 +101,8 @@ export async function generateAIText(
     }
   }
 
-  if (keys.googleApiKey) {
+  // Google as last fallback (only if not already tried as first)
+  if (keys.googleApiKey && !options.googleFirst) {
     const t0 = Date.now()
     const wasFallback = fallbacks.length > 0
     try {
