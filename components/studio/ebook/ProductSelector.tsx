@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import {
   Search,
   Upload,
@@ -52,13 +52,16 @@ function DropKillerSearch({ onSelect }: { onSelect: (p: ProductInput) => void })
 
   return (
     <div className="space-y-4">
+      <p className="text-xs text-zinc-500">
+        Busca en el catalogo de Dropi (+13,500 productos). Escribe el nombre del tipo de producto que vendes.
+      </p>
       <div className="flex gap-2">
         <input
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-          placeholder="Buscar producto... ej: corrector postura, serum facial"
+          placeholder="Ej: corrector de postura, serum facial, faja reductora..."
           className="flex-1 px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 outline-none"
         />
         <button
@@ -70,6 +73,12 @@ function DropKillerSearch({ onSelect }: { onSelect: (p: ProductInput) => void })
           Buscar
         </button>
       </div>
+
+      {!loading && results.length === 0 && query.trim() === '' && (
+        <div className="text-center py-6 text-zinc-500 text-sm">
+          Escribe el nombre de un producto y presiona Buscar
+        </div>
+      )}
 
       {results.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[400px] overflow-y-auto pr-1">
@@ -111,44 +120,40 @@ function DropKillerSearch({ onSelect }: { onSelect: (p: ProductInput) => void })
 // ============================================
 function LandingProducts({ onSelect }: { onSelect: (p: ProductInput) => void }) {
   const [products, setProducts] = useState<any[]>([])
-  const [loading, setLoading] = useState(false)
-  const [loaded, setLoaded] = useState(false)
+  const [loading, setLoading] = useState(true)
 
-  const loadProducts = async () => {
-    if (loaded) return
-    setLoading(true)
-    try {
-      const res = await fetch('/api/productos/my-products')
-      if (res.ok) {
-        const data = await res.json()
-        setProducts(data.products || [])
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await fetch('/api/products')
+        if (res.ok) {
+          const data = await res.json()
+          setProducts(data.products || [])
+        }
+      } catch {
+        toast.error('Error al cargar productos')
+      } finally {
+        setLoading(false)
       }
-    } catch {
-      // Products might not exist yet
-    } finally {
-      setLoading(false)
-      setLoaded(true)
     }
-  }
+    load()
+  }, [])
 
-  if (!loaded) {
+  if (loading) {
     return (
-      <div className="text-center py-8">
-        <button
-          onClick={loadProducts}
-          className="px-6 py-3 bg-zinc-700 hover:bg-zinc-600 rounded-lg text-white transition-colors"
-        >
-          {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Cargar mis productos'}
-        </button>
+      <div className="flex items-center justify-center py-8 gap-2">
+        <Loader2 className="w-5 h-5 text-emerald-400 animate-spin" />
+        <span className="text-sm text-zinc-400">Cargando tus productos...</span>
       </div>
     )
   }
 
   if (products.length === 0) {
     return (
-      <p className="text-center text-zinc-400 py-8">
-        No tienes productos guardados. Usa otra fuente o sube manualmente.
-      </p>
+      <div className="text-center py-8 space-y-2">
+        <p className="text-zinc-400">No tienes productos en el Landing Generator.</p>
+        <p className="text-xs text-zinc-500">Crea una landing primero o usa otra fuente.</p>
+      </div>
     )
   }
 
@@ -160,15 +165,25 @@ function LandingProducts({ onSelect }: { onSelect: (p: ProductInput) => void }) 
           onClick={() =>
             onSelect({
               source: 'landing',
-              name: p.name || p.product_name,
-              description: p.description || p.product_context?.description || '',
+              name: p.name,
+              description: p.description || '',
               images: p.image_url ? [p.image_url] : [],
               externalId: p.id,
             })
           }
-          className="text-left p-3 bg-zinc-800/50 hover:bg-zinc-700/50 border border-zinc-700 hover:border-emerald-500/50 rounded-lg transition-all"
+          className="group text-left p-3 bg-zinc-800/50 hover:bg-zinc-700/50 border border-zinc-700 hover:border-emerald-500/50 rounded-lg transition-all"
         >
-          <p className="text-sm text-white font-medium truncate">{p.name || p.product_name}</p>
+          {p.image_url ? (
+            <img src={p.image_url} alt={p.name} className="w-full h-28 object-cover rounded-md mb-2" />
+          ) : (
+            <div className="w-full h-28 bg-zinc-700 rounded-md mb-2 flex items-center justify-center">
+              <ImageIcon className="w-8 h-8 text-zinc-500" />
+            </div>
+          )}
+          <p className="text-sm text-white font-medium truncate">{p.name}</p>
+          {p.sections_count > 0 && (
+            <p className="text-xs text-zinc-500 mt-1">{p.sections_count} secciones</p>
+          )}
         </button>
       ))}
     </div>
@@ -327,9 +342,16 @@ export default function ProductSelector({ onSelect }: ProductSelectorProps) {
         {activeSource === 'dropkiller' && <DropKillerSearch onSelect={onSelect} />}
         {activeSource === 'landing' && <LandingProducts onSelect={onSelect} />}
         {activeSource === 'droppage' && (
-          <p className="text-center text-zinc-400 py-8">
-            Proximamente — vincula productos de tu tienda DropPage
-          </p>
+          <div className="text-center py-8 space-y-3">
+            <Store className="w-10 h-10 text-zinc-600 mx-auto" />
+            <div>
+              <p className="text-zinc-400 font-medium">Proximamente</p>
+              <p className="text-xs text-zinc-500 mt-1 max-w-xs mx-auto">
+                Pronto podras seleccionar productos directamente de tu tienda DropPage.
+                Por ahora usa &quot;Mis Productos&quot; o sube manualmente.
+              </p>
+            </div>
+          </div>
         )}
         {activeSource === 'manual' && <ManualUpload onSelect={onSelect} />}
       </div>
