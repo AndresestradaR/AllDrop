@@ -16,10 +16,12 @@ import {
   Download,
   AlertCircle,
   Zap,
+  BookOpen,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { InfluencerWizard } from './influencer/InfluencerWizard'
 import { AutoPublisherTool } from './AutoPublisherTool'
+import EbookGenerator from './ebook/EbookGenerator'
 
 interface DropshippingTool {
   id: string
@@ -79,6 +81,14 @@ const DROPSHIPPING_TOOLS: DropshippingTool[] = [
     icon: Zap,
     color: 'from-orange-500 to-red-500',
     emoji: '🚀',
+  },
+  {
+    id: 'ebook-generator',
+    name: 'Ebook Generator',
+    description: 'Crea ebooks profesionales para tus productos',
+    icon: BookOpen,
+    color: 'from-teal-500 to-cyan-500',
+    emoji: '📚',
   },
 ]
 
@@ -2217,6 +2227,10 @@ export function DropshippingGrid() {
 
   if (activeTool === 'auto-publicar') {
     return <AutoPublisherTool onBack={handleBack} />
+  }
+
+  if (activeTool === 'ebook-generator') {
+    return <EbookGenerator onBack={handleBack} />
   }
 
   if (activeTool) {

@@ -991,4 +991,75 @@ Si la imagen tiene grasa negra, el video tendrá grasa negra — Veo no sabe qu�
 
 ---
 
-*Last updated: 2026-03-10 — Video Viral mode (ViralTransformationMode), system prompt adaptativo, first-last-frame para transformaciones (PUSH PENDIENTE), botón enviar al editor*
+---
+
+## 14. GENERADOR DE EBOOKS IA (2026-03-12) — EN DESARROLLO
+
+### Qué es
+Nueva herramienta en Studio IA (Dropshipping) que genera ebooks/PDFs profesionales de 20-50 páginas como complemento digital para productos físicos. Estilo Trolibook pero mejor — diseño premium, imágenes IA, contenido profundo.
+
+### Ubicación
+- Vive en: Studio IA > DropshippingGrid (nueva herramienta "Ebook Generator")
+- Plan: `docs/plans/2026-03-12-ebook-generator.md`
+
+### Archivos clave
+```
+lib/ebook/
+  types.ts              — Interfaces y tipos
+  templates.ts          — 6 plantillas temáticas
+  pdf-builder.tsx       — Componentes @react-pdf/renderer (portada, índice, capítulos)
+
+app/api/studio/ebook/
+  analyze/route.ts      — Analiza producto, sugiere 3 ideas de ebook
+  outline/route.ts      — Genera estructura de capítulos
+  generate/route.ts     — SSE: genera contenido + imágenes + compila PDF
+  download/route.ts     — Descarga PDF con signed URL
+
+components/studio/ebook/
+  EbookGenerator.tsx    — Wizard principal (4 pasos)
+  ProductSelector.tsx   — Selector multi-fuente (DropKiller, Landing Gen, DropPage, manual)
+  IdeaSelector.tsx      — 3 ideas sugeridas por IA
+  TemplateSelector.tsx  — 6 plantillas + upload logo
+  OutlineEditor.tsx     — Editor de capítulos
+  GenerationProgress.tsx — Barra de progreso SSE
+  EbookPreview.tsx      — Preview + descargar
+```
+
+### Servicios que usa (NO modifica)
+- `lib/services/ai-text.ts` → generateAIText() para contenido y análisis
+- `lib/image-providers/index.ts` → generateImage() para portada + ilustraciones
+- `lib/services/r2-upload.ts` → tryUploadToR2() para backup en R2 del usuario
+- Supabase Storage → almacenamiento principal del PDF
+- Tabla `generations` → persistencia (product_name='Ebook: {título}')
+
+### Dependencia nueva
+- `@react-pdf/renderer` — compilación de PDF server-side
+
+### Plantillas temáticas
+| Template | Paleta | Uso |
+|----------|--------|-----|
+| salud-bienestar | Verdes + blancos | Suplementos, postura, fitness |
+| belleza-cuidado | Rosas + dorados | Skincare, cabello |
+| tecnologia | Azules + grises | Gadgets, electrónicos |
+| hogar-cocina | Cálidos | Limpieza, cocina |
+| moda-estilo | Negro + accent | Ropa, accesorios |
+| universal | Neutro profesional | Cualquier producto |
+
+Colores se adaptan al producto. IA sugiere template, usuario puede cambiar. Upload de logo opcional.
+
+### Fuentes de producto
+1. Catálogo DropKiller (product-intelligence-dropi API)
+2. Productos del Landing Generator (tabla products en Supabase)
+3. Productos de DropPage (API bridge)
+4. Upload manual (fotos + nombre + descripción)
+
+### Costo por ebook
+~$0.20-$0.50 (texto ~$0.03 + imágenes ~$0.20-$0.40)
+
+### Futuro (no en MVP)
+- Vincular PDF a DropPage como bonus/upsell en checkout
+- Edición post-generación
+
+---
+
+*Last updated: 2026-03-12 — Ebook Generator IA (en desarrollo), Video Viral mode, system prompt adaptativo*
