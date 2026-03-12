@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { generateAIText, getAIKeys, requireAIKeys, extractJSON } from '@/lib/services/ai-text'
 
-export const maxDuration = 60
+export const maxDuration = 120
 
 const BOT_PROMPT_SYSTEM = `Eres el mejor ingeniero de prompts conversacionales del mundo para bots de ventas por WhatsApp en Latinoamerica, especializado en dropshipping COD (contraentrega).
 
@@ -202,7 +202,9 @@ export async function POST(request: Request) {
       userMessage: userPrompt,
       temperature: 0.7,
       jsonMode: true,
-      kieModel: 'gemini-2.5-pro',
+      // flash en KIE (rapido, 90s budget), pro solo en Google direct (fallback final)
+      // gemini-2.5-pro en KIE es demasiado lento y consume todo el timeout
+      googleModel: 'gemini-2.5-pro',
     })
 
     let parsed: any
