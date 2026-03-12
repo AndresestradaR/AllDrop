@@ -121,7 +121,7 @@ export default function EbookGenerator({ onBack }: EbookGeneratorProps) {
           productName: product!.name,
           productDescription: product!.description,
           selectedIdea: selectedIdea,
-          chaptersCount: 8,
+          chaptersCount: 5,
         }),
       })
 

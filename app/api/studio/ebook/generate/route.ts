@@ -19,14 +19,15 @@ const CHAPTER_SYSTEM_PROMPT = `Eres un escritor profesional de ebooks educativos
 REGLAS:
 - Escribe contenido PROFESIONAL, educativo y atractivo
 - Todo en español neutro latinoamericano
-- Usa párrafos bien desarrollados (4-6 oraciones cada uno)
+- Usa párrafos bien desarrollados (3-5 oraciones cada uno)
 - Incluye datos relevantes, ejemplos prácticos y consejos accionables
 - El tono debe ser cercano pero experto, como un profesor que sabe mucho del tema
 - NO uses markdown, headers ni bullets — solo texto en párrafos fluidos
 - NO uses emojis
 - Separa párrafos con doble salto de línea
-- Cada capítulo debe tener entre 800 y 1200 palabras (4-6 párrafos sustanciosos)
+- Cada capítulo debe tener entre 400 y 600 palabras (3-4 párrafos concisos pero sustanciosos)
 - El contenido debe ser ÚNICO y ÚTIL — no relleno genérico
+- Sé DIRECTO y CONCISO — cada oración debe aportar valor, nada de relleno
 - Relaciona siempre el contenido con el uso práctico del producto
 - Incluye al menos un consejo práctico "pro tip" por capítulo
 
@@ -71,7 +72,7 @@ async function generateIllustration(
   timeoutMs: number = 25000
 ): Promise<string | null> {
   try {
-    const prompt = `Professional ebook illustration: ${keyword}. Clean, modern, editorial style. High quality, detailed, suitable for a professional digital guide about "${ebookTitle}". No text overlay.`
+    const prompt = `Professional high-quality stock photography: ${keyword}. Photorealistic, real people, natural lighting, editorial magazine quality. Crisp detail, vibrant colors, modern lifestyle feel. No text, no watermarks, no AI artifacts.`
 
     const result = await generateImage(
       {
@@ -164,7 +165,7 @@ export async function POST(request: Request) {
 
           // Start cover generation in background — don't wait
           const coverPromise = generateIllustration(
-            `Professional ebook cover illustration for "${outline.title}". Modern, premium, editorial design. Subject: ${productName}. Style: clean, sophisticated, suitable for a digital guide cover. No text.`,
+            `Dramatic cinematic cover photo for premium digital guide about "${productName}". Photorealistic, stunning composition, professional editorial photography. Hero shot with dramatic lighting, rich colors, emotional impact. Magazine cover quality. No text, no watermarks.`,
             outline.title,
             imageKeys,
             imageModel,
@@ -302,7 +303,7 @@ ${i === chaptersWithContent.length - 1 ? 'Este es el último capítulo — cierr
               enhanced_prompt: JSON.stringify({
                 template: template.id,
                 chapters: chaptersWithContent.length,
-                pages: Math.max(20, chaptersWithContent.length * 3 + 5),
+                pages: Math.min(20, chaptersWithContent.length * 3 + 5),
               }),
               status: 'completed',
               generated_image_url: r2Url || storageRef,
@@ -330,7 +331,7 @@ ${i === chaptersWithContent.length - 1 ? 'Este es el último capítulo — cierr
             r2Url,
             coverImageUrl,
             chaptersCount: chaptersWithContent.length,
-            pagesEstimate: Math.max(20, chaptersWithContent.length * 3 + 5),
+            pagesEstimate: Math.min(20, chaptersWithContent.length * 3 + 5),
           }
           controller.enqueue(encoder.encode(`data: ${JSON.stringify(finalResult)}\n\n`))
 

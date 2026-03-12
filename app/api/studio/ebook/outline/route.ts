@@ -20,7 +20,7 @@ Generar la estructura completa de un ebook profesional basado en un producto fis
    - Capitulos avanzados: tips practicos, rutinas, recetas, guias paso a paso
    - Ultimos capitulos: errores comunes, mitos vs realidad, plan de accion personalizado
 3. El resumen de cada capitulo debe tener 3-4 oraciones describiendo el contenido especifico que se cubrira. Se CONCRETO, no vago.
-4. El campo imageKeyword debe ser una descripcion EN INGLES de 3-6 palabras, especifica y visual, para generar una imagen con IA. Ejemplo: "woman applying face serum mirror", "healthy breakfast bowl fruits", "clean kitchen modern appliances".
+4. El campo imageKeyword debe ser una descripcion EN INGLES de 5-10 palabras, especifica y FOTORREALISTA, para generar una foto tipo stock photography con IA. Debe describir una escena con PERSONAS REALES haciendo algo relacionado al tema. Ejemplo: "young latin woman applying face serum looking at mirror bathroom", "fit man doing stretching exercises on yoga mat home", "family cooking healthy meal together modern kitchen". SIEMPRE incluir personas reales en la escena.
 5. La introduccion debe dar la bienvenida al lector, explicar que encontrara en el ebook, y motivar a leerlo completo. 2-3 parrafos.
 6. La conclusion debe resumir los puntos clave, motivar a la accion, y conectar con el producto. 2-3 parrafos.
 
@@ -68,7 +68,7 @@ export async function POST(request: Request) {
       productName,
       productDescription,
       selectedIdea,
-      chaptersCount = 8,
+      chaptersCount = 5,
     } = body as {
       productName: string
       productDescription: string
@@ -89,8 +89,8 @@ export async function POST(request: Request) {
       )
     }
 
-    // Clamp chapters count
-    const chapters = Math.max(5, Math.min(12, chaptersCount))
+    // Clamp chapters count (max 6 for ~20 page PDFs)
+    const chapters = Math.max(3, Math.min(6, chaptersCount))
 
     // Get AI keys with env var fallbacks
     const keys = await getAIKeys(supabase, user.id)

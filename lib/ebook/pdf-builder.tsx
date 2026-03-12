@@ -225,7 +225,7 @@ function createStyles(template: EbookTemplate) {
     },
     chapterImage: {
       width: '100%',
-      height: 220,
+      height: 280,
       objectFit: 'cover',
       borderRadius: 8,
       marginVertical: 20,
