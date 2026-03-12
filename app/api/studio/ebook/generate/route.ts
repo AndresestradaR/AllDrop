@@ -72,7 +72,7 @@ async function generateIllustration(
   timeoutMs: number = 25000
 ): Promise<string | null> {
   try {
-    const prompt = `Professional high-quality stock photography: ${keyword}. Photorealistic, real people, natural lighting, editorial magazine quality. Crisp detail, vibrant colors, modern lifestyle feel. No text, no watermarks, no AI artifacts.`
+    const prompt = `Professional high-quality stock photography for an ebook about "${ebookTitle}": ${keyword}. Photorealistic, real people if appropriate, natural lighting, editorial magazine quality. Crisp detail, vibrant colors, modern lifestyle feel. No text overlay, no watermarks, no AI artifacts, no logos.`
 
     const result = await generateImage(
       {
@@ -95,8 +95,8 @@ async function generateIllustration(
     }
 
     return null
-  } catch (err) {
-    console.error('[Ebook] Image generation failed:', err)
+  } catch (err: any) {
+    console.error(`[Ebook] Image generation failed for "${keyword}":`, err?.message || err)
     return null
   }
 }
@@ -178,12 +178,13 @@ export async function POST(request: Request) {
           for (let i = 0; i < chaptersWithContent.length; i++) {
             const chapter = chaptersWithContent[i]
 
-            // Check time budget — leave 60s for PDF compilation + upload
+            // Check time budget — leave 40s for PDF compilation + upload
             const elapsed = Date.now() - startTime
-            const skipImages = elapsed > 180000
+            const remainingMs = (maxDuration * 1000) - elapsed - 40000
+            const skipImages = remainingMs < 30000
 
-            if (skipImages && i > 0) {
-              console.warn(`[Ebook] Time budget tight at chapter ${i + 1}, text-only mode`)
+            if (skipImages) {
+              console.warn(`[Ebook] Time budget tight at chapter ${i + 1} (${Math.round(remainingMs / 1000)}s left), text-only mode`)
             }
 
             currentStep++
@@ -210,6 +211,9 @@ ${i === chaptersWithContent.length - 1 ? 'Este es el último capítulo — cierr
               googleModel: 'gemini-3.1-pro-preview',
             })
 
+            // Dynamic timeout: at least 30s, up to 45s, based on remaining time
+            const imgTimeout = Math.max(30000, Math.min(45000, remainingMs - 20000))
+
             const imagePromise = skipImages
               ? Promise.resolve(null)
               : generateIllustration(
@@ -217,8 +221,11 @@ ${i === chaptersWithContent.length - 1 ? 'Este es el último capítulo — cierr
                   outline.title,
                   imageKeys,
                   imageModel,
-                  25000
-                ).catch(() => null)
+                  imgTimeout
+                ).catch((err: any) => {
+                  console.error(`[Ebook] Chapter ${i + 1} image failed:`, err?.message || err)
+                  return null
+                })
 
             const [chapterContent, imgUrl] = await Promise.all([textPromise, imagePromise])
 
@@ -228,6 +235,10 @@ ${i === chaptersWithContent.length - 1 ? 'Este es el último capítulo — cierr
               ...(imgUrl ? { imageUrl: imgUrl } : {}),
             }
           }
+
+          // Log image stats
+          const chaptersWithImages = chaptersWithContent.filter(c => c.imageUrl).length
+          console.log(`[Ebook] Chapters done: ${chaptersWithContent.length} total, ${chaptersWithImages} with images, elapsed: ${Math.round((Date.now() - startTime) / 1000)}s`)
 
           // Wait for cover image
           const coverImageUrl = await coverPromise
