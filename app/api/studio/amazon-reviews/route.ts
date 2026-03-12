@@ -93,20 +93,22 @@ export async function POST(request: Request) {
     const marketplace = detectMarketplace(amazon_url)
     const pages = Math.min(Math.max(Number(max_pages) || 3, 1), 10)
 
-    console.log(`[AmazonReviews] User: ${user.id.substring(0, 8)}..., ASIN: ${asin}, Marketplace: ${marketplace}, Pages: ${pages}`)
+    // Build a clean Amazon URL from ASIN for the scraper
+    const cleanAmazonUrl = `https://www.amazon.${marketplace}/dp/${asin}`
 
-    // Call Apify actor: axesso_data/amazon-reviews-scraper
-    const apifyUrl = `https://api.apify.com/v2/acts/axesso_data~amazon-reviews-scraper/run-sync-get-dataset-items?token=${apifyApiKey}&timeout=90`
+    console.log(`[AmazonReviews] User: ${user.id.substring(0, 8)}..., ASIN: ${asin}, Marketplace: ${marketplace}, Pages: ${pages}, URL: ${cleanAmazonUrl}`)
+
+    // Call Apify actor: junglee/amazon-reviews-scraper (most popular, accepts URLs directly)
+    const maxReviews = pages * 10
+    const apifyUrl = `https://api.apify.com/v2/acts/junglee~amazon-reviews-scraper/run-sync-get-dataset-items?token=${apifyApiKey}&timeout=100`
 
     const apifyResponse = await fetch(apifyUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        asin,
-        domainCode: marketplace,
-        sortBy: 'recent',
-        maxPages: pages,
-        filterByStar: 'all_stars',
+        productUrls: [{ url: cleanAmazonUrl }],
+        maxReviews,
+        proxy: { useApifyProxy: true },
       }),
     })
 
@@ -114,7 +116,7 @@ export async function POST(request: Request) {
       const errorText = await apifyResponse.text()
       console.error('[AmazonReviews] Apify error:', apifyResponse.status, errorText.substring(0, 500))
       return NextResponse.json({
-        error: 'Error al obtener reviews de Amazon. Verifica que el ASIN sea correcto e intenta de nuevo.',
+        error: `Error de Apify (${apifyResponse.status}): ${errorText.substring(0, 200)}`,
       }, { status: 502 })
     }
 
@@ -126,14 +128,14 @@ export async function POST(request: Request) {
       }, { status: 404 })
     }
 
-    // Normalize reviews to a consistent format
+    // Normalize reviews — junglee actor output format
     const reviews = rawReviews.slice(0, 200).map((r: any) => ({
-      title: r.ReviewTitle || r.title || '',
-      content: r.ReviewContent || r.reviewDescription || r.text || '',
-      rating: r.RatingScore || r.rating || r.stars || 0,
-      verified: r.Verified ?? r.isVerified ?? false,
-      helpful: r.HelpfulCounts || r.helpfulVotes || 0,
-      date: r.ReviewDate || r.date || '',
+      title: r.reviewTitle || r.title || r.ReviewTitle || '',
+      content: r.reviewBody || r.reviewDescription || r.text || r.ReviewContent || '',
+      rating: r.reviewRating || r.rating || r.stars || r.RatingScore || 0,
+      verified: r.isVerified ?? r.Verified ?? false,
+      helpful: r.reviewReaction || r.helpfulVotes || r.HelpfulCounts || 0,
+      date: r.reviewedIn || r.date || r.ReviewDate || '',
     })).filter((r: any) => r.content && r.content.length > 10)
 
     // Calculate summary stats
