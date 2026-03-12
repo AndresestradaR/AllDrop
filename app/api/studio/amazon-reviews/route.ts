@@ -48,6 +48,16 @@ function detectMarketplace(input: string): string {
   return 'com' // default
 }
 
+// Parse rating from various formats: number, "4.0", "4.0 out of 5 stars", etc.
+function parseRating(val: any): number {
+  if (typeof val === 'number') return val
+  if (typeof val === 'string') {
+    const match = val.match(/([\d.]+)/)
+    if (match) return parseFloat(match[1])
+  }
+  return 0
+}
+
 export async function POST(request: Request) {
   try {
     const supabase = await createClient()
@@ -99,7 +109,7 @@ export async function POST(request: Request) {
     console.log(`[AmazonReviews] User: ${user.id.substring(0, 8)}..., ASIN: ${asin}, Marketplace: ${marketplace}, Pages: ${pages}, URL: ${cleanAmazonUrl}`)
 
     // Call Apify actor: junglee/amazon-reviews-scraper (most popular, accepts URLs directly)
-    const maxReviews = pages * 10
+    const maxReviews = Math.min(pages * 50, 200)
     const apifyUrl = `https://api.apify.com/v2/acts/junglee~amazon-reviews-scraper/run-sync-get-dataset-items?token=${apifyApiKey}&timeout=100`
 
     const apifyResponse = await fetch(apifyUrl, {
@@ -111,6 +121,8 @@ export async function POST(request: Request) {
         proxy: { useApifyProxy: true },
       }),
     })
+
+    console.log(`[AmazonReviews] Apify status: ${apifyResponse.status}, maxReviews requested: ${maxReviews}`)
 
     if (!apifyResponse.ok) {
       const errorText = await apifyResponse.text()
@@ -128,24 +140,32 @@ export async function POST(request: Request) {
       }, { status: 404 })
     }
 
+    // Log first raw review to debug field names
+    if (rawReviews[0]) {
+      console.log(`[AmazonReviews] Sample raw keys: ${Object.keys(rawReviews[0]).join(', ')}`)
+      console.log(`[AmazonReviews] Sample raw review:`, JSON.stringify(rawReviews[0]).substring(0, 500))
+    }
+
     // Normalize reviews — junglee actor output format
     const reviews = rawReviews.slice(0, 200).map((r: any) => ({
       title: r.reviewTitle || r.title || r.ReviewTitle || '',
       content: r.reviewBody || r.reviewDescription || r.text || r.ReviewContent || '',
-      rating: r.reviewRating || r.rating || r.stars || r.RatingScore || 0,
-      verified: r.isVerified ?? r.Verified ?? false,
-      helpful: r.reviewReaction || r.helpfulVotes || r.HelpfulCounts || 0,
+      rating: parseRating(r.reviewRating ?? r.ratingScore ?? r.rating ?? r.stars ?? r.RatingScore),
+      verified: r.isVerified ?? r.Verified ?? (r.reviewedIn?.includes('Verified') || false),
+      helpful: typeof r.reviewReaction === 'string'
+        ? parseInt(r.reviewReaction.replace(/\D/g, '') || '0', 10)
+        : (r.helpfulVotes || r.HelpfulCounts || 0),
       date: r.reviewedIn || r.date || r.ReviewDate || '',
     })).filter((r: any) => r.content && r.content.length > 10)
 
     // Calculate summary stats
     const totalReviews = reviews.length
     const avgRating = totalReviews > 0
-      ? (reviews.reduce((sum: number, r: any) => sum + Number(r.rating), 0) / totalReviews).toFixed(1)
+      ? (reviews.reduce((sum: number, r: any) => sum + r.rating, 0) / totalReviews).toFixed(1)
       : '0'
     const ratingDistribution: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
     reviews.forEach((r: any) => {
-      const star = Math.round(Number(r.rating))
+      const star = Math.round(r.rating)
       if (star >= 1 && star <= 5) ratingDistribution[star]++
     })
 
