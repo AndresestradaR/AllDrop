@@ -13,7 +13,7 @@ export async function GET() {
 
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('google_api_key, openai_api_key, kie_api_key, bfl_api_key, fal_api_key, elevenlabs_api_key, apify_api_key, browserless_api_key, cf_account_id, cf_access_key_id, cf_secret_access_key, cf_bucket_name, cf_public_url, publer_api_key, publer_workspace_id')
+      .select('google_api_key, openai_api_key, kie_api_key, bfl_api_key, fal_api_key, elevenlabs_api_key, apify_api_key, browserless_api_key, cf_account_id, cf_access_key_id, cf_secret_access_key, cf_bucket_name, cf_public_url, publer_api_key, publer_workspace_id, meta_access_token, anthropic_api_key')
       .eq('id', user.id)
       .single()
 
@@ -37,6 +37,8 @@ export async function GET() {
         maskedR2SecretAccessKey: '',
         hasR2SecretAccessKey: false,
         hasPubler: false,
+      hasMetaAccessToken: false,
+      hasAnthropicApiKey: false,
       })
     }
 
@@ -97,6 +99,12 @@ export async function GET() {
       maskedPublerApiKey: safeMask(profile.publer_api_key),
       publerWorkspaceId: safeDecrypt(profile.publer_workspace_id),
       hasPubler: !!(profile.publer_api_key && profile.publer_workspace_id),
+      // Meta Ads
+      maskedMetaAccessToken: safeMask(profile.meta_access_token),
+      hasMetaAccessToken: !!profile.meta_access_token,
+      // Anthropic
+      maskedAnthropicApiKey: safeMask(profile.anthropic_api_key),
+      hasAnthropicApiKey: !!profile.anthropic_api_key,
     })
   } catch (error: any) {
     console.error('GET /api/keys error:', error)
@@ -114,7 +122,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { googleApiKey, openaiApiKey, kieApiKey, bflApiKey, falApiKey, elevenlabsApiKey, apifyApiKey, browserlessApiKey, cfAccountId, cfAccessKeyId, cfSecretAccessKey, cfBucketName, cfPublicUrl, publerApiKey, publerWorkspaceId } = body
+    const { googleApiKey, openaiApiKey, kieApiKey, bflApiKey, falApiKey, elevenlabsApiKey, apifyApiKey, browserlessApiKey, cfAccountId, cfAccessKeyId, cfSecretAccessKey, cfBucketName, cfPublicUrl, publerApiKey, publerWorkspaceId, metaAccessToken, anthropicApiKey } = body
 
     // Build update object with only provided keys
     const updateData: Record<string, string | null> = {}
@@ -166,6 +174,13 @@ export async function POST(request: Request) {
       }
       if (publerWorkspaceId !== undefined) {
         updateData.publer_workspace_id = publerWorkspaceId ? encrypt(publerWorkspaceId) : null
+      }
+      // Meta Ads
+      if (metaAccessToken) {
+        updateData.meta_access_token = encrypt(metaAccessToken)
+      }
+      if (anthropicApiKey) {
+        updateData.anthropic_api_key = encrypt(anthropicApiKey)
       }
     } catch (encryptError: any) {
       console.error('Encryption error:', encryptError)

@@ -40,6 +40,7 @@ const creatorNavigation = [
   { name: 'Landing Code', href: '/dashboard/landing-ia', icon: Zap, isNew: true },
   { name: 'Estudio IA', href: '/dashboard/studio', icon: Wand2, isNew: true },
   { name: 'Encuentra tu Producto Ganador', href: '/dashboard/product-research', icon: Target, isNew: true },
+  { name: 'Meta Ads IA', href: '/dashboard/meta-ads', icon: Sparkles, isNew: true },
 ]
 
 const ADMIN_EMAIL = 'trucosecomydrop@gmail.com'

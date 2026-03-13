@@ -47,6 +47,12 @@ export default function SettingsPage() {
   const [isTestingPubler, setIsTestingPubler] = useState(false)
   const [hasPubler, setHasPubler] = useState(false)
 
+  // Meta Ads state
+  const [metaAccessToken, setMetaAccessToken] = useState<ApiKeyState>({ value: '', hasKey: false, isSaving: false })
+  const [anthropicApiKey, setAnthropicApiKey] = useState<ApiKeyState>({ value: '', hasKey: false, isSaving: false })
+  const [isSavingMeta, setIsSavingMeta] = useState(false)
+  const [hasMetaAds, setHasMetaAds] = useState(false)
+
   useEffect(() => {
     fetchKeys()
     createClient().auth.getUser().then(({ data }) => {
@@ -102,6 +108,14 @@ export default function SettingsPage() {
         setPublerApiKey(prev => ({ ...prev, hasKey: true, value: data.maskedPublerApiKey || '' }))
         setPublerWorkspaceId(data.publerWorkspaceId || '')
       }
+      // Meta Ads
+      if (data.hasMetaAccessToken) {
+        setMetaAccessToken(prev => ({ ...prev, hasKey: true, value: data.maskedMetaAccessToken || '' }))
+      }
+      if (data.hasAnthropicApiKey) {
+        setAnthropicApiKey(prev => ({ ...prev, hasKey: true, value: data.maskedAnthropicApiKey || '' }))
+      }
+      setHasMetaAds(!!data.hasMetaAccessToken && !!data.hasAnthropicApiKey)
     } catch (error) {
       console.error('Error fetching keys:', error)
     } finally {
@@ -220,6 +234,38 @@ export default function SettingsPage() {
       toast.error(error.message || 'Error al guardar')
     } finally {
       setIsSavingPubler(false)
+    }
+  }
+
+  const handleSaveMetaAds = async () => {
+    const hasNewToken = metaAccessToken.value && !metaAccessToken.value.includes('•')
+    const hasNewAnthropicKey = anthropicApiKey.value && !anthropicApiKey.value.includes('•')
+
+    if (!hasNewToken && !hasNewAnthropicKey) {
+      toast.error('Ingresa al menos un campo nuevo')
+      return
+    }
+
+    setIsSavingMeta(true)
+    try {
+      const body: Record<string, string> = {}
+      if (hasNewToken) body.metaAccessToken = metaAccessToken.value
+      if (hasNewAnthropicKey) body.anthropicApiKey = anthropicApiKey.value
+
+      const response = await fetch('/api/keys', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Error al guardar')
+
+      toast.success('Credenciales de Meta Ads IA guardadas')
+      fetchKeys()
+    } catch (error: any) {
+      toast.error(error.message || 'Error al guardar')
+    } finally {
+      setIsSavingMeta(false)
     }
   }
 
@@ -800,6 +846,65 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
+      {/* Meta Ads IA */}
+      <div className="mt-8 mb-4">
+        <h2 className="text-lg font-semibold text-text-primary mb-4 flex items-center gap-2">
+          <Sparkles className="w-5 h-5 text-accent" />
+          Meta Ads IA
+        </h2>
+      </div>
+
+      <Card className="mb-4">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <div className="p-2 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 text-white">
+              <Sparkles className="w-4 h-4" />
+            </div>
+            Meta Ads + Claude IA
+            {hasMetaAds && (
+              <span className="flex items-center gap-1 text-xs text-success ml-auto">
+                <Check className="w-3 h-3" />
+                Configurado
+              </span>
+            )}
+          </CardTitle>
+          <CardDescription>
+            Gestiona tus campañas de Meta Ads con inteligencia artificial conversacional
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-text-secondary mb-1">Meta Access Token *</label>
+            <Input
+              type="password"
+              placeholder="Tu token de acceso de Meta"
+              value={metaAccessToken.value}
+              onChange={(e) => setMetaAccessToken(prev => ({ ...prev, value: e.target.value }))}
+            />
+            <p className="text-xs text-text-muted mt-1">
+              Genéralo en developers.facebook.com → Tu App → Graph API Explorer
+            </p>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-text-secondary mb-1">Anthropic API Key (Claude) *</label>
+            <Input
+              type="password"
+              placeholder="sk-ant-..."
+              value={anthropicApiKey.value}
+              onChange={(e) => setAnthropicApiKey(prev => ({ ...prev, value: e.target.value }))}
+            />
+            <p className="text-xs text-text-muted mt-1">
+              Consíguela en console.anthropic.com → API Keys
+            </p>
+          </div>
+          <div className="flex gap-2 pt-2">
+            <Button onClick={handleSaveMetaAds} isLoading={isSavingMeta} className="flex-1">
+              Guardar Meta Ads IA
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Info Card */}
       <Card className="mt-6" variant="glass">
         <CardContent className="pt-6">
@@ -835,6 +940,10 @@ export default function SettingsPage() {
             <li className="flex items-start gap-2">
               <span className="text-indigo-500">•</span>
               <span><strong>Publer</strong> - Publica en 13 redes sociales directamente</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-purple-500">•</span>
+              <span><strong>Meta Ads IA</strong> - Gestiona campañas de Meta Ads con Claude IA</span>
             </li>
           </ul>
         </CardContent>
