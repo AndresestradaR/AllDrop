@@ -4,6 +4,7 @@ import { useState, useRef } from 'react'
 import { CheckCircle2, Copy, Mail, AlertCircle, Shield, Users, Zap, X, MessageCircle, UserPlus, ArrowRight, Globe } from 'lucide-react'
 
 const YOUTUBE_VIDEO_ID = 'nEHrlt4qZig'
+const YOUTUBE_TUTORIAL_ID = 'GJ3VHWPkAvE'
 const WHATSAPP_LINK = 'https://wa.link/foyivm'
 
 const DROPI_LINKS = [
@@ -266,7 +267,27 @@ MOTIVO: ${form.motivo}`
 
         {/* STEP: Form — existing users */}
         {step === 'form' && (
-          <div className="bg-[#111] border border-[#222] rounded-2xl p-6 sm:p-8">
+          <div className="space-y-6">
+            {/* Tutorial video */}
+            <div className="bg-[#111] border border-[#222] rounded-2xl p-5">
+              <p className="text-sm text-[#999] mb-3 text-center">
+                Mira este video para saber <strong className="text-white">como hacer el proceso paso a paso</strong>
+              </p>
+              <div className="relative rounded-xl overflow-hidden border border-[#222] bg-black">
+                <div className="aspect-video">
+                  <iframe
+                    src={`https://www.youtube.com/embed/${YOUTUBE_TUTORIAL_ID}?rel=0`}
+                    title="Tutorial: Como cambiar de comunidad en Dropi"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                    className="w-full h-full"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Form */}
+            <div className="bg-[#111] border border-[#222] rounded-2xl p-6 sm:p-8">
             <div className="flex items-center gap-2 py-3 px-4 rounded-xl bg-teal-500/5 border border-teal-500/20 text-teal-400 text-sm mb-6">
               <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
               Completa tus datos para generar la plantilla del correo
@@ -361,6 +382,7 @@ MOTIVO: ${form.motivo}`
                 Generar Plantilla del Correo
               </button>
             </form>
+          </div>
           </div>
         )}
 
