@@ -132,8 +132,6 @@ const TOOLS: Tool[] = [
     description: 'Genera system prompts para bots de ventas',
     icon: MessageSquare,
     color: 'from-green-500 to-emerald-500',
-    soon: true,
-    adminOnly: true,
   },
   {
     id: 'person-descriptor',

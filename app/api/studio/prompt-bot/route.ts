@@ -101,11 +101,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    // Admin-only while in development
-    if (user.email !== 'trucosecomydrop@gmail.com') {
-      return NextResponse.json({ error: 'Esta herramienta estara disponible proximamente' }, { status: 403 })
-    }
-
     const body = await request.json()
     const {
       product_name,
