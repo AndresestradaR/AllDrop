@@ -112,11 +112,14 @@ export async function executeChat(
             },
           })
 
-          // Save the assistant message with tool call
+          // Save assistant text (if any) and tool_call separately
+          // This ensures buildAnthropicMessages can reconstruct the full conversation
           if (opts.onSaveMessage) {
+            if (textContent) {
+              await opts.onSaveMessage({ role: 'assistant', content: textContent })
+            }
             await opts.onSaveMessage({
-              role: 'assistant',
-              content: textContent || undefined,
+              role: 'tool_call',
               tool_name: toolName,
               tool_input: toolInput,
               tool_use_id: block.id,

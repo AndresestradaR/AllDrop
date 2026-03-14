@@ -79,30 +79,69 @@ export async function POST(request: Request) {
       action.action_payload
     )
 
+    // Find the original tool_call message to get the tool_use_id
+    const { data: toolCallMsg } = await serviceClient
+      .from('meta_ads_messages')
+      .select('tool_use_id')
+      .eq('conversation_id', action.conversation_id)
+      .eq('role', 'tool_call')
+      .eq('tool_name', action.action_type)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+
+    const toolUseId = toolCallMsg?.tool_use_id || null
+
     if (result.success) {
       await serviceClient
         .from('meta_ads_pending_actions')
         .update({ status: 'executed', executed_at: new Date().toISOString() })
         .eq('id', action_id)
 
-      // Save success message
+      // Save proper tool_result so Claude can see the result in conversation history
+      await serviceClient
+        .from('meta_ads_messages')
+        .insert({
+          conversation_id: action.conversation_id,
+          role: 'tool_result',
+          tool_name: action.action_type,
+          tool_result: result.data || { success: true },
+          tool_use_id: toolUseId,
+        })
+
+      // Save confirmation message for UI display
       await serviceClient
         .from('meta_ads_messages')
         .insert({
           conversation_id: action.conversation_id,
           role: 'confirmation',
           content: `✅ Acción ejecutada: ${action.description}`,
-          tool_result: result.data,
         })
 
-      return NextResponse.json({ success: true, status: 'executed', data: result.data })
+      return NextResponse.json({
+        success: true,
+        status: 'executed',
+        data: result.data,
+        conversation_id: action.conversation_id,
+      })
     } else {
       await serviceClient
         .from('meta_ads_pending_actions')
         .update({ status: 'failed', error_message: result.error })
         .eq('id', action_id)
 
-      // Save error message
+      // Save tool_result with error so Claude knows it failed
+      await serviceClient
+        .from('meta_ads_messages')
+        .insert({
+          conversation_id: action.conversation_id,
+          role: 'tool_result',
+          tool_name: action.action_type,
+          tool_result: { success: false, error: result.error },
+          tool_use_id: toolUseId,
+        })
+
+      // Save error message for UI display
       await serviceClient
         .from('meta_ads_messages')
         .insert({

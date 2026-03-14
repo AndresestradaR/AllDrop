@@ -196,7 +196,21 @@ function buildAnthropicMessages(
 
   for (const msg of dbMessages) {
     if (msg.role === 'user') {
-      messages.push({ role: 'user', content: msg.content || '' })
+      // Merge consecutive user messages (can happen after confirmation + continuation)
+      const lastMsg = messages[messages.length - 1]
+      if (lastMsg?.role === 'user') {
+        if (typeof lastMsg.content === 'string') {
+          // Convert to array format so we can append
+          lastMsg.content = [
+            { type: 'text', text: lastMsg.content },
+            { type: 'text', text: msg.content || '' },
+          ] as any
+        } else if (Array.isArray(lastMsg.content)) {
+          (lastMsg.content as any[]).push({ type: 'text', text: msg.content || '' })
+        }
+      } else {
+        messages.push({ role: 'user', content: msg.content || '' })
+      }
     } else if (msg.role === 'assistant') {
       // Merge consecutive assistant blocks
       const lastMsg = messages[messages.length - 1]
@@ -226,16 +240,23 @@ function buildAnthropicMessages(
         messages.push({ role: 'assistant', content: [toolBlock] as any })
       }
     } else if (msg.role === 'tool_result') {
-      // Add tool_result as user message
-      messages.push({
-        role: 'user',
-        content: [{
-          type: 'tool_result',
-          tool_use_id: msg.tool_use_id || '',
-          content: JSON.stringify(msg.tool_result || {}),
-        }] as any,
-      })
+      // Add tool_result — merge with existing user message if consecutive
+      const lastMsg = messages[messages.length - 1]
+      const toolResultBlock = {
+        type: 'tool_result',
+        tool_use_id: msg.tool_use_id || '',
+        content: JSON.stringify(msg.tool_result || {}),
+      }
+      if (lastMsg?.role === 'user' && Array.isArray(lastMsg.content)) {
+        (lastMsg.content as any[]).push(toolResultBlock)
+      } else {
+        messages.push({
+          role: 'user',
+          content: [toolResultBlock] as any,
+        })
+      }
     }
+    // Skip 'confirmation' role — it's UI-only, not sent to Claude
   }
 
   return messages

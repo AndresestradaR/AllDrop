@@ -58,8 +58,54 @@ export function MetaAdsChat({ conversationId }: MetaAdsChatProps) {
   async function sendMessage() {
     const text = input.trim()
     if (!text || isStreaming) return
-
     setInput('')
+    sendChatMessage(text)
+  }
+
+  async function handleConfirm(confirmed: boolean) {
+    if (!pendingAction) return
+    setConfirmLoading(true)
+
+    try {
+      const res = await fetch('/api/meta-ads/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action_id: pendingAction.action_id,
+          confirmed,
+        }),
+      })
+
+      const result = await res.json()
+      const statusMsg = confirmed
+        ? (result.success ? `✅ ${pendingAction.description}` : `⚠️ Error: ${result.error}`)
+        : `❌ Acción cancelada: ${pendingAction.description}`
+
+      setMessages(prev => [...prev, { role: 'confirmation', content: statusMsg }])
+
+      // Auto-continue: after successful confirmation, send continuation to Claude
+      // so it can proceed with the next step (e.g., create adsets after campaign)
+      if (confirmed && result.success) {
+        setPendingAction(null)
+        setConfirmLoading(false)
+        // Small delay to let the UI update, then auto-continue
+        setTimeout(() => {
+          sendChatMessage('Listo, la acción fue ejecutada exitosamente. Continúa con el siguiente paso del plan.')
+        }, 500)
+        return
+      }
+    } catch (err: any) {
+      setMessages(prev => [...prev, { role: 'confirmation', content: `⚠️ Error: ${err.message}` }])
+    } finally {
+      setPendingAction(null)
+      setConfirmLoading(false)
+    }
+  }
+
+  // Send a message programmatically (used for auto-continuation after confirmation)
+  async function sendChatMessage(text: string) {
+    if (isStreaming) return
+
     setMessages(prev => [...prev, { role: 'user', content: text }])
     setIsStreaming(true)
 
@@ -83,16 +129,14 @@ export function MetaAdsChat({ conversationId }: MetaAdsChatProps) {
       if (!reader) return
 
       const decoder = new TextDecoder()
-
-      // Add placeholder for assistant response
       setMessages(prev => [...prev, { role: 'assistant', content: '' }])
 
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
 
-        const text = decoder.decode(value, { stream: true })
-        const lines = text.split('\n')
+        const chunk = decoder.decode(value, { stream: true })
+        const lines = chunk.split('\n')
 
         for (const line of lines) {
           if (!line.startsWith('data: ')) continue
@@ -110,7 +154,6 @@ export function MetaAdsChat({ conversationId }: MetaAdsChatProps) {
                 return updated
               })
             } else if (event.type === 'tool_start') {
-              // Show tool execution indicator
               setMessages(prev => {
                 const updated = [...prev]
                 const last = updated[updated.length - 1]
@@ -121,7 +164,6 @@ export function MetaAdsChat({ conversationId }: MetaAdsChatProps) {
                 return updated
               })
             } else if (event.type === 'tool_result') {
-              // Remove the "consultando" text, Claude will incorporate results
               setMessages(prev => {
                 const updated = [...prev]
                 const last = updated[updated.length - 1]
@@ -158,36 +200,6 @@ export function MetaAdsChat({ conversationId }: MetaAdsChatProps) {
       setMessages(prev => [...prev, { role: 'assistant', content: `Error de conexión: ${err.message}` }])
     } finally {
       setIsStreaming(false)
-    }
-  }
-
-  async function handleConfirm(confirmed: boolean) {
-    if (!pendingAction) return
-    setConfirmLoading(true)
-
-    try {
-      // We need to find the action_id from pending_actions table
-      // For now, we'll search by conversation_id + pending status
-      const res = await fetch('/api/meta-ads/confirm', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action_id: pendingAction.action_id,
-          confirmed,
-        }),
-      })
-
-      const result = await res.json()
-      const statusMsg = confirmed
-        ? (result.success ? `✅ ${pendingAction.description}` : `⚠️ Error: ${result.error}`)
-        : `❌ Acción cancelada: ${pendingAction.description}`
-
-      setMessages(prev => [...prev, { role: 'confirmation', content: statusMsg }])
-    } catch (err: any) {
-      setMessages(prev => [...prev, { role: 'confirmation', content: `⚠️ Error: ${err.message}` }])
-    } finally {
-      setPendingAction(null)
-      setConfirmLoading(false)
     }
   }
 
