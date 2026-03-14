@@ -25,6 +25,8 @@ export interface ExecutorOptions {
     tool_use_id?: string
     requires_confirmation?: boolean
   }) => Promise<string | undefined>
+  // Callback to fetch user's products from EstrategasIA
+  onGetProducts?: () => Promise<any[]>
   // Callback to create pending action
   onCreatePendingAction?: (action: {
     action_type: string
@@ -134,7 +136,18 @@ export async function executeChat(
           data: { tool_name: toolName, tool_input: toolInput },
         })
 
-        const result = await metaClient.executeTool(toolName, toolInput)
+        // Handle internal tools (not Meta API)
+        let result: { success: boolean; data?: any; error?: string }
+        if (toolName === 'get_my_products' && opts.onGetProducts) {
+          try {
+            const products = await opts.onGetProducts()
+            result = { success: true, data: products }
+          } catch (err: any) {
+            result = { success: false, error: err.message }
+          }
+        } else {
+          result = await metaClient.executeTool(toolName, toolInput)
+        }
 
         sendEvent({
           type: 'tool_result',

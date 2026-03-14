@@ -110,6 +110,20 @@ export async function POST(request: Request) {
               conversationId: conversation_id,
               userId: user.id,
               messages: anthropicMessages,
+              onGetProducts: async () => {
+                const { data: products } = await supabase
+                  .from('products')
+                  .select('id, name, description, image_url, created_at')
+                  .eq('user_id', user!.id)
+                  .order('created_at', { ascending: false })
+                return (products || []).map(p => ({
+                  id: p.id,
+                  nombre: p.name,
+                  descripcion: p.description,
+                  imagen: p.image_url,
+                  landing_url: `https://www.estrategasia.com/dashboard/landing/${p.id}`,
+                }))
+              },
               onSaveMessage: async (msg) => {
                 const { data } = await serviceClient
                   .from('meta_ads_messages')

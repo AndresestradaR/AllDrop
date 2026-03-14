@@ -114,6 +114,17 @@ export const META_ADS_TOOLS = [
     },
   },
 
+  // ==================== INTERNAL TOOLS (EstrategasIA ecosystem) ====================
+  {
+    name: 'get_my_products',
+    description: 'Lista los productos del usuario en EstrategasIA (Landing Generator). Devuelve nombre, descripción, imagen y URL de landing. Úsalo para conocer qué productos tiene el usuario y así crear campañas con esa info.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {},
+      required: [],
+    },
+  },
+
   // ==================== WRITE TOOLS (require confirmation) ====================
   {
     name: 'create_campaign',
