@@ -243,6 +243,8 @@ export class MetaAPIClient {
       objective: rest.objective,
       status: rest.status || 'PAUSED',
       special_ad_categories: rest.special_ad_categories || [],
+      // Required by Meta API v21.0+ — must always be set on campaign
+      is_adset_budget_sharing_enabled: false,
     }
     if (rest.daily_budget) params.daily_budget = rest.daily_budget
     if (rest.lifetime_budget) params.lifetime_budget = rest.lifetime_budget
