@@ -136,6 +136,7 @@ export function MetaAdsChat({ conversationId }: MetaAdsChatProps) {
                 tool_name: event.data.tool_name,
                 tool_input: event.data.tool_input,
                 description: event.data.description,
+                action_id: event.data.action_id,
               })
             } else if (event.type === 'error') {
               assistantText += `\n\n⚠️ ${event.data.message}`

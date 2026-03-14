@@ -89,7 +89,18 @@ export async function executeChat(
         if (isWriteTool(toolName)) {
           needsConfirmation = true
 
-          // Notify frontend that confirmation is needed
+          // Save pending action FIRST to get the action_id
+          let actionId = ''
+          if (opts.onCreatePendingAction) {
+            actionId = await opts.onCreatePendingAction({
+              action_type: toolName,
+              action_payload: toolInput,
+              description: describeAction(toolName, toolInput),
+              tool_use_id: block.id,
+            })
+          }
+
+          // Notify frontend with the action_id
           sendEvent({
             type: 'confirmation_required',
             data: {
@@ -97,18 +108,9 @@ export async function executeChat(
               tool_name: toolName,
               tool_input: toolInput,
               description: describeAction(toolName, toolInput),
+              action_id: actionId,
             },
           })
-
-          // Save pending action
-          if (opts.onCreatePendingAction) {
-            await opts.onCreatePendingAction({
-              action_type: toolName,
-              action_payload: toolInput,
-              description: describeAction(toolName, toolInput),
-              tool_use_id: block.id,
-            })
-          }
 
           // Save the assistant message with tool call
           if (opts.onSaveMessage) {
