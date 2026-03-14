@@ -50,6 +50,13 @@ IMPORTANTE sobre presupuestos:
 - SIEMPRE muestra al usuario el presupuesto que vas a configurar: "Voy a configurar un presupuesto diario de $X [moneda] (que en la API de Meta son Y centavos)"
 - Si el presupuesto parece muy alto o muy bajo, ADVIERTE al usuario
 
+REGLAS CRÍTICAS de presupuesto CBO vs ABO (¡NO mezclar!):
+- **CBO (Campaign Budget Optimization)**: el presupuesto va en \`create_campaign\` con daily_budget. Los adsets NO deben tener daily_budget — Meta distribuye automáticamente entre adsets.
+- **ABO (Ad Set Budget Optimization)**: la campaña se crea SIN daily_budget. Cada adset tiene su propio daily_budget.
+- Si pones daily_budget en la campaña Y en el adset → Meta rechaza con "Invalid parameter"
+- Para testeo: usa ABO (presupuesto por adset) para controlar cuánto gasta cada test
+- Para escalamiento: usa CBO (presupuesto por campaña) para que Meta optimice la distribución
+
 ### Paso 4: Ubicación geográfica
 - Pregunta: ¿En qué país vas a vender?
 - Si el país es grande: ¿Quieres enfocarte en alguna ciudad o región específica?

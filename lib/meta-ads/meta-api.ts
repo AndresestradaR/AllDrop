@@ -57,11 +57,13 @@ export class MetaAPIClient {
 
       if (json.error) {
         const msg = json.error.message || JSON.stringify(json.error)
-        // Detect token expiration
-        if (json.error.code === 190 || json.error.type === 'OAuthException') {
+        const code = json.error.code
+        // Only code 190 is token expiration — OAuthException is too broad (covers code 100, 200, etc.)
+        if (code === 190) {
           return { success: false, error: `Token expirado o inválido: ${msg}. Actualiza tu token de Meta en Settings.` }
         }
-        return { success: false, error: msg }
+        // Include error code for debugging
+        return { success: false, error: `Meta API error (code ${code}): ${msg}` }
       }
 
       return { success: true, data: json }
@@ -264,21 +266,24 @@ export class MetaAPIClient {
     adset_id: string
     name: string
     creative: Record<string, any>
+    page_id?: string
     status?: string
   }): Promise<MetaAPIResponse> {
     const { ad_account_id, ...rest } = input
     // Build creative spec for the API
+    // page_id is REQUIRED in object_story_spec for Meta to know which page publishes the ad
     const creativeSpec: Record<string, any> = {}
     if (rest.creative.title) creativeSpec.title = rest.creative.title
     if (rest.creative.body) creativeSpec.body = rest.creative.body
-    if (rest.creative.link_url) {
+    if (rest.creative.link_url || rest.creative.body) {
       creativeSpec.object_story_spec = {
+        page_id: rest.page_id || rest.creative.page_id,
         link_data: {
           link: rest.creative.link_url,
           message: rest.creative.body,
           name: rest.creative.title,
           call_to_action: rest.creative.call_to_action_type
-            ? { type: rest.creative.call_to_action_type }
+            ? { type: rest.creative.call_to_action_type, value: rest.creative.call_to_action_value }
             : undefined,
           image_hash: rest.creative.image_hash,
           picture: rest.creative.image_url,

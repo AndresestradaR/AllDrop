@@ -220,6 +220,7 @@ export const META_ADS_TOOLS = [
         ad_account_id: { type: 'string', description: 'ID de la cuenta publicitaria' },
         adset_id: { type: 'string', description: 'ID del adset padre' },
         name: { type: 'string', description: 'Nombre del anuncio' },
+        page_id: { type: 'string', description: 'ID de la página de Facebook que publica el anuncio. OBLIGATORIO — usa get_pages para obtenerlo.' },
         creative: {
           type: 'object',
           properties: {
@@ -230,15 +231,19 @@ export const META_ADS_TOOLS = [
             image_url: { type: 'string', description: 'URL de imagen (alternativa a hash)' },
             call_to_action_type: {
               type: 'string',
-              enum: ['SHOP_NOW', 'LEARN_MORE', 'SIGN_UP', 'CONTACT_US', 'GET_OFFER', 'ORDER_NOW'],
+              enum: ['SHOP_NOW', 'LEARN_MORE', 'SIGN_UP', 'CONTACT_US', 'GET_OFFER', 'ORDER_NOW', 'WHATSAPP_MESSAGE', 'SEND_WHATSAPP_MESSAGE'],
               description: 'Tipo de CTA',
+            },
+            call_to_action_value: {
+              type: 'object',
+              description: 'Valor del CTA. Para WhatsApp: { "whatsapp_number": "+57..." }',
             },
           },
           description: 'Configuración del creativo',
         },
         status: { type: 'string', enum: ['ACTIVE', 'PAUSED'], description: 'Estado inicial. Default: PAUSED' },
       },
-      required: ['ad_account_id', 'adset_id', 'name', 'creative'],
+      required: ['ad_account_id', 'adset_id', 'name', 'page_id', 'creative'],
     },
   },
   {
