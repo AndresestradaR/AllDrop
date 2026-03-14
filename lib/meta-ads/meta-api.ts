@@ -257,6 +257,7 @@ export class MetaAPIClient {
     optimization_goal: string
     billing_event: string
     targeting: Record<string, any>
+    bid_strategy?: string
     start_time?: string
     end_time?: string
     status?: string
@@ -269,6 +270,8 @@ export class MetaAPIClient {
       billing_event: rest.billing_event,
       targeting: rest.targeting,
       status: rest.status || 'PAUSED',
+      // Default to LOWEST_COST_WITHOUT_CAP (safest — no bid_amount needed)
+      bid_strategy: rest.bid_strategy || 'LOWEST_COST_WITHOUT_CAP',
     }
     if (rest.daily_budget) params.daily_budget = rest.daily_budget
     if (rest.start_time) params.start_time = rest.start_time
