@@ -56,14 +56,29 @@ export class MetaAPIClient {
       const json = await response.json()
 
       if (json.error) {
-        const msg = json.error.message || JSON.stringify(json.error)
+        const msg = json.error.message || ''
         const code = json.error.code
-        // Only code 190 is token expiration — OAuthException is too broad (covers code 100, 200, etc.)
+        const userMsg = json.error.error_user_msg || ''
+        const userTitle = json.error.error_user_title || ''
+        const subcode = json.error.error_subcode || ''
+        const fbTraceId = json.error.fbtrace_id || ''
+
+        // Only code 190 is token expiration
         if (code === 190) {
           return { success: false, error: `Token expirado o inválido: ${msg}. Actualiza tu token de Meta en Settings.` }
         }
-        // Include error code for debugging
-        return { success: false, error: `Meta API error (code ${code}): ${msg}` }
+
+        // Build detailed error for debugging
+        let detail = `Meta API error (code ${code}${subcode ? `, subcode ${subcode}` : ''}): ${msg}`
+        if (userMsg) detail += ` — ${userMsg}`
+        if (userTitle) detail += ` [${userTitle}]`
+        detail += ` (trace: ${fbTraceId})`
+
+        // Log full error for server-side debugging
+        console.error('[Meta API Error]', JSON.stringify(json.error, null, 2))
+        console.error('[Meta API Request]', method, path, JSON.stringify(params))
+
+        return { success: false, error: detail }
       }
 
       return { success: true, data: json }
