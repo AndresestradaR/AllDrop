@@ -273,10 +273,8 @@ export class MetaAPIClient {
     if (rest.daily_budget) params.daily_budget = rest.daily_budget
     if (rest.start_time) params.start_time = rest.start_time
     if (rest.end_time) params.end_time = rest.end_time
-    // Required by Meta API when using adset-level budget (ABO)
-    if (rest.daily_budget) {
-      params.is_adset_budget_sharing_enabled = false
-    }
+    // Always required by Meta API v21.0+ — must be explicitly set
+    params.is_adset_budget_sharing_enabled = false
     return this.request(`/${ad_account_id}/adsets`, params, 'POST')
   }
 
