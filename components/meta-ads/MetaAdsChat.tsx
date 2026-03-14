@@ -294,7 +294,7 @@ export function MetaAdsChat({ conversationId }: MetaAdsChatProps) {
             onKeyDown={handleKeyDown}
             placeholder="Escribe tu mensaje..."
             rows={1}
-            className="flex-1 resize-none border border-gray-200 rounded-xl px-3 py-2 text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-500/20 outline-none"
+            className="flex-1 resize-none border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-900 bg-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500/20 outline-none"
             style={{ maxHeight: '120px' }}
             onInput={(e) => {
               const el = e.target as HTMLTextAreaElement
