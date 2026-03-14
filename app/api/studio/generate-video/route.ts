@@ -134,12 +134,13 @@ export async function POST(request: Request) {
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('kie_api_key, fal_api_key')
+      .select('kie_api_key, fal_api_key, wavespeed_api_key')
       .eq('id', userId)
       .single()
 
     const kieApiKey = profile?.kie_api_key ? decrypt(profile.kie_api_key) : (process.env.KIE_API_KEY || '')
     const falApiKey = profile?.fal_api_key ? decrypt(profile.fal_api_key) : (process.env.FAL_API_KEY || undefined)
+    const wavespeedApiKey = profile?.wavespeed_api_key ? decrypt(profile.wavespeed_api_key) : (process.env.WAVESPEED_API_KEY || undefined)
 
     if (!kieApiKey) {
       return NextResponse.json({
@@ -242,7 +243,7 @@ export async function POST(request: Request) {
 
     // Create video task (returns taskId for async processing)
     // Pass falApiKey for cascade fallback (KIE -> fal.ai)
-    const result = await generateVideo(generationParams, kieApiKey, falApiKey, forceFal)
+    const result = await generateVideo(generationParams, kieApiKey, falApiKey, forceFal, wavespeedApiKey)
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
 

@@ -26,6 +26,7 @@ export default function SettingsPage() {
   const [kieKey, setKieKey] = useState<ApiKeyState>({ value: '', hasKey: false, isSaving: false })
   const [bflKey, setBflKey] = useState<ApiKeyState>({ value: '', hasKey: false, isSaving: false })
   const [falKey, setFalKey] = useState<ApiKeyState>({ value: '', hasKey: false, isSaving: false })
+  const [wavespeedKey, setWavespeedKey] = useState<ApiKeyState>({ value: '', hasKey: false, isSaving: false })
   const [elevenlabsKey, setElevenlabsKey] = useState<ApiKeyState>({ value: '', hasKey: false, isSaving: false })
   const [apifyKey, setApifyKey] = useState<ApiKeyState>({ value: '', hasKey: false, isSaving: false })
   const [browserlessKey, setBrowserlessKey] = useState<ApiKeyState>({ value: '', hasKey: false, isSaving: false })
@@ -46,6 +47,12 @@ export default function SettingsPage() {
   const [isSavingPubler, setIsSavingPubler] = useState(false)
   const [isTestingPubler, setIsTestingPubler] = useState(false)
   const [hasPubler, setHasPubler] = useState(false)
+
+  // Meta Ads state
+  const [metaAccessToken, setMetaAccessToken] = useState<ApiKeyState>({ value: '', hasKey: false, isSaving: false })
+  const [anthropicApiKey, setAnthropicApiKey] = useState<ApiKeyState>({ value: '', hasKey: false, isSaving: false })
+  const [isSavingMeta, setIsSavingMeta] = useState(false)
+  const [hasMetaAds, setHasMetaAds] = useState(false)
 
   useEffect(() => {
     fetchKeys()
@@ -73,6 +80,9 @@ export default function SettingsPage() {
       }
       if (data.hasFalApiKey) {
         setFalKey(prev => ({ ...prev, hasKey: true, value: data.maskedFalApiKey || '' }))
+      }
+      if (data.hasWavespeedApiKey) {
+        setWavespeedKey(prev => ({ ...prev, hasKey: true, value: data.maskedWavespeedApiKey || '' }))
       }
       if (data.hasElevenlabsApiKey) {
         setElevenlabsKey(prev => ({ ...prev, hasKey: true, value: data.maskedElevenlabsApiKey || '' }))
@@ -102,6 +112,14 @@ export default function SettingsPage() {
         setPublerApiKey(prev => ({ ...prev, hasKey: true, value: data.maskedPublerApiKey || '' }))
         setPublerWorkspaceId(data.publerWorkspaceId || '')
       }
+      // Meta Ads
+      if (data.hasMetaAccessToken) {
+        setMetaAccessToken(prev => ({ ...prev, hasKey: true, value: data.maskedMetaAccessToken || '' }))
+      }
+      if (data.hasAnthropicApiKey) {
+        setAnthropicApiKey(prev => ({ ...prev, hasKey: true, value: data.maskedAnthropicApiKey || '' }))
+      }
+      setHasMetaAds(!!data.hasMetaAccessToken && !!data.hasAnthropicApiKey)
     } catch (error) {
       console.error('Error fetching keys:', error)
     } finally {
@@ -109,13 +127,14 @@ export default function SettingsPage() {
     }
   }
 
-  const handleSaveKey = async (keyType: 'google' | 'openai' | 'kie' | 'bfl' | 'fal' | 'elevenlabs' | 'apify' | 'browserless') => {
+  const handleSaveKey = async (keyType: 'google' | 'openai' | 'kie' | 'bfl' | 'fal' | 'wavespeed' | 'elevenlabs' | 'apify' | 'browserless') => {
     const keyMap = {
       google: { state: googleKey, setter: setGoogleKey, field: 'googleApiKey' },
       openai: { state: openaiKey, setter: setOpenaiKey, field: 'openaiApiKey' },
       kie: { state: kieKey, setter: setKieKey, field: 'kieApiKey' },
       bfl: { state: bflKey, setter: setBflKey, field: 'bflApiKey' },
       fal: { state: falKey, setter: setFalKey, field: 'falApiKey' },
+      wavespeed: { state: wavespeedKey, setter: setWavespeedKey, field: 'wavespeedApiKey' },
       elevenlabs: { state: elevenlabsKey, setter: setElevenlabsKey, field: 'elevenlabsApiKey' },
       apify: { state: apifyKey, setter: setApifyKey, field: 'apifyApiKey' },
       browserless: { state: browserlessKey, setter: setBrowserlessKey, field: 'browserlessApiKey' },
@@ -220,6 +239,38 @@ export default function SettingsPage() {
       toast.error(error.message || 'Error al guardar')
     } finally {
       setIsSavingPubler(false)
+    }
+  }
+
+  const handleSaveMetaAds = async () => {
+    const hasNewToken = metaAccessToken.value && !metaAccessToken.value.includes('•')
+    const hasNewAnthropicKey = anthropicApiKey.value && !anthropicApiKey.value.includes('•')
+
+    if (!hasNewToken && !hasNewAnthropicKey) {
+      toast.error('Ingresa al menos un campo nuevo')
+      return
+    }
+
+    setIsSavingMeta(true)
+    try {
+      const body: Record<string, string> = {}
+      if (hasNewToken) body.metaAccessToken = metaAccessToken.value
+      if (hasNewAnthropicKey) body.anthropicApiKey = anthropicApiKey.value
+
+      const response = await fetch('/api/keys', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Error al guardar')
+
+      toast.success('Credenciales de Meta Ads IA guardadas')
+      fetchKeys()
+    } catch (error: any) {
+      toast.error(error.message || 'Error al guardar')
+    } finally {
+      setIsSavingMeta(false)
     }
   }
 
@@ -469,6 +520,52 @@ export default function SettingsPage() {
           </div>
           <a
             href="https://fal.ai/dashboard/keys"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-xs text-accent hover:text-accent-hover transition-colors"
+          >
+            Obtener API Key <ExternalLink className="w-3 h-3" />
+          </a>
+        </CardContent>
+      </Card>
+
+      {/* WaveSpeed API Key */}
+      <Card className="mb-4">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <div className="p-2 rounded-lg bg-gradient-to-br from-cyan-500 to-teal-500 text-white">
+              <Zap className="w-4 h-4" />
+            </div>
+            WaveSpeed AI (Backup de video e imagen)
+            {wavespeedKey.hasKey && (
+              <span className="flex items-center gap-1 text-xs text-success ml-auto">
+                <Check className="w-3 h-3" />
+                Configurada
+              </span>
+            )}
+          </CardTitle>
+          <CardDescription>
+            Para: Backup automatico si KIE falla — Veo 3.1, Kling 3, Sora 2, Seedance, FLUX
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex gap-2">
+            <Input
+              type="password"
+              placeholder="Tu WaveSpeed API Key"
+              value={wavespeedKey.value}
+              onChange={(e) => setWavespeedKey(prev => ({ ...prev, value: e.target.value }))}
+              className="flex-1"
+            />
+            <Button
+              onClick={() => handleSaveKey('wavespeed')}
+              isLoading={wavespeedKey.isSaving}
+            >
+              Guardar
+            </Button>
+          </div>
+          <a
+            href="https://wavespeed.ai/dashboard"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1 text-xs text-accent hover:text-accent-hover transition-colors"
@@ -800,6 +897,65 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
+      {/* Meta Ads IA */}
+      <div className="mt-8 mb-4">
+        <h2 className="text-lg font-semibold text-text-primary mb-4 flex items-center gap-2">
+          <Sparkles className="w-5 h-5 text-accent" />
+          Meta Ads IA
+        </h2>
+      </div>
+
+      <Card className="mb-4">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <div className="p-2 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 text-white">
+              <Sparkles className="w-4 h-4" />
+            </div>
+            Meta Ads + Claude IA
+            {hasMetaAds && (
+              <span className="flex items-center gap-1 text-xs text-success ml-auto">
+                <Check className="w-3 h-3" />
+                Configurado
+              </span>
+            )}
+          </CardTitle>
+          <CardDescription>
+            Gestiona tus campañas de Meta Ads con inteligencia artificial conversacional
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-text-secondary mb-1">Meta Access Token *</label>
+            <Input
+              type="password"
+              placeholder="Tu token de acceso de Meta"
+              value={metaAccessToken.value}
+              onChange={(e) => setMetaAccessToken(prev => ({ ...prev, value: e.target.value }))}
+            />
+            <p className="text-xs text-text-muted mt-1">
+              Genéralo en developers.facebook.com → Tu App → Graph API Explorer
+            </p>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-text-secondary mb-1">Anthropic API Key (Claude) *</label>
+            <Input
+              type="password"
+              placeholder="sk-ant-..."
+              value={anthropicApiKey.value}
+              onChange={(e) => setAnthropicApiKey(prev => ({ ...prev, value: e.target.value }))}
+            />
+            <p className="text-xs text-text-muted mt-1">
+              Consíguela en console.anthropic.com → API Keys
+            </p>
+          </div>
+          <div className="flex gap-2 pt-2">
+            <Button onClick={handleSaveMetaAds} isLoading={isSavingMeta} className="flex-1">
+              Guardar Meta Ads IA
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Info Card */}
       <Card className="mt-6" variant="glass">
         <CardContent className="pt-6">
@@ -821,6 +977,10 @@ export default function SettingsPage() {
               <span><strong>Seedream</strong> - Ideal para editar y combinar imágenes</span>
             </li>
             <li className="flex items-start gap-2">
+              <span className="text-teal-500">•</span>
+              <span><strong>WaveSpeed</strong> - Backup de video e imagen si KIE falla</span>
+            </li>
+            <li className="flex items-start gap-2">
               <span className="text-violet-500">•</span>
               <span><strong>ElevenLabs</strong> - Voces ultra realistas para tus videos</span>
             </li>
@@ -835,6 +995,10 @@ export default function SettingsPage() {
             <li className="flex items-start gap-2">
               <span className="text-indigo-500">•</span>
               <span><strong>Publer</strong> - Publica en 13 redes sociales directamente</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-purple-500">•</span>
+              <span><strong>Meta Ads IA</strong> - Gestiona campañas de Meta Ads con Claude IA</span>
             </li>
           </ul>
         </CardContent>

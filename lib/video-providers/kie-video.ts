@@ -9,6 +9,7 @@ import {
   getVideoApiModelId,
 } from './types'
 import { generateVideoViaFal } from './fal-video'
+import { generateVideoViaWavespeed } from './wavespeed-video'
 import { logAI } from '../services/ai-monitor'
 
 const KIE_API_BASE = 'https://api.kie.ai/api/v1'
@@ -57,7 +58,8 @@ export async function generateVideo(
   request: GenerateVideoRequest,
   apiKey: string,
   falApiKey?: string,
-  forceFal?: boolean
+  forceFal?: boolean,
+  wavespeedApiKey?: string
 ): Promise<GenerateVideoResult> {
   const t0 = Date.now()
   try {
@@ -91,28 +93,33 @@ export async function generateVideo(
       }
     }
 
-    // Sora 2: fal.ai FIRST, KIE as backup (KIE accepts tasks but fails during polling)
-    if (request.modelId === 'sora-2' && falApiKey) {
-      const falConfig = modelConfig.fal
-      const falPath = falConfig ? (hasImage ? (falConfig.i2v || falConfig.t2v) : falConfig.t2v) : modelConfig.falModelId
-      if (falPath) {
-        console.log(`[Video/Sora2] Trying fal.ai FIRST: ${falPath}`)
-        const t0Fal = Date.now()
-        const falResult = await generateVideoViaFal(falApiKey, falPath, {
+    // Sora 2: WaveSpeed FIRST (async submission, fast), then KIE, then fal.ai last
+    // NEVER try fal.ai first — it polls internally for up to 120s, causing Vercel 504 timeout
+    if (request.modelId === 'sora-2' && wavespeedApiKey && modelConfig.wavespeed) {
+      const wsConfig = modelConfig.wavespeed
+      const wsPath = hasImage ? (wsConfig.i2v || wsConfig.t2v) : wsConfig.t2v
+      if (wsPath) {
+        console.log(`[Video/Sora2] Trying WaveSpeed FIRST: ${wsPath}`)
+        const t0Ws = Date.now()
+        const wsResult = await generateVideoViaWavespeed(wavespeedApiKey, {
           prompt: request.prompt,
+          t2vPath: wsConfig.t2v!,
+          i2vPath: wsConfig.i2v,
           imageUrl: hasImage ? request.imageUrls?.[0] : undefined,
           aspectRatio: request.aspectRatio,
           duration: request.duration,
-          timeoutMs: 120000,
+          resolution: request.resolution,
+          generateAudio: request.enableAudio,
+          timeoutMs: 30000,
         })
-        if (falResult.success) {
-          logAI({ service: 'video', provider: 'fal', status: 'success', response_ms: Date.now() - t0Fal, model: falPath })
-          return falResult
+        if (wsResult.success) {
+          logAI({ service: 'video', provider: 'wavespeed', status: 'success', response_ms: Date.now() - t0Ws, model: wsPath })
+          return wsResult
         }
-        console.warn(`[Video/Sora2] fal.ai failed (${falResult.error}), falling back to KIE`)
-        logAI({ service: 'video', provider: 'fal', status: 'error', response_ms: Date.now() - t0Fal, model: falPath, error_message: falResult.error })
+        console.warn(`[Video/Sora2] WaveSpeed failed (${wsResult.error}), falling back to KIE`)
+        logAI({ service: 'video', provider: 'wavespeed', status: 'error', response_ms: Date.now() - t0Ws, model: wsPath, error_message: wsResult.error })
       }
-      // Fall through to standard KIE flow below
+      // Fall through to standard KIE flow below (KIE → fal.ai)
     }
 
     // Veo models use different endpoint, with fal.ai fallback
@@ -122,6 +129,34 @@ export async function generateVideo(
 
       if (veoResult.success) return veoResult
 
+      // WaveSpeed fallback for Veo (before fal.ai)
+      if (wavespeedApiKey && modelConfig.wavespeed) {
+        const wsConfig = modelConfig.wavespeed
+        const wsPath = hasImage ? (wsConfig.i2v || wsConfig.t2v) : wsConfig.t2v
+        if (wsPath) {
+          console.warn(`[Video/Veo] KIE failed (${veoResult.error}), trying WaveSpeed: ${wsPath}`)
+          const t0Ws = Date.now()
+          const wsResult = await generateVideoViaWavespeed(wavespeedApiKey, {
+            prompt: request.prompt,
+            t2vPath: wsConfig.t2v!,
+            i2vPath: wsConfig.i2v,
+            imageUrl: hasImage ? request.imageUrls?.[0] : undefined,
+            lastImageUrl: hasImage && request.imageUrls!.length > 1 ? request.imageUrls![1] : undefined,
+            aspectRatio: request.aspectRatio,
+            duration: request.duration,
+            resolution: request.resolution,
+            generateAudio: request.enableAudio,
+            timeoutMs: 120000,
+          })
+          if (wsResult.success) {
+            logAI({ service: 'video', provider: 'wavespeed', status: 'success', response_ms: Date.now() - t0Ws, model: wsPath, was_fallback: true })
+            return wsResult
+          }
+          logAI({ service: 'video', provider: 'wavespeed', status: 'error', response_ms: Date.now() - t0Ws, model: wsPath, error_message: wsResult.error, was_fallback: true })
+          console.warn(`[Video/Veo] WaveSpeed also failed: ${wsResult.error}`)
+        }
+      }
+
       // fal.ai fallback for Veo
       const falConfig = modelConfig.fal
       if (falApiKey && falConfig) {
@@ -129,7 +164,9 @@ export async function generateVideo(
         const hasLastFrame = hasImage && request.imageUrls!.length > 1
         const falPath = hasImage ? (falConfig.i2v || falConfig.t2v) : falConfig.t2v
         if (falPath) {
-          console.warn(`[Video/Veo] KIE failed (${veoResult.error}), trying fal.ai: ${falPath}`)
+          const elapsedMs = Date.now() - t0
+          const falTimeout = Math.min(Math.max(110000 - elapsedMs, 20000), 100000)
+          console.warn(`[Video/Veo] KIE failed (${veoResult.error}), trying fal.ai: ${falPath} (timeout=${Math.round(falTimeout/1000)}s)`)
           const t0Fal = Date.now()
           const falResult = await generateVideoViaFal(falApiKey, falPath, {
             prompt: request.prompt,
@@ -137,7 +174,7 @@ export async function generateVideo(
             lastImageUrl: hasLastFrame ? request.imageUrls?.[1] : undefined,
             aspectRatio: request.aspectRatio,
             duration: request.duration,
-            timeoutMs: 120000,
+            timeoutMs: falTimeout,
           })
           if (falResult.success) {
             logAI({ service: 'video', provider: 'fal', status: 'success', response_ms: Date.now() - t0Fal, model: falPath, was_fallback: true })
@@ -161,6 +198,33 @@ export async function generateVideo(
 
     logAI({ service: 'video', provider: 'kie', status: 'error', response_ms: Date.now() - t0, model: request.modelId, error_message: kieResult.error })
 
+    // WaveSpeed fallback: try before fal.ai (more reliable, similar models)
+    if (wavespeedApiKey && modelConfig.wavespeed) {
+      const wsConfig = modelConfig.wavespeed
+      const wsPath = hasImage ? (wsConfig.i2v || wsConfig.t2v) : wsConfig.t2v
+      if (wsPath) {
+        console.warn(`[Video] KIE failed (${kieResult.error}), trying WaveSpeed: ${wsPath}`)
+        const t0Ws = Date.now()
+        const wsResult = await generateVideoViaWavespeed(wavespeedApiKey, {
+          prompt: request.prompt,
+          t2vPath: wsConfig.t2v!,
+          i2vPath: wsConfig.i2v,
+          imageUrl: hasImage ? request.imageUrls?.[0] : undefined,
+          aspectRatio: request.aspectRatio,
+          duration: request.duration,
+          resolution: request.resolution,
+          generateAudio: request.enableAudio,
+          timeoutMs: 120000,
+        })
+        if (wsResult.success) {
+          logAI({ service: 'video', provider: 'wavespeed', status: 'success', response_ms: Date.now() - t0Ws, model: wsPath, was_fallback: true })
+          return wsResult
+        }
+        logAI({ service: 'video', provider: 'wavespeed', status: 'error', response_ms: Date.now() - t0Ws, model: wsPath, error_message: wsResult.error, was_fallback: true })
+        console.warn(`[Video] WaveSpeed also failed: ${wsResult.error}`)
+      }
+    }
+
     // fal.ai fallback: mode-aware — pick T2V or I2V path from model config
     const falConfig = modelConfig.fal
     if (falApiKey && (falConfig || modelConfig.falModelId)) {
@@ -177,14 +241,17 @@ export async function generateVideo(
       }
 
       if (falPath) {
-        console.warn(`[Video] KIE failed (${kieResult.error}), trying fal.ai fallback: ${falPath} (hasImage=${hasImage})`)
+        // Dynamic timeout: use remaining time minus 5s safety margin, max 100s
+        const elapsedMs = Date.now() - t0
+        const falTimeout = Math.min(Math.max(110000 - elapsedMs, 20000), 100000)
+        console.warn(`[Video] KIE failed (${kieResult.error}), trying fal.ai fallback: ${falPath} (hasImage=${hasImage}, timeout=${Math.round(falTimeout/1000)}s)`)
         const t0Fal = Date.now()
         const falResult = await generateVideoViaFal(falApiKey, falPath, {
           prompt: request.prompt,
           imageUrl: hasImage ? request.imageUrls?.[0] : undefined,
           aspectRatio: request.aspectRatio,
           duration: request.duration,
-          timeoutMs: 100000,
+          timeoutMs: falTimeout,
         })
         if (falResult.success) {
           logAI({ service: 'video', provider: 'fal', status: 'success', response_ms: Date.now() - t0Fal, model: falPath, was_fallback: true })

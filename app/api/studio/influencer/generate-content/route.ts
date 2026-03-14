@@ -100,16 +100,17 @@ export async function POST(request: Request) {
     // Get API keys
     const { data: profile } = await supabase
       .from('profiles')
-      .select('google_api_key, openai_api_key, kie_api_key, bfl_api_key, fal_api_key')
+      .select('google_api_key, openai_api_key, kie_api_key, bfl_api_key, fal_api_key, wavespeed_api_key')
       .eq('id', user.id)
       .single()
 
-    const apiKeys: { gemini?: string; openai?: string; kie?: string; bfl?: string; fal?: string } = {}
+    const apiKeys: { gemini?: string; openai?: string; kie?: string; bfl?: string; fal?: string; wavespeed?: string } = {}
     if (profile?.google_api_key) apiKeys.gemini = decrypt(profile.google_api_key)
     if (profile?.openai_api_key) apiKeys.openai = decrypt(profile.openai_api_key)
     if (profile?.kie_api_key) apiKeys.kie = decrypt(profile.kie_api_key)
     if (profile?.bfl_api_key) apiKeys.bfl = decrypt(profile.bfl_api_key)
     if (profile?.fal_api_key) apiKeys.fal = decrypt(profile.fal_api_key)
+    if (profile?.wavespeed_api_key) apiKeys.wavespeed = decrypt(profile.wavespeed_api_key)
 
     // Environment variable fallbacks (platform keys)
     if (!apiKeys.openai && process.env.OPENAI_API_KEY) apiKeys.openai = process.env.OPENAI_API_KEY
@@ -117,6 +118,7 @@ export async function POST(request: Request) {
     if (!apiKeys.bfl && process.env.BFL_API_KEY) apiKeys.bfl = process.env.BFL_API_KEY
     if (!apiKeys.fal && process.env.FAL_API_KEY) apiKeys.fal = process.env.FAL_API_KEY
     if (!apiKeys.gemini && process.env.GEMINI_API_KEY) apiKeys.gemini = process.env.GEMINI_API_KEY
+    if (!apiKeys.wavespeed && process.env.WAVESPEED_API_KEY) apiKeys.wavespeed = process.env.WAVESPEED_API_KEY
 
     const selectedProvider = modelIdToProviderType(modelId)
 

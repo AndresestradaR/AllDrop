@@ -48,6 +48,12 @@ export interface VideoModelConfig {
   noResolutionParam?: boolean // True if model doesn't accept resolution parameter
   useVeoEndpoint?: boolean // Special endpoint for Veo models
   falModelId?: string // fal.ai model path (legacy single path fallback)
+  // WaveSpeed cascade — fallback between KIE and fal.ai
+  wavespeed?: {
+    t2v?: string    // WaveSpeed path for text-to-video
+    i2v?: string    // WaveSpeed path for image-to-video
+    extend?: string // WaveSpeed path for video extend
+  }
   // fal.ai cascade — mode-aware fallback paths
   fal?: {
     t2v?: string    // fal.ai path for text-to-video
@@ -87,6 +93,7 @@ export const VIDEO_MODELS: Record<VideoModelId, VideoModelConfig> = {
     supportsMultiShots: false,
     useVeoEndpoint: true,
     supportsExtend: true,
+    wavespeed: { t2v: 'google/veo3.1/text-to-video', i2v: 'google/veo3.1/image-to-video', extend: 'google/veo3.1/video-extend' },
     fal: { t2v: 'fal-ai/veo3.1', i2v: 'fal-ai/veo3.1/first-last-frame-to-video' },
     tags: ['PREMIUM', 'AUDIO', 'REFERENCES'],
     recommended: true,
@@ -108,6 +115,7 @@ export const VIDEO_MODELS: Record<VideoModelId, VideoModelConfig> = {
     supportsMultiShots: false,
     useVeoEndpoint: true,
     supportsExtend: true,
+    wavespeed: { t2v: 'google/veo3.1-fast/text-to-video', i2v: 'google/veo3.1-fast/image-to-video', extend: 'google/veo3.1-fast/video-extend' },
     fal: { t2v: 'fal-ai/veo3.1/fast', i2v: 'fal-ai/veo3.1/image-to-video' },
     tags: ['FAST', 'AUDIO', 'RECOMENDADO'],
     recommended: true,
@@ -130,6 +138,7 @@ export const VIDEO_MODELS: Record<VideoModelId, VideoModelConfig> = {
     supportsReferences: true,
     supportsStartEndFrames: true,
     supportsMultiShots: true,
+    wavespeed: { t2v: 'kwaivgi/kling-v3.0-pro/text-to-video', i2v: 'kwaivgi/kling-v3.0-pro/image-to-video' },
     fal: { i2v: 'fal-ai/kling-video/v3/pro/image-to-video' },
     tags: ['NEW', 'PREMIUM', 'AUDIO', 'REFERENCES', 'MULTI_SHOTS'],
     recommended: true,
@@ -191,6 +200,7 @@ export const VIDEO_MODELS: Record<VideoModelId, VideoModelConfig> = {
     supportsReferences: false,
     supportsStartEndFrames: true,
     supportsMultiShots: false,
+    wavespeed: { t2v: 'openai/sora-2/text-to-video', i2v: 'openai/sora-2/image-to-video' },
     fal: { t2v: 'fal-ai/sora-2/text-to-video', i2v: 'fal-ai/sora-2/image-to-video', v2v: 'fal-ai/sora-2/video-to-video/remix' },
     tags: ['AUDIO', 'RECOMENDADO'],
     recommended: true,
@@ -254,6 +264,7 @@ export const VIDEO_MODELS: Record<VideoModelId, VideoModelConfig> = {
     supportsReferences: true,
     supportsStartEndFrames: true,
     supportsMultiShots: true,
+    wavespeed: { t2v: 'bytedance/seedance-2/text-to-video', i2v: 'bytedance/seedance-2/image-to-video' },
     tags: ['NEW', 'PREMIUM', 'AUDIO', 'REFERENCES', 'MULTI_SHOTS'],
     recommended: true,
   },
@@ -272,6 +283,7 @@ export const VIDEO_MODELS: Record<VideoModelId, VideoModelConfig> = {
     supportsReferences: false,
     supportsStartEndFrames: true,
     supportsMultiShots: true,
+    wavespeed: { t2v: 'bytedance/seedance-v1.5-pro/text-to-video', i2v: 'bytedance/seedance-v1.5-pro/image-to-video' },
     fal: { t2v: 'fal-ai/bytedance/seedance/v1.5/pro/text-to-video' },
     tags: ['AUDIO', 'MULTI_SHOTS'],
   },
@@ -313,6 +325,7 @@ export const VIDEO_MODELS: Record<VideoModelId, VideoModelConfig> = {
     supportsReferences: false,
     supportsStartEndFrames: true,
     supportsMultiShots: true,
+    wavespeed: { t2v: 'alibaba/wan-2.6/text-to-video', i2v: 'alibaba/wan-2.6/image-to-video' },
     tags: ['NEW', 'AUDIO', 'MULTI_SHOTS'],
   },
   'wan-2.5': {

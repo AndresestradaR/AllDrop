@@ -3,6 +3,7 @@ import { getAuthContext } from '@/lib/auth/cron-auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { decrypt } from '@/lib/services/encryption'
 import { tryUploadUrlToR2 } from '@/lib/services/r2-upload'
+import { checkWavespeedVideoStatus } from '@/lib/video-providers/wavespeed-video'
 
 const KIE_API_BASE = 'https://api.kie.ai/api/v1'
 
@@ -170,18 +171,39 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'taskId es requerido' }, { status: 400 })
     }
 
+    // WaveSpeed tasks have 'ws_' prefix — use WaveSpeed polling
+    const isWavespeedTask = taskId.startsWith('ws_')
+
     const { data: profile } = await supabase
       .from('profiles')
-      .select('kie_api_key')
+      .select('kie_api_key, wavespeed_api_key')
       .eq('id', userId)
       .single()
 
-    if (!profile?.kie_api_key) {
-      return NextResponse.json({ error: 'API key no configurada' }, { status: 400 })
-    }
+    let result: { status: 'processing' | 'completed' | 'failed'; videoUrl?: string; audioUrl?: string; error?: string; taskState?: string }
 
-    const kieApiKey = decrypt(profile.kie_api_key)
-    const result = await checkStatus(taskId, kieApiKey)
+    if (isWavespeedTask) {
+      // WaveSpeed task: use WaveSpeed API for polling
+      const wsKey = profile?.wavespeed_api_key ? decrypt(profile.wavespeed_api_key) : process.env.WAVESPEED_API_KEY
+      if (!wsKey) {
+        return NextResponse.json({ error: 'WaveSpeed API key no configurada' }, { status: 400 })
+      }
+      const wsResult = await checkWavespeedVideoStatus(taskId, wsKey)
+      if (wsResult.status === 'completed' && wsResult.videoUrl) {
+        result = { status: 'completed', videoUrl: wsResult.videoUrl }
+      } else if (!wsResult.success && wsResult.error) {
+        result = { status: 'failed', error: wsResult.error }
+      } else {
+        result = { status: 'processing', taskState: 'wavespeed-processing' }
+      }
+    } else {
+      // KIE task: use KIE API for polling
+      if (!profile?.kie_api_key) {
+        return NextResponse.json({ error: 'API key no configurada' }, { status: 400 })
+      }
+      const kieApiKey = decrypt(profile.kie_api_key)
+      result = await checkStatus(taskId, kieApiKey)
+    }
 
     if (result.status === 'processing') {
       return NextResponse.json({
