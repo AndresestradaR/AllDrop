@@ -178,6 +178,37 @@ export class MetaAPIClient {
     return this.request('/search', params)
   }
 
+  async getPages(): Promise<MetaAPIResponse> {
+    return this.request('/me/accounts', {
+      fields: 'id,name,category,fan_count,picture{url},instagram_business_account{id,username,profile_picture_url,followers_count}',
+      limit: 50,
+    })
+  }
+
+  async getInstagramAccounts(input: {
+    page_id: string
+  }): Promise<MetaAPIResponse> {
+    return this.request(`/${input.page_id}`, {
+      fields: 'instagram_business_account{id,username,name,profile_picture_url,followers_count,media_count}',
+    })
+  }
+
+  async getPhoneNumbers(input: {
+    business_id?: string
+  }): Promise<MetaAPIResponse> {
+    // Try to get WhatsApp Business accounts
+    if (input.business_id) {
+      return this.request(`/${input.business_id}/phone_numbers`, {
+        fields: 'id,display_phone_number,verified_name,quality_rating',
+      })
+    }
+    // Fallback: get from user's WABA (WhatsApp Business Accounts)
+    return this.request('/me/whatsapp_business_accounts', {
+      fields: 'id,name,phone_numbers{id,display_phone_number,verified_name,quality_rating}',
+      limit: 20,
+    })
+  }
+
   // ==================== WRITE ====================
 
   async createCampaign(input: {
@@ -301,6 +332,9 @@ export class MetaAPIClient {
       case 'get_insights': return this.getInsights(toolInput as any)
       case 'get_ad_creative': return this.getAdCreative(toolInput as any)
       case 'search_targeting': return this.searchTargeting(toolInput as any)
+      case 'get_pages': return this.getPages()
+      case 'get_instagram_accounts': return this.getInstagramAccounts(toolInput as any)
+      case 'get_phone_numbers': return this.getPhoneNumbers(toolInput as any)
       case 'create_campaign': return this.createCampaign(toolInput as any)
       case 'create_adset': return this.createAdset(toolInput as any)
       case 'create_ad': return this.createAd(toolInput as any)

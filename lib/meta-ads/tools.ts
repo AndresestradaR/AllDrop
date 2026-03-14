@@ -114,6 +114,39 @@ export const META_ADS_TOOLS = [
     },
   },
 
+  // ==================== META ACCOUNT TOOLS ====================
+  {
+    name: 'get_pages',
+    description: 'Lista las páginas de Facebook del usuario. Necesario para saber qué página asociar a campañas y anuncios.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: 'get_instagram_accounts',
+    description: 'Lista las cuentas de Instagram conectadas a las páginas de Facebook del usuario.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        page_id: { type: 'string', description: 'ID de la página de Facebook para buscar su Instagram conectado' },
+      },
+      required: ['page_id'],
+    },
+  },
+  {
+    name: 'get_phone_numbers',
+    description: 'Lista los números de teléfono de WhatsApp Business asociados a la cuenta del usuario. Útil para campañas de WhatsApp.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        business_id: { type: 'string', description: 'ID del negocio (Business Manager). Si no se proporciona, se buscan en las cuentas de WhatsApp Business del usuario.' },
+      },
+      required: [],
+    },
+  },
+
   // ==================== INTERNAL TOOLS (EstrategasIA ecosystem) ====================
   {
     name: 'get_my_products',

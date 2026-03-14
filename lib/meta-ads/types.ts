@@ -156,6 +156,9 @@ export const READ_ONLY_TOOLS = [
   'get_ad_creative',
   'search_targeting',
   'get_my_products',
+  'get_pages',
+  'get_instagram_accounts',
+  'get_phone_numbers',
 ] as const
 
 export const WRITE_TOOLS = [
