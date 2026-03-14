@@ -109,7 +109,7 @@ export async function POST(request: Request) {
     // Get API keys from profile
     const { data: profile } = await supabase
       .from('profiles')
-      .select('google_api_key, openai_api_key, kie_api_key, bfl_api_key, fal_api_key')
+      .select('google_api_key, openai_api_key, kie_api_key, bfl_api_key, fal_api_key, wavespeed_api_key')
       .eq('id', user.id)
       .single()
 
@@ -120,6 +120,7 @@ export async function POST(request: Request) {
       kie?: string
       bfl?: string
       fal?: string
+      wavespeed?: string
     } = {}
 
     if (profile?.google_api_key) {
@@ -137,6 +138,9 @@ export async function POST(request: Request) {
     if (profile?.fal_api_key) {
       apiKeys.fal = decrypt(profile.fal_api_key)
     }
+    if (profile?.wavespeed_api_key) {
+      apiKeys.wavespeed = decrypt(profile.wavespeed_api_key)
+    }
 
     // Environment variable fallbacks (platform keys)
     if (!apiKeys.openai && process.env.OPENAI_API_KEY) {
@@ -150,6 +154,12 @@ export async function POST(request: Request) {
     }
     if (!apiKeys.fal && process.env.FAL_API_KEY) {
       apiKeys.fal = process.env.FAL_API_KEY
+    }
+    if (profile?.wavespeed_api_key) {
+      apiKeys.wavespeed = decrypt(profile.wavespeed_api_key)
+    }
+    if (!apiKeys.wavespeed && process.env.WAVESPEED_API_KEY) {
+      apiKeys.wavespeed = process.env.WAVESPEED_API_KEY
     }
     if (!apiKeys.gemini && process.env.GEMINI_API_KEY) {
       apiKeys.gemini = process.env.GEMINI_API_KEY

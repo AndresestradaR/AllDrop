@@ -240,7 +240,7 @@ export async function POST(request: Request) {
     // Get API keys
     const { data: profile } = await supabase
       .from('profiles')
-      .select('google_api_key, kie_api_key, fal_api_key')
+      .select('google_api_key, kie_api_key, fal_api_key, wavespeed_api_key')
       .eq('id', user.id)
       .single()
 
@@ -250,6 +250,7 @@ export async function POST(request: Request) {
 
     const kieApiKey = decrypt(profile.kie_api_key)
     const falApiKey = profile?.fal_api_key ? decrypt(profile.fal_api_key) : undefined
+    const wavespeedApiKey = profile?.wavespeed_api_key ? decrypt(profile.wavespeed_api_key) : (process.env.WAVESPEED_API_KEY || undefined)
 
     // Get AI text keys for prompt optimization cascade (KIE→OAI→Google)
     const aiKeys = await getAIKeys(supabase, user.id)
@@ -406,7 +407,7 @@ Generate an optimized video prompt.`
     console.log(`[ExecuteNow] Params:`, JSON.stringify({ ...generationParams, prompt: generationParams.prompt?.substring(0, 80) + '...' }))
     timing('Calling generateVideo')
 
-    const result = await generateVideo(generationParams, kieApiKey, falApiKey)
+    const result = await generateVideo(generationParams, kieApiKey, falApiKey, undefined, wavespeedApiKey)
 
     timing('generateVideo returned')
     console.log(`[ExecuteNow] Result:`, JSON.stringify(result))

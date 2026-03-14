@@ -103,7 +103,7 @@ export async function POST(request: Request) {
     // Get user's API keys
     const { data: profile } = await supabase
       .from('profiles')
-      .select('google_api_key, kie_api_key, openai_api_key, bfl_api_key, fal_api_key')
+      .select('google_api_key, kie_api_key, openai_api_key, bfl_api_key, fal_api_key, wavespeed_api_key')
       .eq('id', user.id)
       .single()
 
@@ -114,6 +114,7 @@ export async function POST(request: Request) {
     // Video keys — BYOK first, then platform env var fallbacks
     const kieApiKey = profile?.kie_api_key ? decrypt(profile.kie_api_key) : (process.env.KIE_API_KEY || '')
     const falApiKey = profile?.fal_api_key ? decrypt(profile.fal_api_key) : (process.env.FAL_API_KEY || undefined)
+    const wavespeedApiKey = profile?.wavespeed_api_key ? decrypt(profile.wavespeed_api_key) : (process.env.WAVESPEED_API_KEY || undefined)
 
     if (!kieApiKey && !falApiKey) {
       return NextResponse.json({
@@ -122,7 +123,7 @@ export async function POST(request: Request) {
     }
 
     // Image generation keys — BYOK first, then platform env var fallbacks
-    const imageApiKeys: { gemini?: string; openai?: string; kie?: string; bfl?: string; fal?: string } = {}
+    const imageApiKeys: { gemini?: string; openai?: string; kie?: string; bfl?: string; fal?: string; wavespeed?: string } = {}
     if (profile?.google_api_key) imageApiKeys.gemini = decrypt(profile.google_api_key)
     else if (process.env.GEMINI_API_KEY) imageApiKeys.gemini = process.env.GEMINI_API_KEY
     if (profile?.openai_api_key) imageApiKeys.openai = decrypt(profile.openai_api_key)
@@ -132,6 +133,8 @@ export async function POST(request: Request) {
     else if (process.env.BFL_API_KEY) imageApiKeys.bfl = process.env.BFL_API_KEY
     if (falApiKey) imageApiKeys.fal = falApiKey
     else if (process.env.FAL_API_KEY) imageApiKeys.fal = process.env.FAL_API_KEY
+    if (wavespeedApiKey) imageApiKeys.wavespeed = wavespeedApiKey
+    else if (process.env.WAVESPEED_API_KEY) imageApiKeys.wavespeed = process.env.WAVESPEED_API_KEY
 
     console.log(`[ResenaUGC] Starting - User: ${user.id.substring(0, 8)}...`)
     console.log(`[ResenaUGC] Product: ${productName}, Model: ${videoModel}, Duration: ${duration}s`)
@@ -333,7 +336,9 @@ The person should be speaking the dialog naturally, with appropriate facial expr
         imageUrls: [faceImageUrl],
       },
       kieApiKey,
-      falApiKey
+      falApiKey,
+      undefined,
+      wavespeedApiKey
     )
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)

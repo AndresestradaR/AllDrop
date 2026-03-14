@@ -9,6 +9,7 @@ import {
   getVideoApiModelId,
 } from './types'
 import { generateVideoViaFal } from './fal-video'
+import { generateVideoViaWavespeed } from './wavespeed-video'
 import { logAI } from '../services/ai-monitor'
 
 const KIE_API_BASE = 'https://api.kie.ai/api/v1'
@@ -57,7 +58,8 @@ export async function generateVideo(
   request: GenerateVideoRequest,
   apiKey: string,
   falApiKey?: string,
-  forceFal?: boolean
+  forceFal?: boolean,
+  wavespeedApiKey?: string
 ): Promise<GenerateVideoResult> {
   const t0 = Date.now()
   try {
@@ -122,6 +124,34 @@ export async function generateVideo(
 
       if (veoResult.success) return veoResult
 
+      // WaveSpeed fallback for Veo (before fal.ai)
+      if (wavespeedApiKey && modelConfig.wavespeed) {
+        const wsConfig = modelConfig.wavespeed
+        const wsPath = hasImage ? (wsConfig.i2v || wsConfig.t2v) : wsConfig.t2v
+        if (wsPath) {
+          console.warn(`[Video/Veo] KIE failed (${veoResult.error}), trying WaveSpeed: ${wsPath}`)
+          const t0Ws = Date.now()
+          const wsResult = await generateVideoViaWavespeed(wavespeedApiKey, {
+            prompt: request.prompt,
+            t2vPath: wsConfig.t2v!,
+            i2vPath: wsConfig.i2v,
+            imageUrl: hasImage ? request.imageUrls?.[0] : undefined,
+            lastImageUrl: hasImage && request.imageUrls!.length > 1 ? request.imageUrls![1] : undefined,
+            aspectRatio: request.aspectRatio,
+            duration: request.duration,
+            resolution: request.resolution,
+            generateAudio: request.enableAudio,
+            timeoutMs: 120000,
+          })
+          if (wsResult.success) {
+            logAI({ service: 'video', provider: 'wavespeed', status: 'success', response_ms: Date.now() - t0Ws, model: wsPath, was_fallback: true })
+            return wsResult
+          }
+          logAI({ service: 'video', provider: 'wavespeed', status: 'error', response_ms: Date.now() - t0Ws, model: wsPath, error_message: wsResult.error, was_fallback: true })
+          console.warn(`[Video/Veo] WaveSpeed also failed: ${wsResult.error}`)
+        }
+      }
+
       // fal.ai fallback for Veo
       const falConfig = modelConfig.fal
       if (falApiKey && falConfig) {
@@ -160,6 +190,33 @@ export async function generateVideo(
     }
 
     logAI({ service: 'video', provider: 'kie', status: 'error', response_ms: Date.now() - t0, model: request.modelId, error_message: kieResult.error })
+
+    // WaveSpeed fallback: try before fal.ai (more reliable, similar models)
+    if (wavespeedApiKey && modelConfig.wavespeed) {
+      const wsConfig = modelConfig.wavespeed
+      const wsPath = hasImage ? (wsConfig.i2v || wsConfig.t2v) : wsConfig.t2v
+      if (wsPath) {
+        console.warn(`[Video] KIE failed (${kieResult.error}), trying WaveSpeed: ${wsPath}`)
+        const t0Ws = Date.now()
+        const wsResult = await generateVideoViaWavespeed(wavespeedApiKey, {
+          prompt: request.prompt,
+          t2vPath: wsConfig.t2v!,
+          i2vPath: wsConfig.i2v,
+          imageUrl: hasImage ? request.imageUrls?.[0] : undefined,
+          aspectRatio: request.aspectRatio,
+          duration: request.duration,
+          resolution: request.resolution,
+          generateAudio: request.enableAudio,
+          timeoutMs: 120000,
+        })
+        if (wsResult.success) {
+          logAI({ service: 'video', provider: 'wavespeed', status: 'success', response_ms: Date.now() - t0Ws, model: wsPath, was_fallback: true })
+          return wsResult
+        }
+        logAI({ service: 'video', provider: 'wavespeed', status: 'error', response_ms: Date.now() - t0Ws, model: wsPath, error_message: wsResult.error, was_fallback: true })
+        console.warn(`[Video] WaveSpeed also failed: ${wsResult.error}`)
+      }
+    }
 
     // fal.ai fallback: mode-aware — pick T2V or I2V path from model config
     const falConfig = modelConfig.fal

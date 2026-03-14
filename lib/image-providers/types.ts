@@ -52,6 +52,10 @@ export interface ImageModelConfig {
       i2i?: string    // KIE model ID for image-to-image (undefined = no I2I on KIE)
       mode: 'nano-banana' | 'seedream' | 'gpt-image'  // controls how images are passed
     }
+    wavespeed?: {
+      t2i: string     // WaveSpeed model path for T2I (e.g. 'google/nano-banana-2/text-to-image')
+      i2i?: string    // WaveSpeed model path for I2I/edit (e.g. 'google/nano-banana-2/edit')
+    }
     fal: {
       t2i: string     // fal.ai full path for T2I
       i2i?: string    // fal.ai /edit path for I2I (REQUIRED for image input — T2I ignores images)
@@ -92,6 +96,7 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModelConfig> = {
     availableIn: 'both',
     cascade: {
       kie: { t2i: 'nano-banana-pro', i2i: 'nano-banana-pro', mode: 'nano-banana' },
+      wavespeed: { t2i: 'google/nano-banana-pro/text-to-image', i2i: 'google/nano-banana-pro/edit' },
       fal: { t2i: 'fal-ai/nano-banana-pro', i2i: 'fal-ai/nano-banana-pro/edit' },
       directApi: 'gemini',
       directModelId: 'gemini-3-pro-image-preview',
@@ -118,6 +123,7 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModelConfig> = {
     availableIn: 'both',
     cascade: {
       kie: { t2i: 'gpt-image/1.5-text-to-image', i2i: 'gpt-image/1.5-image-to-image', mode: 'gpt-image' },
+      wavespeed: { t2i: 'openai/gpt-image-1.5/text-to-image', i2i: 'openai/gpt-image-1.5/edit' },
       fal: { t2i: 'fal-ai/gpt-image-1.5', i2i: 'fal-ai/gpt-image-1.5/edit' },
       directApi: 'openai',
     },
@@ -143,6 +149,7 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModelConfig> = {
     apiModelId: 'flux-2-max',
     availableIn: 'studio',
     cascade: {
+      wavespeed: { t2i: 'wavespeed-ai/flux-2-max/text-to-image', i2i: 'wavespeed-ai/flux-2-max/edit' },
       fal: { t2i: 'fal-ai/flux-2-max', i2i: 'fal-ai/flux-2-max/edit' },
       directApi: 'bfl',
     },
@@ -163,6 +170,7 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModelConfig> = {
     availableIn: 'studio',
     cascade: {
       kie: { t2i: 'flux-2/pro-text-to-image', i2i: 'flux-2/pro-image-to-image', mode: 'nano-banana' },
+      wavespeed: { t2i: 'wavespeed-ai/flux-2-pro/text-to-image', i2i: 'wavespeed-ai/flux-2-pro/edit' },
       fal: { t2i: 'fal-ai/flux-2-pro', i2i: 'fal-ai/flux-2-pro/edit' },
       directApi: 'bfl',
     },
@@ -183,6 +191,7 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModelConfig> = {
     availableIn: 'studio',
     cascade: {
       kie: { t2i: 'flux-2/flex-text-to-image', i2i: 'flux-2/flex-image-to-image', mode: 'nano-banana' },
+      wavespeed: { t2i: 'wavespeed-ai/flux-2-flex/text-to-image', i2i: 'wavespeed-ai/flux-2-flex/edit' },
       fal: { t2i: 'fal-ai/flux-2-flex', i2i: 'fal-ai/flux-2-flex/edit' },
       directApi: 'bfl',
     },
@@ -209,6 +218,7 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModelConfig> = {
     availableIn: 'both',
     cascade: {
       kie: { t2i: 'nano-banana-2', i2i: 'nano-banana-2', mode: 'nano-banana' },
+      wavespeed: { t2i: 'google/nano-banana-2/text-to-image', i2i: 'google/nano-banana-2/edit' },
       fal: { t2i: 'fal-ai/nano-banana-2', i2i: 'fal-ai/nano-banana-2/edit' },
       directApi: 'gemini',
       directModelId: 'gemini-3.1-flash-image-preview',
@@ -231,6 +241,7 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModelConfig> = {
     availableIn: 'both',
     cascade: {
       kie: { t2i: 'seedream/5-lite-text-to-image', i2i: 'seedream/5-lite-image-to-image', mode: 'seedream' },
+      wavespeed: { t2i: 'bytedance/seedream-v5.0-lite/text-to-image', i2i: 'bytedance/seedream-v5.0-lite/edit' },
       fal: { t2i: 'fal-ai/bytedance/seedream/v5/lite/text-to-image', i2i: 'fal-ai/bytedance/seedream/v5/lite/edit' },
     },
   },
@@ -251,6 +262,7 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModelConfig> = {
     availableIn: 'studio',
     cascade: {
       kie: { t2i: 'seedream/5-lite-text-to-image', i2i: 'seedream/5-lite-image-to-image', mode: 'seedream' },
+      wavespeed: { t2i: 'bytedance/seedream-v5.0/text-to-image', i2i: 'bytedance/seedream-v5.0/edit' },
       fal: { t2i: 'fal-ai/seedream-3.0/pro', i2i: 'fal-ai/seedream-3.0/pro/edit' },
     },
   },
@@ -412,13 +424,14 @@ export function getApiKeyField(modelId: ImageModelId): string {
 /** Check if at least one API key exists for any step in the model's cascade */
 export function hasCascadeKey(
   modelId: ImageModelId,
-  keys: { gemini?: string; openai?: string; kie?: string; bfl?: string; fal?: string }
+  keys: { gemini?: string; openai?: string; kie?: string; bfl?: string; fal?: string; wavespeed?: string }
 ): boolean {
   const model = IMAGE_MODELS[modelId]
   const c = model.cascade
   if (!c) return false
   return !!(
     (c.kie && keys.kie) ||
+    (c.wavespeed && keys.wavespeed) ||
     (c.fal && keys.fal) ||
     (c.directApi === 'gemini' && keys.gemini) ||
     (c.directApi === 'openai' && keys.openai) ||

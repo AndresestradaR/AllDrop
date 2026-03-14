@@ -13,6 +13,7 @@ import { openaiProvider } from './openai'
 import { seedreamProvider } from './kie-seedream'
 import { fluxProvider } from './bfl-flux'
 import { generateViaFal, falImageToBase64 } from './fal'
+import { generateViaWavespeed } from './wavespeed'
 import { logAI } from '../services/ai-monitor'
 
 /**
@@ -150,6 +151,7 @@ export async function generateImage(
     kie?: string
     bfl?: string
     fal?: string
+    wavespeed?: string
   },
   options?: { maxTotalMs?: number }
 ): Promise<GenerateImageResult> {
@@ -167,8 +169,8 @@ export async function generateImage(
   const hasTime = (minMs: number = 8000) => remaining() > minMs
 
   console.log(`[Cascade] START model=${request.modelId}, hasImages=${hasImages}, budget=${Math.round(totalBudgetMs / 1000)}s`)
-  console.log(`[Cascade] keys: kie=${!!apiKeys.kie} fal=${!!apiKeys.fal} gemini=${!!apiKeys.gemini} openai=${!!apiKeys.openai} bfl=${!!apiKeys.bfl}`)
-  console.log(`[Cascade] config: kie=${!!cascade?.kie} fal=${!!cascade?.fal} directApi=${cascade?.directApi || 'none'}`)
+  console.log(`[Cascade] keys: kie=${!!apiKeys.kie} wavespeed=${!!apiKeys.wavespeed} fal=${!!apiKeys.fal} gemini=${!!apiKeys.gemini} openai=${!!apiKeys.openai} bfl=${!!apiKeys.bfl}`)
+  console.log(`[Cascade] config: kie=${!!cascade?.kie} wavespeed=${!!cascade?.wavespeed} fal=${!!cascade?.fal} directApi=${cascade?.directApi || 'none'}`)
 
   // ── Step 1: OpenAI direct FIRST (solo para modelos GPT Image) ──
   if (cascade?.directApi === 'openai' && apiKeys.openai && hasTime()) {
@@ -220,6 +222,54 @@ export async function generateImage(
       cascadeErrors.push(err.message || 'KIE fallo')
     }
     console.warn(`[Cascade] KIE ${kieModelId} failed (${Math.round((Date.now() - t0) / 1000)}s), ${Math.round(remaining() / 1000)}s left`)
+  }
+
+  // ── Step 2.5: WaveSpeed — fallback de KIE, antes de fal.ai ──
+  // WaveSpeed gets 50% of remaining budget, capped at 45s.
+  // Uses sync mode for images (blocks until complete, no polling needed).
+  if (cascade?.wavespeed && apiKeys.wavespeed && hasTime()) {
+    const wsPath = hasImages && cascade.wavespeed.i2i ? cascade.wavespeed.i2i : cascade.wavespeed.t2i
+    const wsBudget = Math.min(remaining() * 0.5, 45000)
+    const t0 = Date.now()
+
+    // Collect image URLs for WaveSpeed I2I
+    const wsImageUrls: string[] = []
+    if (hasImages) {
+      if (request.templateUrl?.startsWith('http')) wsImageUrls.push(request.templateUrl)
+      if (request.productImageUrls?.length) wsImageUrls.push(...request.productImageUrls)
+    }
+
+    console.log(`[Cascade] WaveSpeed ${wsPath} — budget: ${Math.round(wsBudget / 1000)}s, images: ${wsImageUrls.length}, remaining: ${Math.round(remaining() / 1000)}s`)
+
+    try {
+      const wsResult = await withTimeout(
+        generateViaWavespeed(apiKeys.wavespeed, {
+          prompt,
+          modelPath: cascade.wavespeed.t2i,
+          editPath: cascade.wavespeed.i2i,
+          imageUrls: wsImageUrls.length > 0 ? wsImageUrls : undefined,
+          aspectRatio: request.aspectRatio || '9:16',
+          resolution: '1k',
+          syncMode: true,
+          timeoutMs: wsBudget,
+        }),
+        wsBudget + 2000, // 2s grace
+        'WaveSpeed'
+      )
+
+      if (wsResult.success) {
+        logAI({ service: 'image', provider: 'wavespeed', status: 'success', response_ms: Date.now() - t0, model: wsPath, was_fallback: cascadeErrors.length > 0 })
+        console.log(`[Cascade] WaveSpeed succeeded (${Math.round((Date.now() - t0) / 1000)}s)${cascadeErrors.length > 0 ? ' — fallback' : ''}`)
+        return { ...wsResult, provider: request.provider, usedProvider: `wavespeed:${wsPath}` }
+      }
+
+      logAI({ service: 'image', provider: 'wavespeed', status: 'error', response_ms: Date.now() - t0, model: wsPath, error_message: wsResult.error, was_fallback: cascadeErrors.length > 0 })
+      cascadeErrors.push(wsResult.error || 'WaveSpeed fallo')
+    } catch (err: any) {
+      logAI({ service: 'image', provider: 'wavespeed', status: 'error', response_ms: Date.now() - t0, model: wsPath, error_message: err.message, was_fallback: cascadeErrors.length > 0 })
+      cascadeErrors.push(err.message || 'WaveSpeed fallo')
+    }
+    console.warn(`[Cascade] WaveSpeed ${wsPath} failed (${Math.round((Date.now() - t0) / 1000)}s), ${Math.round(remaining() / 1000)}s left`)
   }
 
   // ── Step 3: fal.ai — fallback de KIE ──
