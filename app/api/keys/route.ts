@@ -13,7 +13,7 @@ export async function GET() {
 
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('google_api_key, openai_api_key, kie_api_key, bfl_api_key, fal_api_key, elevenlabs_api_key, apify_api_key, browserless_api_key, cf_account_id, cf_access_key_id, cf_secret_access_key, cf_bucket_name, cf_public_url, publer_api_key, publer_workspace_id, meta_access_token, anthropic_api_key')
+      .select('google_api_key, openai_api_key, kie_api_key, bfl_api_key, fal_api_key, wavespeed_api_key, elevenlabs_api_key, apify_api_key, browserless_api_key, cf_account_id, cf_access_key_id, cf_secret_access_key, cf_bucket_name, cf_public_url, publer_api_key, publer_workspace_id, meta_access_token, anthropic_api_key')
       .eq('id', user.id)
       .single()
 
@@ -25,6 +25,7 @@ export async function GET() {
         hasKieApiKey: false,
         hasBflApiKey: false,
         hasFalApiKey: false,
+        hasWavespeedApiKey: false,
         hasElevenlabsApiKey: false,
         hasApifyApiKey: false,
         hasBrowserlessApiKey: false,
@@ -77,6 +78,9 @@ export async function GET() {
       // fal.ai
       maskedFalApiKey: safeMask(profile.fal_api_key),
       hasFalApiKey: !!profile.fal_api_key,
+      // WaveSpeed
+      maskedWavespeedApiKey: safeMask(profile.wavespeed_api_key),
+      hasWavespeedApiKey: !!profile.wavespeed_api_key,
       // ElevenLabs
       maskedElevenlabsApiKey: safeMask(profile.elevenlabs_api_key),
       hasElevenlabsApiKey: !!profile.elevenlabs_api_key,
@@ -122,7 +126,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { googleApiKey, openaiApiKey, kieApiKey, bflApiKey, falApiKey, elevenlabsApiKey, apifyApiKey, browserlessApiKey, cfAccountId, cfAccessKeyId, cfSecretAccessKey, cfBucketName, cfPublicUrl, publerApiKey, publerWorkspaceId, metaAccessToken, anthropicApiKey } = body
+    const { googleApiKey, openaiApiKey, kieApiKey, bflApiKey, falApiKey, wavespeedApiKey, elevenlabsApiKey, apifyApiKey, browserlessApiKey, cfAccountId, cfAccessKeyId, cfSecretAccessKey, cfBucketName, cfPublicUrl, publerApiKey, publerWorkspaceId, metaAccessToken, anthropicApiKey } = body
 
     // Build update object with only provided keys
     const updateData: Record<string, string | null> = {}
@@ -142,6 +146,9 @@ export async function POST(request: Request) {
       }
       if (falApiKey) {
         updateData.fal_api_key = encrypt(falApiKey)
+      }
+      if (wavespeedApiKey) {
+        updateData.wavespeed_api_key = encrypt(wavespeedApiKey)
       }
       if (elevenlabsApiKey) {
         updateData.elevenlabs_api_key = encrypt(elevenlabsApiKey)

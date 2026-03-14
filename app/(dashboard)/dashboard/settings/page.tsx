@@ -26,6 +26,7 @@ export default function SettingsPage() {
   const [kieKey, setKieKey] = useState<ApiKeyState>({ value: '', hasKey: false, isSaving: false })
   const [bflKey, setBflKey] = useState<ApiKeyState>({ value: '', hasKey: false, isSaving: false })
   const [falKey, setFalKey] = useState<ApiKeyState>({ value: '', hasKey: false, isSaving: false })
+  const [wavespeedKey, setWavespeedKey] = useState<ApiKeyState>({ value: '', hasKey: false, isSaving: false })
   const [elevenlabsKey, setElevenlabsKey] = useState<ApiKeyState>({ value: '', hasKey: false, isSaving: false })
   const [apifyKey, setApifyKey] = useState<ApiKeyState>({ value: '', hasKey: false, isSaving: false })
   const [browserlessKey, setBrowserlessKey] = useState<ApiKeyState>({ value: '', hasKey: false, isSaving: false })
@@ -80,6 +81,9 @@ export default function SettingsPage() {
       if (data.hasFalApiKey) {
         setFalKey(prev => ({ ...prev, hasKey: true, value: data.maskedFalApiKey || '' }))
       }
+      if (data.hasWavespeedApiKey) {
+        setWavespeedKey(prev => ({ ...prev, hasKey: true, value: data.maskedWavespeedApiKey || '' }))
+      }
       if (data.hasElevenlabsApiKey) {
         setElevenlabsKey(prev => ({ ...prev, hasKey: true, value: data.maskedElevenlabsApiKey || '' }))
       }
@@ -123,13 +127,14 @@ export default function SettingsPage() {
     }
   }
 
-  const handleSaveKey = async (keyType: 'google' | 'openai' | 'kie' | 'bfl' | 'fal' | 'elevenlabs' | 'apify' | 'browserless') => {
+  const handleSaveKey = async (keyType: 'google' | 'openai' | 'kie' | 'bfl' | 'fal' | 'wavespeed' | 'elevenlabs' | 'apify' | 'browserless') => {
     const keyMap = {
       google: { state: googleKey, setter: setGoogleKey, field: 'googleApiKey' },
       openai: { state: openaiKey, setter: setOpenaiKey, field: 'openaiApiKey' },
       kie: { state: kieKey, setter: setKieKey, field: 'kieApiKey' },
       bfl: { state: bflKey, setter: setBflKey, field: 'bflApiKey' },
       fal: { state: falKey, setter: setFalKey, field: 'falApiKey' },
+      wavespeed: { state: wavespeedKey, setter: setWavespeedKey, field: 'wavespeedApiKey' },
       elevenlabs: { state: elevenlabsKey, setter: setElevenlabsKey, field: 'elevenlabsApiKey' },
       apify: { state: apifyKey, setter: setApifyKey, field: 'apifyApiKey' },
       browserless: { state: browserlessKey, setter: setBrowserlessKey, field: 'browserlessApiKey' },
@@ -515,6 +520,52 @@ export default function SettingsPage() {
           </div>
           <a
             href="https://fal.ai/dashboard/keys"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-xs text-accent hover:text-accent-hover transition-colors"
+          >
+            Obtener API Key <ExternalLink className="w-3 h-3" />
+          </a>
+        </CardContent>
+      </Card>
+
+      {/* WaveSpeed API Key */}
+      <Card className="mb-4">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <div className="p-2 rounded-lg bg-gradient-to-br from-cyan-500 to-teal-500 text-white">
+              <Zap className="w-4 h-4" />
+            </div>
+            WaveSpeed AI (Backup de video e imagen)
+            {wavespeedKey.hasKey && (
+              <span className="flex items-center gap-1 text-xs text-success ml-auto">
+                <Check className="w-3 h-3" />
+                Configurada
+              </span>
+            )}
+          </CardTitle>
+          <CardDescription>
+            Para: Backup automatico si KIE falla — Veo 3.1, Kling 3, Sora 2, Seedance, FLUX
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex gap-2">
+            <Input
+              type="password"
+              placeholder="Tu WaveSpeed API Key"
+              value={wavespeedKey.value}
+              onChange={(e) => setWavespeedKey(prev => ({ ...prev, value: e.target.value }))}
+              className="flex-1"
+            />
+            <Button
+              onClick={() => handleSaveKey('wavespeed')}
+              isLoading={wavespeedKey.isSaving}
+            >
+              Guardar
+            </Button>
+          </div>
+          <a
+            href="https://wavespeed.ai/dashboard"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1 text-xs text-accent hover:text-accent-hover transition-colors"
@@ -924,6 +975,10 @@ export default function SettingsPage() {
             <li className="flex items-start gap-2">
               <span className="text-orange-500">•</span>
               <span><strong>Seedream</strong> - Ideal para editar y combinar imágenes</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-teal-500">•</span>
+              <span><strong>WaveSpeed</strong> - Backup de video e imagen si KIE falla</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-violet-500">•</span>
