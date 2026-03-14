@@ -56,9 +56,19 @@ export async function generateVideoViaFal(
     input.aspect_ratio = options.aspectRatio
   }
 
-  // Duration
+  // Duration — normalize to valid values per model to avoid 400 errors
   if (options.duration) {
-    input.duration = options.duration
+    const d = options.duration
+    const model = falModelPath || ''
+    if (model.includes('sora')) {
+      // fal.ai Sora 2: 4, 8, 12, 16, 20
+      input.duration = d <= 6 ? 4 : d <= 10 ? 8 : d <= 14 ? 12 : d <= 18 ? 16 : 20
+    } else {
+      input.duration = d
+    }
+    if (input.duration !== d) {
+      console.log(`[fal.ai/video] Duration normalized: ${d}s → ${input.duration}s`)
+    }
   }
 
   try {

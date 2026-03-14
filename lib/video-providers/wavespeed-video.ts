@@ -69,8 +69,27 @@ export async function generateVideoViaWavespeed(
   }
 
   if (options.duration) {
-    // WaveSpeed Veo accepts duration as integer (4, 6, 8)
-    body.duration = options.duration
+    // WaveSpeed accepts specific duration values per model
+    // Normalize to nearest valid value to avoid 400 errors
+    const d = options.duration
+    if (modelPath.includes('veo')) {
+      // Veo: 4, 6, 8
+      body.duration = d <= 5 ? 4 : d <= 7 ? 6 : 8
+    } else if (modelPath.includes('sora')) {
+      // Sora 2: 4, 8, 12
+      body.duration = d <= 6 ? 4 : d <= 10 ? 8 : 12
+    } else if (modelPath.includes('kling')) {
+      // Kling: 5, 10
+      body.duration = d <= 7 ? 5 : 10
+    } else if (modelPath.includes('seedance')) {
+      // Seedance: 5, 8, 10
+      body.duration = d <= 6 ? 5 : d <= 9 ? 8 : 10
+    } else {
+      body.duration = d
+    }
+    if (body.duration !== d) {
+      console.log(`[WaveSpeed/video] Duration normalized: ${d}s → ${body.duration}s for ${modelPath}`)
+    }
   }
 
   if (options.resolution) {
