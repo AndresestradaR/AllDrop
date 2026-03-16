@@ -1,7 +1,17 @@
 // lib/meta-ads/estrategas-tools.ts
 // Handles EstrategasIA internal tool calls for Matías agent
+// NOTE: Cannot use createServiceClient() from server.ts because it depends on
+// cookies() which is unavailable inside the ReadableStream SSE context.
+// Instead we create a direct Supabase client with the service role key.
 
-import { createServiceClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
+
+function createDirectServiceClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
+}
 
 interface EstrategasToolsOptions {
   userId: string
@@ -29,7 +39,7 @@ export class EstrategasToolsHandler {
   // Get user's products from EstrategasIA
   async getProducts(): Promise<{ success: boolean; data?: any; error?: string }> {
     try {
-      const serviceClient = await createServiceClient()
+      const serviceClient = createDirectServiceClient()
       const { data: products, error } = await serviceClient
         .from('products')
         .select('id, name, description, image_url, created_at')
@@ -59,7 +69,7 @@ export class EstrategasToolsHandler {
     description?: string
   }): Promise<{ success: boolean; data?: any; error?: string }> {
     try {
-      const serviceClient = await createServiceClient()
+      const serviceClient = createDirectServiceClient()
       const { data: product, error } = await serviceClient
         .from('products')
         .insert({
@@ -89,10 +99,10 @@ export class EstrategasToolsHandler {
   // Get landing sections for a product
   async getLandingSections(productId: string): Promise<{ success: boolean; data?: any; error?: string }> {
     try {
-      const serviceClient = await createServiceClient()
+      const serviceClient = createDirectServiceClient()
       const { data: sections, error } = await serviceClient
         .from('landing_sections')
-        .select('id, category, image_url, template_id, created_at, sort_order')
+        .select('*')
         .eq('product_id', productId)
         .order('sort_order', { ascending: true })
 
@@ -107,10 +117,10 @@ export class EstrategasToolsHandler {
   // Get available templates (for banner generation)
   async getTemplates(): Promise<{ success: boolean; data?: any; error?: string }> {
     try {
-      const serviceClient = await createServiceClient()
+      const serviceClient = createDirectServiceClient()
       const { data: templates, error } = await serviceClient
         .from('templates')
-        .select('id, name, category, image_url, description')
+        .select('id, name, category, image_url')
         .eq('is_active', true)
         .order('category', { ascending: true })
 
@@ -155,7 +165,7 @@ export class EstrategasToolsHandler {
 
       if (productPhotos.length === 0) {
         // Try to get product image from DB
-        const serviceClient = await createServiceClient()
+        const serviceClient = createDirectServiceClient()
         const { data: product } = await serviceClient
           .from('products')
           .select('image_url')
@@ -171,10 +181,9 @@ export class EstrategasToolsHandler {
       }
 
       // Call /api/generate-landing internally via fetch to our own server
-      // We need to use the Supabase token for auth
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL
-        ? `https://${process.env.VERCEL_URL}`
-        : 'http://localhost:3000'
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL
+        || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null)
+        || 'http://localhost:3000'
 
       const res = await fetch(`${baseUrl}/api/generate-landing`, {
         method: 'POST',
@@ -232,7 +241,7 @@ export class EstrategasToolsHandler {
     metadata?: Record<string, any>
   }): Promise<{ success: boolean; data?: any; error?: string }> {
     try {
-      const serviceClient = await createServiceClient()
+      const serviceClient = createDirectServiceClient()
 
       // Create import bundle
       const { data: bundle, error: bundleError } = await serviceClient
@@ -271,7 +280,7 @@ export class EstrategasToolsHandler {
     filename?: string
   }): Promise<{ success: boolean; data?: any; error?: string }> {
     try {
-      const serviceClient = await createServiceClient()
+      const serviceClient = createDirectServiceClient()
 
       // If it's already a public URL, just store it
       if (input.image_data.startsWith('http')) {
