@@ -245,18 +245,20 @@ export class MetaAPIClient {
     special_ad_categories?: string[]
   }): Promise<MetaAPIResponse> {
     const { ad_account_id, ...rest } = input
+    // CBO = budget on campaign (adsets share it), ABO = budget on each adset
+    const isCBO = !!(rest.daily_budget || rest.lifetime_budget)
     const params: Record<string, any> = {
       name: rest.name,
       objective: rest.objective,
       status: rest.status || 'PAUSED',
       special_ad_categories: rest.special_ad_categories || [],
-      // Required by Meta API v21.0+ — must always be set on campaign
-      is_adset_budget_sharing_enabled: false,
-      // LOWEST_COST_WITHOUT_CAP doesn't require bid_amount — safest default
-      bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
+      // Required by Meta API v21.0+
+      is_adset_budget_sharing_enabled: isCBO,
     }
+    // For CBO: budget + bid_strategy go on the campaign
     if (rest.daily_budget) params.daily_budget = rest.daily_budget
     if (rest.lifetime_budget) params.lifetime_budget = rest.lifetime_budget
+    if (isCBO) params.bid_strategy = 'LOWEST_COST_WITHOUT_CAP'
     return this.request(`/${ad_account_id}/campaigns`, params, 'POST')
   }
 
@@ -281,6 +283,8 @@ export class MetaAPIClient {
       billing_event: rest.billing_event,
       targeting: rest.targeting,
       status: rest.status || 'PAUSED',
+      // For ABO campaigns, bid_strategy goes on the adset (not campaign)
+      bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
     }
     if (rest.daily_budget) params.daily_budget = rest.daily_budget
     if (rest.start_time) params.start_time = rest.start_time
