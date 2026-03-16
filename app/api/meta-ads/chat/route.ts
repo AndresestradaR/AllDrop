@@ -248,6 +248,27 @@ export async function POST(request: Request) {
   }
 }
 
+// Truncate large tool results to avoid exceeding token limits
+function truncateToolResult(result: Record<string, any> | null): string {
+  const str = JSON.stringify(result || {})
+  // Max ~4000 chars per tool result (roughly 1000 tokens)
+  if (str.length <= 4000) return str
+  // Try to keep the structure but truncate large arrays/strings
+  try {
+    const parsed = JSON.parse(str)
+    if (Array.isArray(parsed)) {
+      // Keep first 5 items of large arrays
+      const truncated = parsed.slice(0, 5)
+      return JSON.stringify({ items: truncated, _truncated: true, _total: parsed.length })
+    }
+    if (parsed.data && Array.isArray(parsed.data)) {
+      const truncated = { ...parsed, data: parsed.data.slice(0, 5), _truncated: true, _total: parsed.data.length }
+      return JSON.stringify(truncated)
+    }
+  } catch { /* ignore */ }
+  return str.substring(0, 4000) + '... [truncated]'
+}
+
 // Convert DB messages to Anthropic API format
 function buildAnthropicMessages(
   dbMessages: Array<{
@@ -261,7 +282,10 @@ function buildAnthropicMessages(
 ): Anthropic.MessageParam[] {
   const messages: Anthropic.MessageParam[] = []
 
-  for (const msg of dbMessages) {
+  // Keep only last 60 messages to avoid token overflow
+  const recentMessages = dbMessages.length > 60 ? dbMessages.slice(-60) : dbMessages
+
+  for (const msg of recentMessages) {
     if (msg.role === 'user') {
       // Merge consecutive user messages (can happen after confirmation + continuation)
       const lastMsg = messages[messages.length - 1]
@@ -312,7 +336,7 @@ function buildAnthropicMessages(
       const toolResultBlock = {
         type: 'tool_result',
         tool_use_id: msg.tool_use_id || '',
-        content: JSON.stringify(msg.tool_result || {}),
+        content: truncateToolResult(msg.tool_result),
       }
       if (lastMsg?.role === 'user' && Array.isArray(lastMsg.content)) {
         (lastMsg.content as any[]).push(toolResultBlock)
