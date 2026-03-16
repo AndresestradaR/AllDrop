@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Send, Loader2, Check, X, ChevronDown, Zap } from 'lucide-react'
+import { Send, Loader2, Check, X, ChevronDown, Zap, Paperclip } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 
 interface Message {
@@ -40,8 +40,10 @@ export function MetaAdsChat({ conversationId }: MetaAdsChatProps) {
   const [confirmLoading, setConfirmLoading] = useState(false)
   const [selectedModel, setSelectedModel] = useState(CLAUDE_MODELS[0].id)
   const [autoExecute, setAutoExecute] = useState(true)
+  const [attachedImages, setAttachedImages] = useState<string[]>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     loadMessages()
@@ -63,11 +65,32 @@ export function MetaAdsChat({ conversationId }: MetaAdsChatProps) {
     }
   }
 
+  function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files
+    if (!files) return
+    for (const file of Array.from(files)) {
+      if (!file.type.startsWith('image/')) continue
+      const reader = new FileReader()
+      reader.onload = () => {
+        const dataUrl = reader.result as string
+        setAttachedImages(prev => [...prev, dataUrl])
+      }
+      reader.readAsDataURL(file)
+    }
+    // Reset input so same file can be selected again
+    e.target.value = ''
+  }
+
   async function sendMessage() {
     const text = input.trim()
-    if (!text || isStreaming) return
+    if ((!text && attachedImages.length === 0) || isStreaming) return
     setInput('')
-    sendChatMessage(text)
+    const messageText = attachedImages.length > 0
+      ? `${text || 'Fotos del producto'}\n\n[${attachedImages.length} imagen(es) adjunta(s)]`
+      : text
+    const images = [...attachedImages]
+    setAttachedImages([])
+    sendChatMessage(messageText, images)
   }
 
   async function handleConfirm(confirmed: boolean) {
@@ -111,7 +134,7 @@ export function MetaAdsChat({ conversationId }: MetaAdsChatProps) {
   }
 
   // Send a message programmatically (used for auto-continuation after confirmation)
-  async function sendChatMessage(text: string) {
+  async function sendChatMessage(text: string, images?: string[]) {
     if (isStreaming) return
 
     setMessages(prev => [...prev, { role: 'user', content: text }])
@@ -123,7 +146,7 @@ export function MetaAdsChat({ conversationId }: MetaAdsChatProps) {
       const res = await fetch('/api/meta-ads/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ conversation_id: conversationId, message: text, model: selectedModel, auto_execute: autoExecute }),
+        body: JSON.stringify({ conversation_id: conversationId, message: text, model: selectedModel, auto_execute: autoExecute, product_images: images || [] }),
       })
 
       if (!res.ok) {
@@ -339,7 +362,39 @@ export function MetaAdsChat({ conversationId }: MetaAdsChatProps) {
 
       {/* Input */}
       <div className="border-t border-gray-200 p-3">
+        {attachedImages.length > 0 && (
+          <div className="flex gap-2 mb-2 flex-wrap">
+            {attachedImages.map((img, i) => (
+              <div key={i} className="relative group">
+                <img src={img} alt={`Producto ${i + 1}`} className="w-16 h-16 object-cover rounded-lg border border-gray-200" />
+                <button
+                  onClick={() => setAttachedImages(prev => prev.filter((_, idx) => idx !== i))}
+                  className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
+          onChange={handleImageUpload}
+        />
         <div className="flex items-end gap-2">
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isStreaming}
+            className="p-2.5 text-gray-400 hover:text-gray-600 disabled:opacity-50 transition-colors"
+            title="Adjuntar imagen del producto"
+          >
+            <Paperclip className="w-4 h-4" />
+          </button>
           <textarea
             ref={inputRef}
             value={input}
@@ -357,7 +412,7 @@ export function MetaAdsChat({ conversationId }: MetaAdsChatProps) {
           />
           <button
             onClick={sendMessage}
-            disabled={!input.trim() || isStreaming}
+            disabled={(!input.trim() && attachedImages.length === 0) || isStreaming}
             className="p-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 disabled:opacity-50 disabled:hover:bg-purple-600 transition-colors"
           >
             {isStreaming ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}

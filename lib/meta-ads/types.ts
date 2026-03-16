@@ -160,6 +160,17 @@ export const READ_ONLY_TOOLS = [
   'get_instagram_accounts',
   'get_phone_numbers',
   'get_pixels',
+  'get_landing_sections',
+  'get_templates',
+  'upload_product_image',
+  'get_droppage_products',
+  'get_droppage_page_designs',
+  'get_droppage_checkout_config',
+  'get_droppage_quantity_offers',
+  'get_droppage_upsells',
+  'get_droppage_downsells',
+  'get_droppage_domains',
+  'get_droppage_store_config',
 ] as const
 
 export const WRITE_TOOLS = [
@@ -169,6 +180,18 @@ export const WRITE_TOOLS = [
   'update_budget',
   'toggle_status',
   'update_targeting',
+  'create_estrategas_product',
+  'generate_landing_banner',
+  'import_sections_to_droppage',
+  'create_droppage_product',
+  'create_droppage_page_design',
+  'associate_droppage_product_design',
+  'update_droppage_checkout_config',
+  'create_droppage_quantity_offer',
+  'create_droppage_upsell',
+  'update_droppage_upsell_config',
+  'create_droppage_downsell',
+  'update_droppage_store_config',
 ] as const
 
 export type ReadOnlyTool = typeof READ_ONLY_TOOLS[number]

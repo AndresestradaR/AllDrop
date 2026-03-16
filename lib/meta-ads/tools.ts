@@ -309,4 +309,358 @@ export const META_ADS_TOOLS = [
       required: ['adset_id', 'targeting'],
     },
   },
+
+  // ==================== ESTRATEGAS IA TOOLS ====================
+  {
+    name: 'create_estrategas_product',
+    description: 'Crea un nuevo producto en EstrategasIA (Landing Generator). Esto crea el registro del producto para después generar banners y landing page.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        name: { type: 'string', description: 'Nombre del producto' },
+        description: { type: 'string', description: 'Descripción del producto' },
+      },
+      required: ['name'],
+    },
+  },
+  {
+    name: 'upload_product_image',
+    description: 'Registra una imagen del producto enviada por el usuario en el chat. Necesaria antes de generar banners. El usuario envía la imagen por el chat y esta herramienta la almacena.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        image_data: { type: 'string', description: 'URL pública de la imagen o data URL base64' },
+        filename: { type: 'string', description: 'Nombre del archivo (opcional)' },
+      },
+      required: ['image_data'],
+    },
+  },
+  {
+    name: 'get_landing_sections',
+    description: 'Lista las secciones de landing (banners) generadas para un producto en EstrategasIA. Cada sección es un banner con su categoría (hero, oferta, testimonios, etc.).',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        product_id: { type: 'string', description: 'ID del producto en EstrategasIA' },
+      },
+      required: ['product_id'],
+    },
+  },
+  {
+    name: 'get_templates',
+    description: 'Lista las plantillas de banner disponibles en EstrategasIA, agrupadas por categoría (hero, oferta, antes-despues, beneficios, testimonios, etc.). Usa esto para escoger la mejor plantilla por categoría según el producto.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: 'generate_landing_banner',
+    description: 'Genera un banner/sección de landing con IA. Selecciona una plantilla y tipo de sección, y la IA genera el banner usando las fotos del producto. Llama MÚLTIPLES VECES para generar diferentes secciones (hero, oferta, testimonios, beneficios, etc.). Necesita al menos 1 foto del producto (upload_product_image).',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        product_id: { type: 'string', description: 'ID del producto en EstrategasIA' },
+        product_name: { type: 'string', description: 'Nombre del producto' },
+        template_id: { type: 'string', description: 'ID de la plantilla a usar (de get_templates)' },
+        template_url: { type: 'string', description: 'URL de la imagen de la plantilla (de get_templates)' },
+        section_type: {
+          type: 'string',
+          enum: ['hero', 'oferta', 'antes_despues', 'beneficios', 'tabla_comparativa', 'autoridad', 'testimonios', 'modo_uso', 'logistica', 'faq', 'casos_uso', 'caracteristicas', 'ingredientes', 'comunidad'],
+          description: 'Tipo de sección a generar',
+        },
+        product_details: { type: 'string', description: 'Detalles del producto para el copy del banner (max 500 chars)' },
+        sales_angle: { type: 'string', description: 'Ángulo de venta para el banner (max 150 chars)' },
+        target_avatar: { type: 'string', description: 'Avatar/público objetivo (max 150 chars)' },
+        additional_instructions: { type: 'string', description: 'Instrucciones adicionales para la IA (max 200 chars)' },
+        currency_symbol: { type: 'string', description: 'Símbolo de moneda (default: $)' },
+        price_after: { type: 'number', description: 'Precio de venta (para secciones de oferta)' },
+        price_before: { type: 'number', description: 'Precio anterior tachado (para secciones de oferta)' },
+        target_country: { type: 'string', description: 'País objetivo (CO, MX, CL, etc.)' },
+        color_palette: { type: 'string', description: 'Paleta de colores deseada (ej: "morado y dorado", "verde natural")' },
+      },
+      required: ['product_id', 'product_name', 'template_id', 'template_url', 'section_type'],
+    },
+  },
+  {
+    name: 'import_sections_to_droppage',
+    description: 'Importa los banners generados a DropPage para armar la landing automáticamente. Pasa los section_ids obtenidos de generate_landing_banner. La landing se ensambla automáticamente.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        section_ids: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string', description: 'ID de la sección (de generate_landing_banner)' },
+              order: { type: 'number', description: 'Orden de la sección (0=hero, 1=oferta, 2=beneficios...)' },
+            },
+          },
+          description: 'Secciones a importar en orden',
+        },
+        metadata: {
+          type: 'object',
+          description: 'Metadata: { product_name, product_photos }',
+        },
+      },
+      required: ['section_ids'],
+    },
+  },
+
+  // ==================== DROPPAGE TOOLS (Read) ====================
+  {
+    name: 'get_droppage_products',
+    description: 'Lista los productos en la tienda DropPage del usuario. Incluye precio, variantes, imágenes.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        search: { type: 'string', description: 'Buscar producto por nombre' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'get_droppage_page_designs',
+    description: 'Lista los diseños de página (landings) en DropPage.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        page_type: { type: 'string', enum: ['home', 'product', 'custom'], description: 'Filtrar por tipo de página' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'get_droppage_checkout_config',
+    description: 'Obtiene la configuración del checkout (formulario, campos, departamentos excluidos) de DropPage.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        country: { type: 'string', description: 'Código de país (CO, MX, CL, PE, etc.)' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'get_droppage_quantity_offers',
+    description: 'Lista las ofertas de cantidad (2x, 3x) configuradas en DropPage.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: 'get_droppage_upsells',
+    description: 'Lista los upsells configurados en DropPage.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: 'get_droppage_downsells',
+    description: 'Lista los downsells configurados en DropPage.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: 'get_droppage_domains',
+    description: 'Lista los dominios configurados en DropPage.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: 'get_droppage_store_config',
+    description: 'Obtiene la configuración general de la tienda DropPage (nombre, colores, pixel, WhatsApp, moneda, etc.).',
+    input_schema: {
+      type: 'object' as const,
+      properties: {},
+      required: [],
+    },
+  },
+
+  // ==================== DROPPAGE TOOLS (Write) ====================
+  {
+    name: 'create_droppage_product',
+    description: 'Crea un producto en la tienda DropPage con precio, variantes y código Dropi. REQUIERE CONFIRMACIÓN.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        name: { type: 'string', description: 'Nombre del producto' },
+        description: { type: 'string', description: 'Descripción larga' },
+        short_description: { type: 'string', description: 'Descripción corta' },
+        price: { type: 'number', description: 'Precio de venta (ej: 89900 para COP)' },
+        compare_at_price: { type: 'number', description: 'Precio anterior (tachado)' },
+        cost_price: { type: 'number', description: 'Costo real del producto' },
+        dropi_product_id: { type: 'string', description: 'ID del producto en Dropi (para sincronización de órdenes)' },
+        country: { type: 'string', description: 'País (CO, MX, CL, etc.)' },
+        variants: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              name: { type: 'string', description: 'Nombre de la variante (ej: "Rojo - Talla M")' },
+              variant_type: { type: 'string', description: 'Tipo (Color, Talla, etc.)' },
+              variant_value: { type: 'string', description: 'Valor (Rojo, M, etc.)' },
+              price_override: { type: 'number', description: 'Precio diferente para esta variante (opcional)' },
+              dropi_variation_id: { type: 'string', description: 'ID de la variación en Dropi' },
+            },
+          },
+          description: 'Variantes del producto',
+        },
+      },
+      required: ['name', 'price'],
+    },
+  },
+  {
+    name: 'create_droppage_page_design',
+    description: 'Crea un diseño de página (landing) en DropPage. Después se importan las secciones desde EstrategasIA.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        page_type: { type: 'string', enum: ['home', 'product', 'custom'], description: 'Tipo de página' },
+        title: { type: 'string', description: 'Título de la página' },
+        slug: { type: 'string', description: 'Slug para la URL (auto-generado si se omite)' },
+        product_id: { type: 'string', description: 'ID del producto en DropPage (para tipo "product")' },
+        domain_id: { type: 'string', description: 'ID del dominio a asociar' },
+      },
+      required: ['page_type', 'title'],
+    },
+  },
+  {
+    name: 'associate_droppage_product_design',
+    description: 'Asocia un producto con un diseño de página en DropPage.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        design_id: { type: 'string', description: 'ID del diseño de página' },
+        product_id: { type: 'string', description: 'ID del producto (null para desasociar)' },
+      },
+      required: ['design_id', 'product_id'],
+    },
+  },
+  {
+    name: 'update_droppage_checkout_config',
+    description: 'Actualiza la configuración del checkout en DropPage (departamentos excluidos, textos, colores).',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        country: { type: 'string', description: 'País del checkout' },
+        excluded_departments: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Departamentos/regiones a excluir del envío',
+        },
+        cta_text: { type: 'string', description: 'Texto del botón CTA (usa {order_total} para precio)' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'create_droppage_quantity_offer',
+    description: 'Crea una oferta de cantidad (2x, 3x) en DropPage. REQUIERE CONFIRMACIÓN.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        name: { type: 'string', description: 'Nombre de la oferta' },
+        is_active: { type: 'boolean', description: 'Activar inmediatamente' },
+        product_ids: { type: 'array', items: { type: 'string' }, description: 'Productos a los que aplica (null = todos)' },
+        tiers: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              title: { type: 'string', description: 'Título del tier (ej: "1x", "2x Ahorra 10%")' },
+              quantity: { type: 'number', description: 'Cantidad de unidades' },
+              position: { type: 'number', description: 'Posición visual (0, 1, 2...)' },
+              is_preselected: { type: 'boolean', description: 'Si este tier viene seleccionado por defecto' },
+              discount_type: { type: 'string', enum: ['percentage', 'fixed', 'none'], description: 'Tipo de descuento' },
+              discount_value: { type: 'number', description: 'Valor del descuento (ej: 10 para 10%)' },
+              label_text: { type: 'string', description: 'Etiqueta visual (ej: "MÁS VENDIDO", "MEJOR OFERTA")' },
+            },
+          },
+          description: 'Tiers de la oferta (1x, 2x, 3x)',
+        },
+      },
+      required: ['name', 'tiers'],
+    },
+  },
+  {
+    name: 'create_droppage_upsell',
+    description: 'Crea un upsell en DropPage (producto complementario después del checkout). REQUIERE CONFIRMACIÓN.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        name: { type: 'string', description: 'Nombre del upsell' },
+        is_active: { type: 'boolean', description: 'Activar inmediatamente' },
+        upsell_product_id: { type: 'string', description: 'ID del producto upsell' },
+        trigger_type: { type: 'string', enum: ['all', 'specific'], description: 'Cuándo mostrar: "all" o "specific" productos' },
+        trigger_product_ids: { type: 'array', items: { type: 'string' }, description: 'IDs de productos que activan el upsell' },
+        discount_type: { type: 'string', enum: ['none', 'percentage', 'fixed'], description: 'Tipo de descuento' },
+        discount_value: { type: 'number', description: 'Valor del descuento' },
+        title: { type: 'string', description: 'Título del modal upsell' },
+        add_button_text: { type: 'string', description: 'Texto del botón de agregar' },
+        decline_button_text: { type: 'string', description: 'Texto del botón de rechazar' },
+      },
+      required: ['name'],
+    },
+  },
+  {
+    name: 'update_droppage_upsell_config',
+    description: 'Actualiza la configuración global de upsells en DropPage.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        is_active: { type: 'boolean', description: 'Activar/desactivar upsells globalmente' },
+        max_upsells_per_order: { type: 'number', description: 'Máximo de upsells por orden' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'create_droppage_downsell',
+    description: 'Crea un downsell en DropPage (oferta de salida cuando el usuario intenta abandonar). REQUIERE CONFIRMACIÓN.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        name: { type: 'string', description: 'Nombre del downsell' },
+        is_active: { type: 'boolean', description: 'Activar inmediatamente' },
+        discount_type: { type: 'string', enum: ['none', 'percentage', 'fixed'], description: 'Tipo de descuento' },
+        discount_value: { type: 'number', description: 'Valor del descuento (ej: 10 para 10%)' },
+        title: { type: 'string', description: 'Título principal (ej: "Espera!")' },
+        subtitle: { type: 'string', description: 'Subtítulo (ej: "Tenemos una oferta para ti!")' },
+        badge_text: { type: 'string', description: 'Texto del badge de descuento' },
+        complete_button_text: { type: 'string', description: 'Texto del botón de completar (usa {discount} para el valor)' },
+        decline_button_text: { type: 'string', description: 'Texto del botón de rechazar' },
+      },
+      required: ['name'],
+    },
+  },
+  {
+    name: 'update_droppage_store_config',
+    description: 'Actualiza la configuración general de la tienda DropPage (nombre, colores, pixel, WhatsApp, etc.).',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        store_name: { type: 'string', description: 'Nombre de la tienda' },
+        primary_color: { type: 'string', description: 'Color primario (hex)' },
+        accent_color: { type: 'string', description: 'Color de acento (hex)' },
+        meta_pixel_id: { type: 'string', description: 'ID del pixel de Meta para tracking' },
+        whatsapp_number: { type: 'string', description: 'Número de WhatsApp para soporte' },
+        currency_symbol: { type: 'string', description: 'Símbolo de moneda ($)' },
+        currency_code: { type: 'string', description: 'Código de moneda (COP, MXN, etc.)' },
+      },
+      required: [],
+    },
+  },
 ]

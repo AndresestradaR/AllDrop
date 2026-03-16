@@ -38,6 +38,8 @@ export interface ExecutorOptions {
     description: string
     tool_use_id: string
   }) => Promise<string>
+  onExecuteEstrategasTool?: (toolName: string, toolInput: Record<string, any>) => Promise<{ success: boolean; data?: any; error?: string }>
+  onExecuteDropPageTool?: (toolName: string, toolInput: Record<string, any>) => Promise<{ success: boolean; data?: any; error?: string }>
 }
 
 // Maximum tool_use loop iterations to prevent infinite loops
@@ -188,7 +190,24 @@ export async function executeChat(
 
         // Handle internal tools (not Meta API)
         let result: { success: boolean; data?: any; error?: string }
-        if (toolName === 'get_my_products' && opts.onGetProducts) {
+        // Handle EstrategasIA tools
+        if (['create_estrategas_product', 'get_landing_sections', 'get_templates', 'generate_landing_banner', 'import_sections_to_droppage', 'upload_product_image'].includes(toolName)) {
+          if (opts.onExecuteEstrategasTool) {
+            result = await opts.onExecuteEstrategasTool(toolName, toolInput)
+          } else {
+            result = { success: false, error: 'EstrategasIA tools not configured' }
+          }
+        }
+        // Handle DropPage tools
+        else if (toolName.startsWith('get_droppage_') || toolName.startsWith('create_droppage_') || toolName.startsWith('update_droppage_') || toolName === 'associate_droppage_product_design') {
+          if (opts.onExecuteDropPageTool) {
+            result = await opts.onExecuteDropPageTool(toolName, toolInput)
+          } else {
+            result = { success: false, error: 'DropPage tools not configured' }
+          }
+        }
+        // Handle internal tools (not Meta API)
+        else if (toolName === 'get_my_products' && opts.onGetProducts) {
           try {
             const products = await opts.onGetProducts()
             result = { success: true, data: products }

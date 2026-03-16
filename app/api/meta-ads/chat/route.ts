@@ -2,6 +2,8 @@
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { decrypt } from '@/lib/services/encryption'
 import { executeChat } from '@/lib/meta-ads/claude-executor'
+import { DropPageClient } from '@/lib/meta-ads/droppage-client'
+import { EstrategasToolsHandler } from '@/lib/meta-ads/estrategas-tools'
 import type { SSEEvent } from '@/lib/meta-ads/types'
 import type Anthropic from '@anthropic-ai/sdk'
 
@@ -15,8 +17,11 @@ export async function POST(request: Request) {
       return new Response(JSON.stringify({ error: 'No autorizado' }), { status: 401 })
     }
 
+    const { data: { session } } = await supabase.auth.getSession()
+    const supabaseAccessToken = session?.access_token || ''
+
     const body = await request.json()
-    const { conversation_id, message, model, auto_execute } = body
+    const { conversation_id, message, model, auto_execute, product_images } = body
 
     if (!conversation_id || !message) {
       return new Response(JSON.stringify({ error: 'conversation_id y message son requeridos' }), { status: 400 })
@@ -56,6 +61,32 @@ export async function POST(request: Request) {
     } catch {
       return new Response(JSON.stringify({ error: 'Error descifrando credenciales. Reconfigura en Settings.' }), { status: 400 })
     }
+
+    // Upload product images from chat to Supabase Storage
+    let productImageUrls: string[] = []
+    if (product_images?.length > 0) {
+      for (const imageData of product_images) {
+        const base64Match = imageData.match(/^data:image\/\w+;base64,(.+)$/)
+        if (base64Match) {
+          const buffer = Buffer.from(base64Match[1], 'base64')
+          const fileName = `meta-ads/${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.webp`
+          await serviceClient.storage.from('landing-images').upload(fileName, buffer, {
+            contentType: 'image/webp',
+            upsert: true,
+          })
+          const { data: urlData } = serviceClient.storage.from('landing-images').getPublicUrl(fileName)
+          productImageUrls.push(urlData.publicUrl)
+        }
+      }
+    }
+
+    // Create Phase 2 clients
+    const dropPageClient = new DropPageClient({ supabaseAccessToken })
+    const estrategasTools = new EstrategasToolsHandler({
+      userId: user.id,
+      supabaseAccessToken,
+      productImageUrls,
+    })
 
     // Save user message
     await serviceClient
@@ -112,6 +143,12 @@ export async function POST(request: Request) {
               model: model || undefined,
               autoExecute: auto_execute === true,
               messages: anthropicMessages,
+              onExecuteEstrategasTool: async (toolName, toolInput) => {
+                return estrategasTools.executeTool(toolName, toolInput)
+              },
+              onExecuteDropPageTool: async (toolName, toolInput) => {
+                return dropPageClient.executeTool(toolName, toolInput)
+              },
               onGetProducts: async () => {
                 const { data: products } = await supabase
                   .from('products')
