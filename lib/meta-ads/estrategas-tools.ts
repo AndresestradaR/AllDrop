@@ -198,6 +198,7 @@ export class EstrategasToolsHandler {
           templateId: input.template_id,
           templateUrl: input.template_url,
           productPhotos,
+          modelId: 'nano-banana-2',  // Default model with full cascade (KIE → fal → Gemini)
           outputSize: '1080x1920',
           creativeControls: {
             sectionType: input.section_type,
