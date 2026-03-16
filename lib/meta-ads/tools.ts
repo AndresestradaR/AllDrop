@@ -147,6 +147,18 @@ export const META_ADS_TOOLS = [
     },
   },
 
+  {
+    name: 'get_pixels',
+    description: 'Lista los píxeles de Facebook (AdsPixels) de una cuenta publicitaria. Necesario para campañas de OUTCOME_SALES y OUTCOME_LEADS que requieren promoted_object con pixel_id.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        ad_account_id: { type: 'string', description: 'ID de la cuenta publicitaria (ej: act_123456)' },
+      },
+      required: ['ad_account_id'],
+    },
+  },
+
   // ==================== INTERNAL TOOLS (EstrategasIA ecosystem) ====================
   {
     name: 'get_my_products',
@@ -202,7 +214,11 @@ export const META_ADS_TOOLS = [
         billing_event: { type: 'string', enum: ['IMPRESSIONS', 'LINK_CLICKS'], description: 'Evento de facturación' },
         targeting: {
           type: 'object',
-          description: 'Configuración de targeting: geo_locations, age_min, age_max, genders, interests, behaviors, etc.',
+          description: 'Configuración de targeting: geo_locations (OBLIGATORIO, ej: {"countries":["CO"]}), age_min, age_max, genders, etc.',
+        },
+        promoted_object: {
+          type: 'object',
+          description: 'OBLIGATORIO para OUTCOME_SALES y OUTCOME_LEADS. Para ventas: {"pixel_id":"123","custom_event_type":"PURCHASE"}. Para leads: {"pixel_id":"123","custom_event_type":"LEAD"}. Usa get_pixels para obtener el pixel_id.',
         },
         start_time: { type: 'string', description: 'Fecha/hora inicio ISO 8601' },
         end_time: { type: 'string', description: 'Fecha/hora fin ISO 8601' },
