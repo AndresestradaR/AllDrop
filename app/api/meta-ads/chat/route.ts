@@ -107,6 +107,34 @@ export async function POST(request: Request) {
     // Convert DB messages to Anthropic format
     const anthropicMessages = buildAnthropicMessages(history || [])
 
+    // If user uploaded product images, inject them into the last user message
+    // so Claude can actually SEE the product photos + know they're available for banners
+    if (productImageUrls.length > 0 && anthropicMessages.length > 0) {
+      const lastMsg = anthropicMessages[anthropicMessages.length - 1]
+      if (lastMsg.role === 'user') {
+        // Convert to array format with image blocks
+        const existingContent = typeof lastMsg.content === 'string'
+          ? [{ type: 'text' as const, text: lastMsg.content }]
+          : Array.isArray(lastMsg.content) ? [...lastMsg.content as any[]] : []
+
+        // Add image blocks so Claude can see the photos
+        for (const url of productImageUrls) {
+          existingContent.push({
+            type: 'image' as const,
+            source: { type: 'url' as const, url },
+          } as any)
+        }
+
+        // Add note about available photos for banner generation
+        existingContent.push({
+          type: 'text' as const,
+          text: `\n\n[Sistema: ${productImageUrls.length} foto(s) del producto subida(s) exitosamente y disponibles para generar banners. URLs: ${productImageUrls.join(', ')}]`,
+        })
+
+        lastMsg.content = existingContent as any
+      }
+    }
+
     // Update conversation title if first message
     if (anthropicMessages.length <= 1) {
       const shortTitle = message.length > 60 ? message.substring(0, 57) + '...' : message
