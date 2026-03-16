@@ -58,8 +58,8 @@ export async function executeChat(
     iterations++
 
     // Call Claude with tools
-    const validModels = ['claude-opus-4-6-20250514', 'claude-sonnet-4-6-20250514', 'claude-haiku-4-5-20251001']
-    const selectedModel = opts.model && validModels.includes(opts.model) ? opts.model : 'claude-opus-4-6-20250514'
+    const validModels = ['claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001']
+    const selectedModel = opts.model && validModels.includes(opts.model) ? opts.model : 'claude-opus-4-6'
     const response = await anthropic.messages.create({
       model: selectedModel,
       max_tokens: 8192,
