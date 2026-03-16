@@ -103,11 +103,31 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Demasiadas solicitudes. Intenta de nuevo en un momento.' }, { status: 429 })
     }
 
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    // Support both cookie-based auth and Authorization header (for internal server calls)
+    let user: any = null
+    let supabase: any = null
+    const authHeader = request.headers.get('Authorization')
+    if (authHeader?.startsWith('Bearer ')) {
+      // Internal call from estrategas-tools.ts — verify token via Supabase
+      const { createClient: createSupabaseClient } = await import('@supabase/supabase-js')
+      supabase = createSupabaseClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        { global: { headers: { Authorization: authHeader } } }
+      )
+      const { data: { user: tokenUser }, error: tokenError } = await supabase.auth.getUser()
+      if (!tokenError && tokenUser) {
+        user = tokenUser
+      }
+    }
+    if (!user) {
+      // Fallback to cookie-based auth
+      supabase = await createClient()
+      const { data: { user: cookieUser }, error: authError } = await supabase.auth.getUser()
+      if (authError || !cookieUser) {
+        return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+      }
+      user = cookieUser
     }
 
     const body = await request.json()

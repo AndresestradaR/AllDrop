@@ -45,6 +45,50 @@ export interface ExecutorOptions {
 // Maximum tool_use loop iterations to prevent infinite loops
 const MAX_TOOL_ITERATIONS = 30
 
+// EstrategasIA tool names — used for routing
+const ESTRATEGAS_TOOLS = [
+  'create_estrategas_product',
+  'get_landing_sections',
+  'get_templates',
+  'generate_landing_banner',
+  'import_sections_to_droppage',
+  'upload_product_image',
+]
+
+// Route tool execution to the correct handler (EstrategasIA, DropPage, or Meta API)
+async function routeToolExecution(
+  toolName: string,
+  toolInput: Record<string, any>,
+  metaClient: MetaAPIClient,
+  opts: Pick<ExecutorOptions, 'onExecuteEstrategasTool' | 'onExecuteDropPageTool' | 'onGetProducts'>,
+): Promise<{ success: boolean; data?: any; error?: string }> {
+  // EstrategasIA tools
+  if (ESTRATEGAS_TOOLS.includes(toolName)) {
+    if (opts.onExecuteEstrategasTool) {
+      return opts.onExecuteEstrategasTool(toolName, toolInput)
+    }
+    return { success: false, error: 'EstrategasIA tools not configured' }
+  }
+  // DropPage tools
+  if (toolName.startsWith('get_droppage_') || toolName.startsWith('create_droppage_') || toolName.startsWith('update_droppage_') || toolName === 'associate_droppage_product_design') {
+    if (opts.onExecuteDropPageTool) {
+      return opts.onExecuteDropPageTool(toolName, toolInput)
+    }
+    return { success: false, error: 'DropPage tools not configured' }
+  }
+  // Internal product list
+  if (toolName === 'get_my_products' && opts.onGetProducts) {
+    try {
+      const products = await opts.onGetProducts()
+      return { success: true, data: products }
+    } catch (err: any) {
+      return { success: false, error: err.message }
+    }
+  }
+  // Default: Meta Ads API
+  return metaClient.executeTool(toolName, toolInput)
+}
+
 export async function executeChat(
   opts: ExecutorOptions,
   sendEvent: (event: SSEEvent) => void
@@ -149,7 +193,7 @@ export async function executeChat(
             data: { tool_name: toolName, tool_input: toolInput, is_write: true },
           })
 
-          const result = await metaClient.executeTool(toolName, toolInput)
+          const result = await routeToolExecution(toolName, toolInput, metaClient, opts)
 
           sendEvent({
             type: 'tool_result',
@@ -188,35 +232,7 @@ export async function executeChat(
           data: { tool_name: toolName, tool_input: toolInput },
         })
 
-        // Handle internal tools (not Meta API)
-        let result: { success: boolean; data?: any; error?: string }
-        // Handle EstrategasIA tools
-        if (['create_estrategas_product', 'get_landing_sections', 'get_templates', 'generate_landing_banner', 'import_sections_to_droppage', 'upload_product_image'].includes(toolName)) {
-          if (opts.onExecuteEstrategasTool) {
-            result = await opts.onExecuteEstrategasTool(toolName, toolInput)
-          } else {
-            result = { success: false, error: 'EstrategasIA tools not configured' }
-          }
-        }
-        // Handle DropPage tools
-        else if (toolName.startsWith('get_droppage_') || toolName.startsWith('create_droppage_') || toolName.startsWith('update_droppage_') || toolName === 'associate_droppage_product_design') {
-          if (opts.onExecuteDropPageTool) {
-            result = await opts.onExecuteDropPageTool(toolName, toolInput)
-          } else {
-            result = { success: false, error: 'DropPage tools not configured' }
-          }
-        }
-        // Handle internal tools (not Meta API)
-        else if (toolName === 'get_my_products' && opts.onGetProducts) {
-          try {
-            const products = await opts.onGetProducts()
-            result = { success: true, data: products }
-          } catch (err: any) {
-            result = { success: false, error: err.message }
-          }
-        } else {
-          result = await metaClient.executeTool(toolName, toolInput)
-        }
+        const result = await routeToolExecution(toolName, toolInput, metaClient, opts)
 
         sendEvent({
           type: 'tool_result',
