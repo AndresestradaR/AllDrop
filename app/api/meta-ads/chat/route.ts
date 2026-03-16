@@ -16,7 +16,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { conversation_id, message, model } = body
+    const { conversation_id, message, model, auto_execute } = body
 
     if (!conversation_id || !message) {
       return new Response(JSON.stringify({ error: 'conversation_id y message son requeridos' }), { status: 400 })
@@ -110,6 +110,7 @@ export async function POST(request: Request) {
               conversationId: conversation_id,
               userId: user.id,
               model: model || undefined,
+              autoExecute: auto_execute === true,
               messages: anthropicMessages,
               onGetProducts: async () => {
                 const { data: products } = await supabase

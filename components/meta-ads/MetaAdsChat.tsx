@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Send, Loader2, Check, X, ChevronDown } from 'lucide-react'
+import { Send, Loader2, Check, X, ChevronDown, Zap } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 
 interface Message {
@@ -39,6 +39,7 @@ export function MetaAdsChat({ conversationId }: MetaAdsChatProps) {
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null)
   const [confirmLoading, setConfirmLoading] = useState(false)
   const [selectedModel, setSelectedModel] = useState(CLAUDE_MODELS[0].id)
+  const [autoExecute, setAutoExecute] = useState(true)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -122,7 +123,7 @@ export function MetaAdsChat({ conversationId }: MetaAdsChatProps) {
       const res = await fetch('/api/meta-ads/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ conversation_id: conversationId, message: text, model: selectedModel }),
+        body: JSON.stringify({ conversation_id: conversationId, message: text, model: selectedModel, auto_execute: autoExecute }),
       })
 
       if (!res.ok) {
@@ -306,7 +307,7 @@ export function MetaAdsChat({ conversationId }: MetaAdsChatProps) {
 
       {/* Input */}
       <div className="border-t border-gray-200 p-3">
-        <div className="flex items-center gap-2 mb-2">
+        <div className="flex items-center gap-3 mb-2">
           <div className="relative">
             <select
               value={selectedModel}
@@ -320,6 +321,19 @@ export function MetaAdsChat({ conversationId }: MetaAdsChatProps) {
             </select>
             <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
           </div>
+          <button
+            onClick={() => setAutoExecute(!autoExecute)}
+            disabled={isStreaming}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 ${
+              autoExecute
+                ? 'bg-amber-100 text-amber-700 border border-amber-200'
+                : 'bg-gray-50 text-gray-500 border border-gray-200 hover:bg-gray-100'
+            }`}
+            title={autoExecute ? 'Matías ejecuta todo automáticamente sin pedir permiso' : 'Matías pide confirmación antes de cada acción'}
+          >
+            <Zap className={`w-3 h-3 ${autoExecute ? 'fill-amber-500' : ''}`} />
+            {autoExecute ? 'Auto' : 'Confirmar'}
+          </button>
         </div>
         <div className="flex items-end gap-2">
           <textarea

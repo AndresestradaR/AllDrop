@@ -15,6 +15,8 @@ export interface ExecutorOptions {
   userId: string
   // Claude model to use
   model?: string
+  // Auto-execute write tools without individual confirmation
+  autoExecute?: boolean
   // Previous messages for context (Anthropic format)
   messages: Anthropic.MessageParam[]
   // Callback to persist messages/actions to DB
@@ -39,7 +41,7 @@ export interface ExecutorOptions {
 }
 
 // Maximum tool_use loop iterations to prevent infinite loops
-const MAX_TOOL_ITERATIONS = 15
+const MAX_TOOL_ITERATIONS = 30
 
 export async function executeChat(
   opts: ExecutorOptions,
@@ -89,8 +91,8 @@ export async function executeChat(
         const toolName = block.name
         const toolInput = block.input as Record<string, any>
 
-        // Check if this is a write tool (needs confirmation)
-        if (isWriteTool(toolName)) {
+        // Check if this is a write tool (needs confirmation unless autoExecute)
+        if (isWriteTool(toolName) && !opts.autoExecute) {
           needsConfirmation = true
 
           // Save pending action FIRST to get the action_id
@@ -117,7 +119,6 @@ export async function executeChat(
           })
 
           // Save assistant text (if any) and tool_call separately
-          // This ensures buildAnthropicMessages can reconstruct the full conversation
           if (opts.onSaveMessage) {
             if (textContent) {
               await opts.onSaveMessage({ role: 'assistant', content: textContent })
@@ -137,6 +138,46 @@ export async function executeChat(
             data: { stop_reason: 'confirmation_required', tool_use_id: block.id },
           })
           return
+        }
+
+        // Auto-execute write tools: notify frontend, execute, continue loop
+        if (isWriteTool(toolName) && opts.autoExecute) {
+          sendEvent({
+            type: 'tool_start',
+            data: { tool_name: toolName, tool_input: toolInput, is_write: true },
+          })
+
+          const result = await metaClient.executeTool(toolName, toolInput)
+
+          sendEvent({
+            type: 'tool_result',
+            data: { tool_name: toolName, result, is_write: true },
+          })
+
+          // Save to DB
+          if (opts.onSaveMessage) {
+            await opts.onSaveMessage({
+              role: 'tool_call',
+              tool_name: toolName,
+              tool_input: toolInput,
+              tool_use_id: block.id,
+            })
+            await opts.onSaveMessage({
+              role: 'tool_result',
+              tool_name: toolName,
+              tool_result: result,
+              tool_use_id: block.id,
+            })
+          }
+
+          // Accumulate for next iteration
+          toolUseBlocks.push(block)
+          toolResultBlocks.push({
+            type: 'tool_result' as const,
+            tool_use_id: block.id,
+            content: JSON.stringify(result),
+          })
+          continue
         }
 
         // Read-only tool — execute immediately
