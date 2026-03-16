@@ -293,7 +293,7 @@ export class EstrategasToolsHandler {
       const fileName = `meta-ads/${this.userId}/${timestamp}-product.webp`
 
       // Extract base64 data
-      const base64Match = input.image_data.match(/^data:image\/\w+;base64,(.+)$/)
+      const base64Match = input.image_data.match(/^data:[^;]+;base64,(.+)$/)
       if (!base64Match) {
         return { success: false, error: 'Formato de imagen no válido' }
       }

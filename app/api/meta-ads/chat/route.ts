@@ -66,7 +66,7 @@ export async function POST(request: Request) {
     let productImageUrls: string[] = []
     if (product_images?.length > 0) {
       for (const imageData of product_images) {
-        const base64Match = imageData.match(/^data:image\/\w+;base64,(.+)$/)
+        const base64Match = imageData.match(/^data:[^;]+;base64,(.+)$/)
         if (base64Match) {
           const buffer = Buffer.from(base64Match[1], 'base64')
           const fileName = `meta-ads/${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.webp`
