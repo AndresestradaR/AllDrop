@@ -252,6 +252,8 @@ export class MetaAPIClient {
       special_ad_categories: rest.special_ad_categories || [],
       // Required by Meta API v21.0+ — must always be set on campaign
       is_adset_budget_sharing_enabled: false,
+      // LOWEST_COST_WITHOUT_CAP doesn't require bid_amount — safest default
+      bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
     }
     if (rest.daily_budget) params.daily_budget = rest.daily_budget
     if (rest.lifetime_budget) params.lifetime_budget = rest.lifetime_budget
