@@ -3,6 +3,8 @@ import { NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { decrypt } from '@/lib/services/encryption'
 import { executeConfirmedAction } from '@/lib/meta-ads/claude-executor'
+import { EstrategasToolsHandler } from '@/lib/meta-ads/estrategas-tools'
+import { DropPageClient } from '@/lib/meta-ads/droppage-client'
 
 export async function POST(request: Request) {
   try {
@@ -73,10 +75,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Error descifrando token de Meta' }, { status: 400 })
     }
 
+    // Get Supabase session for Phase 2 clients
+    const { data: { session } } = await supabase.auth.getSession()
+    const supabaseAccessToken = session?.access_token || ''
+
+    const estrategasTools = new EstrategasToolsHandler({
+      userId: user.id,
+      supabaseAccessToken,
+    })
+    const dropPageClient = new DropPageClient({ supabaseAccessToken })
+
     const result = await executeConfirmedAction(
       metaAccessToken,
       action.action_type,
-      action.action_payload
+      action.action_payload,
+      {
+        onExecuteEstrategasTool: (tn, ti) => estrategasTools.executeTool(tn, ti),
+        onExecuteDropPageTool: (tn, ti) => dropPageClient.executeTool(tn, ti),
+      }
     )
 
     // Find the original tool_call message to get the tool_use_id

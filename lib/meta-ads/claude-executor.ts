@@ -286,14 +286,18 @@ export async function executeChat(
   sendEvent({ type: 'done', data: { stop_reason: 'end_turn' } })
 }
 
-// Execute a confirmed write action
+// Execute a confirmed write action — routes to correct handler
 export async function executeConfirmedAction(
   metaAccessToken: string,
   toolName: string,
-  toolInput: Record<string, any>
+  toolInput: Record<string, any>,
+  handlers?: {
+    onExecuteEstrategasTool?: (toolName: string, toolInput: Record<string, any>) => Promise<{ success: boolean; data?: any; error?: string }>
+    onExecuteDropPageTool?: (toolName: string, toolInput: Record<string, any>) => Promise<{ success: boolean; data?: any; error?: string }>
+  }
 ): Promise<{ success: boolean; data?: any; error?: string }> {
   const metaClient = new MetaAPIClient({ accessToken: metaAccessToken })
-  return metaClient.executeTool(toolName, toolInput)
+  return routeToolExecution(toolName, toolInput, metaClient, handlers || {})
 }
 
 // Generate human-readable description for write actions
