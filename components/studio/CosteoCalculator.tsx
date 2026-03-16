@@ -25,39 +25,39 @@ interface CountryConfig {
 
 const COUNTRIES: CountryConfig[] = [
   {
-    code: 'CO', name: 'Colombia', flag: '\🇨\🇴', currency: 'COP', symbol: '$',
+    code: 'CO', name: 'Colombia', flag: '🇨🇴', currency: 'COP', symbol: '$',
     defaultCost: 30000, defaultShipping: 20000, defaultPrice: 100000,
-    shippingHint: 'Aprox. $18.000\–$20.000',
+    shippingHint: 'Aprox. $18.000–$20.000',
     formatNumber: (n) => n.toLocaleString('es-CO'),
   },
   {
-    code: 'MX', name: 'M\éxico', flag: '\🇲\🇽', currency: 'MXN', symbol: '$',
+    code: 'MX', name: 'México', flag: '🇲🇽', currency: 'MXN', symbol: '$',
     defaultCost: 250, defaultShipping: 150, defaultPrice: 899,
-    shippingHint: 'Aprox. $120\–$180',
+    shippingHint: 'Aprox. $120–$180',
     formatNumber: (n) => n.toLocaleString('es-MX'),
   },
   {
-    code: 'PE', name: 'Per\ú', flag: '\🇵\🇪', currency: 'PEN', symbol: 'S/',
+    code: 'PE', name: 'Perú', flag: '🇵🇪', currency: 'PEN', symbol: 'S/',
     defaultCost: 30, defaultShipping: 15, defaultPrice: 99,
-    shippingHint: 'Aprox. S/12\–S/18',
+    shippingHint: 'Aprox. S/12–S/18',
     formatNumber: (n) => n.toLocaleString('es-PE'),
   },
   {
-    code: 'EC', name: 'Ecuador', flag: '\🇪\🇨', currency: 'USD', symbol: '$',
+    code: 'EC', name: 'Ecuador', flag: '🇪🇨', currency: 'USD', symbol: '$',
     defaultCost: 8, defaultShipping: 5, defaultPrice: 30,
-    shippingHint: 'Aprox. $4\–$6',
+    shippingHint: 'Aprox. $4–$6',
     formatNumber: (n) => n.toLocaleString('en-US'),
   },
   {
-    code: 'CL', name: 'Chile', flag: '\🇨\🇱', currency: 'CLP', symbol: '$',
+    code: 'CL', name: 'Chile', flag: '🇨🇱', currency: 'CLP', symbol: '$',
     defaultCost: 10000, defaultShipping: 5000, defaultPrice: 39900,
-    shippingHint: 'Aprox. $4.000\–$6.000',
+    shippingHint: 'Aprox. $4.000–$6.000',
     formatNumber: (n) => n.toLocaleString('es-CL'),
   },
   {
-    code: 'GT', name: 'Guatemala', flag: '\🇬\🇹', currency: 'GTQ', symbol: 'Q',
+    code: 'GT', name: 'Guatemala', flag: '🇬🇹', currency: 'GTQ', symbol: 'Q',
     defaultCost: 80, defaultShipping: 40, defaultPrice: 299,
-    shippingHint: 'Aprox. Q35\–Q50',
+    shippingHint: 'Aprox. Q35–Q50',
     formatNumber: (n) => n.toLocaleString('es-GT'),
   },
 ]
@@ -71,20 +71,18 @@ function CurrencyInput({
   const theme = useCalcTheme()
   return (
     <div className="flex-1 min-w-[140px]">
-      <label className={cn('block text-xs font-bold uppercase tracking-wider mb-1.5', theme === 'light' ? 'text-gray-500' : 'text-text-secondary')}>{label}</label>
+      <label className="block text-xs font-bold uppercase tracking-wider mb-1.5" style={{ color: theme === 'light' ? '#6b7280' : undefined }}>{label}</label>
       <div className={cn('flex items-center rounded-lg border overflow-hidden', theme === 'light' ? 'bg-gray-50 border-gray-200' : 'bg-[#1a1a2e] border-border')}>
-        <span className={cn('pl-3 pr-1 text-sm font-medium', theme === 'light' ? 'text-gray-400' : 'text-text-secondary')}>{symbol}</span>
+        <span className="pl-3 pr-1 text-sm font-medium" style={{ color: theme === 'light' ? '#9ca3af' : undefined }}>{symbol}</span>
         <input
           type="number"
           value={value || ''}
           onChange={(e) => onChange(Number(e.target.value) || 0)}
-          className={cn(
-            'w-full bg-transparent px-2 py-2.5 font-semibold text-sm outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none',
-            theme === 'light' ? 'text-gray-900' : 'text-text-primary'
-          )}
+          className="w-full bg-transparent px-2 py-2.5 font-semibold text-sm outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+          style={{ color: theme === 'light' ? '#111827' : undefined }}
         />
       </div>
-      {hint && <p className={cn('text-[11px] mt-1', theme === 'light' ? 'text-gray-400' : 'text-text-secondary')}>{hint}</p>}
+      {hint && <p className="text-[11px] mt-1" style={{ color: theme === 'light' ? '#9ca3af' : undefined }}>{hint}</p>}
     </div>
   )
 }
@@ -97,17 +95,18 @@ function NumberInput({
   const theme = useCalcTheme()
   return (
     <div className="flex-1 min-w-[140px]">
-      <label className={cn('block text-xs font-bold uppercase tracking-wider mb-1.5', theme === 'light' ? 'text-gray-500' : 'text-text-secondary')}>{label}</label>
+      <label className="block text-xs font-bold uppercase tracking-wider mb-1.5" style={{ color: theme === 'light' ? '#6b7280' : undefined }}>{label}</label>
       <input
         type="number"
         value={value || ''}
         onChange={(e) => onChange(Number(e.target.value) || 0)}
         className={cn(
           'w-full rounded-lg border px-3 py-2.5 font-semibold text-sm outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none',
-          theme === 'light' ? 'bg-gray-50 border-gray-200 text-gray-900' : 'bg-[#1a1a2e] border-border text-text-primary'
+          theme === 'light' ? 'bg-gray-50 border-gray-200' : 'bg-[#1a1a2e] border-border'
         )}
+        style={{ color: theme === 'light' ? '#111827' : undefined }}
       />
-      {hint && <p className={cn('text-[11px] mt-1', theme === 'light' ? 'text-gray-400' : 'text-text-secondary')}>{hint}</p>}
+      {hint && <p className="text-[11px] mt-1" style={{ color: theme === 'light' ? '#9ca3af' : undefined }}>{hint}</p>}
     </div>
   )
 }
@@ -122,8 +121,8 @@ function SliderInput({
   return (
     <div className="flex-1 min-w-[180px]">
       <div className="flex items-center justify-between mb-1.5">
-        <label className={cn('text-xs font-bold uppercase tracking-wider', theme === 'light' ? 'text-gray-500' : 'text-text-secondary')}>{label}</label>
-        <span className={cn('text-sm font-bold', theme === 'light' ? 'text-gray-900' : 'text-text-primary')}>{value}%</span>
+        <label className="text-xs font-bold uppercase tracking-wider" style={{ color: theme === 'light' ? '#6b7280' : undefined }}>{label}</label>
+        <span className="text-sm font-bold" style={{ color: theme === 'light' ? '#111827' : undefined }}>{value}%</span>
       </div>
       <input
         type="range"
@@ -152,11 +151,8 @@ function ResultCard({
     danger: theme === 'light' ? 'border-red-200 bg-red-50' : 'border-red-500/30 bg-red-500/5',
     warning: theme === 'light' ? 'border-amber-200 bg-amber-50' : 'border-amber-500/30 bg-amber-500/5',
   }
-  const valueColors = {
-    default: theme === 'light' ? 'text-gray-900' : 'text-text-primary',
-    success: theme === 'light' ? 'text-emerald-700' : 'text-emerald-400',
-    danger: theme === 'light' ? 'text-red-700' : 'text-red-400',
-    warning: theme === 'light' ? 'text-amber-700' : 'text-amber-400',
+  const valueStyleColors: Record<string, string> = {
+    default: '#111827', success: '#047857', danger: '#b91c1c', warning: '#b45309',
   }
   return (
     <div className={cn(
@@ -164,9 +160,9 @@ function ResultCard({
       colors[variant],
       highlight && 'ring-1 ring-amber-500/40'
     )}>
-      <p className={cn('text-[10px] font-bold uppercase tracking-wider mb-1', theme === 'light' ? 'text-gray-500' : 'text-text-secondary')}>{title}</p>
-      <p className={cn('text-lg font-bold', valueColors[variant])}>{value}</p>
-      {subtitle && <p className={cn('text-[11px] mt-0.5', theme === 'light' ? 'text-gray-400' : 'text-text-secondary')}>{subtitle}</p>}
+      <p className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: theme === 'light' ? '#6b7280' : undefined }}>{title}</p>
+      <p className="text-lg font-bold" style={{ color: theme === 'light' ? valueStyleColors[variant] : undefined }}>{value}</p>
+      {subtitle && <p className="text-[11px] mt-0.5" style={{ color: theme === 'light' ? '#9ca3af' : undefined }}>{subtitle}</p>}
     </div>
   )
 }
@@ -175,7 +171,7 @@ function FlowArrow({ text }: { text: string }) {
   const theme = useCalcTheme()
   return (
     <div className="flex items-center justify-center py-1">
-      <div className={cn('flex items-center gap-2 text-[11px]', theme === 'light' ? 'text-gray-400' : 'text-text-secondary')}>
+      <div className={cn('flex items-center gap-2 text-[11px]', theme === 'dark' && 'text-text-secondary')} style={theme === 'light' ? { color: '#9ca3af' } : undefined}>
         <div className={cn('h-px w-8', theme === 'light' ? 'bg-gray-200' : 'bg-border')} />
         <span>{text}</span>
         <div className={cn('h-px w-8', theme === 'light' ? 'bg-gray-200' : 'bg-border')} />
@@ -188,12 +184,12 @@ function SectionHeader({ step, title, subtitle }: { step: number; title: string;
   const theme = useCalcTheme()
   return (
     <div className={cn('flex items-center gap-3 mb-4 pb-3 border-b', theme === 'light' ? 'border-gray-200' : 'border-border')}>
-      <div className={cn('w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0', theme === 'light' ? 'bg-amber-100 text-amber-700' : 'bg-amber-500/20 text-amber-400')}>
+      <div className={cn('w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0', theme === 'light' ? 'bg-amber-100' : 'bg-amber-500/20 text-amber-400')} style={theme === 'light' ? { color: '#b45309' } : undefined}>
         {step}
       </div>
       <div>
-        <h3 className={cn('font-bold text-sm', theme === 'light' ? 'text-gray-900' : 'text-text-primary')}>{title}</h3>
-        <p className={cn('text-xs', theme === 'light' ? 'text-gray-500' : 'text-text-secondary')}>{subtitle}</p>
+        <h3 className="font-bold text-sm" style={{ color: theme === 'light' ? '#111827' : undefined }}>{title}</h3>
+        <p className="text-xs" style={{ color: theme === 'light' ? '#6b7280' : undefined }}>{subtitle}</p>
       </div>
     </div>
   )
@@ -287,46 +283,46 @@ function CalculatorMode({ country }: { country: CountryConfig }) {
       <SectionCard>
         <SectionHeader step={1} title="Costeo del Producto" subtitle="Precio de venta, producto y flete" />
         <div className="flex flex-wrap gap-4 mb-4">
-          <CurrencyInput label="\💰 Costo Producto" value={cost} onChange={setCost} hint="Lo que pagas al proveedor" symbol={country.symbol} />
-          <CurrencyInput label="\🚚 Flete Promedio" value={shipping} onChange={setShipping} hint={country.shippingHint} symbol={country.symbol} />
-          <CurrencyInput label="\🏷\️ Precio de Venta" value={price} onChange={setPrice} hint="\¿A cu\ánto lo vendes?" symbol={country.symbol} />
+          <CurrencyInput label="💰 Costo Producto" value={cost} onChange={setCost} hint="Lo que pagas al proveedor" symbol={country.symbol} />
+          <CurrencyInput label="🚚 Flete Promedio" value={shipping} onChange={setShipping} hint={country.shippingHint} symbol={country.symbol} />
+          <CurrencyInput label="🏷️ Precio de Venta" value={price} onChange={setPrice} hint="¿A cuánto lo vendes?" symbol={country.symbol} />
         </div>
 
         <ResultCard
           title="Tu Margen Bruto"
-          value={`${calc.marginPct.toFixed(1)}% \— ${marginLabel}`}
-          subtitle={`Costo total: ${fmt(calc.totalCost)} \· Ganancia por unidad: ${fmt(calc.profit)}`}
+          value={`${calc.marginPct.toFixed(1)}% — ${marginLabel}`}
+          subtitle={`Costo total: ${fmt(calc.totalCost)} · Ganancia por unidad: ${fmt(calc.profit)}`}
           variant={marginVariant as any}
         />
 
         <div className="grid grid-cols-2 gap-3 mt-3">
-          <ResultCard title="Precio M\ínimo (50%)" value={fmt(calc.minPrice)} subtitle="Margen bruto del 50%" />
-          <ResultCard title="Precio \Óptimo (60%) \⭐" value={fmt(calc.optPrice)} subtitle="Margen bruto del 60%" highlight />
+          <ResultCard title="Precio Mínimo (50%)" value={fmt(calc.minPrice)} subtitle="Margen bruto del 50%" />
+          <ResultCard title="Precio Óptimo (60%) ⭐" value={fmt(calc.optPrice)} subtitle="Margen bruto del 60%" highlight />
         </div>
       </SectionCard>
 
       {/* Section 2: Sales Simulation */}
       <SectionCard>
-        <SectionHeader step={2} title="Simulaci\ón de Ventas" subtitle="Cancelaciones, devoluciones y margen bruto real" />
+        <SectionHeader step={2} title="Simulación de Ventas" subtitle="Cancelaciones, devoluciones y margen bruto real" />
 
         <div className="flex flex-wrap gap-4 mb-4">
-          <NumberInput label="\📦 Pedidos / D\ía" value={ordersPerDay} onChange={setOrdersPerDay} />
-          <SliderInput label="\📵 % Cancelaciones" value={cancelPct} onChange={setCancelPct} />
-          <SliderInput label="\↩\️ % Devoluciones" value={returnPct} onChange={setReturnPct} />
+          <NumberInput label="📦 Pedidos / Día" value={ordersPerDay} onChange={setOrdersPerDay} />
+          <SliderInput label="📵 % Cancelaciones" value={cancelPct} onChange={setCancelPct} />
+          <SliderInput label="↩️ % Devoluciones" value={returnPct} onChange={setReturnPct} />
         </div>
 
         <div className="space-y-1">
-          <ResultCard title="Ventas Totales" value={`${calc.totalOrders} pedidos \· ${fmt(calc.totalRevenue)}`} />
-          <FlowArrow text={`\−${cancelPct}% = \−${calc.cancelledOrders} pedidos cancelados`} />
-          <ResultCard title="Despachados" value={`${calc.dispatched} pedidos \· ${fmt(calc.dispatchedRevenue)}`} />
-          <FlowArrow text={`\−${returnPct}% = \−${calc.returnedOrders} pedidos devueltos`} />
-          <ResultCard title="Entregados \✅" value={`${calc.delivered} pedidos \· ${fmt(calc.deliveredRevenue)}`} variant="success" />
+          <ResultCard title="Ventas Totales" value={`${calc.totalOrders} pedidos · ${fmt(calc.totalRevenue)}`} />
+          <FlowArrow text={`−${cancelPct}% = −${calc.cancelledOrders} pedidos cancelados`} />
+          <ResultCard title="Despachados" value={`${calc.dispatched} pedidos · ${fmt(calc.dispatchedRevenue)}`} />
+          <FlowArrow text={`−${returnPct}% = −${calc.returnedOrders} pedidos devueltos`} />
+          <ResultCard title="Entregados ✅" value={`${calc.delivered} pedidos · ${fmt(calc.deliveredRevenue)}`} variant="success" />
         </div>
 
         <div className="grid grid-cols-3 gap-3 mt-3">
           <ResultCard title={`Margen Bruto (${calc.marginPct.toFixed(0)}%)`} value={fmt(calc.grossMargin)} subtitle={`${calc.marginPct.toFixed(1)}% sobre ingresos entregados`} />
-          <ResultCard title="Fletes Devueltos" value={`\−${fmt(calc.returnShipping)}`} subtitle={`${calc.returnedOrders} dev. \× ${fmt(shipping)}`} variant="danger" />
-          <ResultCard title="Margen Bruto Real \🎯" value={fmt(calc.realMargin)} subtitle="Margen bruto \− fletes devueltos" variant={calc.realMargin > 0 ? 'success' : 'danger'} />
+          <ResultCard title="Fletes Devueltos" value={`−${fmt(calc.returnShipping)}`} subtitle={`${calc.returnedOrders} dev. × ${fmt(shipping)}`} variant="danger" />
+          <ResultCard title="Margen Bruto Real 🎯" value={fmt(calc.realMargin)} subtitle="Margen bruto − fletes devueltos" variant={calc.realMargin > 0 ? 'success' : 'danger'} />
         </div>
       </SectionCard>
 
@@ -335,17 +331,17 @@ function CalculatorMode({ country }: { country: CountryConfig }) {
         <SectionHeader step={3} title="Calculadora de Pauta" subtitle="CPA ideal y utilidad operacional" />
 
         <InsetBox className="mb-4">
-          <p className={cn('text-[10px] font-bold uppercase tracking-wider mb-1', theme === 'light' ? 'text-gray-500' : 'text-text-secondary')}>Resumen del Escenario</p>
-          <div className={cn('flex flex-wrap gap-x-4 gap-y-0.5 text-xs', theme === 'light' ? 'text-gray-500' : 'text-text-secondary')}>
-            <span>Precio venta: <b className={theme === 'light' ? 'text-gray-900' : 'text-text-primary'}>{fmt(price)}</b></span>
-            <span>Costo total: <b className={theme === 'light' ? 'text-gray-900' : 'text-text-primary'}>{fmt(calc.totalCost)}</b></span>
-            <span>Margen bruto: <b className={theme === 'light' ? 'text-gray-900' : 'text-text-primary'}>{calc.marginPct.toFixed(1)}%</b></span>
-            <span>Pedidos: <b className={theme === 'light' ? 'text-gray-900' : 'text-text-primary'}>{calc.totalOrders}</b></span>
-            <span>Margen neto: <b className={theme === 'light' ? 'text-gray-900' : 'text-text-primary'}>{fmt(calc.realMargin)}</b></span>
+          <p className={cn('text-[10px] font-bold uppercase tracking-wider mb-1', theme === 'dark' && 'text-text-secondary')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>Resumen del Escenario</p>
+          <div className={cn('flex flex-wrap gap-x-4 gap-y-0.5 text-xs', theme === 'dark' && 'text-text-secondary')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>
+            <span>Precio venta: <b style={theme === 'light' ? { color: '#111827' } : undefined} className={theme === 'dark' ? 'text-text-primary' : undefined}>{fmt(price)}</b></span>
+            <span>Costo total: <b style={theme === 'light' ? { color: '#111827' } : undefined} className={theme === 'dark' ? 'text-text-primary' : undefined}>{fmt(calc.totalCost)}</b></span>
+            <span>Margen bruto: <b style={theme === 'light' ? { color: '#111827' } : undefined} className={theme === 'dark' ? 'text-text-primary' : undefined}>{calc.marginPct.toFixed(1)}%</b></span>
+            <span>Pedidos: <b style={theme === 'light' ? { color: '#111827' } : undefined} className={theme === 'dark' ? 'text-text-primary' : undefined}>{calc.totalOrders}</b></span>
+            <span>Margen neto: <b style={theme === 'light' ? { color: '#111827' } : undefined} className={theme === 'dark' ? 'text-text-primary' : undefined}>{fmt(calc.realMargin)}</b></span>
           </div>
         </InsetBox>
 
-        <p className={cn('text-xs font-bold uppercase tracking-wider mb-3', theme === 'light' ? 'text-gray-500' : 'text-text-secondary')}>\🎯 Presupuesto de Pauta sobre el Margen Bruto</p>
+        <p className={cn('text-xs font-bold uppercase tracking-wider mb-3', theme === 'dark' && 'text-text-secondary')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>{'🎯'} Presupuesto de Pauta sobre el Margen Bruto</p>
 
         <div className="grid grid-cols-3 gap-3 mb-4">
           {[
@@ -360,21 +356,21 @@ function CalculatorMode({ country }: { country: CountryConfig }) {
                 : (theme === 'light' ? 'border-gray-200 bg-white' : 'border-border')
             )}>
               {tier.label && (
-                <span className={cn('inline-block px-2 py-0.5 text-[9px] font-bold uppercase rounded mb-1.5', theme === 'light' ? 'bg-amber-100 text-amber-700' : 'bg-amber-500/20 text-amber-400')}>
+                <span className={cn('inline-block px-2 py-0.5 text-[9px] font-bold uppercase rounded mb-1.5', theme === 'light' ? 'bg-amber-100' : 'bg-amber-500/20 text-amber-400')} style={theme === 'light' ? { color: '#b45309' } : undefined}>
                   {tier.label}
                 </span>
               )}
-              <p className={cn('text-[10px] font-bold uppercase tracking-wider', theme === 'light' ? 'text-gray-500' : 'text-text-secondary')}>{tier.pct}% del Margen</p>
-              <p className={cn('text-lg font-bold', theme === 'light' ? 'text-gray-900' : 'text-text-primary')}>{fmt(tier.budget)}</p>
+              <p className={cn('text-[10px] font-bold uppercase tracking-wider', theme === 'dark' && 'text-text-secondary')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>{tier.pct}% del Margen</p>
+              <p className={cn('text-lg font-bold', theme === 'dark' && 'text-text-primary')} style={theme === 'light' ? { color: '#111827' } : undefined}>{fmt(tier.budget)}</p>
               <div className="mt-2 space-y-1">
                 <div>
-                  <p className={cn('text-[10px]', theme === 'light' ? 'text-gray-500' : 'text-text-secondary')}>CPA m\áximo</p>
-                  <p className={cn('text-sm font-bold', theme === 'light' ? 'text-gray-900' : 'text-text-primary')}>{fmt(tier.cpa)}</p>
-                  <p className={cn('text-[10px]', theme === 'light' ? 'text-gray-500' : 'text-text-secondary')}>para {calc.totalOrders} pedidos</p>
+                  <p className={cn('text-[10px]', theme === 'dark' && 'text-text-secondary')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>CPA máximo</p>
+                  <p className={cn('text-sm font-bold', theme === 'dark' && 'text-text-primary')} style={theme === 'light' ? { color: '#111827' } : undefined}>{fmt(tier.cpa)}</p>
+                  <p className={cn('text-[10px]', theme === 'dark' && 'text-text-secondary')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>para {calc.totalOrders} pedidos</p>
                 </div>
                 <div className={cn('pt-1 border-t', theme === 'light' ? 'border-gray-100' : 'border-border/50')}>
-                  <p className={cn('text-[10px]', theme === 'light' ? 'text-gray-500' : 'text-text-secondary')}>Margen operacional</p>
-                  <p className={cn('text-sm font-bold', theme === 'light' ? 'text-emerald-700' : 'text-emerald-400')}>{fmt(tier.op)}</p>
+                  <p className={cn('text-[10px]', theme === 'dark' && 'text-text-secondary')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>Margen operacional</p>
+                  <p className={cn('text-sm font-bold', theme === 'dark' && 'text-emerald-400')} style={theme === 'light' ? { color: '#047857' } : undefined}>{fmt(tier.op)}</p>
                 </div>
               </div>
             </div>
@@ -382,12 +378,12 @@ function CalculatorMode({ country }: { country: CountryConfig }) {
         </div>
 
         <InsetBox className="p-4">
-          <CurrencyInput label="\📈 \¿Cu\ál es tu CPA actual?" value={currentCPA} onChange={setCurrentCPA} hint="Costo por adquisici\ón en tu plataforma de pauta" symbol={country.symbol} />
+          <CurrencyInput label="📈 ¿Cuál es tu CPA actual?" value={currentCPA} onChange={setCurrentCPA} hint="Costo por adquisición en tu plataforma de pauta" symbol={country.symbol} />
           {currentCPA > 0 && (
             <div className="grid grid-cols-3 gap-3 mt-3">
-              <ResultCard title="Gasto Total en Pauta" value={fmt(calc.cpaTotalSpend)} subtitle={`${calc.totalOrders} pedidos \× ${fmt(currentCPA)}`} />
-              <ResultCard title="Margen Operacional" value={fmt(calc.cpaOperational)} variant={calc.cpaOperational > 0 ? 'success' : 'danger'} subtitle="Margen real \− gasto pauta" />
-              <ResultCard title="ROAS" value={`${calc.cpaROAS.toFixed(1)}x`} variant={calc.cpaROAS >= 3 ? 'success' : calc.cpaROAS >= 2 ? 'warning' : 'danger'} subtitle="Retorno sobre inversi\ón" />
+              <ResultCard title="Gasto Total en Pauta" value={fmt(calc.cpaTotalSpend)} subtitle={`${calc.totalOrders} pedidos × ${fmt(currentCPA)}`} />
+              <ResultCard title="Margen Operacional" value={fmt(calc.cpaOperational)} variant={calc.cpaOperational > 0 ? 'success' : 'danger'} subtitle="Margen real − gasto pauta" />
+              <ResultCard title="ROAS" value={`${calc.cpaROAS.toFixed(1)}x`} variant={calc.cpaROAS >= 3 ? 'success' : calc.cpaROAS >= 2 ? 'warning' : 'danger'} subtitle="Retorno sobre inversión" />
             </div>
           )}
         </InsetBox>
@@ -395,18 +391,24 @@ function CalculatorMode({ country }: { country: CountryConfig }) {
 
       {/* Golden Rules */}
       <SectionCard>
-        <p className={cn('text-xs font-bold uppercase tracking-wider mb-3', theme === 'light' ? 'text-gray-500' : 'text-text-secondary')}>\📚 Reglas de Oro</p>
+        <p className={cn('text-xs font-bold uppercase tracking-wider mb-3', theme === 'dark' && 'text-text-secondary')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>{'📚'} Reglas de Oro</p>
         <div className="grid grid-cols-3 gap-3">
           {[
-            { emoji: '\🎯', title: 'Regla del 50%', desc: 'Costo total = m\áximo 50% del precio de venta.' },
-            { emoji: '\⭐', title: 'Regla del 40%', desc: 'Costo total = 40% del precio \→ margen del 60%.' },
-            { emoji: '\📢', title: 'Regla del 35%', desc: 'Pauta = m\áximo 35% del margen neto real.' },
+            { emoji: '🎯', title: 'Regla del 50%', desc: 'Costo total = máximo 50% del precio de venta.' },
+            { emoji: '⭐', title: 'Regla del 40%', desc: 'Costo total = 40% del precio → margen del 60%.' },
+            { emoji: '📢', title: 'Regla del 35%', desc: 'Pauta = máximo 35% del margen neto real.' },
           ].map((rule) => (
-            <InsetBox key={rule.title} className="text-center p-3">
+            <div
+              key={rule.title}
+              className={cn(
+                'text-center p-3 rounded-xl border',
+                theme === 'light' ? 'bg-amber-50 border-amber-200' : 'bg-[#1a1a2e] border-border'
+              )}
+            >
               <span className="text-lg">{rule.emoji}</span>
-              <p className={cn('text-xs font-bold mt-1', theme === 'light' ? 'text-gray-900' : 'text-text-primary')}>{rule.title}</p>
-              <p className={cn('text-[10px] mt-0.5', theme === 'light' ? 'text-gray-500' : 'text-text-secondary')}>{rule.desc}</p>
-            </InsetBox>
+              <p className="text-xs font-bold mt-1" style={{ color: theme === 'light' ? '#111827' : undefined }}>{rule.title}</p>
+              <p className="text-[10px] mt-0.5" style={{ color: theme === 'light' ? '#6b7280' : undefined }}>{rule.desc}</p>
+            </div>
           ))}
         </div>
       </SectionCard>
@@ -468,76 +470,76 @@ function RealMode({ country }: { country: CountryConfig }) {
       <SectionCard>
         <SectionHeader step={1} title="Tu Producto" subtitle="Precio, costo y flete" />
         <div className="flex flex-wrap gap-4">
-          <CurrencyInput label="\🏷\️ Precio de Venta" value={price} onChange={setPrice} symbol={country.symbol} />
-          <CurrencyInput label="\💰 Costo Producto" value={cost} onChange={setCost} symbol={country.symbol} />
-          <CurrencyInput label="\🚚 Flete Promedio" value={shipping} onChange={setShipping} hint={country.shippingHint} symbol={country.symbol} />
+          <CurrencyInput label="🏷️ Precio de Venta" value={price} onChange={setPrice} symbol={country.symbol} />
+          <CurrencyInput label="💰 Costo Producto" value={cost} onChange={setCost} symbol={country.symbol} />
+          <CurrencyInput label="🚚 Flete Promedio" value={shipping} onChange={setShipping} hint={country.shippingHint} symbol={country.symbol} />
         </div>
       </SectionCard>
 
       <SectionCard>
-        <SectionHeader step={2} title="Tu Campa\ña Real" subtitle="Inversi\ón, pedidos y d\ías" />
+        <SectionHeader step={2} title="Tu Campaña Real" subtitle="Inversión, pedidos y días" />
         <div className="flex flex-wrap gap-4 mb-4">
-          <CurrencyInput label="\💸 Inversi\ón en Pauta" value={adSpend} onChange={setAdSpend} hint="Total invertido en ese per\íodo" symbol={country.symbol} />
-          <NumberInput label="\📦 Pedidos Totales" value={totalOrders} onChange={setTotalOrders} hint="Pedidos recibidos en ese per\íodo" />
-          <NumberInput label="\📅 D\ías de Campa\ña" value={days} onChange={setDays} hint="\¿En cu\ántos d\ías fue eso?" />
+          <CurrencyInput label="💸 Inversión en Pauta" value={adSpend} onChange={setAdSpend} hint="Total invertido en ese período" symbol={country.symbol} />
+          <NumberInput label="📦 Pedidos Totales" value={totalOrders} onChange={setTotalOrders} hint="Pedidos recibidos en ese período" />
+          <NumberInput label="📅 Días de Campaña" value={days} onChange={setDays} hint="¿En cuántos días fue eso?" />
         </div>
         <div className="flex flex-wrap gap-4">
-          <SliderInput label="\📵 % Cancelaciones" value={cancelPct} onChange={setCancelPct} />
-          <SliderInput label="\↩\️ % Devoluciones" value={returnPct} onChange={setReturnPct} />
+          <SliderInput label="📵 % Cancelaciones" value={cancelPct} onChange={setCancelPct} />
+          <SliderInput label="↩️ % Devoluciones" value={returnPct} onChange={setReturnPct} />
         </div>
       </SectionCard>
 
       {allFilled ? (
         <>
           <SectionCard>
-            <SectionHeader step={3} title="Tu Embudo Real" subtitle="Pedidos \→ Entregas \→ Ganancia" />
+            <SectionHeader step={3} title="Tu Embudo Real" subtitle="Pedidos → Entregas → Ganancia" />
             <div className="space-y-1">
-              <ResultCard title="Pedidos Totales" value={`${totalOrders} pedidos \· ${fmt(calc.totalRevenue)}`} />
-              <FlowArrow text={`\−${cancelPct}% = \−${calc.cancelledOrders} cancelados`} />
+              <ResultCard title="Pedidos Totales" value={`${totalOrders} pedidos · ${fmt(calc.totalRevenue)}`} />
+              <FlowArrow text={`−${cancelPct}% = −${calc.cancelledOrders} cancelados`} />
               <ResultCard title="Despachados" value={`${calc.dispatched} pedidos`} />
-              <FlowArrow text={`\−${returnPct}% = \−${calc.returnedOrders} devueltos`} />
-              <ResultCard title="Entregados \✅" value={`${calc.delivered} pedidos \· ${fmt(calc.deliveredRevenue)}`} variant="success" />
+              <FlowArrow text={`−${returnPct}% = −${calc.returnedOrders} devueltos`} />
+              <ResultCard title="Entregados ✅" value={`${calc.delivered} pedidos · ${fmt(calc.deliveredRevenue)}`} variant="success" />
             </div>
           </SectionCard>
 
           <SectionCard>
-            <SectionHeader step={4} title="Tu Rentabilidad Real" subtitle="Ingresos \− costos \− pauta" />
+            <SectionHeader step={4} title="Tu Rentabilidad Real" subtitle="Ingresos − costos − pauta" />
 
             <div className="grid grid-cols-2 gap-3 mb-3">
               <ResultCard title="Ingresos Entregados" value={fmt(calc.deliveredRevenue)} />
               <ResultCard title={`Margen Bruto (${calc.marginPct.toFixed(0)}%)`} value={fmt(calc.grossMargin)} />
-              <ResultCard title="Fletes Devueltos" value={`\−${fmt(calc.returnShipping)}`} variant="danger" subtitle={`${calc.returnedOrders} dev. \× ${fmt(shipping)}`} />
+              <ResultCard title="Fletes Devueltos" value={`−${fmt(calc.returnShipping)}`} variant="danger" subtitle={`${calc.returnedOrders} dev. × ${fmt(shipping)}`} />
               <ResultCard title="Margen Neto Real" value={fmt(calc.realMargin)} variant={calc.realMargin > 0 ? 'success' : 'danger'} />
             </div>
 
             <div className="grid grid-cols-2 gap-3 mb-3">
-              <ResultCard title="Inversi\ón en Pauta" value={`\−${fmt(adSpend)}`} variant="danger" />
+              <ResultCard title="Inversión en Pauta" value={`−${fmt(adSpend)}`} variant="danger" />
               <ResultCard
-                title="UTILIDAD OPERACIONAL \🎯"
+                title="UTILIDAD OPERACIONAL 🎯"
                 value={fmt(calc.operationalMargin)}
                 variant={calc.operationalMargin > 0 ? 'success' : 'danger'}
                 highlight
-                subtitle={calc.operationalMargin > 0 ? 'Est\ás ganando dinero' : '\¡Est\ás perdiendo dinero!'}
+                subtitle={calc.operationalMargin > 0 ? 'Estás ganando dinero' : '¡Estás perdiendo dinero!'}
               />
             </div>
 
             <div className="grid grid-cols-4 gap-3">
               <ResultCard title="CPA Real" value={fmt(calc.cpa)} subtitle="Costo por pedido" variant={calc.cpa <= calc.breakEvenCPA ? 'success' : 'danger'} />
-              <ResultCard title="CPA Break-Even" value={fmt(calc.breakEvenCPA)} subtitle="CPA m\áximo sin perder" />
+              <ResultCard title="CPA Break-Even" value={fmt(calc.breakEvenCPA)} subtitle="CPA máximo sin perder" />
               <ResultCard title="ROAS" value={`${calc.roas.toFixed(1)}x`} variant={calc.roas >= 3 ? 'success' : calc.roas >= 2 ? 'warning' : 'danger'} subtitle={calc.roas >= 3 ? 'Excelente' : calc.roas >= 2 ? 'Aceptable' : 'Bajo'} />
-              <ResultCard title="Ganancia / D\ía" value={fmt(calc.profitPerDay)} variant={calc.profitPerDay > 0 ? 'success' : 'danger'} subtitle={`${calc.ordersPerDay.toFixed(1)} pedidos/d\ía`} />
+              <ResultCard title="Ganancia / Día" value={fmt(calc.profitPerDay)} variant={calc.profitPerDay > 0 ? 'success' : 'danger'} subtitle={`${calc.ordersPerDay.toFixed(1)} pedidos/día`} />
             </div>
           </SectionCard>
         </>
       ) : (
         <div className={cn('rounded-2xl border p-6 text-center', theme === 'light' ? 'bg-amber-50 border-amber-200' : 'bg-surface-secondary border-amber-500/20')}>
-          <p className={cn('font-bold text-sm mb-2', theme === 'light' ? 'text-amber-700' : 'text-amber-400')}>\⛔ Completa todos los campos para ver los resultados</p>
+          <p className={cn('font-bold text-sm mb-2', theme === 'dark' && 'text-amber-400')} style={theme === 'light' ? { color: '#b45309' } : undefined}>{'⛔'} Completa todos los campos para ver los resultados</p>
           <div className="flex flex-wrap gap-2 justify-center">
-            {price <= 0 && <span className={cn('text-xs px-2 py-1 rounded', theme === 'light' ? 'text-gray-500 bg-gray-100' : 'text-text-secondary bg-[#1a1a2e]')}>\🏷\️ Precio de venta</span>}
-            {cost <= 0 && <span className={cn('text-xs px-2 py-1 rounded', theme === 'light' ? 'text-gray-500 bg-gray-100' : 'text-text-secondary bg-[#1a1a2e]')}>\💰 Costo producto</span>}
-            {shipping <= 0 && <span className={cn('text-xs px-2 py-1 rounded', theme === 'light' ? 'text-gray-500 bg-gray-100' : 'text-text-secondary bg-[#1a1a2e]')}>\🚚 Flete promedio</span>}
-            {adSpend <= 0 && <span className={cn('text-xs px-2 py-1 rounded', theme === 'light' ? 'text-gray-500 bg-gray-100' : 'text-text-secondary bg-[#1a1a2e]')}>\💸 Inversi\ón en pauta</span>}
-            {totalOrders <= 0 && <span className={cn('text-xs px-2 py-1 rounded', theme === 'light' ? 'text-gray-500 bg-gray-100' : 'text-text-secondary bg-[#1a1a2e]')}>\📦 Pedidos totales</span>}
+            {price <= 0 && <span className={cn('text-xs px-2 py-1 rounded', theme === 'light' ? 'bg-gray-100' : 'text-text-secondary bg-[#1a1a2e]')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>{'🏷️'} Precio de venta</span>}
+            {cost <= 0 && <span className={cn('text-xs px-2 py-1 rounded', theme === 'light' ? 'bg-gray-100' : 'text-text-secondary bg-[#1a1a2e]')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>{'💰'} Costo producto</span>}
+            {shipping <= 0 && <span className={cn('text-xs px-2 py-1 rounded', theme === 'light' ? 'bg-gray-100' : 'text-text-secondary bg-[#1a1a2e]')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>{'🚚'} Flete promedio</span>}
+            {adSpend <= 0 && <span className={cn('text-xs px-2 py-1 rounded', theme === 'light' ? 'bg-gray-100' : 'text-text-secondary bg-[#1a1a2e]')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>{'💸'} Inversión en pauta</span>}
+            {totalOrders <= 0 && <span className={cn('text-xs px-2 py-1 rounded', theme === 'light' ? 'bg-gray-100' : 'text-text-secondary bg-[#1a1a2e]')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>{'📦'} Pedidos totales</span>}
           </div>
         </div>
       )}
@@ -556,25 +558,29 @@ export default function CosteoCalculator({ onBack }: { onBack: () => void }) {
   return (
     <ThemeCtx.Provider value={theme}>
       <div className="h-[calc(100vh-200px)]">
-        <div className={cn(
-          'rounded-2xl border h-full flex flex-col transition-colors duration-200',
-          theme === 'light' ? 'bg-[#faf9f7] border-gray-200' : 'bg-surface border-border'
-        )}>
+        <div
+          className={cn(
+            'rounded-2xl border h-full flex flex-col transition-colors duration-200',
+            theme === 'light' ? 'bg-[#faf9f7] border-gray-200' : 'bg-surface border-border'
+          )}
+          style={theme === 'light' ? { color: '#111827' } : undefined}
+        >
           {/* Header */}
           <div className={cn('flex items-center justify-between px-6 py-4 border-b flex-shrink-0', theme === 'light' ? 'border-gray-200' : 'border-border')}>
             <div className="flex items-center gap-4">
               <button
                 onClick={onBack}
-                className={cn('p-2 rounded-lg transition-colors', theme === 'light' ? 'hover:bg-gray-100 text-gray-500 hover:text-gray-900' : 'hover:bg-surface-secondary text-text-secondary hover:text-text-primary')}
+                className={cn('p-2 rounded-lg transition-colors', theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-surface-secondary text-text-secondary hover:text-text-primary')}
+                style={theme === 'light' ? { color: '#6b7280' } : undefined}
               >
                 <ArrowLeft className="w-5 h-5" />
               </button>
               <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-gradient-to-br from-amber-500 to-yellow-500">
-                <span className="text-xl">{'\📊'}</span>
+                <span className="text-xl">{'📊'}</span>
               </div>
               <div>
-                <h2 className={cn('text-lg font-semibold', theme === 'light' ? 'text-gray-900' : 'text-text-primary')}>Calculadora de Costeo</h2>
-                <p className={cn('text-sm', theme === 'light' ? 'text-gray-500' : 'text-text-secondary')}>Rentabilidad COD \· {country.currency}</p>
+                <h2 className={cn('text-lg font-semibold', theme === 'dark' && 'text-text-primary')} style={theme === 'light' ? { color: '#111827' } : undefined}>Calculadora de Costeo</h2>
+                <p className={cn('text-sm', theme === 'dark' && 'text-text-secondary')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>Rentabilidad COD · {country.currency}</p>
               </div>
             </div>
 
@@ -586,22 +592,24 @@ export default function CosteoCalculator({ onBack }: { onBack: () => void }) {
                   className={cn(
                     'px-3 py-1.5 text-xs font-medium rounded-md transition-all',
                     mode === 'calculator'
-                      ? (theme === 'light' ? 'bg-white text-amber-700 shadow-sm' : 'bg-amber-500/20 text-amber-400')
-                      : (theme === 'light' ? 'text-gray-500 hover:text-gray-900' : 'text-text-secondary hover:text-text-primary')
+                      ? (theme === 'light' ? 'bg-white shadow-sm' : 'bg-amber-500/20 text-amber-400')
+                      : (theme === 'dark' ? 'text-text-secondary hover:text-text-primary' : '')
                   )}
+                  style={theme === 'light' ? { color: mode === 'calculator' ? '#b45309' : '#6b7280' } : undefined}
                 >
-                  {'\📊'} Calculadora
+                  {'📊'} Calculadora
                 </button>
                 <button
                   onClick={() => setMode('real')}
                   className={cn(
                     'px-3 py-1.5 text-xs font-medium rounded-md transition-all',
                     mode === 'real'
-                      ? (theme === 'light' ? 'bg-white text-amber-700 shadow-sm' : 'bg-amber-500/20 text-amber-400')
-                      : (theme === 'light' ? 'text-gray-500 hover:text-gray-900' : 'text-text-secondary hover:text-text-primary')
+                      ? (theme === 'light' ? 'bg-white shadow-sm' : 'bg-amber-500/20 text-amber-400')
+                      : (theme === 'dark' ? 'text-text-secondary hover:text-text-primary' : '')
                   )}
+                  style={theme === 'light' ? { color: mode === 'real' ? '#b45309' : '#6b7280' } : undefined}
                 >
-                  {'\📈'} Real
+                  {'📈'} Real
                 </button>
               </div>
 
@@ -610,9 +618,10 @@ export default function CosteoCalculator({ onBack }: { onBack: () => void }) {
                 onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
                 className={cn(
                   'p-2 rounded-lg border transition-colors',
-                  theme === 'light' ? 'bg-gray-100 border-gray-200 text-gray-600 hover:bg-gray-200' : 'bg-[#1a1a2e] border-border text-text-secondary hover:text-text-primary'
+                  theme === 'light' ? 'bg-gray-100 border-gray-200 hover:bg-gray-200' : 'bg-[#1a1a2e] border-border text-text-secondary hover:text-text-primary'
                 )}
                 title={theme === 'light' ? 'Modo oscuro' : 'Modo claro'}
+                style={theme === 'light' ? { color: '#4b5563' } : undefined}
               >
                 {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
               </button>
@@ -623,12 +632,13 @@ export default function CosteoCalculator({ onBack }: { onBack: () => void }) {
                   onClick={() => setShowCountries(!showCountries)}
                   className={cn(
                     'flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors',
-                    theme === 'light' ? 'bg-gray-100 border-gray-200 text-gray-900 hover:bg-gray-200' : 'bg-[#1a1a2e] border-border text-text-primary hover:border-border/80'
+                    theme === 'light' ? 'bg-gray-100 border-gray-200 hover:bg-gray-200' : 'bg-[#1a1a2e] border-border text-text-primary hover:border-border/80'
                   )}
+                  style={theme === 'light' ? { color: '#111827' } : undefined}
                 >
                   <span>{country.flag}</span>
                   <span>{country.name}</span>
-                  <span className={theme === 'light' ? 'text-gray-400' : 'text-text-secondary'}>{'\▾'}</span>
+                  <span style={theme === 'light' ? { color: '#9ca3af' } : undefined} className={theme === 'dark' ? 'text-text-secondary' : undefined}>{'▾'}</span>
                 </button>
                 {showCountries && (
                   <>
@@ -642,13 +652,14 @@ export default function CosteoCalculator({ onBack }: { onBack: () => void }) {
                             'w-full flex items-center gap-2 px-3 py-2 text-xs transition-colors',
                             theme === 'light' ? 'hover:bg-gray-50' : 'hover:bg-surface-secondary',
                             i === countryIdx
-                              ? (theme === 'light' ? 'text-amber-700 font-bold' : 'text-amber-400 font-bold')
-                              : (theme === 'light' ? 'text-gray-900' : 'text-text-primary')
+                              ? (theme === 'dark' ? 'text-amber-400 font-bold' : 'font-bold')
+                              : (theme === 'dark' ? 'text-text-primary' : '')
                           )}
+                          style={theme === 'light' ? { color: i === countryIdx ? '#b45309' : '#111827' } : undefined}
                         >
                           <span>{c.flag}</span>
                           <span>{c.name}</span>
-                          <span className={cn('ml-auto', theme === 'light' ? 'text-gray-400' : 'text-text-secondary')}>{c.currency}</span>
+                          <span className={cn('ml-auto', theme === 'dark' && 'text-text-secondary')} style={theme === 'light' ? { color: '#9ca3af' } : undefined}>{c.currency}</span>
                         </button>
                       ))}
                     </div>
@@ -663,14 +674,14 @@ export default function CosteoCalculator({ onBack }: { onBack: () => void }) {
             <div className="text-center mb-4">
               <span className={cn(
                 'inline-block px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-full border',
-                theme === 'light' ? 'text-amber-700 bg-amber-50 border-amber-200' : 'text-amber-400 bg-amber-500/10 border-amber-500/20'
-              )}>
-                {country.flag} Dropshipping {country.name} \· {country.currency}
+                theme === 'light' ? 'bg-amber-50 border-amber-200' : 'text-amber-400 bg-amber-500/10 border-amber-500/20'
+              )} style={theme === 'light' ? { color: '#b45309' } : undefined}>
+                {country.flag} Dropshipping {country.name} · {country.currency}
               </span>
-              <h3 className={cn('text-xl font-bold mt-2', theme === 'light' ? 'text-gray-900' : 'text-text-primary')}>
-                {mode === 'calculator' ? '\¿Es rentable tu producto?' : '\¿Cu\ánto te est\ás ganando'}
+              <h3 className={cn('text-xl font-bold mt-2', theme === 'dark' && 'text-text-primary')} style={theme === 'light' ? { color: '#111827' } : undefined}>
+                {mode === 'calculator' ? '¿Es rentable tu producto?' : '¿Cuánto te estás ganando'}
               </h3>
-              <p className={cn('text-sm', theme === 'light' ? 'text-gray-500' : 'text-text-secondary')}>
+              <p className={cn('text-sm', theme === 'dark' && 'text-text-secondary')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>
                 {mode === 'calculator'
                   ? 'Calcula todo en 3 pasos.'
                   : 'con lo que ya inviertes?'}
