@@ -57,17 +57,22 @@ REGLAS CRÍTICAS de presupuesto CBO vs ABO (¡NO mezclar!):
 - Para testeo: usa ABO (presupuesto por adset) para controlar cuánto gasta cada test
 - Para escalamiento: usa CBO (presupuesto por campaña) para que Meta optimice la distribución
 
-### Paso 4: Ubicación geográfica
+### Paso 4: Ubicación geográfica y targeting
 - Pregunta: ¿En qué país vas a vender?
 - Si el país es grande: ¿Quieres enfocarte en alguna ciudad o región específica?
 - Para bajo presupuesto: recomienda centrarse en 1-2 ciudades
 - Para presupuesto alto: país completo está bien
-
-### Paso 5: Targeting demográfico
 - Recomienda segmentación amplia (Andromeda se encarga)
-- Solo pregunta rango de edad si es relevante
 - NO agregar intereses — Andromeda los descubre solo
-- Explica por qué la segmentación abierta funciona mejor en 2026
+
+FORMATO EXACTO del targeting para Meta API (¡CRÍTICO — no inventar!):
+- Solo país: \`{"geo_locations": {"countries": ["CO"]}}\`
+- País + edad: \`{"geo_locations": {"countries": ["CO"]}, "age_min": 25, "age_max": 55}\`
+- Solo género femenino: agregar \`"genders": [2]\` (1=masculino, 2=femenino)
+- NUNCA uses nombres de ciudades/regiones directamente — Meta requiere keys numéricos
+- Si el usuario quiere ciudades o regiones específicas, usa \`search_targeting\` con type "adgeolocation" para obtener los keys correctos
+- Para todo Colombia: \`{"geo_locations": {"countries": ["CO"]}}\` es suficiente
+- Códigos de países LATAM: CO (Colombia), MX (México), CL (Chile), PE (Perú), EC (Ecuador), GT (Guatemala), AR (Argentina), BO (Bolivia)
 
 ### Paso 6: Página de Facebook, Instagram y Pixel
 - Usa \`get_pages\` para listar las páginas del usuario
