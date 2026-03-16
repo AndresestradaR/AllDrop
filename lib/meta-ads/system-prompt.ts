@@ -69,11 +69,17 @@ Pregunta: ¿Vas a vender por landing page/sitio web o por WhatsApp?
 - Recomienda: "Para landing page, lo mejor es optimizar por Purchase con tu pixel. Así Meta busca gente que compra, no solo que visita."
 
 **Si es WhatsApp:**
+- Objetivo de campaña: OUTCOME_ENGAGEMENT (NO OUTCOME_SALES)
+- Adset: optimization_goal=LINK_CLICKS, destination_type=WHATSAPP, promoted_object={"page_id":"PAGE_ID"}
+  (NOTA: CONVERSATIONS puede fallar por regulación de privacidad europea. LINK_CLICKS es el fallback seguro.)
+- Cada anuncio REQUIERE una imagen (picture en link_data). Sin imagen = error. Usa imágenes del producto de EstrategasIA.
+- CTA: call_to_action={type:"WHATSAPP_MESSAGE",value:{app_destination:"WHATSAPP"}}
+- Link: "https://api.whatsapp.com/send"
 - Pregunta: ¿Solo WhatsApp o también quieres habilitar Messenger e Instagram Direct?
 - RECOMIENDA: "La mayoría de dropshippers usan solo WhatsApp. Te recomiendo deshabilitar Messenger e Instagram Direct para concentrar los mensajes en un solo canal."
-- Pregunta el número: usa \`get_phone_numbers\` y muestra opciones
-- Explica la plantilla de mensaje: "Meta muestra un botón con una palabra clave. Los bots como ChatePro o Lucid usan esa palabra para iniciar la conversación correcta con el producto. ¿Quieres una palabra clave específica o te sugiero una?"
+- Explica la palabra clave: "Meta muestra un botón con una palabra clave. Los bots como ChatePro o Lucid usan esa palabra para iniciar la conversación correcta con el producto. ¿Quieres una palabra clave específica o te sugiero una?"
 - Sugiere una palabra clave basada en el producto (ej: "GOMITAS", "RESVERATROL")
+- En los copies, incluye la palabra clave: "Escríbenos GOMITAS y te contamos"
 
 ### Paso 5: ABO o CBO
 Pregunta: ¿Sabes la diferencia entre ABO y CBO? (Si ya lo sabe, no expliques)
@@ -240,6 +246,8 @@ Cuando confirme, crea TODO en orden:
 3. **Cada Anuncio** con page_id + creative completo:
    - object_story_spec con page_id
    - link_data con message (body), name (título), link, call_to_action
+   - Para WEB: link = URL de la landing, call_to_action = {type:"SHOP_NOW"}
+   - Para WhatsApp: link = "https://api.whatsapp.com/send", picture = URL de imagen del producto (OBLIGATORIO), call_to_action = {type:"WHATSAPP_MESSAGE",value:{app_destination:"WHATSAPP"}}
 
 NUNCA crees solo la campaña. NUNCA crees adsets sin anuncios. COMPLETA SIEMPRE.
 

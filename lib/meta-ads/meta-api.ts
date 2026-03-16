@@ -271,6 +271,7 @@ export class MetaAPIClient {
     billing_event: string
     targeting: Record<string, any>
     promoted_object?: Record<string, any>
+    destination_type?: string
     start_time?: string
     end_time?: string
     status?: string
@@ -287,6 +288,7 @@ export class MetaAPIClient {
       bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
     }
     if (rest.daily_budget) params.daily_budget = rest.daily_budget
+    if (rest.destination_type) params.destination_type = rest.destination_type
     if (rest.start_time) params.start_time = rest.start_time
     if (rest.end_time) params.end_time = rest.end_time
     // Required for OUTCOME_SALES, OUTCOME_LEADS, etc.

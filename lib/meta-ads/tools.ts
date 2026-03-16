@@ -205,11 +205,11 @@ export const META_ADS_TOOLS = [
         ad_account_id: { type: 'string', description: 'ID de la cuenta publicitaria' },
         campaign_id: { type: 'string', description: 'ID de la campaña padre' },
         name: { type: 'string', description: 'Nombre del adset' },
-        daily_budget: { type: 'number', description: 'Presupuesto diario en centavos' },
+        daily_budget: { type: 'number', description: 'Presupuesto diario en la unidad mínima de la moneda. COP/CLP: valor directo (ej: 15000). USD/MXN: multiplicar por 100 (ej: $50 USD = 5000).' },
         optimization_goal: {
           type: 'string',
-          enum: ['LINK_CLICKS', 'LANDING_PAGE_VIEWS', 'IMPRESSIONS', 'REACH', 'OFFSITE_CONVERSIONS', 'VALUE', 'LEAD_GENERATION'],
-          description: 'Objetivo de optimización',
+          enum: ['LINK_CLICKS', 'LANDING_PAGE_VIEWS', 'IMPRESSIONS', 'REACH', 'OFFSITE_CONVERSIONS', 'VALUE', 'LEAD_GENERATION', 'CONVERSATIONS'],
+          description: 'Objetivo de optimización. OFFSITE_CONVERSIONS para ventas web, LINK_CLICKS para WhatsApp.',
         },
         billing_event: { type: 'string', enum: ['IMPRESSIONS', 'LINK_CLICKS'], description: 'Evento de facturación' },
         targeting: {
@@ -218,7 +218,12 @@ export const META_ADS_TOOLS = [
         },
         promoted_object: {
           type: 'object',
-          description: 'OBLIGATORIO para OUTCOME_SALES y OUTCOME_LEADS. Para ventas: {"pixel_id":"123","custom_event_type":"PURCHASE"}. Para leads: {"pixel_id":"123","custom_event_type":"LEAD"}. Usa get_pixels para obtener el pixel_id.',
+          description: 'Para ventas web: {"pixel_id":"123","custom_event_type":"PURCHASE"}. Para WhatsApp: {"page_id":"123"}. Usa get_pixels para obtener el pixel_id.',
+        },
+        destination_type: {
+          type: 'string',
+          enum: ['UNDEFINED', 'WEBSITE', 'WHATSAPP', 'MESSENGER', 'INSTAGRAM_DIRECT'],
+          description: 'Tipo de destino. WHATSAPP para campañas de WhatsApp. Omitir para web.',
         },
         start_time: { type: 'string', description: 'Fecha/hora inicio ISO 8601' },
         end_time: { type: 'string', description: 'Fecha/hora fin ISO 8601' },
