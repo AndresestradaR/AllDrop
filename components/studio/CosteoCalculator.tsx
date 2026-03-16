@@ -446,20 +446,28 @@ function RealMode({ country }: { country: CountryConfig }) {
     const returnShipping = returnedOrders * shipping
     const realMargin = grossMargin - returnShipping
 
+    const dispatchedRevenue = dispatched * price
     const cpa = totalOrders > 0 ? adSpend / totalOrders : 0
+    const cpaPerDelivery = delivered > 0 ? adSpend / delivered : 0
     const operationalMargin = realMargin - adSpend
     const roas = adSpend > 0 ? deliveredRevenue / adSpend : 0
     const ordersPerDay = days > 0 ? totalOrders / days : 0
     const profitPerDay = days > 0 ? operationalMargin / days : 0
     const breakEvenCPA = totalOrders > 0 ? realMargin / totalOrders : 0
+    const adSpendPctOfMargin = realMargin > 0 ? (adSpend / realMargin) * 100 : 0
+    const weeklyAdSpend = days > 0 ? (adSpend / days) * 7 : 0
+    const weeklyProfit = days > 0 ? (operationalMargin / days) * 7 : 0
+    const monthlyAdSpend = days > 0 ? (adSpend / days) * 30 : 0
+    const monthlyProfit = days > 0 ? (operationalMargin / days) * 30 : 0
 
     return {
       totalCost, profit, marginPct,
       cancelledOrders, dispatched, returnedOrders, delivered,
-      totalRevenue, deliveredRevenue,
+      totalRevenue, dispatchedRevenue, deliveredRevenue,
       grossMargin, returnShipping, realMargin,
-      cpa, operationalMargin, roas, ordersPerDay, profitPerDay,
-      breakEvenCPA,
+      cpa, cpaPerDelivery, operationalMargin, roas, ordersPerDay, profitPerDay,
+      breakEvenCPA, adSpendPctOfMargin,
+      weeklyAdSpend, weeklyProfit, monthlyAdSpend, monthlyProfit,
     }
   }, [price, cost, shipping, adSpend, totalOrders, days, cancelPct, returnPct])
 
@@ -496,7 +504,7 @@ function RealMode({ country }: { country: CountryConfig }) {
             <div className="space-y-1">
               <ResultCard title="Pedidos Totales" value={`${totalOrders} pedidos · ${fmt(calc.totalRevenue)}`} />
               <FlowArrow text={`−${cancelPct}% = −${calc.cancelledOrders} cancelados`} />
-              <ResultCard title="Despachados" value={`${calc.dispatched} pedidos`} />
+              <ResultCard title="Despachados" value={`${calc.dispatched} pedidos · ${fmt(calc.dispatchedRevenue)}`} />
               <FlowArrow text={`−${returnPct}% = −${calc.returnedOrders} devueltos`} />
               <ResultCard title="Entregados ✅" value={`${calc.delivered} pedidos · ${fmt(calc.deliveredRevenue)}`} variant="success" />
             </div>
@@ -512,23 +520,84 @@ function RealMode({ country }: { country: CountryConfig }) {
               <ResultCard title="Margen Neto Real" value={fmt(calc.realMargin)} variant={calc.realMargin > 0 ? 'success' : 'danger'} />
             </div>
 
+            <ResultCard title="Inversión en Pauta" value={`−${fmt(adSpend)}`} variant="danger" subtitle={`${days} día(s) de campaña`} />
+
             <div className="grid grid-cols-2 gap-3 mb-3">
-              <ResultCard title="Inversión en Pauta" value={`−${fmt(adSpend)}`} variant="danger" />
-              <ResultCard
-                title="UTILIDAD OPERACIONAL 🎯"
-                value={fmt(calc.operationalMargin)}
-                variant={calc.operationalMargin > 0 ? 'success' : 'danger'}
-                highlight
-                subtitle={calc.operationalMargin > 0 ? 'Estás ganando dinero' : '¡Estás perdiendo dinero!'}
-              />
+              <ResultCard title="CPA Real" value={fmt(calc.cpa)} subtitle="Por cada pedido recibido (inversión ÷ pedidos totales)" variant={calc.cpa <= calc.breakEvenCPA ? 'success' : 'danger'} />
+              <ResultCard title={'CPA Real por Entrega ⭐'} value={fmt(calc.cpaPerDelivery)} subtitle="Lo que realmente te cuesta cada pedido entregado" variant={calc.cpaPerDelivery <= calc.breakEvenCPA ? 'success' : 'danger'} />
             </div>
 
-            <div className="grid grid-cols-4 gap-3">
-              <ResultCard title="CPA Real" value={fmt(calc.cpa)} subtitle="Costo por pedido" variant={calc.cpa <= calc.breakEvenCPA ? 'success' : 'danger'} />
+            <div className="grid grid-cols-2 gap-3 mb-3">
               <ResultCard title="CPA Break-Even" value={fmt(calc.breakEvenCPA)} subtitle="CPA máximo sin perder" />
               <ResultCard title="ROAS" value={`${calc.roas.toFixed(1)}x`} variant={calc.roas >= 3 ? 'success' : calc.roas >= 2 ? 'warning' : 'danger'} subtitle={calc.roas >= 3 ? 'Excelente' : calc.roas >= 2 ? 'Aceptable' : 'Bajo'} />
-              <ResultCard title="Ganancia / Día" value={fmt(calc.profitPerDay)} variant={calc.profitPerDay > 0 ? 'success' : 'danger'} subtitle={`${calc.ordersPerDay.toFixed(1)} pedidos/día`} />
             </div>
+
+            <ResultCard
+              title="% de Pauta sobre Margen"
+              value={`${calc.adSpendPctOfMargin.toFixed(1)}%`}
+              subtitle={
+                calc.adSpendPctOfMargin <= 35
+                  ? `Excelente — dentro del 35% ideal`
+                  : calc.adSpendPctOfMargin <= 50
+                  ? `Aceptable — pero intenta bajar al 35%`
+                  : `Peligroso — estás gastando demasiado en pauta`
+              }
+              variant={calc.adSpendPctOfMargin <= 35 ? 'success' : calc.adSpendPctOfMargin <= 50 ? 'warning' : 'danger'}
+              highlight
+            />
+          </SectionCard>
+
+          <SectionCard>
+            <SectionHeader step={5} title={`Lo que te queda en ${days} día(s)`} subtitle="Margen Operacional Real" />
+            <ResultCard
+              title={'🏆 Margen Operacional Real'}
+              value={fmt(calc.operationalMargin)}
+              subtitle="Margen bruto real − inversión pauta"
+              variant={calc.operationalMargin > 0 ? 'success' : 'danger'}
+              highlight
+            />
+
+            <div className="grid grid-cols-2 gap-3 mt-3">
+              <div className={cn(
+                'rounded-xl border p-4',
+                theme === 'light' ? 'bg-white border-gray-200' : 'border-border'
+              )}>
+                <p className={cn('text-[10px] font-bold uppercase tracking-wider mb-2', theme === 'dark' && 'text-text-secondary')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>{'📅'} A la Semana</p>
+                <div className="space-y-1.5">
+                  <div>
+                    <p className={cn('text-[10px]', theme === 'dark' && 'text-text-secondary')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>Inversión en pauta</p>
+                    <p className="text-sm font-bold" style={{ color: theme === 'light' ? '#b91c1c' : '#f87171' }}>{fmt(calc.weeklyAdSpend)}</p>
+                  </div>
+                  <div>
+                    <p className={cn('text-[10px]', theme === 'dark' && 'text-text-secondary')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>Ganancia neta</p>
+                    <p className="text-sm font-bold" style={{ color: calc.weeklyProfit > 0 ? (theme === 'light' ? '#047857' : '#34d399') : (theme === 'light' ? '#b91c1c' : '#f87171') }}>{fmt(calc.weeklyProfit)}</p>
+                  </div>
+                </div>
+              </div>
+              <div className={cn(
+                'rounded-xl border p-4',
+                theme === 'light' ? 'bg-white border-gray-200' : 'border-border'
+              )}>
+                <p className={cn('text-[10px] font-bold uppercase tracking-wider mb-2', theme === 'dark' && 'text-text-secondary')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>{'📆'} Al Mes</p>
+                <div className="space-y-1.5">
+                  <div>
+                    <p className={cn('text-[10px]', theme === 'dark' && 'text-text-secondary')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>Inversión en pauta</p>
+                    <p className="text-sm font-bold" style={{ color: theme === 'light' ? '#b91c1c' : '#f87171' }}>{fmt(calc.monthlyAdSpend)}</p>
+                  </div>
+                  <div>
+                    <p className={cn('text-[10px]', theme === 'dark' && 'text-text-secondary')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>Ganancia neta</p>
+                    <p className="text-sm font-bold" style={{ color: calc.monthlyProfit > 0 ? (theme === 'light' ? '#047857' : '#34d399') : (theme === 'light' ? '#b91c1c' : '#f87171') }}>{fmt(calc.monthlyProfit)}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <ResultCard
+              title={`Ganancia / Día`}
+              value={fmt(calc.profitPerDay)}
+              variant={calc.profitPerDay > 0 ? 'success' : 'danger'}
+              subtitle={`${calc.ordersPerDay.toFixed(1)} pedidos/día`}
+            />
           </SectionCard>
         </>
       ) : (
