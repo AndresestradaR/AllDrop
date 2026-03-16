@@ -17,11 +17,13 @@ import {
   AlertCircle,
   Zap,
   BookOpen,
+  Calculator,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { InfluencerWizard } from './influencer/InfluencerWizard'
 import { AutoPublisherTool } from './AutoPublisherTool'
 import EbookGenerator from './ebook/EbookGenerator'
+import CosteoCalculator from './CosteoCalculator'
 
 interface DropshippingTool {
   id: string
@@ -89,6 +91,14 @@ const DROPSHIPPING_TOOLS: DropshippingTool[] = [
     icon: BookOpen,
     color: 'from-teal-500 to-cyan-500',
     emoji: '📚',
+  },
+  {
+    id: 'costeo-calculator',
+    name: 'Calculadora Costeo',
+    description: 'Rentabilidad, CPA y simulación de ventas COD',
+    icon: Calculator,
+    color: 'from-amber-500 to-yellow-500',
+    emoji: '📊',
   },
 ]
 
@@ -2231,6 +2241,10 @@ export function DropshippingGrid() {
 
   if (activeTool === 'ebook-generator') {
     return <EbookGenerator onBack={handleBack} />
+  }
+
+  if (activeTool === 'costeo-calculator') {
+    return <CosteoCalculator onBack={handleBack} />
   }
 
   if (activeTool) {
