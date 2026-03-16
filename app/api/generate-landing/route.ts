@@ -161,11 +161,15 @@ export async function POST(request: Request) {
     }
 
     // Get API keys from profile
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('google_api_key, openai_api_key, kie_api_key, bfl_api_key, fal_api_key, wavespeed_api_key')
       .eq('id', user.id)
       .single()
+
+    console.log(`[Generate] Auth: internal=${!!internalKey}, userId=${user.id}`)
+    console.log(`[Generate] Profile found: ${!!profile}, error: ${profileError?.message || 'none'}`)
+    console.log(`[Generate] Profile keys: google=${!!profile?.google_api_key}, openai=${!!profile?.openai_api_key}, kie=${!!profile?.kie_api_key}, bfl=${!!profile?.bfl_api_key}, fal=${!!profile?.fal_api_key}`)
 
     // Build API keys object
     const apiKeys: {
@@ -218,6 +222,8 @@ export async function POST(request: Request) {
     if (!apiKeys.gemini && process.env.GEMINI_API_KEY) {
       apiKeys.gemini = process.env.GEMINI_API_KEY
     }
+
+    console.log(`[Generate] Final keys: gemini=${!!apiKeys.gemini}, openai=${!!apiKeys.openai}, kie=${!!apiKeys.kie}, bfl=${!!apiKeys.bfl}, fal=${!!apiKeys.fal}`)
 
     // Validate we have at least one usable API key for the model's cascade
     const selectedProvider = provider as ImageProviderType

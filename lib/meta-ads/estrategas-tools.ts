@@ -214,7 +214,15 @@ export class EstrategasToolsHandler {
         }),
       })
 
-      const data = await res.json()
+      const responseText = await res.text()
+      console.log(`[EstrategasTools] generate-landing response: status=${res.status}, body=${responseText.substring(0, 500)}`)
+
+      let data: any
+      try {
+        data = JSON.parse(responseText)
+      } catch {
+        return { success: false, error: `Invalid response from generate-landing: ${responseText.substring(0, 200)}` }
+      }
 
       if (!data.success) {
         return { success: false, error: data.error || 'Error generando banner' }
