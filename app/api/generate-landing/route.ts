@@ -103,25 +103,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Demasiadas solicitudes. Intenta de nuevo en un momento.' }, { status: 429 })
     }
 
-    // Support both cookie-based auth and Authorization header (for internal server calls)
+    // Support both cookie-based auth and internal service key auth
     let user: any = null
     let supabase: any = null
-    const authHeader = request.headers.get('Authorization')
-    if (authHeader?.startsWith('Bearer ')) {
-      // Internal call from estrategas-tools.ts — verify token via Supabase
+
+    // Internal server-to-server calls from estrategas-tools.ts use service key + userId
+    const internalKey = request.headers.get('X-Internal-Key')
+    const internalUserId = request.headers.get('X-Internal-User-Id')
+    if (internalKey && internalUserId && internalKey === process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      // Trusted internal call — create service client for storage operations
       const { createClient: createSupabaseClient } = await import('@supabase/supabase-js')
       supabase = createSupabaseClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        { global: { headers: { Authorization: authHeader } } }
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
       )
-      const { data: { user: tokenUser }, error: tokenError } = await supabase.auth.getUser()
-      if (!tokenError && tokenUser) {
-        user = tokenUser
-      }
+      user = { id: internalUserId }
     }
+
     if (!user) {
-      // Fallback to cookie-based auth
+      // Normal browser request — cookie-based auth
       supabase = await createClient()
       const { data: { user: cookieUser }, error: authError } = await supabase.auth.getUser()
       if (authError || !cookieUser) {

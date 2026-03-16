@@ -189,8 +189,8 @@ export class EstrategasToolsHandler {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Cookie': `sb-access-token=${this.token}`,
-          'Authorization': `Bearer ${this.token}`,
+          'X-Internal-Key': process.env.SUPABASE_SERVICE_ROLE_KEY!,
+          'X-Internal-User-Id': this.userId,
         },
         body: JSON.stringify({
           productId: input.product_id,
