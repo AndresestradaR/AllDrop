@@ -57,8 +57,8 @@ export async function executeChat(
 
     // Call Claude with tools
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 4096,
+      model: 'claude-opus-4-6-20250514',
+      max_tokens: 8192,
       system: META_ADS_SYSTEM_PROMPT,
       tools: META_ADS_TOOLS.map(t => ({
         name: t.name,
