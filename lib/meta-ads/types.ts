@@ -159,6 +159,7 @@ export const READ_ONLY_TOOLS = [
   'get_pages',
   'get_instagram_accounts',
   'get_phone_numbers',
+  'get_pixels',
 ] as const
 
 export const WRITE_TOOLS = [

@@ -213,15 +213,22 @@ export class MetaAPIClient {
   async getPhoneNumbers(input: {
     business_id?: string
   }): Promise<MetaAPIResponse> {
-    // Try to get WhatsApp Business accounts
     if (input.business_id) {
       return this.request(`/${input.business_id}/phone_numbers`, {
         fields: 'id,display_phone_number,verified_name,quality_rating',
       })
     }
-    // Fallback: get from user's WABA (WhatsApp Business Accounts)
     return this.request('/me/whatsapp_business_accounts', {
       fields: 'id,name,phone_numbers{id,display_phone_number,verified_name,quality_rating}',
+      limit: 20,
+    })
+  }
+
+  async getPixels(input: {
+    ad_account_id: string
+  }): Promise<MetaAPIResponse> {
+    return this.request(`/${input.ad_account_id}/adspixels`, {
+      fields: 'id,name,last_fired_time,is_created_by_business',
       limit: 20,
     })
   }
@@ -259,6 +266,7 @@ export class MetaAPIClient {
     optimization_goal: string
     billing_event: string
     targeting: Record<string, any>
+    promoted_object?: Record<string, any>
     start_time?: string
     end_time?: string
     status?: string
@@ -271,14 +279,12 @@ export class MetaAPIClient {
       billing_event: rest.billing_event,
       targeting: rest.targeting,
       status: rest.status || 'PAUSED',
-      // bid_strategy is a CAMPAIGN-level field, NOT adset-level
-      // At adset level, Meta inherits the campaign's bid strategy automatically
     }
     if (rest.daily_budget) params.daily_budget = rest.daily_budget
     if (rest.start_time) params.start_time = rest.start_time
     if (rest.end_time) params.end_time = rest.end_time
-    // Always required by Meta API v21.0+ — must be explicitly set
-    params.is_adset_budget_sharing_enabled = false
+    // Required for OUTCOME_SALES, OUTCOME_LEADS, etc.
+    if (rest.promoted_object) params.promoted_object = rest.promoted_object
     return this.request(`/${ad_account_id}/adsets`, params, 'POST')
   }
 
@@ -361,6 +367,7 @@ export class MetaAPIClient {
       case 'get_pages': return this.getPages()
       case 'get_instagram_accounts': return this.getInstagramAccounts(toolInput as any)
       case 'get_phone_numbers': return this.getPhoneNumbers(toolInput as any)
+      case 'get_pixels': return this.getPixels(toolInput as any)
       case 'create_campaign': return this.createCampaign(toolInput as any)
       case 'create_adset': return this.createAdset(toolInput as any)
       case 'create_ad': return this.createAd(toolInput as any)
