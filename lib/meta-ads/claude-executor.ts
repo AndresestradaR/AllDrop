@@ -13,6 +13,8 @@ export interface ExecutorOptions {
   metaAccessToken: string
   conversationId: string
   userId: string
+  // Claude model to use
+  model?: string
   // Previous messages for context (Anthropic format)
   messages: Anthropic.MessageParam[]
   // Callback to persist messages/actions to DB
@@ -56,8 +58,10 @@ export async function executeChat(
     iterations++
 
     // Call Claude with tools
+    const validModels = ['claude-opus-4-6-20250514', 'claude-sonnet-4-6-20250514', 'claude-haiku-4-5-20251001']
+    const selectedModel = opts.model && validModels.includes(opts.model) ? opts.model : 'claude-opus-4-6-20250514'
     const response = await anthropic.messages.create({
-      model: 'claude-opus-4-6-20250514',
+      model: selectedModel,
       max_tokens: 8192,
       system: META_ADS_SYSTEM_PROMPT,
       tools: META_ADS_TOOLS.map(t => ({

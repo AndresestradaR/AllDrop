@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Send, Loader2, Check, X } from 'lucide-react'
+import { Send, Loader2, Check, X, ChevronDown } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 
 interface Message {
@@ -22,6 +22,12 @@ interface PendingAction {
   action_id?: string
 }
 
+const CLAUDE_MODELS = [
+  { id: 'claude-opus-4-6-20250514', label: 'Opus 4.6', description: 'Más inteligente' },
+  { id: 'claude-sonnet-4-6-20250514', label: 'Sonnet 4.6', description: 'Equilibrado' },
+  { id: 'claude-haiku-4-5-20251001', label: 'Haiku 4.5', description: 'Más rápido' },
+]
+
 interface MetaAdsChatProps {
   conversationId: string
 }
@@ -32,6 +38,7 @@ export function MetaAdsChat({ conversationId }: MetaAdsChatProps) {
   const [isStreaming, setIsStreaming] = useState(false)
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null)
   const [confirmLoading, setConfirmLoading] = useState(false)
+  const [selectedModel, setSelectedModel] = useState(CLAUDE_MODELS[0].id)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -115,7 +122,7 @@ export function MetaAdsChat({ conversationId }: MetaAdsChatProps) {
       const res = await fetch('/api/meta-ads/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ conversation_id: conversationId, message: text }),
+        body: JSON.stringify({ conversation_id: conversationId, message: text, model: selectedModel }),
       })
 
       if (!res.ok) {
@@ -299,6 +306,21 @@ export function MetaAdsChat({ conversationId }: MetaAdsChatProps) {
 
       {/* Input */}
       <div className="border-t border-gray-200 p-3">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="relative">
+            <select
+              value={selectedModel}
+              onChange={(e) => setSelectedModel(e.target.value)}
+              disabled={isStreaming}
+              className="appearance-none bg-gray-50 border border-gray-200 rounded-lg pl-2.5 pr-7 py-1 text-xs text-gray-600 hover:bg-gray-100 focus:border-purple-500 focus:ring-1 focus:ring-purple-500/20 outline-none cursor-pointer disabled:opacity-50"
+            >
+              {CLAUDE_MODELS.map(m => (
+                <option key={m.id} value={m.id}>{m.label} — {m.description}</option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+          </div>
+        </div>
         <div className="flex items-end gap-2">
           <textarea
             ref={inputRef}
