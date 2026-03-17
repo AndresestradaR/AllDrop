@@ -63,7 +63,8 @@ export async function POST(request: Request) {
     }
 
     // Upload product images from chat to Supabase Storage
-    let productImageUrls: string[] = []
+    const newImageUrls: string[] = []  // Only photos from THIS message
+    let productImageUrls: string[] = []  // ALL photos (new + historical)
     if (product_images?.length > 0) {
       for (const imageData of product_images) {
         const base64Match = imageData.match(/^data:[^;]+;base64,(.+)$/)
@@ -75,18 +76,11 @@ export async function POST(request: Request) {
             upsert: true,
           })
           const { data: urlData } = serviceClient.storage.from('landing-images').getPublicUrl(fileName)
+          newImageUrls.push(urlData.publicUrl)
           productImageUrls.push(urlData.publicUrl)
         }
       }
     }
-
-    // Create Phase 2 clients
-    const dropPageClient = new DropPageClient({ supabaseAccessToken })
-    const estrategasTools = new EstrategasToolsHandler({
-      userId: user.id,
-      supabaseAccessToken,
-      productImageUrls,
-    })
 
     // Save user message
     await serviceClient
@@ -104,12 +98,32 @@ export async function POST(request: Request) {
       .eq('conversation_id', conversation_id)
       .order('created_at', { ascending: true })
 
+    // Recover product image URLs from previous messages (upload_product_image results)
+    // so the pipeline has access to photos the user uploaded in earlier messages
+    if (history) {
+      for (const msg of history) {
+        if (msg.tool_name === 'upload_product_image' && msg.tool_result) {
+          const result = typeof msg.tool_result === 'string' ? JSON.parse(msg.tool_result) : msg.tool_result
+          if (result.url) productImageUrls.push(result.url)
+        }
+      }
+    }
+
+    // Create Phase 2 clients
+    const dropPageClient = new DropPageClient({ supabaseAccessToken })
+    const estrategasTools = new EstrategasToolsHandler({
+      userId: user.id,
+      supabaseAccessToken,
+      productImageUrls,
+    })
+
     // Convert DB messages to Anthropic format
     const anthropicMessages = buildAnthropicMessages(history || [])
 
-    // If user uploaded product images, inject them into the last user message
+    // If user uploaded NEW product images in THIS message, inject them into the last user message
     // so Claude can actually SEE the product photos + know they're available for banners
-    if (productImageUrls.length > 0 && anthropicMessages.length > 0) {
+    // Only inject NEW photos — historical ones are already in the EstrategasToolsHandler
+    if (newImageUrls.length > 0 && anthropicMessages.length > 0) {
       const lastMsg = anthropicMessages[anthropicMessages.length - 1]
       if (lastMsg.role === 'user') {
         // Convert to array format with image blocks
@@ -117,8 +131,8 @@ export async function POST(request: Request) {
           ? [{ type: 'text' as const, text: lastMsg.content }]
           : Array.isArray(lastMsg.content) ? [...lastMsg.content as any[]] : []
 
-        // Add image blocks so Claude can see the photos
-        for (const url of productImageUrls) {
+        // Add image blocks so Claude can see the NEW photos
+        for (const url of newImageUrls) {
           existingContent.push({
             type: 'image' as const,
             source: { type: 'url' as const, url },
@@ -128,7 +142,7 @@ export async function POST(request: Request) {
         // Add note about available photos for banner generation
         existingContent.push({
           type: 'text' as const,
-          text: `\n\n[Sistema: ${productImageUrls.length} foto(s) del producto subida(s) exitosamente y disponibles para generar banners. URLs: ${productImageUrls.join(', ')}]`,
+          text: `\n\n[Sistema: ${newImageUrls.length} foto(s) nueva(s) subida(s). Total disponible para banners: ${productImageUrls.length} foto(s). URLs: ${productImageUrls.join(', ')}]`,
         })
 
         lastMsg.content = existingContent as any

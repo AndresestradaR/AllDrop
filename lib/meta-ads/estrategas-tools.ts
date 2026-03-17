@@ -70,12 +70,15 @@ export class EstrategasToolsHandler {
   }): Promise<{ success: boolean; data?: any; error?: string }> {
     try {
       const serviceClient = createDirectServiceClient()
+      // Set image_url to first product photo if available
+      const imageUrl = this.productImageUrls.length > 0 ? this.productImageUrls[0] : null
       const { data: product, error } = await serviceClient
         .from('products')
         .insert({
           user_id: this.userId,
           name: input.name,
           description: input.description || null,
+          image_url: imageUrl,
         })
         .select('id, name, description, image_url, created_at')
         .single()
@@ -88,6 +91,7 @@ export class EstrategasToolsHandler {
           id: product.id,
           nombre: product.name,
           descripcion: product.description,
+          imagen: product.image_url,
           landing_url: `https://www.estrategasia.com/dashboard/landing/${product.id}`,
         },
       }
@@ -162,6 +166,7 @@ export class EstrategasToolsHandler {
     try {
       // Use product images uploaded by user in chat, or fallback to product image_url
       let productPhotos = [...this.productImageUrls]
+      console.log(`[EstrategasTools] generateBanner: productImageUrls=${this.productImageUrls.length}, section=${input.section_type}`)
 
       if (productPhotos.length === 0) {
         // Try to get product image from DB
@@ -217,6 +222,17 @@ export class EstrategasToolsHandler {
 
       const responseText = await res.text()
       console.log(`[EstrategasTools] generate-landing response: status=${res.status}, body=${responseText.substring(0, 500)}`)
+
+      // If HTTP error, log details and return clear error
+      if (!res.ok) {
+        console.error(`[EstrategasTools] generate-landing HTTP ${res.status}: ${responseText.substring(0, 300)}`)
+        let errorMsg = `Error HTTP ${res.status} generando banner`
+        try {
+          const errData = JSON.parse(responseText)
+          errorMsg = errData.error || errorMsg
+        } catch { /* ignore parse error */ }
+        return { success: false, error: errorMsg }
+      }
 
       let data: any
       try {

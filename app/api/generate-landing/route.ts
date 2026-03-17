@@ -97,27 +97,33 @@ async function uploadToStorage(
 export async function POST(request: Request) {
   const startTime = Date.now()
   try {
-    const ip = getClientIp(request)
-    const { success } = aiLimiter.check(ip)
-    if (!success) {
-      return NextResponse.json({ error: 'Demasiadas solicitudes. Intenta de nuevo en un momento.' }, { status: 429 })
-    }
-
     // Support both cookie-based auth and internal service key auth
     let user: any = null
     let supabase: any = null
+    let isInternalCall = false
 
     // Internal server-to-server calls from estrategas-tools.ts use service key + userId
     const internalKey = request.headers.get('X-Internal-Key')
     const internalUserId = request.headers.get('X-Internal-User-Id')
     if (internalKey && internalUserId && internalKey === process.env.SUPABASE_SERVICE_ROLE_KEY) {
       // Trusted internal call — create service client for storage operations
+      isInternalCall = true
       const { createClient: createSupabaseClient } = await import('@supabase/supabase-js')
       supabase = createSupabaseClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.SUPABASE_SERVICE_ROLE_KEY!,
       )
       user = { id: internalUserId }
+      console.log(`[Generate] Internal call for userId=${internalUserId}`)
+    }
+
+    // Rate limit only external (browser) requests — internal pipeline calls skip this
+    if (!isInternalCall) {
+      const ip = getClientIp(request)
+      const { success } = aiLimiter.check(ip)
+      if (!success) {
+        return NextResponse.json({ error: 'Demasiadas solicitudes. Intenta de nuevo en un momento.' }, { status: 429 })
+      }
     }
 
     if (!user) {
@@ -223,14 +229,16 @@ export async function POST(request: Request) {
       apiKeys.gemini = process.env.GEMINI_API_KEY
     }
 
-    console.log(`[Generate] Final keys: gemini=${!!apiKeys.gemini}, openai=${!!apiKeys.openai}, kie=${!!apiKeys.kie}, bfl=${!!apiKeys.bfl}, fal=${!!apiKeys.fal}`)
+    console.log(`[Generate] Final keys: gemini=${!!apiKeys.gemini}, openai=${!!apiKeys.openai}, kie=${!!apiKeys.kie}, bfl=${!!apiKeys.bfl}, fal=${!!apiKeys.fal}, wavespeed=${!!apiKeys.wavespeed}, internal=${isInternalCall}, model=${modelId || 'default'}`)
 
     // Validate we have at least one usable API key for the model's cascade
     const selectedProvider = provider as ImageProviderType
 
     if (modelId && !hasCascadeKey(modelId as ImageModelId, apiKeys)) {
+      console.error(`[Generate] NO cascade keys for model=${modelId}! Profile keys: google=${!!profile?.google_api_key}, kie=${!!profile?.kie_api_key}, fal=${!!profile?.fal_api_key}. Env fallbacks: GEMINI=${!!process.env.GEMINI_API_KEY}, KIE=${!!process.env.KIE_API_KEY}, FAL=${!!process.env.FAL_API_KEY}`)
       return NextResponse.json({
-        error: 'Configura al menos una API key compatible (KIE, fal.ai, Google, OpenAI o BFL) en Settings',
+        error: `Sin API keys para generar imágenes con ${modelId}. Configura KIE, fal.ai, Google o OpenAI en Settings, o contacta soporte.`,
+        success: false,
       }, { status: 400 })
     }
 
