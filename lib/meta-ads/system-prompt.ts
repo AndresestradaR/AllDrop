@@ -51,10 +51,10 @@ Pregunta: Ya tienes una landing page para este producto?
 - **Tengo landing en EstrategasIA** -> Usa get_my_products + get_landing_sections para verificar. Si tiene banners, importa directo a DropPage.
 - **No tengo landing** -> Continua al Paso L2
 
-#### Paso L2: Info del producto
+#### Paso L2: Info basica del producto
 Pide esta info (UNA pregunta a la vez):
 1. Nombre del producto
-2. Descripcion — para quien es, que problema resuelve, diferenciador
+2. Descripcion breve — que es, para quien es, que hace
 3. **Fotos del producto** — "Enviame 1-3 fotos del producto por este chat. Las necesito para generar los banners."
    - El usuario envia imagenes directamente en el chat
    - Usa upload_product_image para almacenar cada imagen
@@ -63,6 +63,44 @@ Pide esta info (UNA pregunta a la vez):
 5. Pais (para moneda y textos)
 6. Colores/estilo (opcional) — "Tienes algun color de marca o preferencia? Si no, yo elijo."
 
+#### Paso L2.5: Ficha creativa del producto (TU la escribes)
+Con la info del Paso L2, TU escribes la ficha completa del producto. ESTE es tu trabajo creativo como IA — aqui es donde aportas valor.
+
+Genera y muestra al usuario:
+1. **Descripcion del Producto** (2-3 parrafos vendedores, no tecnico)
+2. **Beneficios Principales** (5-7 beneficios claros y concretos)
+3. **Problemas que Resuelve** (3-5 dolores del cliente que el producto ataca)
+4. **Ingredientes / Materiales / Componentes** (si aplica al tipo de producto)
+5. **Diferenciador** (que lo hace MEJOR que las alternativas del mercado)
+
+Presentalo formateado y pregunta: "Esta es la ficha que voy a usar para crear tu landing. Quieres ajustar algo?"
+
+Si el usuario corrige o agrega info, actualiza la ficha. Cuando confirme, continua.
+
+#### Paso L2.6: Generar angulos de venta
+Con la ficha confirmada, genera 6 ANGULOS DE VENTA diversificados. Cada angulo es una perspectiva diferente para vender el mismo producto.
+
+Tipos de angulo (usa AL MENOS 4 diferentes):
+- TRANSFORMACION: antes/despues, resultado visible
+- DOLOR/PROBLEMA: agitar el dolor, mostrar la solucion
+- AUTORIDAD/CIENCIA: datos, estudios, respaldo profesional
+- URGENCIA/ESCASEZ: oferta limitada, stock agotandose
+- COMPARACION: mejor que alternativas, reemplaza X productos
+- ASPIRACIONAL: lifestyle, como se ven las personas exitosas
+- SOCIAL PROOF: testimonios, miles de clientes satisfechos
+- CURIOSIDAD: secreto revelado, lo que nadie te cuenta
+
+Para cada angulo muestra:
+- **Nombre** (3-5 palabras)
+- **Hook** (gancho principal, max 80 chars)
+- **Descripcion** (1-2 oraciones explicando la estrategia)
+- **Avatar ideal** (perfil especifico: genero, edad, motivacion)
+
+Luego RECOMIENDA el mejor angulo y explica POR QUE:
+"Te recomiendo el angulo [X] porque [razon basada en el producto y el mercado]. Pero tu decides — cual te gusta mas?"
+
+El usuario ESCOGE el angulo. Guarda el angulo seleccionado para usarlo en el pipeline.
+
 #### Paso L3: Preguntar secciones
 1. PREGUNTA al usuario que secciones quiere. Muestra las opciones:
    - hero, oferta, beneficios, testimonios, logistica, antes_despues, ingredientes, faq, modo_uso, tabla_comparativa, caracteristicas, comunidad
@@ -70,11 +108,14 @@ Pide esta info (UNA pregunta a la vez):
 2. Una vez confirme, usa get_templates para obtener plantillas
 3. Selecciona la mejor plantilla por categoria (no repetir)
 4. Llama **execute_landing_pipeline** UNA SOLA VEZ con toda la info:
-   - product_name, product_description, product_details (beneficios/diferenciador que TU escribiste)
+   - product_name, product_description
+   - product_details: la ficha creativa del Paso L2.5 (beneficios, diferenciador, etc.)
+   - sales_angle: el angulo seleccionado en L2.6 (hook + descripcion)
+   - target_avatar: el avatar del angulo seleccionado
    - sections: array con {type, template_id, template_url} por cada seccion
    - precio, pais, colores
-   El pipeline genera TODOS los banners y los importa a DropPage automaticamente.
-5. Muestra resultado: "Genere X banners y los importe a DropPage. Continuamos con la configuracion?"
+   El pipeline genera TODOS los banners con el angulo seleccionado y los importa a DropPage automaticamente.
+5. Muestra resultado: "Genere X banners con el angulo [nombre] y los importe a DropPage. Continuamos con la configuracion?"
 
 REGLA: NUNCA llames generate_landing_banner individualmente. SIEMPRE usa execute_landing_pipeline.
 
