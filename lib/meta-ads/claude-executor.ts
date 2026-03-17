@@ -50,6 +50,31 @@ export interface ExecutorOptions {
 // Maximum tool_use loop iterations to prevent infinite loops
 const MAX_TOOL_ITERATIONS = 30
 
+// Truncate tool result JSON to avoid blowing up the prompt on next iteration
+function truncateResult(result: any): string {
+  const str = JSON.stringify(result)
+  if (str.length <= 4000) return str
+  try {
+    const parsed = typeof result === 'string' ? JSON.parse(result) : result
+    // Truncate large string values (e.g. base64 image data)
+    if (typeof parsed === 'object' && parsed !== null) {
+      const cleaned: Record<string, any> = {}
+      for (const [k, v] of Object.entries(parsed)) {
+        if (typeof v === 'string' && v.length > 500) {
+          cleaned[k] = v.substring(0, 200) + `... [${v.length} chars]`
+        } else if (Array.isArray(v) && v.length > 10) {
+          cleaned[k] = v.slice(0, 5)
+          cleaned[`_${k}_total`] = v.length
+        } else {
+          cleaned[k] = v
+        }
+      }
+      return JSON.stringify(cleaned)
+    }
+  } catch { /* ignore */ }
+  return str.substring(0, 4000) + '... [truncated]'
+}
+
 // Detect which phase the conversation is in based on tool usage history
 function detectPhase(messages: Anthropic.MessageParam[]): AgentPhase {
   const allContent = JSON.stringify(messages)
@@ -280,7 +305,7 @@ export async function executeChat(
           toolResultBlocks.push({
             type: 'tool_result' as const,
             tool_use_id: block.id,
-            content: JSON.stringify(result),
+            content: truncateResult(result),
           })
           continue
         }

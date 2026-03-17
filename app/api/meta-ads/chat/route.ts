@@ -251,16 +251,15 @@ export async function POST(request: Request) {
   }
 }
 
-// Truncate large tool results to avoid exceeding token limits
-function truncateToolResult(result: Record<string, any> | null): string {
-  const str = JSON.stringify(result || {})
-  // Max ~4000 chars per tool result (roughly 1000 tokens)
-  if (str.length <= 4000) return str
+// Truncate large JSON data to avoid exceeding token limits
+// Used for both tool_input and tool_result
+function truncateJSON(data: Record<string, any> | null, maxChars = 4000): string {
+  const str = JSON.stringify(data || {})
+  if (str.length <= maxChars) return str
   // Try to keep the structure but truncate large arrays/strings
   try {
     const parsed = JSON.parse(str)
     if (Array.isArray(parsed)) {
-      // Keep first 5 items of large arrays
       const truncated = parsed.slice(0, 5)
       return JSON.stringify({ items: truncated, _truncated: true, _total: parsed.length })
     }
@@ -268,8 +267,24 @@ function truncateToolResult(result: Record<string, any> | null): string {
       const truncated = { ...parsed, data: parsed.data.slice(0, 5), _truncated: true, _total: parsed.data.length }
       return JSON.stringify(truncated)
     }
+    // Truncate individual string values that are too long (e.g. base64 image data)
+    const cleaned: Record<string, any> = {}
+    for (const [k, v] of Object.entries(parsed)) {
+      if (typeof v === 'string' && v.length > 500) {
+        cleaned[k] = v.substring(0, 200) + `... [truncated, ${v.length} chars]`
+      } else {
+        cleaned[k] = v
+      }
+    }
+    const cleanedStr = JSON.stringify(cleaned)
+    if (cleanedStr.length <= maxChars) return cleanedStr
   } catch { /* ignore */ }
-  return str.substring(0, 4000) + '... [truncated]'
+  return str.substring(0, maxChars) + '... [truncated]'
+}
+
+// Legacy alias
+function truncateToolResult(result: Record<string, any> | null): string {
+  return truncateJSON(result)
 }
 
 // Convert DB messages to Anthropic API format
@@ -321,12 +336,22 @@ function buildAnthropicMessages(
       }
     } else if (msg.role === 'tool_call') {
       // Add tool_use block to assistant message
+      // Truncate tool_input to avoid base64 image data blowing up the prompt
       const lastMsg = messages[messages.length - 1]
+      let safeInput = msg.tool_input || {}
+      const inputStr = JSON.stringify(safeInput)
+      if (inputStr.length > 4000) {
+        try {
+          safeInput = JSON.parse(truncateJSON(safeInput))
+        } catch {
+          safeInput = { _truncated: true, _note: 'Input too large' }
+        }
+      }
       const toolBlock = {
         type: 'tool_use',
         id: msg.tool_use_id || `tool_${Date.now()}`,
         name: msg.tool_name || '',
-        input: msg.tool_input || {},
+        input: safeInput,
       }
       if (lastMsg?.role === 'assistant' && Array.isArray(lastMsg.content)) {
         (lastMsg.content as any[]).push(toolBlock)
