@@ -1,9 +1,12 @@
 // lib/meta-ads/landing-pipeline.ts
 // Deterministic pipeline for landing creation — no Claude calls needed
-// Executes: create product → generate ALL banners → import to DropPage
+// Executes: create product → generate ALL banners (parallel) → import to DropPage
 
 import { EstrategasToolsHandler } from './estrategas-tools'
 import type { SSEEvent } from './types'
+
+// Max concurrent banner generations to avoid rate limits but stay within Vercel timeout
+const MAX_CONCURRENT = 3
 
 export interface LandingPipelineInput {
   product_name: string
@@ -48,7 +51,8 @@ export async function executeLandingPipeline(
   sendEvent: (event: SSEEvent) => void,
 ): Promise<LandingPipelineResult> {
   const errors: string[] = []
-  const sectionsGenerated: SectionResult[] = []
+  // Pre-allocate array to preserve original order
+  const sectionsGenerated: SectionResult[] = new Array(input.sections.length)
 
   // Step 1: Create product (or use existing)
   let productId = input.existing_product_id || ''
@@ -69,12 +73,14 @@ export async function executeLandingPipeline(
     sendEvent({ type: 'tool_result', data: { tool_name: 'pipeline_step', result: { step: 'Producto creado ✓' } } })
   }
 
-  // Step 2: Generate ALL banners sequentially (avoid rate limits)
-  sendEvent({ type: 'tool_start', data: { tool_name: 'pipeline_step', tool_input: { step: `Generando ${input.sections.length} banners...` } } })
+  // Step 2: Generate banners in parallel with semaphore (MAX_CONCURRENT at a time)
+  sendEvent({ type: 'tool_start', data: { tool_name: 'pipeline_step', tool_input: { step: `Generando ${input.sections.length} banners (${MAX_CONCURRENT} en paralelo)...` } } })
 
-  for (let i = 0; i < input.sections.length; i++) {
-    const section = input.sections[i]
-    sendEvent({ type: 'tool_start', data: { tool_name: 'pipeline_step', tool_input: { step: `Banner ${i + 1}/${input.sections.length}: ${section.type}...` } } })
+  let completed = 0
+
+  async function generateBanner(index: number) {
+    const section = input.sections[index]
+    sendEvent({ type: 'tool_start', data: { tool_name: 'pipeline_step', tool_input: { step: `Banner ${index + 1}/${input.sections.length}: ${section.type}...` } } })
 
     const bannerResult = await estrategasTools.executeTool('generate_landing_banner', {
       product_id: productId,
@@ -93,32 +99,41 @@ export async function executeLandingPipeline(
       color_palette: input.color_palette,
     })
 
+    completed++
+
     if (bannerResult.success) {
-      sectionsGenerated.push({
+      sectionsGenerated[index] = {
         type: section.type,
         section_id: bannerResult.data.section_id,
         image_url: bannerResult.data.image_url,
         success: true,
-      })
-      sendEvent({ type: 'tool_result', data: { tool_name: 'pipeline_step', result: { step: `Banner ${section.type} ✓` } } })
+      }
+      sendEvent({ type: 'tool_result', data: { tool_name: 'pipeline_step', result: { step: `Banner ${section.type} ✓ (${completed}/${input.sections.length})` } } })
     } else {
-      sectionsGenerated.push({
+      sectionsGenerated[index] = {
         type: section.type,
         section_id: '',
         image_url: '',
         success: false,
         error: bannerResult.error,
-      })
+      }
       errors.push(`Banner ${section.type}: ${bannerResult.error}`)
-      sendEvent({ type: 'tool_result', data: { tool_name: 'pipeline_step', result: { step: `Banner ${section.type} ✗: ${bannerResult.error}` } } })
+      sendEvent({ type: 'tool_result', data: { tool_name: 'pipeline_step', result: { step: `Banner ${section.type} ✗: ${bannerResult.error} (${completed}/${input.sections.length})` } } })
     }
   }
 
-  // Step 3: Import successful sections to DropPage
-  const successfulSections = sectionsGenerated.filter(s => s.success)
+  // Process in batches of MAX_CONCURRENT
+  for (let batchStart = 0; batchStart < input.sections.length; batchStart += MAX_CONCURRENT) {
+    const batchEnd = Math.min(batchStart + MAX_CONCURRENT, input.sections.length)
+    const batchIndices = Array.from({ length: batchEnd - batchStart }, (_, i) => batchStart + i)
+    await Promise.all(batchIndices.map(i => generateBanner(i)))
+  }
+
+  // Step 3: Import successful sections to DropPage (in original order)
+  const successfulSections = sectionsGenerated.filter(s => s && s.success)
 
   if (successfulSections.length === 0) {
-    return { success: false, product_id: productId, sections_generated: sectionsGenerated, errors: ['No se generó ningún banner exitosamente'] }
+    return { success: false, product_id: productId, sections_generated: sectionsGenerated.filter(Boolean), errors: errors.length > 0 ? errors : ['No se generó ningún banner exitosamente'] }
   }
 
   sendEvent({ type: 'tool_start', data: { tool_name: 'pipeline_step', tool_input: { step: `Importando ${successfulSections.length} banners a DropPage...` } } })
@@ -142,7 +157,7 @@ export async function executeLandingPipeline(
   return {
     success: successfulSections.length > 0,
     product_id: productId,
-    sections_generated: sectionsGenerated,
+    sections_generated: sectionsGenerated.filter(Boolean),
     bundle_id: bundleId,
     landing_url: landingUrl,
     errors,

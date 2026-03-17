@@ -7,7 +7,7 @@ import { EstrategasToolsHandler } from '@/lib/meta-ads/estrategas-tools'
 import type { SSEEvent } from '@/lib/meta-ads/types'
 import type Anthropic from '@anthropic-ai/sdk'
 
-export const maxDuration = 120
+export const maxDuration = 300
 
 export async function POST(request: Request) {
   try {
