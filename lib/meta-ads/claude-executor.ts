@@ -185,6 +185,49 @@ export async function executeChat(
     const phase = detectPhase(currentMessages)
     const phaseTools = getToolsForPhase(phase)
 
+    // Safety check: measure total message size and log for debugging
+    const messagesJson = JSON.stringify(currentMessages)
+    const systemSize = META_ADS_SYSTEM_PROMPT.length
+    const toolsSize = JSON.stringify(phaseTools).length
+    const messagesSize = messagesJson.length
+    const totalChars = systemSize + toolsSize + messagesSize
+    console.log(`[Executor] Iteration ${iterations}: system=${systemSize}, tools=${toolsSize}, messages=${messagesSize}, total=${totalChars} chars (~${Math.round(totalChars / 4)} tokens), phase=${phase}`)
+
+    // If messages are enormous, find and log the largest content blocks
+    if (messagesSize > 500000) {
+      console.error(`[Executor] WARNING: messages are ${messagesSize} chars! Scanning for large blocks...`)
+      for (let mi = 0; mi < currentMessages.length; mi++) {
+        const msg = currentMessages[mi]
+        const msgStr = JSON.stringify(msg)
+        if (msgStr.length > 50000) {
+          console.error(`[Executor] Message[${mi}] role=${msg.role} size=${msgStr.length} chars`)
+          // Truncate this message's content to prevent the explosion
+          if (Array.isArray(msg.content)) {
+            for (let ci = 0; ci < (msg.content as any[]).length; ci++) {
+              const block = (msg.content as any[])[ci]
+              const blockStr = JSON.stringify(block)
+              if (blockStr.length > 10000) {
+                console.error(`[Executor] Message[${mi}].content[${ci}] type=${block.type} size=${blockStr.length} chars — TRUNCATING`)
+                if (block.type === 'tool_use' && block.input) {
+                  block.input = { _truncated: true, _original_size: blockStr.length }
+                } else if (block.type === 'tool_result' && typeof block.content === 'string' && block.content.length > 4000) {
+                  block.content = block.content.substring(0, 4000) + '... [truncated]'
+                } else if (block.type === 'text' && typeof block.text === 'string' && block.text.length > 10000) {
+                  block.text = block.text.substring(0, 5000) + `... [truncated from ${block.text.length} chars]`
+                }
+              }
+            }
+          } else if (typeof msg.content === 'string' && msg.content.length > 50000) {
+            console.error(`[Executor] Message[${mi}] string content size=${msg.content.length} — TRUNCATING`)
+            msg.content = msg.content.substring(0, 5000) + `... [truncated from ${(msg.content as string).length} chars]`
+          }
+        }
+      }
+      // Re-measure after truncation
+      const newSize = JSON.stringify(currentMessages).length
+      console.log(`[Executor] After emergency truncation: ${messagesSize} -> ${newSize} chars`)
+    }
+
     const response = await anthropic.messages.create({
       model: selectedModel,
       max_tokens: 8192,
