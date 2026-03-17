@@ -1,6 +1,6 @@
 'use client'
 
-import { MessageSquare } from 'lucide-react'
+import { MessageSquare, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
 
 interface Conversation {
@@ -13,10 +13,11 @@ interface ConversationListProps {
   conversations: Conversation[]
   activeId: string | null
   onSelect: (id: string) => void
+  onDelete: (id: string) => void
   loading: boolean
 }
 
-export function ConversationList({ conversations, activeId, onSelect, loading }: ConversationListProps) {
+export function ConversationList({ conversations, activeId, onSelect, onDelete, loading }: ConversationListProps) {
   if (loading) {
     return (
       <div className="flex-1 p-3 space-y-2">
@@ -38,26 +39,34 @@ export function ConversationList({ conversations, activeId, onSelect, loading }:
   return (
     <div className="flex-1 overflow-y-auto p-2 space-y-1">
       {conversations.map(conv => (
-        <button
+        <div
           key={conv.id}
-          onClick={() => onSelect(conv.id)}
           className={cn(
-            'w-full text-left px-3 py-2.5 rounded-lg transition-colors text-sm group',
+            'w-full text-left px-3 py-2.5 rounded-lg transition-colors text-sm group flex items-start gap-2 cursor-pointer',
             activeId === conv.id
               ? 'bg-purple-100 text-purple-700'
               : 'hover:bg-gray-100 text-gray-700'
           )}
+          onClick={() => onSelect(conv.id)}
         >
-          <div className="flex items-start gap-2">
-            <MessageSquare className="w-4 h-4 mt-0.5 flex-shrink-0 opacity-50" />
-            <div className="min-w-0">
-              <p className="truncate font-medium">{conv.title}</p>
-              <p className="text-xs text-gray-400 mt-0.5">
-                {new Date(conv.updated_at).toLocaleDateString('es', { day: 'numeric', month: 'short' })}
-              </p>
-            </div>
+          <MessageSquare className="w-4 h-4 mt-0.5 flex-shrink-0 opacity-50" />
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-medium">{conv.title}</p>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {new Date(conv.updated_at).toLocaleDateString('es', { day: 'numeric', month: 'short' })}
+            </p>
           </div>
-        </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              onDelete(conv.id)
+            }}
+            className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-red-100 hover:text-red-600 transition-all flex-shrink-0"
+            title="Eliminar conversación"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
       ))}
     </div>
   )

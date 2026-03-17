@@ -62,6 +62,15 @@ export default function MetaAdsPage() {
     }
   }
 
+  async function deleteConversation(id: string) {
+    if (!confirm('Eliminar esta conversación?')) return
+    const res = await fetch(`/api/meta-ads/conversations/${id}`, { method: 'DELETE' })
+    if (res.ok) {
+      setConversations(prev => prev.filter(c => c.id !== id))
+      if (activeConversation === id) setActiveConversation(null)
+    }
+  }
+
   if (hasKeys === false) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -103,6 +112,7 @@ export default function MetaAdsPage() {
             conversations={conversations}
             activeId={activeConversation}
             onSelect={(id) => setActiveConversation(id)}
+            onDelete={deleteConversation}
             loading={loading}
           />
         </div>
