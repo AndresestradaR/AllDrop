@@ -3,7 +3,7 @@
 
 import Anthropic from '@anthropic-ai/sdk'
 import { MetaAPIClient } from './meta-api'
-import { META_ADS_TOOLS } from './tools'
+import { META_ADS_TOOLS, getToolsForPhase, type AgentPhase } from './tools'
 import { META_ADS_SYSTEM_PROMPT } from './system-prompt'
 import { isWriteTool } from './types'
 import type { SSEEvent } from './types'
@@ -44,6 +44,23 @@ export interface ExecutorOptions {
 
 // Maximum tool_use loop iterations to prevent infinite loops
 const MAX_TOOL_ITERATIONS = 30
+
+// Detect which phase the conversation is in based on tool usage history
+function detectPhase(messages: Anthropic.MessageParam[]): AgentPhase {
+  const allContent = JSON.stringify(messages)
+
+  // Check for Meta Ads tool usage or campaign-related content
+  const hasMetaTools = /create_campaign|create_adset|create_ad|get_campaigns|get_adsets|get_ads|get_insights|get_pixels|get_pages|search_targeting/.test(allContent)
+  // Check for landing/banner generation
+  const hasLandingTools = /generate_landing_banner|import_sections_to_droppage|get_templates|create_estrategas_product/.test(allContent)
+  // Check for DropPage setup
+  const hasDropPageTools = /create_droppage_product|create_droppage_page_design|create_droppage_quantity_offer|update_droppage_checkout_config/.test(allContent)
+
+  if (hasMetaTools) return 'meta_ads'
+  if (hasDropPageTools) return 'droppage_setup'
+  if (hasLandingTools) return 'landing_creation'
+  return 'initial'
+}
 
 // EstrategasIA tool names — used for routing
 const ESTRATEGAS_TOOLS = [
@@ -105,14 +122,26 @@ export async function executeChat(
   while (iterations < MAX_TOOL_ITERATIONS) {
     iterations++
 
-    // Call Claude with tools
+    // Call Claude with tools — phase-aware tool pruning + prompt caching
     const validModels = ['claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001']
-    const selectedModel = opts.model && validModels.includes(opts.model) ? opts.model : 'claude-opus-4-6'
+    const selectedModel = opts.model && validModels.includes(opts.model) ? opts.model : 'claude-sonnet-4-6'
+
+    // Detect conversation phase to send only relevant tools (saves ~40% tokens)
+    const phase = detectPhase(currentMessages)
+    const phaseTools = getToolsForPhase(phase)
+
     const response = await anthropic.messages.create({
       model: selectedModel,
       max_tokens: 8192,
-      system: META_ADS_SYSTEM_PROMPT,
-      tools: META_ADS_TOOLS.map(t => ({
+      // Prompt caching: system prompt + tools cached after first call (90% savings on input)
+      system: [
+        {
+          type: 'text' as const,
+          text: META_ADS_SYSTEM_PROMPT,
+          cache_control: { type: 'ephemeral' as const },
+        },
+      ],
+      tools: phaseTools.map(t => ({
         name: t.name,
         description: t.description,
         input_schema: t.input_schema as Anthropic.Tool['input_schema'],

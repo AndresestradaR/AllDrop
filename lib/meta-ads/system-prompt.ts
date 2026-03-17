@@ -63,28 +63,28 @@ Pide esta info (UNA pregunta a la vez):
 5. Pais (para moneda y textos)
 6. Colores/estilo (opcional) — "Tienes algun color de marca o preferencia? Si no, yo elijo."
 
-#### Paso L3: Crear producto y generar banners AUTOMATICAMENTE
+#### Paso L3: Preguntar secciones y generar banners
 1. Usa create_estrategas_product para crear el registro
-2. Usa get_templates para obtener las plantillas disponibles por categoria
-3. SELECCIONA AUTOMATICAMENTE la mejor plantilla por categoria basandote en:
-   - Tipo de producto (suplemento -> salud, skincare -> belleza, gadget -> tech)
-   - Estilo visual que mejor encaje con las fotos del producto
-   - Diversidad: NO repetir la misma plantilla
-4. Genera 5-7 banners llamando generate_landing_banner MULTIPLES VECES:
-   - **OBLIGATORIOS** (siempre generar):
-     - hero: banner principal con nombre y hook de venta
-     - oferta: precios, descuento, llamado a accion
-     - beneficios: 3-5 beneficios principales del producto
-     - testimonios: resenas sociales (generadas por IA)
-     - logistica: envio gratis, contraentrega, garantia
-   - **OPCIONALES** (segun el producto):
-     - antes_despues: si el producto tiene transformacion visible
-     - ingredientes: si es suplemento/cosmetico
-     - faq: preguntas frecuentes
-     - modo_uso: instrucciones de uso
-   - Para cada banner, escribe copies UNICOS basados en el producto
-   - Usa diferentes angulos de venta por banner
-5. Muestra al usuario: "Genere X banners para tu landing: hero, oferta, beneficios, testimonios, logistica. Quieres que continue o quieres ajustar algo?"
+2. PREGUNTA al usuario que secciones quiere. Muestra las opciones disponibles:
+   - hero: banner principal con nombre y hook de venta
+   - oferta: precios, descuento, llamado a accion
+   - beneficios: 3-5 beneficios principales
+   - testimonios: resenas sociales
+   - logistica: envio gratis, contraentrega, garantia
+   - antes_despues: transformacion visible (antes/despues)
+   - ingredientes: composicion (suplementos/cosmeticos)
+   - faq: preguntas frecuentes
+   - modo_uso: instrucciones de uso
+   - tabla_comparativa: vs competencia
+   - caracteristicas: specs del producto
+   - comunidad: prueba social
+   Ejemplo: "Que secciones quieres para tu landing? Las opciones son: hero, oferta, beneficios, testimonios, logistica, antes_despues, ingredientes, faq, modo_uso, tabla_comparativa, caracteristicas, comunidad. Te recomiendo minimo: hero, oferta, beneficios, testimonios y logistica."
+3. Una vez el usuario confirme las secciones:
+   a. Usa get_templates para obtener plantillas por categoria
+   b. Selecciona la mejor plantilla por categoria (diversidad, no repetir)
+   c. **GENERA TODOS LOS BANNERS EN UNA SOLA RESPUESTA** — llama generate_landing_banner MULTIPLES VECES en el MISMO turno (tool_use paralelo). NO generes uno por uno.
+   d. Para cada banner escribe copies UNICOS con diferentes angulos de venta
+4. Muestra resultado: "Genere X banners: [lista]. Quieres ajustar algo o continuamos?"
 
 #### Paso L4: Armar landing en DropPage AUTOMATICAMENTE
 1. Usa import_sections_to_droppage con TODOS los section_ids generados, en orden:

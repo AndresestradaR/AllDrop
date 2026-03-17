@@ -1,5 +1,54 @@
 // Meta Ads AI Manager — Tool definitions for Anthropic API
 
+// Phase-based tool pruning — only send relevant tools per conversation phase
+export type AgentPhase = 'initial' | 'landing_creation' | 'droppage_setup' | 'meta_ads'
+
+// Tools needed per phase (names only — matched against META_ADS_TOOLS)
+const PHASE_TOOLS: Record<AgentPhase, string[]> = {
+  // Initial: basic discovery + landing start
+  initial: [
+    'get_ad_accounts', 'get_my_products', 'get_pages',
+    'create_estrategas_product', 'upload_product_image', 'get_templates',
+    'generate_landing_banner', 'get_landing_sections', 'import_sections_to_droppage',
+    'get_droppage_domains', 'get_droppage_products',
+  ],
+  // Landing creation: banner generation + import
+  landing_creation: [
+    'get_my_products', 'create_estrategas_product', 'upload_product_image',
+    'get_templates', 'generate_landing_banner', 'get_landing_sections',
+    'import_sections_to_droppage',
+    'get_droppage_domains', 'get_droppage_products', 'get_droppage_page_designs',
+    'create_droppage_product', 'create_droppage_page_design',
+    'associate_droppage_product_design',
+  ],
+  // DropPage setup: product, checkout, offers
+  droppage_setup: [
+    'get_droppage_products', 'get_droppage_page_designs', 'get_droppage_checkout_config',
+    'get_droppage_quantity_offers', 'get_droppage_upsells', 'get_droppage_downsells',
+    'get_droppage_domains', 'get_droppage_store_config',
+    'create_droppage_product', 'create_droppage_page_design',
+    'associate_droppage_product_design', 'update_droppage_checkout_config',
+    'create_droppage_quantity_offer', 'create_droppage_upsell',
+    'update_droppage_upsell_config', 'create_droppage_downsell',
+    'update_droppage_store_config',
+    'get_ad_accounts', 'get_pages', 'get_pixels',
+  ],
+  // Meta Ads: campaign creation + optimization
+  meta_ads: [
+    'get_ad_accounts', 'get_campaigns', 'get_adsets', 'get_ads',
+    'get_insights', 'get_ad_creative', 'search_targeting',
+    'get_pages', 'get_instagram_accounts', 'get_phone_numbers', 'get_pixels',
+    'create_campaign', 'create_adset', 'create_ad',
+    'update_budget', 'toggle_status', 'update_targeting',
+    'get_my_products', 'get_droppage_store_config',
+  ],
+}
+
+export function getToolsForPhase(phase: AgentPhase) {
+  const allowedNames = PHASE_TOOLS[phase]
+  return META_ADS_TOOLS.filter(t => allowedNames.includes(t.name))
+}
+
 export const META_ADS_TOOLS = [
   // ==================== READ-ONLY TOOLS ====================
   {
