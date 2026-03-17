@@ -7,6 +7,8 @@ import { META_ADS_TOOLS, getToolsForPhase, type AgentPhase } from './tools'
 import { META_ADS_SYSTEM_PROMPT } from './system-prompt'
 import { isWriteTool } from './types'
 import type { SSEEvent } from './types'
+import { executeLandingPipeline } from './landing-pipeline'
+import { executeDropPagePipeline } from './droppage-pipeline'
 
 export interface ExecutorOptions {
   anthropicApiKey: string
@@ -40,6 +42,9 @@ export interface ExecutorOptions {
   }) => Promise<string>
   onExecuteEstrategasTool?: (toolName: string, toolInput: Record<string, any>) => Promise<{ success: boolean; data?: any; error?: string }>
   onExecuteDropPageTool?: (toolName: string, toolInput: Record<string, any>) => Promise<{ success: boolean; data?: any; error?: string }>
+  // Pipeline support — direct references for deterministic execution
+  estrategasToolsHandler?: import('./estrategas-tools').EstrategasToolsHandler
+  dropPageClientInstance?: import('./droppage-client').DropPageClient
 }
 
 // Maximum tool_use loop iterations to prevent infinite loops
@@ -72,13 +77,28 @@ const ESTRATEGAS_TOOLS = [
   'upload_product_image',
 ]
 
-// Route tool execution to the correct handler (EstrategasIA, DropPage, or Meta API)
+// Extended options for routing including pipeline support
+interface RouteOptions extends Pick<ExecutorOptions, 'onExecuteEstrategasTool' | 'onExecuteDropPageTool' | 'onGetProducts'> {
+  estrategasTools?: import('./estrategas-tools').EstrategasToolsHandler
+  dropPageClient?: import('./droppage-client').DropPageClient
+  sendEvent?: (event: SSEEvent) => void
+}
+
+// Route tool execution to the correct handler (EstrategasIA, DropPage, Pipeline, or Meta API)
 async function routeToolExecution(
   toolName: string,
   toolInput: Record<string, any>,
   metaClient: MetaAPIClient,
-  opts: Pick<ExecutorOptions, 'onExecuteEstrategasTool' | 'onExecuteDropPageTool' | 'onGetProducts'>,
+  opts: RouteOptions,
 ): Promise<{ success: boolean; data?: any; error?: string }> {
+  // Pipeline tools — execute deterministic pipelines directly (no Claude cost)
+  if (toolName === 'execute_landing_pipeline' && opts.estrategasTools && opts.sendEvent) {
+    return executeLandingPipeline(toolInput as any, opts.estrategasTools, opts.sendEvent)
+  }
+  if (toolName === 'execute_droppage_setup' && opts.dropPageClient && opts.sendEvent) {
+    return executeDropPagePipeline(toolInput as any, opts.dropPageClient, opts.sendEvent)
+  }
+
   // EstrategasIA tools
   if (ESTRATEGAS_TOOLS.includes(toolName)) {
     if (opts.onExecuteEstrategasTool) {
@@ -118,6 +138,16 @@ export async function executeChat(
   // Build the current message list
   let currentMessages: Anthropic.MessageParam[] = [...messages]
   let iterations = 0
+
+  // Route options — includes pipeline support
+  const routeOpts: RouteOptions = {
+    onExecuteEstrategasTool: opts.onExecuteEstrategasTool,
+    onExecuteDropPageTool: opts.onExecuteDropPageTool,
+    onGetProducts: opts.onGetProducts,
+    estrategasTools: opts.estrategasToolsHandler,
+    dropPageClient: opts.dropPageClientInstance,
+    sendEvent,
+  }
 
   while (iterations < MAX_TOOL_ITERATIONS) {
     iterations++
@@ -222,7 +252,7 @@ export async function executeChat(
             data: { tool_name: toolName, tool_input: toolInput, is_write: true },
           })
 
-          const result = await routeToolExecution(toolName, toolInput, metaClient, opts)
+          const result = await routeToolExecution(toolName, toolInput, metaClient, routeOpts)
 
           sendEvent({
             type: 'tool_result',
@@ -261,7 +291,7 @@ export async function executeChat(
           data: { tool_name: toolName, tool_input: toolInput },
         })
 
-        const result = await routeToolExecution(toolName, toolInput, metaClient, opts)
+        const result = await routeToolExecution(toolName, toolInput, metaClient, routeOpts)
 
         sendEvent({
           type: 'tool_result',

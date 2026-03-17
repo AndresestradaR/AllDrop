@@ -183,6 +183,8 @@ export const WRITE_TOOLS = [
   'create_estrategas_product',
   'generate_landing_banner',
   'import_sections_to_droppage',
+  'execute_landing_pipeline',
+  'execute_droppage_setup',
   'create_droppage_product',
   'create_droppage_page_design',
   'associate_droppage_product_design',

@@ -10,6 +10,7 @@ const PHASE_TOOLS: Record<AgentPhase, string[]> = {
     'get_ad_accounts', 'get_my_products', 'get_pages',
     'create_estrategas_product', 'upload_product_image', 'get_templates',
     'generate_landing_banner', 'get_landing_sections', 'import_sections_to_droppage',
+    'execute_landing_pipeline', 'execute_droppage_setup',
     'get_droppage_domains', 'get_droppage_products',
   ],
   // Landing creation: banner generation + import
@@ -17,6 +18,7 @@ const PHASE_TOOLS: Record<AgentPhase, string[]> = {
     'get_my_products', 'create_estrategas_product', 'upload_product_image',
     'get_templates', 'generate_landing_banner', 'get_landing_sections',
     'import_sections_to_droppage',
+    'execute_landing_pipeline',
     'get_droppage_domains', 'get_droppage_products', 'get_droppage_page_designs',
     'create_droppage_product', 'create_droppage_page_design',
     'associate_droppage_product_design',
@@ -31,6 +33,7 @@ const PHASE_TOOLS: Record<AgentPhase, string[]> = {
     'create_droppage_quantity_offer', 'create_droppage_upsell',
     'update_droppage_upsell_config', 'create_droppage_downsell',
     'update_droppage_store_config',
+    'execute_droppage_setup',
     'get_ad_accounts', 'get_pages', 'get_pixels',
   ],
   // Meta Ads: campaign creation + optimization
@@ -455,6 +458,120 @@ export const META_ADS_TOOLS = [
         },
       },
       required: ['section_ids'],
+    },
+  },
+
+  // ==================== PIPELINE TOOLS (execute entire flows directly — $0 Claude cost) ====================
+  {
+    name: 'execute_landing_pipeline',
+    description: 'Ejecuta el pipeline COMPLETO de creación de landing: crea producto en EstrategasIA, genera TODOS los banners de una vez, y los importa a DropPage. Llama esto UNA SOLA VEZ con toda la info. REQUIERE que el usuario haya confirmado secciones y plantillas. Cada banner se genera secuencialmente y el progreso se muestra en el chat.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        product_name: { type: 'string', description: 'Nombre del producto' },
+        product_description: { type: 'string', description: 'Descripción del producto' },
+        sections: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              type: { type: 'string', description: 'Tipo de sección: hero, oferta, beneficios, testimonios, logistica, antes_despues, ingredientes, faq, modo_uso, etc.' },
+              template_id: { type: 'string', description: 'ID de la plantilla (de get_templates)' },
+              template_url: { type: 'string', description: 'URL de la plantilla (de get_templates)' },
+            },
+            required: ['type', 'template_id', 'template_url'],
+          },
+          description: 'Secciones a generar con su plantilla seleccionada',
+        },
+        product_details: { type: 'string', description: 'Detalles/beneficios/diferenciador del producto (max 500 chars)' },
+        sales_angle: { type: 'string', description: 'Ángulo de venta principal' },
+        target_avatar: { type: 'string', description: 'Público objetivo' },
+        additional_instructions: { type: 'string', description: 'Instrucciones adicionales para la IA' },
+        price_after: { type: 'number', description: 'Precio de venta' },
+        price_before: { type: 'number', description: 'Precio anterior (tachado)' },
+        currency_symbol: { type: 'string', description: 'Símbolo moneda ($)' },
+        target_country: { type: 'string', description: 'País (CO, MX, CL, etc.)' },
+        color_palette: { type: 'string', description: 'Paleta de colores' },
+        existing_product_id: { type: 'string', description: 'ID producto existente (omitir para crear nuevo)' },
+      },
+      required: ['product_name', 'product_description', 'sections', 'product_details'],
+    },
+  },
+  {
+    name: 'execute_droppage_setup',
+    description: 'Ejecuta el setup COMPLETO de DropPage de una vez: crea producto, landing, ofertas por cantidad, upsell, downsell, y configura checkout. Llama esto UNA SOLA VEZ con toda la info recopilada del usuario.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        product_name: { type: 'string', description: 'Nombre del producto' },
+        product_description: { type: 'string', description: 'Descripción' },
+        price: { type: 'number', description: 'Precio de venta (ej: 89900 para COP)' },
+        compare_at_price: { type: 'number', description: 'Precio anterior (tachado)' },
+        country: { type: 'string', description: 'País (CO, MX, CL, etc.)' },
+        dropi_product_id: { type: 'string', description: 'ID producto Dropi' },
+        variants: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              name: { type: 'string' },
+              variant_type: { type: 'string' },
+              variant_value: { type: 'string' },
+              price_override: { type: 'number' },
+              dropi_variation_id: { type: 'string' },
+            },
+          },
+          description: 'Variantes del producto',
+        },
+        page_title: { type: 'string', description: 'Título de la landing page' },
+        domain_id: { type: 'string', description: 'ID del dominio (de get_droppage_domains)' },
+        quantity_offers: {
+          type: 'object',
+          properties: {
+            tiers: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  title: { type: 'string' },
+                  quantity: { type: 'number' },
+                  position: { type: 'number' },
+                  is_preselected: { type: 'boolean' },
+                  discount_type: { type: 'string', enum: ['percentage', 'fixed', 'none'] },
+                  discount_value: { type: 'number' },
+                  label_text: { type: 'string' },
+                },
+              },
+            },
+          },
+          description: 'Ofertas 1x, 2x, 3x',
+        },
+        upsell: {
+          type: 'object',
+          properties: {
+            product_name: { type: 'string' },
+            product_price: { type: 'number' },
+            discount_type: { type: 'string' },
+            discount_value: { type: 'number' },
+            title: { type: 'string' },
+          },
+          description: 'Configuración upsell (omitir si no quiere)',
+        },
+        downsell: {
+          type: 'object',
+          properties: {
+            discount_type: { type: 'string' },
+            discount_value: { type: 'number' },
+            title: { type: 'string' },
+            subtitle: { type: 'string' },
+          },
+          description: 'Configuración downsell (omitir si no quiere)',
+        },
+        checkout_country: { type: 'string', description: 'País del checkout' },
+        excluded_departments: { type: 'array', items: { type: 'string' }, description: 'Departamentos excluidos' },
+        meta_pixel_id: { type: 'string', description: 'ID del pixel de Meta' },
+      },
+      required: ['product_name', 'price', 'page_title'],
     },
   },
 

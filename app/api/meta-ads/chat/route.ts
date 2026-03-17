@@ -177,6 +177,9 @@ export async function POST(request: Request) {
               onExecuteDropPageTool: async (toolName, toolInput) => {
                 return dropPageClient.executeTool(toolName, toolInput)
               },
+              // Pipeline support — direct instances for deterministic execution
+              estrategasToolsHandler: estrategasTools,
+              dropPageClientInstance: dropPageClient,
               onGetProducts: async () => {
                 const { data: products } = await supabase
                   .from('products')
