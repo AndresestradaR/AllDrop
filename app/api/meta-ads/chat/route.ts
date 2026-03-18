@@ -123,7 +123,7 @@ export async function POST(request: Request) {
       }
     }
     // Deduplicate URLs
-    productImageUrls = [...new Set(productImageUrls)]
+    productImageUrls = productImageUrls.filter((url, i) => productImageUrls.indexOf(url) === i)
 
     // Create Phase 2 clients
     const dropPageClient = new DropPageClient({ supabaseAccessToken })
