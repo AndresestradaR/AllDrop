@@ -130,6 +130,7 @@ export class DropPageClient {
   }
 
   async updatePageDesign(designId: string, input: {
+    grapesjs_data?: Record<string, any>
     html_content?: string
     css_content?: string
     is_published?: boolean

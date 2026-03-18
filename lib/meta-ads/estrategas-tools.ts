@@ -161,7 +161,10 @@ export class EstrategasToolsHandler {
     price_after?: number
     price_before?: number
     target_country?: string
-    color_palette?: string
+    color_palette?: string  // Legacy: string like "verdes y dorados"
+    colorPalette?: { primary: string; secondary: string; accent: string; extra?: string }
+    productContext?: { description?: string; benefits?: string; problems?: string; ingredients?: string; differentiator?: string }
+    typography?: { headings?: string; subheadings?: string; body?: string }
   }): Promise<{ success: boolean; data?: any; error?: string }> {
     try {
       // Use product images uploaded by user in chat, or fallback to product image_url
@@ -205,6 +208,12 @@ export class EstrategasToolsHandler {
           productPhotos,
           modelId: 'nano-banana-2',  // Default model with full cascade (KIE → fal → Gemini)
           outputSize: '1080x1920',
+          // Structured color palette (hex codes) — same format as manual UI
+          ...(input.colorPalette && { colorPalette: input.colorPalette }),
+          // Structured product context — same format as manual UI
+          ...(input.productContext && { productContext: input.productContext }),
+          // Typography — same format as manual UI
+          ...(input.typography && { typography: input.typography }),
           creativeControls: {
             sectionType: input.section_type,
             productDetails: input.product_details || '',
@@ -215,7 +224,8 @@ export class EstrategasToolsHandler {
             priceAfter: input.price_after,
             priceBefore: input.price_before,
             targetCountry: input.target_country,
-            colorPalette: input.color_palette,
+            // Legacy string fallback if no structured palette
+            ...(!input.colorPalette && input.color_palette && { colorPalette: input.color_palette }),
           },
         }),
       })
@@ -260,38 +270,53 @@ export class EstrategasToolsHandler {
     }
   }
 
-  // Import sections to DropPage (create bundle) — AUTOMATIC, no manual constructor
+  // Import sections to DropPage — calls the REAL import endpoint (same as "Enviar a mi editor" button)
   async importSectionsToDropPage(input: {
     section_ids: Array<{ id: string; order: number }>
     metadata?: Record<string, any>
   }): Promise<{ success: boolean; data?: any; error?: string }> {
     try {
-      const serviceClient = createDirectServiceClient()
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL
+        || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null)
+        || 'http://localhost:3000'
 
-      // Create import bundle
-      const { data: bundle, error: bundleError } = await serviceClient
-        .from('import_bundles')
-        .insert({
-          user_id: this.userId,
+      // Call the real import-sections endpoint with internal auth bypass
+      const res = await fetch(`${baseUrl}/api/minishop/import-sections`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Internal-Key': process.env.SUPABASE_SERVICE_ROLE_KEY!,
+          'X-Internal-User-Id': this.userId,
+        },
+        body: JSON.stringify({
           section_ids: input.section_ids,
           metadata: {
             ...input.metadata,
             product_photos: this.productImageUrls,
-            auto_import: true,  // Flag for DropPage to auto-import without user interaction
           },
-          status: 'pending',
-        })
-        .select('id')
-        .single()
+        }),
+      })
 
-      if (bundleError) return { success: false, error: bundleError.message }
+      const responseText = await res.text()
+      console.log(`[EstrategasTools] import-sections response: status=${res.status}, body=${responseText.substring(0, 300)}`)
+
+      if (!res.ok) {
+        let errorMsg = `Error HTTP ${res.status} importando secciones`
+        try {
+          const errData = JSON.parse(responseText)
+          errorMsg = errData.error || errorMsg
+        } catch { /* ignore */ }
+        return { success: false, error: errorMsg }
+      }
+
+      const data = JSON.parse(responseText)
 
       return {
         success: true,
         data: {
-          bundle_id: bundle.id,
-          redirect_url: `/constructor/import-sections?bundle=${bundle.id}`,
-          message: 'Secciones importadas a DropPage. La landing se armó automáticamente con los banners generados.',
+          bundle_id: data.bundle_id,
+          redirect_url: data.redirect_url,
+          message: 'Secciones importadas a DropPage con imágenes optimizadas.',
         },
       }
     } catch (err: any) {
