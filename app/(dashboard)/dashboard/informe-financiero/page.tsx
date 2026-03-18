@@ -28,6 +28,7 @@ interface OrderData {
 interface MetaData {
   has_meta: boolean
   spend: number
+  total_spend?: number
   impressions: number
   clicks: number
   cpc: number
