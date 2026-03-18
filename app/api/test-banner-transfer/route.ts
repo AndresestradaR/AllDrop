@@ -114,15 +114,25 @@ export async function GET(request: Request) {
 
   log.push(`Built grapesjs_data: ${imageComponents.length} components`)
 
-  // Step 4: If designId provided, update the page_design in DropPage
-  if (designId && supabaseToken) {
+  // Step 4: If designId provided, update via DropPage API using cookie-based auth from the user's session
+  if (designId) {
     const DROPPAGE_API = process.env.NEXT_PUBLIC_DROPPAGE_API_URL || 'https://shopiestrategas-production.up.railway.app'
 
-    // SSO: get DropPage JWT
+    // Use Supabase auth from cookies to get a DropPage JWT via SSO
+    const { createClient: createAuthClient } = await import('@/lib/supabase/server')
+    const authClient = await createAuthClient()
+    const { data: { session } } = await authClient.auth.getSession()
+
+    if (!session?.access_token) {
+      log.push('No Supabase session — user must be logged in')
+      return NextResponse.json({ error: 'Not logged in', log }, { status: 401 })
+    }
+
+    // SSO: exchange Supabase token for DropPage JWT
     const ssoRes = await fetch(`${DROPPAGE_API}/api/auth/sso/verify`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ access_token: supabaseToken }),
+      body: JSON.stringify({ access_token: session.access_token }),
     })
 
     if (!ssoRes.ok) {
@@ -132,36 +142,40 @@ export async function GET(request: Request) {
 
     const ssoData = await ssoRes.json()
     const jwt = ssoData.access_token
-    log.push('SSO OK')
+    log.push('SSO OK — got DropPage JWT')
 
     // Update page_design
+    const updatePayload = {
+      grapesjs_data,
+      html_content: resolvedUrls
+        .map(url => `<img src="${url}" style="width:100%;max-width:100%;display:block;margin:0 auto;" />`)
+        .join('\n'),
+      css_content: 'body{margin:0;padding:0;} img{max-width:100%;}',
+      is_published: true,
+    }
+
+    log.push(`Sending PUT to ${DROPPAGE_API}/api/admin/page-designs/${designId}`)
+    log.push(`Payload size: ${JSON.stringify(updatePayload).length} chars`)
+
     const updateRes = await fetch(`${DROPPAGE_API}/api/admin/page-designs/${designId}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${jwt}`,
       },
-      body: JSON.stringify({
-        grapesjs_data,
-        html_content: resolvedUrls
-          .map(url => `<img src="${url}" style="width:100%;max-width:100%;display:block;margin:0 auto;" />`)
-          .join('\n'),
-        css_content: 'body{margin:0;padding:0;} img{max-width:100%;}',
-        is_published: true,
-      }),
+      body: JSON.stringify(updatePayload),
     })
 
     const updateBody = await updateRes.text()
     log.push(`Update response: ${updateRes.status} ${updateBody.substring(0, 300)}`)
 
     if (updateRes.ok) {
-      log.push('\n✅ SUCCESS — banners should now appear in DropPage constructor')
+      log.push('\n✅ SUCCESS — reload the constructor page to see the banners')
     } else {
       log.push('\n❌ FAILED to update page_design')
     }
   } else {
-    log.push('\nNo designId/supabaseToken provided — dry run only')
-    log.push('To actually update: add &designId=xxx&supabaseToken=yyy')
+    log.push('\nDry run — no designId. Add &designId=xxx to update a page_design')
   }
 
   return NextResponse.json({
