@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { FileText, Play, Download, Eye, ChevronLeft, MessageCircle } from 'lucide-react'
+import { FileText, Play, Download, Eye, ChevronLeft, MessageCircle, ExternalLink } from 'lucide-react'
 
 interface ProviderResource {
   title: string
@@ -24,6 +24,7 @@ interface Provider {
   videoId: string | null
   contacts: ProviderContact[]
   resources: ProviderResource[]
+  dropiUrl: string | null
 }
 
 const PROVIDERS: Provider[] = [
@@ -57,6 +58,7 @@ const PROVIDERS: Provider[] = [
         url: '/proveedores/catalogo-nutranova.pdf',
       },
     ],
+    dropiUrl: 'https://app.dropi.co/dashboard/provider/501369/juan?isFavorite=false',
   },
 ]
 
@@ -175,6 +177,27 @@ export default function ProveedoresPage() {
                 <MessageCircle className="w-4 h-4 text-[#25D366] flex-shrink-0 opacity-60 group-hover:opacity-100 transition-opacity" />
               </a>
             ))}
+
+            {/* Dropi Link */}
+            {selectedProvider.dropiUrl && (
+              <a
+                href={selectedProvider.dropiUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 p-3 bg-[#FF6B35]/10 border border-[#FF6B35]/30 rounded-xl hover:bg-[#FF6B35]/20 hover:border-[#FF6B35]/50 transition-all group"
+              >
+                <div className="w-10 h-10 rounded-lg bg-[#FF6B35]/20 text-[#FF6B35] flex items-center justify-center flex-shrink-0 font-bold text-xs">
+                  D
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm font-semibold text-text-primary group-hover:text-[#FF6B35] transition-colors">
+                    Visitalos en DROPI
+                  </h3>
+                  <p className="text-xs text-text-secondary">Catálogo completo en Dropi</p>
+                </div>
+                <ExternalLink className="w-4 h-4 text-[#FF6B35] flex-shrink-0 opacity-60 group-hover:opacity-100 transition-opacity" />
+              </a>
+            )}
           </div>
         </div>
 
