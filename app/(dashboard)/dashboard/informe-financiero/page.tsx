@@ -30,9 +30,12 @@ interface MetaData {
   spend: number
   total_spend?: number
   impressions: number
+  total_impressions?: number
   clicks: number
+  total_clicks?: number
   cpc: number
   ctr: number
+  accounts?: Array<{ cpc?: number; [key: string]: any }>
   error?: string
 }
 
