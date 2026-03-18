@@ -121,7 +121,9 @@ async function routeToolExecution(
     return executeLandingPipeline(toolInput as any, opts.estrategasTools, opts.sendEvent)
   }
   if (toolName === 'execute_droppage_setup' && opts.dropPageClient && opts.sendEvent) {
-    return executeDropPagePipeline(toolInput as any, opts.dropPageClient, opts.sendEvent)
+    // Inject userId so pipeline can auto-fetch banner images from DB
+    const dropPageInput = { ...toolInput, user_id: opts.userId }
+    return executeDropPagePipeline(dropPageInput as any, opts.dropPageClient, opts.sendEvent)
   }
 
   // EstrategasIA tools

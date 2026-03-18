@@ -574,8 +574,9 @@ export const META_ADS_TOOLS = [
         section_image_urls: {
           type: 'array',
           items: { type: 'string' },
-          description: 'URLs de los banners generados por execute_landing_pipeline. Se usan para armar el HTML de la landing.',
+          description: 'OPCIONAL: URLs de los banners. Si se omite, el pipeline los busca automáticamente en la DB usando estrategas_product_id.',
         },
+        estrategas_product_id: { type: 'string', description: 'ID del producto en EstrategasIA (retornado por execute_landing_pipeline). El pipeline usa este ID para buscar automáticamente los banners generados.' },
         page_title: { type: 'string', description: 'Título de la landing page' },
         domain_id: { type: 'string', description: 'ID del dominio (de get_droppage_domains)' },
         cta_button_text: { type: 'string', description: 'Texto del botón CTA flotante (ej: "¡QUIERO ALIVIAR MI GASTRITIS!"). Si se omite: "¡COMPRAR AHORA!"' },

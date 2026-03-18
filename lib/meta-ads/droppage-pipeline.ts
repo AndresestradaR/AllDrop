@@ -2,8 +2,16 @@
 // Deterministic pipeline for DropPage setup — no Claude calls needed
 // Executes: create product → quantity offers → upsell → downsell → checkout → associate
 
+import { createClient } from '@supabase/supabase-js'
 import { DropPageClient } from './droppage-client'
 import type { SSEEvent } from './types'
+
+function createDirectServiceClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
+}
 
 export interface DropPagePipelineInput {
   // Product
@@ -23,8 +31,12 @@ export interface DropPagePipelineInput {
   }>
   // Product images (URLs from user uploads in chat)
   product_image_urls?: string[]
-  // Banner/section images (from landing pipeline)
+  // Banner/section images (from landing pipeline) — optional: if empty, auto-fetched from DB
   section_image_urls?: string[]
+  // EstrategasIA product ID — used to auto-fetch banner URLs from landing_sections table
+  estrategas_product_id?: string
+  // User ID — needed for DB queries
+  user_id?: string
   // Page design
   page_title: string
   domain_id?: string
@@ -142,13 +154,37 @@ export async function executeDropPagePipeline(
       errors.push(`Asociar producto a landing: ${assocResult.error}`)
     }
 
+    // Auto-fetch section images from DB if not provided (solves truncation problem)
+    let sectionImageUrls = input.section_image_urls || []
+    if (sectionImageUrls.length === 0 && input.estrategas_product_id && input.user_id) {
+      try {
+        const serviceClient = createDirectServiceClient()
+        const { data: sections } = await serviceClient
+          .from('landing_sections')
+          .select('generated_image_url')
+          .eq('product_id', input.estrategas_product_id)
+          .eq('user_id', input.user_id)
+          .eq('status', 'completed')
+          .order('sort_order', { ascending: true })
+
+        if (sections?.length) {
+          sectionImageUrls = sections
+            .map((s: any) => s.generated_image_url)
+            .filter((url: string) => url && url.startsWith('http'))
+          console.log(`[DropPagePipeline] Auto-fetched ${sectionImageUrls.length} banner URLs from landing_sections`)
+        }
+      } catch (e: any) {
+        console.warn('[DropPagePipeline] Failed to auto-fetch sections:', e.message)
+      }
+    }
+
     // Populate page design with banner section images using GrapesJS format
     // This is the same format the DropPage constructor uses when importing via "Enviar a mi editor"
-    if (input.section_image_urls?.length) {
+    if (sectionImageUrls.length > 0) {
       sendEvent({ type: 'tool_start', data: { tool_name: 'pipeline_step', tool_input: { step: 'Armando landing con banners...' } } })
 
       // Build GrapesJS components — same structure as PageDesigner.jsx import effect
-      const imageComponents = input.section_image_urls.map((url, i) => ({
+      const imageComponents = sectionImageUrls.map((url, i) => ({
         type: 'image',
         tagName: 'img',
         attributes: {
@@ -174,7 +210,7 @@ export async function executeDropPagePipeline(
 
       const updateResult = await dropPageClient.updatePageDesign(designId, {
         grapesjs_data,
-        html_content: input.section_image_urls
+        html_content: sectionImageUrls
           .map(url => `<img src="${url}" alt="${input.product_name}" style="width:100%;max-width:100%;display:block;margin:0 auto;" />`)
           .join('\n'),
         css_content: 'body{margin:0;padding:0;} img{max-width:100%;}',
@@ -182,13 +218,13 @@ export async function executeDropPagePipeline(
         product_metadata: {
           product_name: input.product_name,
           cta_text: input.cta_button_text || '¡COMPRAR AHORA!',
-          section_count: input.section_image_urls.length,
+          section_count: sectionImageUrls.length,
           generated_by: 'matias_pipeline',
         },
       })
 
       if (updateResult.success) {
-        sendEvent({ type: 'tool_result', data: { tool_name: 'pipeline_step', result: { step: `Landing armada con ${input.section_image_urls.length} banners y publicada ✓` } } })
+        sendEvent({ type: 'tool_result', data: { tool_name: 'pipeline_step', result: { step: `Landing armada con ${sectionImageUrls.length} banners y publicada ✓` } } })
       } else {
         errors.push(`Armar landing: ${updateResult.error}`)
       }

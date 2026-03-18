@@ -169,10 +169,11 @@ Pregunta UNA cosa a la vez:
 #### Paso L5: Ejecutar setup de DropPage
 Una vez tengas TODA la info, llama **execute_droppage_setup** UNA SOLA VEZ con:
 - product_name
-- product_description: descripcion CORTA (1-2 oraciones). La descripcion larga de la ficha creativa (L2.5) ya esta en los banners de la landing, NO va en el producto de DropPage.
+- product_description: descripcion CORTA (1-2 oraciones). La descripcion larga ya esta en los banners.
 - price, compare_at_price, country, domain_id
-- **product_image_urls**: las URLs de las fotos que el usuario envio en el chat (se suben a Multimedia del producto)
-- **section_image_urls**: las URLs de los banners generados por execute_landing_pipeline (se usan para armar el HTML de la landing). Toma las image_url del resultado de execute_landing_pipeline.
+- **estrategas_product_id**: el product_id que retorno execute_landing_pipeline. CRITICO — el pipeline usa este ID para buscar automaticamente los banners generados y armar la landing. Sin este campo, la landing queda VACIA.
+- **product_image_urls**: las URLs de las fotos del chat (se suben a Multimedia del producto)
+- section_image_urls: OPCIONAL — si lo omites, el pipeline los busca auto de la DB con estrategas_product_id
 - **cta_button_text**: el texto del boton CTA del Paso L3.5
 - quantity_offers: si el usuario dio precios totales, usa total_price en cada tier. Si no, usa tiers estandar con porcentaje (1x none, 2x 10%, 3x 15%)
 - upsell y downsell si el usuario los quiso
