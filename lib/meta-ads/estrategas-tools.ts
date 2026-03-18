@@ -108,7 +108,7 @@ export class EstrategasToolsHandler {
         .from('landing_sections')
         .select('*')
         .eq('product_id', productId)
-        .order('sort_order', { ascending: true })
+        .order('created_at', { ascending: true })
 
       if (error) return { success: false, error: error.message }
 

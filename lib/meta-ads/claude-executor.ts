@@ -45,6 +45,8 @@ export interface ExecutorOptions {
   // Pipeline support — direct references for deterministic execution
   estrategasToolsHandler?: import('./estrategas-tools').EstrategasToolsHandler
   dropPageClientInstance?: import('./droppage-client').DropPageClient
+  // Auto-recovered from conversation history: product_id from last execute_landing_pipeline
+  lastLandingProductId?: string
 }
 
 // Maximum tool_use loop iterations to prevent infinite loops
@@ -105,6 +107,8 @@ const ESTRATEGAS_TOOLS = [
 // Extended options for routing including pipeline support
 interface RouteOptions extends Pick<ExecutorOptions, 'onExecuteEstrategasTool' | 'onExecuteDropPageTool' | 'onGetProducts'> {
   userId?: string
+  // Auto-populated: product_id from the last execute_landing_pipeline result
+  lastLandingProductId?: string
   estrategasTools?: import('./estrategas-tools').EstrategasToolsHandler
   dropPageClient?: import('./droppage-client').DropPageClient
   sendEvent?: (event: SSEEvent) => void
@@ -119,11 +123,20 @@ async function routeToolExecution(
 ): Promise<{ success: boolean; data?: any; error?: string }> {
   // Pipeline tools — execute deterministic pipelines directly (no Claude cost)
   if (toolName === 'execute_landing_pipeline' && opts.estrategasTools && opts.sendEvent) {
-    return executeLandingPipeline(toolInput as any, opts.estrategasTools, opts.sendEvent)
+    const result = await executeLandingPipeline(toolInput as any, opts.estrategasTools, opts.sendEvent)
+    // Save product_id for auto-injection into execute_droppage_setup
+    if (result.product_id) {
+      opts.lastLandingProductId = result.product_id
+    }
+    return result
   }
   if (toolName === 'execute_droppage_setup' && opts.dropPageClient && opts.sendEvent) {
-    // Inject userId so pipeline can auto-fetch banner images from DB
-    const dropPageInput = { ...toolInput, user_id: opts.userId }
+    // Auto-inject userId + estrategas_product_id so pipeline can fetch banners from DB
+    const dropPageInput = {
+      ...toolInput,
+      user_id: opts.userId,
+      estrategas_product_id: toolInput.estrategas_product_id || opts.lastLandingProductId,
+    }
     return executeDropPagePipeline(dropPageInput as any, opts.dropPageClient, opts.sendEvent)
   }
 
@@ -170,6 +183,7 @@ export async function executeChat(
   // Route options — includes pipeline support
   const routeOpts: RouteOptions = {
     userId: opts.userId,
+    lastLandingProductId: opts.lastLandingProductId,
     onExecuteEstrategasTool: opts.onExecuteEstrategasTool,
     onExecuteDropPageTool: opts.onExecuteDropPageTool,
     onGetProducts: opts.onGetProducts,

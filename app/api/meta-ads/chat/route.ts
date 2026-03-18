@@ -125,6 +125,19 @@ export async function POST(request: Request) {
     // Deduplicate URLs
     productImageUrls = productImageUrls.filter((url, i) => productImageUrls.indexOf(url) === i)
 
+    // Recover estrategas product_id from previous execute_landing_pipeline results
+    let lastLandingProductId: string | undefined
+    if (history) {
+      for (const msg of history) {
+        if (msg.tool_name === 'execute_landing_pipeline' && msg.tool_result) {
+          try {
+            const result = typeof msg.tool_result === 'string' ? JSON.parse(msg.tool_result) : msg.tool_result
+            if (result.product_id) lastLandingProductId = result.product_id
+          } catch { /* ignore */ }
+        }
+      }
+    }
+
     // Create Phase 2 clients
     const dropPageClient = new DropPageClient({ supabaseAccessToken })
     const estrategasTools = new EstrategasToolsHandler({
@@ -210,6 +223,7 @@ export async function POST(request: Request) {
               // Pipeline support — direct instances for deterministic execution
               estrategasToolsHandler: estrategasTools,
               dropPageClientInstance: dropPageClient,
+              lastLandingProductId,
               onGetProducts: async () => {
                 const { data: products } = await supabase
                   .from('products')
