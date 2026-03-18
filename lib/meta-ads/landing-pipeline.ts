@@ -13,8 +13,9 @@ function createDirectServiceClient() {
   )
 }
 
-// Max concurrent banner generations to avoid rate limits but stay within Vercel timeout
-const MAX_CONCURRENT = 3
+// Max concurrent banner generations — 2 to avoid rate limiting from KIE/WaveSpeed
+// (3 caused connection errors; manual UI does 1 at a time)
+const MAX_CONCURRENT = 2
 
 export interface LandingPipelineInput {
   product_name: string
@@ -201,6 +202,23 @@ export async function executeLandingPipeline(
     const batchEnd = Math.min(batchStart + MAX_CONCURRENT, input.sections.length)
     const batchIndices = Array.from({ length: batchEnd - batchStart }, (_, i) => batchStart + i)
     await Promise.all(batchIndices.map(i => generateBanner(i)))
+  }
+
+  // Step 2.5: Retry failed banners ONE MORE TIME (sequentially to avoid rate limits)
+  const failedIndices = sectionsGenerated
+    .map((s, i) => (s && !s.success ? i : -1))
+    .filter(i => i >= 0)
+
+  if (failedIndices.length > 0 && failedIndices.length < input.sections.length) {
+    sendEvent({ type: 'tool_start', data: { tool_name: 'pipeline_step', tool_input: { step: `Reintentando ${failedIndices.length} banner(s) fallidos...` } } })
+    for (const idx of failedIndices) {
+      // Remove the error from the errors array
+      const section = input.sections[idx]
+      const errIdx = errors.findIndex(e => e.includes(section.type))
+      if (errIdx >= 0) errors.splice(errIdx, 1)
+      // Retry sequentially (1 at a time)
+      await generateBanner(idx)
+    }
   }
 
   // Step 3: Import successful sections to DropPage (in original order)

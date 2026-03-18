@@ -82,13 +82,16 @@ export async function POST(request: Request) {
       }
     }
 
-    // Save user message
+    // Save user message (include photo URLs marker so they persist across requests)
+    const messageContent = newImageUrls.length > 0
+      ? `${message}\n[product_photos:${newImageUrls.join(',')}]`
+      : message
     await serviceClient
       .from('meta_ads_messages')
       .insert({
         conversation_id,
         role: 'user',
-        content: message,
+        content: messageContent,
       })
 
     // Load conversation history for context
@@ -98,16 +101,29 @@ export async function POST(request: Request) {
       .eq('conversation_id', conversation_id)
       .order('created_at', { ascending: true })
 
-    // Recover product image URLs from previous messages (upload_product_image results)
-    // so the pipeline has access to photos the user uploaded in earlier messages
+    // Recover product image URLs from previous messages
+    // Sources: 1) upload_product_image tool results, 2) chat-uploaded photos saved as system notes
     if (history) {
       for (const msg of history) {
+        // Source 1: explicit tool calls
         if (msg.tool_name === 'upload_product_image' && msg.tool_result) {
-          const result = typeof msg.tool_result === 'string' ? JSON.parse(msg.tool_result) : msg.tool_result
-          if (result.url) productImageUrls.push(result.url)
+          try {
+            const result = typeof msg.tool_result === 'string' ? JSON.parse(msg.tool_result) : msg.tool_result
+            if (result.url) productImageUrls.push(result.url)
+          } catch { /* ignore parse errors */ }
+        }
+        // Source 2: photos auto-uploaded from chat attachments (saved as system notes)
+        if (msg.role === 'user' && typeof msg.content === 'string' && msg.content.includes('[product_photos:')) {
+          const match = msg.content.match(/\[product_photos:([^\]]+)\]/)
+          if (match) {
+            const urls = match[1].split(',').map((u: string) => u.trim()).filter((u: string) => u.startsWith('http'))
+            productImageUrls.push(...urls)
+          }
         }
       }
     }
+    // Deduplicate URLs
+    productImageUrls = [...new Set(productImageUrls)]
 
     // Create Phase 2 clients
     const dropPageClient = new DropPageClient({ supabaseAccessToken })
