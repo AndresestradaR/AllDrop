@@ -156,7 +156,9 @@ export async function executeDropPagePipeline(
 
     // Auto-fetch section images from DB if not provided (solves truncation problem)
     let sectionImageUrls = input.section_image_urls || []
+    console.log(`[DropPagePipeline:Step3] section_image_urls provided: ${sectionImageUrls.length} | estrategas_product_id: ${input.estrategas_product_id || 'NONE'}`)
     if (sectionImageUrls.length === 0 && input.estrategas_product_id) {
+      console.log(`[DropPagePipeline:Step3] Auto-fetching banners from landing_sections...`)
       try {
         const serviceClient = createDirectServiceClient()
         const { data: sections } = await serviceClient

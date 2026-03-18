@@ -117,8 +117,12 @@ export async function POST(request: Request) {
     })
     const dropPageClient = new DropPageClient({ supabaseAccessToken })
 
-    // Dummy sendEvent for pipeline progress (confirm endpoint doesn't stream SSE)
-    const sendEvent = () => {}
+    // Log sendEvent for pipeline progress (confirm endpoint doesn't stream SSE but we log)
+    const sendEvent = (event: any) => {
+      console.log(`[Matias:Confirm:SSE] ${event.type} | ${JSON.stringify(event.data || {}).substring(0, 200)}`)
+    }
+
+    console.log(`[Matias:Confirm] Executing ${action.action_type} | userId: ${user.id} | lastLandingProductId: ${lastLandingProductId} | productImages: ${productImageUrls.length}`)
 
     const result = await executeConfirmedAction(
       metaAccessToken,

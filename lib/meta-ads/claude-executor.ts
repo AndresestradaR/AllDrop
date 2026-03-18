@@ -122,26 +122,41 @@ async function routeToolExecution(
   opts: RouteOptions,
 ): Promise<{ success: boolean; data?: any; error?: string }> {
   // Pipeline tools — execute deterministic pipelines directly (no Claude cost)
+  console.log(`[Matias:Route] Tool: ${toolName} | hasDropPageClient: ${!!opts.dropPageClient} | hasSendEvent: ${!!opts.sendEvent} | hasEstrategasTools: ${!!opts.estrategasTools}`)
+
   if (toolName === 'execute_landing_pipeline' && opts.estrategasTools && opts.sendEvent) {
+    console.log(`[Matias:LandingPipeline] START | sections: ${(toolInput as any).sections?.length || 0} | product: ${(toolInput as any).product_name}`)
     const result = await executeLandingPipeline(toolInput as any, opts.estrategasTools, opts.sendEvent)
+    console.log(`[Matias:LandingPipeline] END | success: ${result.success} | product_id: ${result.product_id} | sections: ${result.sections_generated?.length || 0} | errors: ${result.errors?.length || 0}`)
+    if (result.errors?.length) console.log(`[Matias:LandingPipeline] Errors: ${result.errors.join(' | ').substring(0, 500)}`)
     // Save product_id for auto-injection into execute_droppage_setup
     if (result.product_id) {
       opts.lastLandingProductId = result.product_id
+      console.log(`[Matias:LandingPipeline] Saved lastLandingProductId: ${result.product_id}`)
     }
     return result
   }
   if (toolName === 'execute_droppage_setup' && opts.dropPageClient && opts.sendEvent) {
     // Auto-inject userId + estrategas_product_id so pipeline can fetch banners from DB
+    const estrategasProductId = toolInput.estrategas_product_id || opts.lastLandingProductId
+    console.log(`[Matias:DropPagePipeline] START | product: ${toolInput.product_name} | estrategas_product_id: ${estrategasProductId} | userId: ${opts.userId}`)
     const dropPageInput = {
       ...toolInput,
       user_id: opts.userId,
-      estrategas_product_id: toolInput.estrategas_product_id || opts.lastLandingProductId,
+      estrategas_product_id: estrategasProductId,
     }
-    return executeDropPagePipeline(dropPageInput as any, opts.dropPageClient, opts.sendEvent)
+    const result = await executeDropPagePipeline(dropPageInput as any, opts.dropPageClient, opts.sendEvent)
+    console.log(`[Matias:DropPagePipeline] END | success: ${result.success} | design_id: ${result.design_id} | errors: ${result.errors?.length || 0}`)
+    if (result.errors?.length) console.log(`[Matias:DropPagePipeline] Errors: ${result.errors.join(' | ')}`)
+    return result
+  }
+  if (toolName === 'execute_droppage_setup' && (!opts.dropPageClient || !opts.sendEvent)) {
+    console.error(`[Matias:DropPagePipeline] BLOCKED — missing handlers! dropPageClient: ${!!opts.dropPageClient} sendEvent: ${!!opts.sendEvent}`)
   }
 
   // EstrategasIA tools
   if (ESTRATEGAS_TOOLS.includes(toolName)) {
+    console.log(`[Matias:Tool] ${toolName}`)
     if (opts.onExecuteEstrategasTool) {
       return opts.onExecuteEstrategasTool(toolName, toolInput)
     }
