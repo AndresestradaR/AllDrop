@@ -75,6 +75,18 @@ export async function GET(request: Request) {
     cost_return_shipping: raw.financials?.estimated_return_shipping || 0,
     by_product: raw.by_product || [],
     daily_orders: raw.daily_orders || [],
+    // Wallet data from Dropi
+    wallet: raw.wallet ? {
+      available: raw.wallet.available || false,
+      error: raw.wallet.error || null,
+      transaction_count: raw.wallet.transaction_count || 0,
+      summary: raw.wallet.summary || [],
+      revenue: raw.wallet.revenue || 0,
+      costs: raw.wallet.costs || 0,
+      other_entries: raw.wallet.other_entries || 0,
+      other_exits: raw.wallet.other_exits || 0,
+      omitted: raw.wallet.omitted || [],
+    } : null,
   }
 
   return NextResponse.json(mapped)

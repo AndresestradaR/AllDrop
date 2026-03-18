@@ -12,6 +12,26 @@ interface OrderStatusBreakdown {
   amount: number
 }
 
+interface WalletTransaction {
+  code: string
+  description: string
+  type: string
+  count: number
+  total: number
+}
+
+interface WalletData {
+  available: boolean
+  error: string | null
+  transaction_count: number
+  summary: WalletTransaction[]
+  revenue: number
+  costs: number
+  other_entries: number
+  other_exits: number
+  omitted: WalletTransaction[]
+}
+
 interface OrderData {
   total_orders: number
   confirmed_count: number
@@ -23,6 +43,7 @@ interface OrderData {
   cost_merchandise: number
   cost_shipping: number
   cost_return_shipping: number
+  wallet?: WalletData | null
 }
 
 interface MetaData {
@@ -74,6 +95,23 @@ const STATUS_COLORS: Record<string, string> = {
   CANCELADO: 'bg-red-50 border-red-200 text-red-600',
 }
 
+const WALLET_FRIENDLY_NAMES: Record<string, string> = {
+  '1000': 'Flete cobrado (nueva orden)',
+  '1001': 'Recaudo por entrega',
+  '1002': 'Ganancia como dropshipper',
+  '1003': 'Devolucion de flete (entregada)',
+  '1006': 'Ganancia como proveedor',
+  '1013': 'Devolucion flete (no efectiva)',
+  '1014': 'Cobro devolucion (no efectiva)',
+  '1020': 'Retiro de saldo en cartera',
+  '1030': 'Transferencia recibida',
+  '1031': 'Transferencia enviada',
+  '1034': 'Devolucion flete (cambio transportadora)',
+  '1038': 'Recarga tarjeta de credito',
+  '1039': 'Retiro tarjeta de credito',
+  '1045': 'Mantenimiento mensual tarjeta',
+}
+
 const EXPENSE_CATEGORIES = [
   'Inversion publicitaria',
   'Herramientas',
@@ -115,6 +153,7 @@ export default function InformeFinancieroPage() {
   // Collapsible sections
   const [showStatusSection, setShowStatusSection] = useState(true)
   const [showTransactions, setShowTransactions] = useState(true)
+  const [showOmitted, setShowOmitted] = useState(false)
 
   const generated = orderData !== null
 
@@ -220,9 +259,11 @@ export default function InformeFinancieroPage() {
   const totalIncome = expenses.filter(e => e.type === 'income').reduce((sum, e) => sum + e.amount, 0)
   const metaSpend = metaData?.has_meta ? (metaData.total_spend ?? metaData.spend ?? 0) : 0
 
-  const utilidadActual = orderData
-    ? orderData.revenue - orderData.cost_merchandise - orderData.cost_shipping - orderData.cost_return_shipping
-    : 0
+  const utilidadActual = orderData?.wallet?.available
+    ? orderData.wallet.revenue - orderData.wallet.costs
+    : orderData
+      ? orderData.revenue - orderData.cost_merchandise - orderData.cost_shipping - orderData.cost_return_shipping
+      : 0
 
   const utilidadFinal = utilidadActual - metaSpend - totalExpenses + totalIncome
 
@@ -381,71 +422,146 @@ export default function InformeFinancieroPage() {
             </button>
 
             {showTransactions && (
-              <div className="bg-surface rounded-xl shadow-sm border border-border overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-border bg-gray-50/50">
-                        <th className="text-left py-3 px-4 font-semibold text-text-secondary">Concepto</th>
-                        <th className="text-right py-3 px-4 font-semibold text-text-secondary">Registros</th>
-                        <th className="text-right py-3 px-4 font-semibold text-text-secondary">Total</th>
-                        <th className="text-right py-3 px-4 font-semibold text-text-secondary">%</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {[
-                        {
-                          label: 'Recaudo de venta',
-                          count: orderData.confirmed_count,
-                          amount: orderData.revenue,
-                          positive: true,
-                        },
-                        {
-                          label: 'Costo de mercancia',
-                          count: orderData.confirmed_count,
-                          amount: -orderData.cost_merchandise,
-                          positive: false,
-                        },
-                        {
-                          label: 'Costo de envio',
-                          count: orderData.confirmed_count,
-                          amount: -orderData.cost_shipping,
-                          positive: false,
-                        },
-                        {
-                          label: 'Envio devoluciones',
-                          count: orderData.cancelled_count,
-                          amount: -orderData.cost_return_shipping,
-                          positive: false,
-                        },
-                      ].map((row, i) => (
-                        <tr key={i} className="border-b border-border/50 last:border-0">
-                          <td className="py-3 px-4 font-medium text-text-primary">{row.label}</td>
-                          <td className="py-3 px-4 text-right text-text-secondary">{formatNumber(row.count)}</td>
-                          <td className={`py-3 px-4 text-right font-semibold ${row.positive ? 'text-emerald-600' : 'text-red-600'}`}>
-                            {formatCurrency(Math.abs(row.amount))}
+              <>
+                <div className="bg-surface rounded-xl shadow-sm border border-border overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-border bg-gray-50/50">
+                          <th className="text-left py-3 px-4 font-semibold text-text-secondary">Concepto</th>
+                          <th className="text-right py-3 px-4 font-semibold text-text-secondary">Registros</th>
+                          <th className="text-right py-3 px-4 font-semibold text-text-secondary">Total</th>
+                          <th className="text-right py-3 px-4 font-semibold text-text-secondary">%</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {orderData.wallet?.available ? (
+                          /* ── Wallet real de Dropi ── */
+                          orderData.wallet.summary.map((tx, i) => {
+                            const isEntry = tx.type === 'ENTRADA'
+                            const walletTotal = orderData.wallet!.revenue + orderData.wallet!.costs
+                            return (
+                              <tr key={`wallet-${tx.code}-${i}`} className="border-b border-border/50 last:border-0">
+                                <td className="py-3 px-4 font-medium text-text-primary">
+                                  {WALLET_FRIENDLY_NAMES[tx.code] || tx.description}
+                                </td>
+                                <td className="py-3 px-4 text-right text-text-secondary">{formatNumber(tx.count)}</td>
+                                <td className={`py-3 px-4 text-right font-semibold ${isEntry ? 'text-emerald-600' : 'text-red-600'}`}>
+                                  {isEntry ? '' : '-'}{formatCurrency(tx.total)}
+                                </td>
+                                <td className="py-3 px-4 text-right text-text-secondary">
+                                  {walletTotal > 0 ? formatPct((tx.total / walletTotal) * 100) : '0.0%'}
+                                </td>
+                              </tr>
+                            )
+                          })
+                        ) : (
+                          /* ── Estimado (fallback sin wallet) ── */
+                          [{
+                            label: 'Recaudo de venta',
+                            count: orderData.confirmed_count,
+                            amount: orderData.revenue,
+                            positive: true,
+                          },
+                          {
+                            label: 'Costo de mercancia',
+                            count: orderData.confirmed_count,
+                            amount: -orderData.cost_merchandise,
+                            positive: false,
+                          },
+                          {
+                            label: 'Costo de envio',
+                            count: orderData.confirmed_count,
+                            amount: -orderData.cost_shipping,
+                            positive: false,
+                          },
+                          {
+                            label: 'Envio devoluciones',
+                            count: orderData.cancelled_count,
+                            amount: -orderData.cost_return_shipping,
+                            positive: false,
+                          }].map((row, i) => (
+                            <tr key={i} className="border-b border-border/50 last:border-0">
+                              <td className="py-3 px-4 font-medium text-text-primary">{row.label}</td>
+                              <td className="py-3 px-4 text-right text-text-secondary">{formatNumber(row.count)}</td>
+                              <td className={`py-3 px-4 text-right font-semibold ${row.positive ? 'text-emerald-600' : 'text-red-600'}`}>
+                                {formatCurrency(Math.abs(row.amount))}
+                              </td>
+                              <td className="py-3 px-4 text-right text-text-secondary">
+                                {orderData.revenue > 0 ? formatPct((Math.abs(row.amount) / orderData.revenue) * 100) : '0.0%'}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                      <tfoot>
+                        <tr className="bg-gray-50/80">
+                          <td className="py-3 px-4 font-bold text-text-primary">UTILIDAD BRUTA</td>
+                          <td className="py-3 px-4"></td>
+                          <td className={`py-3 px-4 text-right font-bold text-lg ${utilidadActual >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                            {formatCurrency(utilidadActual)}
                           </td>
-                          <td className="py-3 px-4 text-right text-text-secondary">
-                            {orderData.revenue > 0 ? formatPct((Math.abs(row.amount) / orderData.revenue) * 100) : '0.0%'}
+                          <td className="py-3 px-4 text-right font-semibold text-text-secondary">
+                            {orderData.revenue > 0 ? formatPct((utilidadActual / orderData.revenue) * 100) : '0.0%'}
                           </td>
                         </tr>
-                      ))}
-                    </tbody>
-                    <tfoot>
-                      <tr className="bg-gray-50/80">
-                        <td className="py-3 px-4 font-bold text-text-primary">UTILIDAD BRUTA</td>
-                        <td className="py-3 px-4"></td>
-                        <td className={`py-3 px-4 text-right font-bold text-lg ${utilidadActual >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                          {formatCurrency(utilidadActual)}
-                        </td>
-                        <td className="py-3 px-4 text-right font-semibold text-text-secondary">
-                          {orderData.revenue > 0 ? formatPct((utilidadActual / orderData.revenue) * 100) : '0.0%'}
-                        </td>
-                      </tr>
-                    </tfoot>
-                  </table>
+                      </tfoot>
+                    </table>
+                  </div>
                 </div>
-              </div>
+
+                {/* Warning when wallet is not available */}
+                {!orderData.wallet?.available && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3 mt-4">
+                    <AlertCircle className="w-5 h-5 text-amber-500 mt-0.5 shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium text-amber-800">Datos estimados</p>
+                      <p className="text-sm text-amber-700 mt-0.5">
+                        {orderData.wallet?.error
+                          ? `No se pudo obtener la cartera de Dropi: ${orderData.wallet.error}`
+                          : 'Conecta tu cuenta de Dropi para ver transacciones reales del wallet.'}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Omitted wallet transactions */}
+                {orderData.wallet?.available && orderData.wallet.omitted.length > 0 && (
+                  <div className="mt-4">
+                    <button
+                      onClick={() => setShowOmitted(!showOmitted)}
+                      className="flex items-center gap-2 text-sm text-text-secondary hover:text-text-primary transition-colors"
+                    >
+                      {showOmitted ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      <span>Movimientos omitidos ({orderData.wallet!.omitted.length})</span>
+                    </button>
+                    {showOmitted && (
+                      <div className="mt-2 bg-gray-50 rounded-xl border border-border overflow-hidden">
+                        <div className="px-4 py-2 bg-amber-50 border-b border-amber-200">
+                          <p className="text-xs text-amber-700">
+                            Estos movimientos no se incluyen en el calculo de utilidad (mantenimientos, retiros, transferencias, etc.)
+                          </p>
+                        </div>
+                        <table className="w-full text-sm">
+                          <tbody>
+                            {orderData.wallet!.omitted.map((tx, i) => (
+                              <tr key={`omitted-${tx.code}-${i}`} className="border-b border-border/50 last:border-0">
+                                <td className="py-2 px-4 text-text-secondary">
+                                  {WALLET_FRIENDLY_NAMES[tx.code] || tx.description}
+                                </td>
+                                <td className="py-2 px-4 text-right text-text-secondary">{formatNumber(tx.count)}</td>
+                                <td className={`py-2 px-4 text-right font-medium ${tx.type === 'ENTRADA' ? 'text-emerald-600' : 'text-red-600'}`}>
+                                  {tx.type === 'ENTRADA' ? '' : '-'}{formatCurrency(tx.total)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
             )}
           </section>
 
@@ -626,7 +742,9 @@ export default function InformeFinancieroPage() {
                 <p className={`text-2xl font-bold ${utilidadActual >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                   {formatCurrency(utilidadActual)}
                 </p>
-                <p className="text-xs text-text-secondary mt-1">Ventas - costos de mercancia y envio</p>
+                <p className="text-xs text-text-secondary mt-1">
+                  {orderData?.wallet?.available ? 'Datos reales del wallet de Dropi' : 'Ventas - costos de mercancia y envio'}
+                </p>
               </div>
 
               <div className="bg-surface rounded-xl shadow-sm border border-border p-6">
