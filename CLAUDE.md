@@ -1062,4 +1062,135 @@ Colores se adaptan al producto. IA sugiere template, usuario puede cambiar. Uplo
 
 ---
 
-*Last updated: 2026-03-12 — Ebook Generator IA (en desarrollo), Video Viral mode, system prompt adaptativo*
+---
+
+## 15. MATÍAS — Agente Meta Ads IA (2026-03-18) — EN PROGRESO
+
+### Qué es
+Agente conversacional (Claude) dentro de estrategasia.com que crea landings, configura DropPage y monta campañas de Meta Ads. Vive en la sección Meta Ads del dashboard.
+
+### Problema original
+- Costaba $16-20 por flujo completo
+- Token explosion con base64 de imágenes
+- Solucionado en 2026-03-17: $0.36/flujo con caching + tool pruning + pipelines
+
+### Estado actual (2026-03-18)
+
+#### Commits aplicados hoy (main):
+1. `5ebe7bc` → Fix 7 issues de test MW GASTRIC (foto producto, landing vacía, ofertas, pixel, CTA, descripción)
+2. `b3728d2` → **Cambio principal**: colorPalette estructurado + productContext + typography + import real + grapesjs_data
+
+#### Qué se corrigió (sesión 2026-03-18):
+
+**Problema detectado en test con VitMinPRO (suplemento avícola):**
+- Banners con colores DIFERENTES en cada sección (no consistentes)
+- Detalles del producto VACÍOS en los banners (no se pasaban los campos de la ficha creativa)
+- Landing VACÍA en DropPage (banners no se transferían al constructor GrapesJS)
+- Producto sin foto en multimedia de DropPage
+- Ofertas por cantidad con precios incorrectos (descuento mal calculado)
+
+**Causa raíz**: Matías NO usaba el mismo flujo que el Generador de Landings manual:
+- Colores se pasaban como string vago ("verdes y dorados") en vez de hex codes estructurados
+- Ficha creativa (L2.5) se pasaba como un blob en `product_details` en vez de campos separados
+- Tipografía no se pasaba
+- Import a DropPage creaba un `import_bundle` crudo en Supabase que nadie procesaba
+- Nunca se construía `grapesjs_data` para el editor visual
+
+**Fixes aplicados:**
+
+| Fix | Archivo | Qué cambió |
+|-----|---------|-----------|
+| Colores hex | `estrategas-tools.ts`, `landing-pipeline.ts`, `tools.ts` | `colorPalette: {primary:"#hex", secondary:"#hex", accent:"#hex"}` como objeto — mismo formato que UI manual |
+| Detalles del producto | `estrategas-tools.ts`, `landing-pipeline.ts`, `tools.ts` | `productContext: {description, benefits, problems, ingredients, differentiator}` como campos separados |
+| Tipografía | idem | `typography: {headings, subheadings, body}` con descripción de fuentes |
+| Import real | `estrategas-tools.ts` | `importSectionsToDropPage()` ahora llama `POST /api/minishop/import-sections` (con bypass `X-Internal-Key`) en vez de crear bundle crudo |
+| Bypass auth | `app/api/minishop/import-sections/route.ts` | Agregado `X-Internal-Key` + `X-Internal-User-Id` bypass (mismo patrón que `/api/generate-landing`) |
+| GrapesJS data | `droppage-pipeline.ts` | Construye `grapesjs_data` con componentes `{type:"image", tagName:"img", style:{width:"100%"}}` — mismo formato que `PageDesigner.jsx` import |
+| Fotos producto | `droppage-pipeline.ts`, `droppage-client.ts` | Sube `product_image_urls` a multimedia del producto vía `POST /products/{id}/images/from-url` |
+| Endpoint imagen URL | `shopiestrategas/backend/app/api/admin/products.py` | Nuevo endpoint `POST /api/admin/products/{id}/images/from-url` — descarga y sube imagen |
+| Ofertas por cantidad | `droppage-pipeline.ts`, `tools.ts` | Nuevo campo `total_price` en tiers — pipeline calcula `discount_type: 'fixed'` automáticamente |
+| System prompt | `system-prompt.ts` | Paso L2.6 pide hex codes, L3 pasa `colorPalette` + `productContext` + `typography`, L3.5 pregunta CTA, L4.9 busca pixel en `get_droppage_store_config` primero |
+
+#### Safety nets (reverts):
+- Cada commit tiene un revert + reapply en el historial
+- Si algo se rompe: `git revert HEAD && git push` en el repo afectado
+
+### ⚠️ Pendiente de probar (2026-03-18)
+- [ ] Colores consistentes en banners (¿los hex llegan al prompt de imagen?)
+- [ ] productContext se inyecta en banners (¿los detalles aparecen en el texto del banner?)
+- [ ] Import real funciona (¿el bypass auth del SSE context pasa?)
+- [ ] grapesjs_data aparece en constructor DropPage (¿se ven los banners en el editor?)
+- [ ] Fotos del producto llegan a multimedia de DropPage
+- [ ] Ofertas con total_price calculan bien
+- [ ] NO se crean productos duplicados en DropPage
+
+### Archivos clave
+
+```
+lib/meta-ads/
+  system-prompt.ts      — System prompt de Matías (flujo interactivo completo)
+  knowledge-base.ts     — Base de conocimiento Meta Ads 2026 (NO TOCAR)
+  claude-executor.ts    — Loop de tool_use + SSE streaming + routing
+  tools.ts              — 41 herramientas + AgentPhase + getToolsForPhase()
+  types.ts              — Tipos + READ_ONLY_TOOLS + WRITE_TOOLS
+  meta-api.ts           — Cliente de Meta Marketing API
+  landing-pipeline.ts   — Pipeline: crear producto + generar banners + importar
+  droppage-pipeline.ts  — Pipeline: crear producto DropPage + grapesjs_data + ofertas + checkout
+  estrategas-tools.ts   — Handler EstrategasIA (producto CRUD, banners, import real)
+  droppage-client.ts    — Cliente DropPage API con SSO + uploadProductImageFromUrl + updatePageDesign
+
+app/api/meta-ads/
+  chat/route.ts         — Endpoint SSE para chat con Matías
+  confirm/route.ts      — Confirmar acciones de escritura pendientes
+
+app/api/minishop/
+  import-sections/route.ts — Import real de banners (con bypass X-Internal-Key para pipeline)
+
+components/meta-ads/
+  MetaAdsChat.tsx       — UI del chat con SSE streaming
+```
+
+### Flujo de Matías para crear landing (actualizado 2026-03-18)
+
+```
+L1: ¿Tienes landing? → Si tiene URL, salta a campaña. Si no, continúa.
+L2: Info básica: nombre, descripción breve, fotos, precio, país
+    L2.6: **Colores de marca** — pide 3 hex codes (primary, secondary, accent)
+          Si no tiene, sugiere paleta basada en tipo de producto
+L2.5: [CREATIVO — Claude escribe] Ficha del producto → productContext:
+      - description (2-3 párrafos vendedores)
+      - benefits (5-7 beneficios)
+      - problems (3-5 dolores)
+      - ingredients (si aplica)
+      - differentiator
+L2.6: [CREATIVO — Claude genera] 6 ángulos de venta → usuario escoge
+L3: Preguntar secciones → get_templates → execute_landing_pipeline con:
+      - colorPalette: {primary:"#hex", secondary:"#hex", accent:"#hex"}
+      - productContext: {description, benefits, problems, ingredients, differentiator}
+      - typography: {headings:"Montserrat...", subheadings:"Open Sans...", body:"Open Sans..."}
+      - sales_angle, target_avatar, sections, precio, país
+    Pipeline: genera banners → importa via /api/minishop/import-sections (real)
+L3.5: Texto del botón CTA
+L4: Info DropPage (dominio, precio, Dropi, variantes, ofertas con total_price, upsell, downsell, pixel)
+L5: execute_droppage_setup con:
+      - product_image_urls (se suben a multimedia)
+      - section_image_urls (se arma grapesjs_data)
+      - cta_button_text
+      - quantity_offers con total_price (auto-calcula descuento)
+L6: "Tu landing está lista" → ¿Crear campaña de Meta Ads?
+```
+
+### Cosas que NO tocar
+- **System prompt de generate-angles/route.ts** — para Banner Generator UI, NO para Matías
+- **System prompt de enhance-prompt/route.ts** — para Banner Generator UI
+- **knowledge-base.ts** — solo actualizar si cambian APIs de Meta
+- **`/api/generate-landing/route.ts`** — ya acepta colorPalette, productContext, typography como objetos (no necesita cambios)
+
+### Errores conocidos NO relacionados con Matías
+- `Cannot read properties of undefined (reading 'toFixed')` — Dashboard BalanceCards, probablemente cuando KIE/BFL no retorna balance
+- `storage:ebooks/...pdf: ERR_UNKNOWN_URL_SCHEME` — patrón conocido de persistencia de ebooks
+- `favicon.ico 404` — favicon faltante
+
+---
+
+*Last updated: 2026-03-18 — Matías: campos estructurados (colorPalette, productContext, typography) + import real + grapesjs_data*
