@@ -499,12 +499,12 @@ export const META_ADS_TOOLS = [
   },
   {
     name: 'execute_droppage_setup',
-    description: 'Ejecuta el setup COMPLETO de DropPage de una vez: crea producto, landing, ofertas por cantidad, upsell, downsell, y configura checkout. Llama esto UNA SOLA VEZ con toda la info recopilada del usuario.',
+    description: 'Ejecuta el setup COMPLETO de DropPage de una vez: crea producto, sube fotos, arma landing con banners, ofertas por cantidad, upsell, downsell, y configura checkout. Llama esto UNA SOLA VEZ con toda la info recopilada del usuario.',
     input_schema: {
       type: 'object' as const,
       properties: {
         product_name: { type: 'string', description: 'Nombre del producto' },
-        product_description: { type: 'string', description: 'Descripción' },
+        product_description: { type: 'string', description: 'Descripción CORTA para el producto (1-2 oraciones). La descripción larga va en los banners de la landing, NO aquí.' },
         price: { type: 'number', description: 'Precio de venta (ej: 89900 para COP)' },
         compare_at_price: { type: 'number', description: 'Precio anterior (tachado)' },
         country: { type: 'string', description: 'País (CO, MX, CL, etc.)' },
@@ -523,8 +523,19 @@ export const META_ADS_TOOLS = [
           },
           description: 'Variantes del producto',
         },
+        product_image_urls: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'URLs de las fotos del producto (del chat). Se suben a la sección Multimedia del producto en DropPage.',
+        },
+        section_image_urls: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'URLs de los banners generados por execute_landing_pipeline. Se usan para armar el HTML de la landing.',
+        },
         page_title: { type: 'string', description: 'Título de la landing page' },
         domain_id: { type: 'string', description: 'ID del dominio (de get_droppage_domains)' },
+        cta_button_text: { type: 'string', description: 'Texto del botón CTA flotante (ej: "¡QUIERO ALIVIAR MI GASTRITIS!"). Si se omite: "¡COMPRAR AHORA!"' },
         quantity_offers: {
           type: 'object',
           properties: {
@@ -533,18 +544,19 @@ export const META_ADS_TOOLS = [
               items: {
                 type: 'object',
                 properties: {
-                  title: { type: 'string' },
+                  title: { type: 'string', description: 'Ej: "1 Unidad", "2 Unidades"' },
                   quantity: { type: 'number' },
                   position: { type: 'number' },
                   is_preselected: { type: 'boolean' },
-                  discount_type: { type: 'string', enum: ['percentage', 'fixed', 'none'] },
-                  discount_value: { type: 'number' },
-                  label_text: { type: 'string' },
+                  discount_type: { type: 'string', enum: ['percentage', 'fixed', 'none'], description: 'Tipo de descuento. Usa "fixed" cuando el usuario da precios absolutos por tier.' },
+                  discount_value: { type: 'number', description: 'Para "percentage": % de descuento (ej: 10 = 10%). Para "fixed": cantidad a restar del precio base POR UNIDAD (ej: si base es 104900 y 2x total es 129900, fixed = 104900 - 64950 = 39950).' },
+                  label_text: { type: 'string', description: 'Etiqueta (ej: "MÁS VENDIDO", "MEJOR OFERTA")' },
+                  total_price: { type: 'number', description: 'OPCIONAL: precio total del tier (ej: 129900 para 2 unidades). Si se proporciona, el pipeline calcula automáticamente discount_type=fixed y discount_value correcto. PREFERIR ESTE CAMPO cuando el usuario da precios absolutos.' },
                 },
               },
             },
           },
-          description: 'Ofertas 1x, 2x, 3x',
+          description: 'Ofertas 1x, 2x, 3x. IMPORTANTE: cuando el usuario da precios totales por tier, usar total_price para evitar errores de cálculo.',
         },
         upsell: {
           type: 'object',
