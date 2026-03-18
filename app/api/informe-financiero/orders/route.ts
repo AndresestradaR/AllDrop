@@ -51,6 +51,31 @@ export async function GET(request: Request) {
     )
   }
 
-  const data = await reportRes.json()
-  return NextResponse.json(data)
+  const raw = await reportRes.json()
+
+  // Map backend structure to frontend-expected flat structure
+  const cancelled_count = (raw.summary?.total_orders || 0) - (raw.summary?.confirmed_orders || 0)
+  const total = raw.summary?.total_orders || 0
+
+  const mapped = {
+    total_orders: raw.summary?.total_orders || 0,
+    confirmed_count: raw.summary?.confirmed_orders || 0,
+    confirmed_pct: raw.summary?.confirmed_pct || 0,
+    cancelled_count,
+    cancelled_pct: total > 0 ? Math.round((cancelled_count / total) * 10000) / 100 : 0,
+    status_breakdown: (raw.by_status || []).map((s: any) => ({
+      status: s.status,
+      count: s.count || 0,
+      percentage: s.pct || 0,
+      amount: s.amount || 0,
+    })),
+    revenue: raw.financials?.revenue || 0,
+    cost_merchandise: raw.financials?.cost_merchandise || 0,
+    cost_shipping: raw.financials?.shipping_cost || 0,
+    cost_return_shipping: raw.financials?.estimated_return_shipping || 0,
+    by_product: raw.by_product || [],
+    daily_orders: raw.daily_orders || [],
+  }
+
+  return NextResponse.json(mapped)
 }

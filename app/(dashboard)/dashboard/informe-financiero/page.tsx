@@ -58,7 +58,7 @@ const formatNumber = (n: number) => {
   return new Intl.NumberFormat('es-CO').format(n)
 }
 
-const formatPct = (pct: number) => `${pct.toFixed(1)}%`
+const formatPct = (pct: number | undefined | null) => `${(pct ?? 0).toFixed(1)}%`
 
 const STATUS_COLORS: Record<string, string> = {
   ENTREGADO: 'bg-emerald-50 border-emerald-200 text-emerald-700',
@@ -214,7 +214,7 @@ export default function InformeFinancieroPage() {
 
   const totalExpenses = expenses.filter(e => e.type === 'expense').reduce((sum, e) => sum + e.amount, 0)
   const totalIncome = expenses.filter(e => e.type === 'income').reduce((sum, e) => sum + e.amount, 0)
-  const metaSpend = metaData?.has_meta ? metaData.spend : 0
+  const metaSpend = metaData?.has_meta ? (metaData.total_spend ?? metaData.spend ?? 0) : 0
 
   const utilidadActual = orderData
     ? orderData.revenue - orderData.cost_merchandise - orderData.cost_shipping - orderData.cost_return_shipping
@@ -452,19 +452,19 @@ export default function InformeFinancieroPage() {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div className="bg-surface rounded-xl shadow-sm border border-border p-5">
                   <p className="text-xs text-text-secondary uppercase font-medium">Gasto total</p>
-                  <p className="text-xl font-bold text-red-600 mt-1">{formatCurrency(metaData.spend)}</p>
+                  <p className="text-xl font-bold text-red-600 mt-1">{formatCurrency(metaData.total_spend ?? metaData.spend ?? 0)}</p>
                 </div>
                 <div className="bg-surface rounded-xl shadow-sm border border-border p-5">
                   <p className="text-xs text-text-secondary uppercase font-medium">Impresiones</p>
-                  <p className="text-xl font-bold text-text-primary mt-1">{formatNumber(metaData.impressions)}</p>
+                  <p className="text-xl font-bold text-text-primary mt-1">{formatNumber(metaData.total_impressions ?? metaData.impressions ?? 0)}</p>
                 </div>
                 <div className="bg-surface rounded-xl shadow-sm border border-border p-5">
                   <p className="text-xs text-text-secondary uppercase font-medium">Clicks</p>
-                  <p className="text-xl font-bold text-text-primary mt-1">{formatNumber(metaData.clicks)}</p>
+                  <p className="text-xl font-bold text-text-primary mt-1">{formatNumber(metaData.total_clicks ?? metaData.clicks ?? 0)}</p>
                 </div>
                 <div className="bg-surface rounded-xl shadow-sm border border-border p-5">
                   <p className="text-xs text-text-secondary uppercase font-medium">CPC</p>
-                  <p className="text-xl font-bold text-text-primary mt-1">{formatCurrency(metaData.cpc)}</p>
+                  <p className="text-xl font-bold text-text-primary mt-1">{formatCurrency(metaData.accounts?.[0]?.cpc ?? metaData.cpc ?? 0)}</p>
                 </div>
               </div>
             ) : (
