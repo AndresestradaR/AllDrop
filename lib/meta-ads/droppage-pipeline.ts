@@ -199,13 +199,21 @@ export async function executeDropPagePipeline(
         },
       }))
 
+      // GrapesJS project data format — must include frames[] wrapper
+      // This matches the format returned by editor.getProjectData()
       const grapesjs_data = {
         pages: [{
-          component: {
-            type: 'wrapper',
-            components: imageComponents,
-          },
+          id: 'page-1',
+          frames: [{
+            id: 'frame-1',
+            component: {
+              type: 'wrapper',
+              components: imageComponents,
+            },
+          }],
         }],
+        assets: sectionImageUrls.map(url => ({ src: url, type: 'image' })),
+        styles: [],
       }
 
       const updateResult = await dropPageClient.updatePageDesign(designId, {
