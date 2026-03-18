@@ -70,12 +70,25 @@ export function MetaAdsChat({ conversationId }: MetaAdsChatProps) {
     if (!files) return
     for (const file of Array.from(files)) {
       if (!file.type.startsWith('image/')) continue
-      const reader = new FileReader()
-      reader.onload = () => {
-        const dataUrl = reader.result as string
+      // Compress image to avoid 413 Content Too Large (Vercel 4.5MB body limit)
+      const img = new Image()
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        const MAX_SIZE = 1200
+        let w = img.width
+        let h = img.height
+        if (w > MAX_SIZE || h > MAX_SIZE) {
+          if (w > h) { h = Math.round(h * MAX_SIZE / w); w = MAX_SIZE }
+          else { w = Math.round(w * MAX_SIZE / h); h = MAX_SIZE }
+        }
+        canvas.width = w
+        canvas.height = h
+        const ctx = canvas.getContext('2d')
+        ctx?.drawImage(img, 0, 0, w, h)
+        const dataUrl = canvas.toDataURL('image/webp', 0.8)
         setAttachedImages(prev => [...prev, dataUrl])
       }
-      reader.readAsDataURL(file)
+      img.src = URL.createObjectURL(file)
     }
     // Reset input so same file can be selected again
     e.target.value = ''
