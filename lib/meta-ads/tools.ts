@@ -13,26 +13,20 @@ const PHASE_TOOLS: Record<AgentPhase, string[]> = {
     'execute_landing_pipeline', 'execute_droppage_setup',
     'get_droppage_domains', 'get_droppage_products',
   ],
-  // Landing creation: banner generation + import
+  // Landing creation: ONLY pipeline + read tools (no individual banner/import tools)
+  // Claude MUST use execute_landing_pipeline — individual tools removed to prevent bypass
   landing_creation: [
-    'get_my_products', 'create_estrategas_product', 'upload_product_image',
-    'get_templates', 'generate_landing_banner', 'get_landing_sections',
-    'import_sections_to_droppage',
+    'get_my_products', 'upload_product_image',
+    'get_templates', 'get_landing_sections',
     'execute_landing_pipeline',
-    'get_droppage_domains', 'get_droppage_products', 'get_droppage_page_designs',
-    'create_droppage_product', 'create_droppage_page_design',
-    'associate_droppage_product_design',
+    'get_droppage_domains', 'get_droppage_products',
   ],
-  // DropPage setup: product, checkout, offers
+  // DropPage setup: ONLY pipeline + read tools (no individual write tools)
+  // Claude MUST use execute_droppage_setup — individual tools removed to prevent bypass
   droppage_setup: [
     'get_droppage_products', 'get_droppage_page_designs', 'get_droppage_checkout_config',
     'get_droppage_quantity_offers', 'get_droppage_upsells', 'get_droppage_downsells',
     'get_droppage_domains', 'get_droppage_store_config',
-    'create_droppage_product', 'create_droppage_page_design',
-    'associate_droppage_product_design', 'update_droppage_checkout_config',
-    'create_droppage_quantity_offer', 'create_droppage_upsell',
-    'update_droppage_upsell_config', 'create_droppage_downsell',
-    'update_droppage_store_config',
     'execute_droppage_setup',
     'get_ad_accounts', 'get_pages', 'get_pixels',
   ],
