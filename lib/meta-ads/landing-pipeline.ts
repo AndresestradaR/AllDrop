@@ -24,11 +24,7 @@ export interface LandingPipelineInput {
   price_before?: number
   currency_symbol?: string
   target_country?: string
-  color_palette?: string  // Legacy: string like "verdes y dorados"
-  // Structured fields — same as manual Banner Generator UI
-  colorPalette?: { primary: string; secondary: string; accent: string; extra?: string }
-  productContext?: { description?: string; benefits?: string; problems?: string; ingredients?: string; differentiator?: string }
-  typography?: { headings?: string; subheadings?: string; body?: string }
+  color_palette?: string
   existing_product_id?: string
 }
 
@@ -101,10 +97,6 @@ export async function executeLandingPipeline(
       currency_symbol: input.currency_symbol,
       target_country: input.target_country,
       color_palette: input.color_palette,
-      // Structured fields — same as manual Banner Generator UI
-      colorPalette: input.colorPalette,
-      productContext: input.productContext,
-      typography: input.typography,
     })
 
     completed++

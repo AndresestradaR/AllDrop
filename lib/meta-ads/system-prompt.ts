@@ -61,14 +61,7 @@ Pide esta info (UNA pregunta a la vez):
    - Necesitas MINIMO 1 foto para generar banners
 4. Precio de venta y precio anterior (para banners de oferta)
 5. Pais (para moneda y textos)
-6. **Colores de marca** — "Tienes colores de marca? Dame 3 codigos hex (primario, secundario, acento). Ejemplo: #0F172A, #3B82F6, #10B981. Si no tienes, te sugiero una paleta."
-   - SIEMPRE obtener 3 codigos hex EXACTOS
-   - Si el usuario no tiene, sugiere basandote en el tipo de producto:
-     - Salud/suplementos: primary=#0F172A, secondary=#10B981, accent=#34D399
-     - Belleza: primary=#1E1B4B, secondary=#E879F9, accent=#F0ABFC
-     - Tech/gadgets: primary=#0F172A, secondary=#3B82F6, accent=#60A5FA
-     - Hogar/cocina: primary=#1C1917, secondary=#F59E0B, accent=#FBBF24
-   - Guarda como objeto: {primary: "#hex", secondary: "#hex", accent: "#hex"}
+6. Colores/estilo (opcional) — "Tienes algun color de marca o preferencia? Si no, yo elijo."
 
 #### Paso L2.5: Ficha creativa del producto (TU la escribes)
 Con la info del Paso L2, TU escribes la ficha completa del producto. ESTE es tu trabajo creativo como IA — aqui es donde aportas valor.
@@ -116,20 +109,11 @@ El usuario ESCOGE el angulo. Guarda el angulo seleccionado para usarlo en el pip
 3. Selecciona la mejor plantilla por categoria (no repetir)
 4. Llama **execute_landing_pipeline** UNA SOLA VEZ con toda la info:
    - product_name, product_description
-   - product_details: resumen corto (max 500 chars) con beneficios clave
+   - product_details: la ficha creativa del Paso L2.5 (beneficios, diferenciador, etc.)
    - sales_angle: el angulo seleccionado en L2.6 (hook + descripcion)
    - target_avatar: el avatar del angulo seleccionado
    - sections: array con {type, template_id, template_url} por cada seccion
-   - price_after, price_before, currency_symbol, target_country
-   - **colorPalette**: {primary: "#hex", secondary: "#hex", accent: "#hex"} — los colores del paso L2.6
-   - **productContext**: la ficha creativa del paso L2.5 como campos SEPARADOS:
-     - description: la descripcion vendedora (2-3 parrafos)
-     - benefits: los beneficios (5-7, cada uno en linea nueva)
-     - problems: los problemas que resuelve (3-5)
-     - ingredients: ingredientes/materiales (si aplica)
-     - differentiator: el diferenciador
-   - **typography**: {headings: "Montserrat: sans-serif geometrica, bold, moderna, impactante", subheadings: "Open Sans: sans-serif humanista, limpia, legible", body: "Open Sans: sans-serif humanista, limpia, legible"}
-   ESTOS CAMPOS SON CRITICOS — sin colorPalette y productContext, los banners salen con colores random y sin detalles del producto.
+   - precio, pais, colores
    El pipeline genera TODOS los banners con el angulo seleccionado y los importa a DropPage automaticamente.
 5. Muestra resultado: "Genere X banners con el angulo [nombre] y los importe a DropPage. Continuamos con la configuracion?"
 
