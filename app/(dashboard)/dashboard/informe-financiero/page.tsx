@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { CalendarDays, Loader2, Trash2, Plus, TrendingUp, TrendingDown, DollarSign, AlertCircle, ChevronDown, ChevronUp, Upload } from 'lucide-react'
+import { CalendarDays, Loader2, Trash2, Plus, TrendingUp, TrendingDown, DollarSign, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -15,7 +15,6 @@ interface OrderStatusBreakdown {
 interface WalletTransaction {
   code: string
   description: string
-  friendlyName?: string
   type: string
   count: number
   total: number
@@ -24,7 +23,6 @@ interface WalletTransaction {
 interface WalletData {
   available: boolean
   error: string | null
-  source?: string
   transaction_count: number
   summary: WalletTransaction[]
   revenue: number
@@ -152,10 +150,6 @@ export default function InformeFinancieroPage() {
   const [savingExpense, setSavingExpense] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
-  // Excel upload
-  const [uploadingExcel, setUploadingExcel] = useState(false)
-  const [walletFromExcel, setWalletFromExcel] = useState<WalletData | null>(null)
-
   // Collapsible sections
   const [showStatusSection, setShowStatusSection] = useState(true)
   const [showTransactions, setShowTransactions] = useState(true)
@@ -259,40 +253,14 @@ export default function InformeFinancieroPage() {
     }
   }
 
-  // ─── Excel upload ───────────────────────────────────────────────────────
-
-  const handleExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setUploadingExcel(true)
-    try {
-      const formData = new FormData()
-      formData.append('file', file)
-      const res = await fetch('/api/informe-financiero/parse-excel', {
-        method: 'POST',
-        body: formData,
-      })
-      if (res.ok) {
-        const data = await res.json()
-        setWalletFromExcel(data)
-      }
-    } catch {
-      // silent
-    } finally {
-      setUploadingExcel(false)
-    }
-  }
-
   // ─── Computed values ─────────────────────────────────────────────────────
 
   const totalExpenses = expenses.filter(e => e.type === 'expense').reduce((sum, e) => sum + e.amount, 0)
   const totalIncome = expenses.filter(e => e.type === 'income').reduce((sum, e) => sum + e.amount, 0)
   const metaSpend = metaData?.has_meta ? (metaData.total_spend ?? metaData.spend ?? 0) : 0
 
-  const activeWallet = walletFromExcel || orderData?.wallet
-
-  const utilidadActual = activeWallet?.available
-    ? activeWallet.revenue - activeWallet.costs
+  const utilidadActual = orderData?.wallet?.available
+    ? orderData.wallet.revenue - orderData.wallet.costs
     : orderData
       ? orderData.revenue - orderData.cost_merchandise - orderData.cost_shipping - orderData.cost_return_shipping
       : 0
@@ -439,61 +407,6 @@ export default function InformeFinancieroPage() {
             )}
           </section>
 
-          {/* ─── Excel Upload para Dropi Wallet ───────────────────────── */}
-          {!activeWallet?.available && (
-            <section className="bg-surface rounded-xl shadow-sm border border-border p-6">
-              <div className="flex items-start gap-4">
-                <div className="flex-1">
-                  <h3 className="text-base font-semibold text-text-primary">Datos financieros del wallet de Dropi</h3>
-                  <p className="text-sm text-text-secondary mt-1">
-                    Para ver las transacciones reales (recaudo, fletes, ganancias), descarga el Excel del Historial de Cartera desde Dropi y subelo aqui.
-                  </p>
-                  <ol className="text-sm text-text-secondary mt-2 space-y-1 list-decimal list-inside">
-                    <li>Abre <a href="https://app.dropi.co/dashboard/historywallet" target="_blank" rel="noopener" className="text-accent underline">Historial de Cartera en Dropi</a></li>
-                    <li>Selecciona el rango de fechas</li>
-                    <li>Haz clic en &quot;Descargar en Excel&quot;</li>
-                    <li>Sube el archivo aqui</li>
-                  </ol>
-                </div>
-                <div>
-                  <label className="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent/90 transition-colors cursor-pointer">
-                    {uploadingExcel ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Upload className="w-4 h-4" />
-                    )}
-                    {uploadingExcel ? 'Procesando...' : 'Subir Excel'}
-                    <input
-                      type="file"
-                      accept=".xlsx,.xls"
-                      onChange={handleExcelUpload}
-                      className="hidden"
-                      disabled={uploadingExcel}
-                    />
-                  </label>
-                </div>
-              </div>
-            </section>
-          )}
-
-          {/* Excel upload success */}
-          {walletFromExcel?.available && (
-            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-emerald-600" />
-                <p className="text-sm font-medium text-emerald-700">
-                  Excel cargado: {walletFromExcel.transaction_count} transacciones procesadas
-                </p>
-              </div>
-              <button
-                onClick={() => setWalletFromExcel(null)}
-                className="text-sm text-emerald-600 hover:text-emerald-800 font-medium"
-              >
-                Quitar
-              </button>
-            </div>
-          )}
-
           {/* ─── Transacciones ─────────────────────────────────────────── */}
           <section>
             <button
@@ -522,15 +435,15 @@ export default function InformeFinancieroPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {activeWallet?.available ? (
+                        {orderData.wallet?.available ? (
                           /* ── Wallet real de Dropi ── */
-                          activeWallet.summary.map((tx, i) => {
+                          orderData.wallet.summary.map((tx, i) => {
                             const isEntry = tx.type === 'ENTRADA'
-                            const walletTotal = activeWallet.revenue + activeWallet.costs
+                            const walletTotal = orderData.wallet!.revenue + orderData.wallet!.costs
                             return (
                               <tr key={`wallet-${tx.code}-${i}`} className="border-b border-border/50 last:border-0">
                                 <td className="py-3 px-4 font-medium text-text-primary">
-                                  {WALLET_FRIENDLY_NAMES[tx.code] || tx.friendlyName || tx.description}
+                                  {WALLET_FRIENDLY_NAMES[tx.code] || tx.description}
                                 </td>
                                 <td className="py-3 px-4 text-right text-text-secondary">{formatNumber(tx.count)}</td>
                                 <td className={`py-3 px-4 text-right font-semibold ${isEntry ? 'text-emerald-600' : 'text-red-600'}`}>
@@ -598,29 +511,29 @@ export default function InformeFinancieroPage() {
                 </div>
 
                 {/* Warning when wallet is not available */}
-                {!activeWallet?.available && (
+                {!orderData.wallet?.available && (
                   <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3 mt-4">
                     <AlertCircle className="w-5 h-5 text-amber-500 mt-0.5 shrink-0" />
                     <div>
                       <p className="text-sm font-medium text-amber-800">Datos estimados</p>
                       <p className="text-sm text-amber-700 mt-0.5">
-                        {activeWallet?.error
-                          ? `No se pudo obtener la cartera de Dropi: ${activeWallet.error}`
-                          : 'Sube el Excel del Historial de Cartera de Dropi para ver transacciones reales.'}
+                        {orderData.wallet?.error
+                          ? `No se pudo obtener la cartera de Dropi: ${orderData.wallet.error}`
+                          : 'Conecta tu cuenta de Dropi para ver transacciones reales del wallet.'}
                       </p>
                     </div>
                   </div>
                 )}
 
                 {/* Omitted wallet transactions */}
-                {activeWallet?.available && activeWallet.omitted.length > 0 && (
+                {orderData.wallet?.available && orderData.wallet.omitted.length > 0 && (
                   <div className="mt-4">
                     <button
                       onClick={() => setShowOmitted(!showOmitted)}
                       className="flex items-center gap-2 text-sm text-text-secondary hover:text-text-primary transition-colors"
                     >
                       {showOmitted ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                      <span>Movimientos omitidos ({activeWallet.omitted.length})</span>
+                      <span>Movimientos omitidos ({orderData.wallet!.omitted.length})</span>
                     </button>
                     {showOmitted && (
                       <div className="mt-2 bg-gray-50 rounded-xl border border-border overflow-hidden">
@@ -631,10 +544,10 @@ export default function InformeFinancieroPage() {
                         </div>
                         <table className="w-full text-sm">
                           <tbody>
-                            {activeWallet.omitted.map((tx, i) => (
+                            {orderData.wallet!.omitted.map((tx, i) => (
                               <tr key={`omitted-${tx.code}-${i}`} className="border-b border-border/50 last:border-0">
                                 <td className="py-2 px-4 text-text-secondary">
-                                  {WALLET_FRIENDLY_NAMES[tx.code] || tx.friendlyName || tx.description}
+                                  {WALLET_FRIENDLY_NAMES[tx.code] || tx.description}
                                 </td>
                                 <td className="py-2 px-4 text-right text-text-secondary">{formatNumber(tx.count)}</td>
                                 <td className={`py-2 px-4 text-right font-medium ${tx.type === 'ENTRADA' ? 'text-emerald-600' : 'text-red-600'}`}>
@@ -830,7 +743,7 @@ export default function InformeFinancieroPage() {
                   {formatCurrency(utilidadActual)}
                 </p>
                 <p className="text-xs text-text-secondary mt-1">
-                  {activeWallet?.available ? 'Datos reales del wallet de Dropi' : 'Ventas - costos de mercancia y envio'}
+                  {orderData?.wallet?.available ? 'Datos reales del wallet de Dropi' : 'Ventas - costos de mercancia y envio'}
                 </p>
               </div>
 
