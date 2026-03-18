@@ -34,6 +34,11 @@ const PROVIDERS: Provider[] = [
         type: 'pdf',
         url: '/proveedores/catalogo-nutranova.pdf',
       },
+      {
+        title: 'Kompras Plus - Proveedor Dropshipping',
+        type: 'video',
+        url: 'https://youtu.be/RkCtDKuVBw0',
+      },
     ],
   },
 ]
