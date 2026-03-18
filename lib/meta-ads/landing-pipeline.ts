@@ -87,7 +87,7 @@ export async function executeLandingPipeline(
     sendEvent({ type: 'tool_result', data: { tool_name: 'pipeline_step', result: { step: 'Producto creado ✓' } } })
   }
 
-  // Step 1.5: Persist productContext, colorPalette, pricing, country to the product
+  // Step 1.5: Persist productContext, colorPalette, pricing, country, photos to the product
   try {
     const updateData: Record<string, any> = {}
     if (input.productContext) updateData.product_context = input.productContext
@@ -99,6 +99,11 @@ export async function executeLandingPipeline(
         priceBefore: input.price_before,
         currencySymbol: input.currency_symbol || '$',
       }
+    }
+    // Persist product photos from chat (Supabase Storage URLs)
+    const photoUrls = estrategasTools['productImageUrls'] as string[]
+    if (photoUrls?.length > 0) {
+      updateData.product_photos = photoUrls
     }
 
     if (Object.keys(updateData).length > 0) {
