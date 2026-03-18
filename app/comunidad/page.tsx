@@ -4,7 +4,7 @@ import { useState, useRef } from 'react'
 import { CheckCircle2, Copy, Mail, AlertCircle, Shield, Users, Zap, X, MessageCircle, UserPlus, ArrowRight, Globe } from 'lucide-react'
 
 const YOUTUBE_VIDEO_ID = 'nEHrlt4qZig'
-const YOUTUBE_TUTORIAL_ID = 'GJ3VHWPkAvE'
+const TUTORIAL_VIDEO_URL = 'https://papfcbiswvdgalfteujm.supabase.co/storage/v1/object/public/landing-images/comunidad/como-unirse-tutorial.mp4'
 const WHATSAPP_LINK = 'https://wa.link/foyivm'
 
 const DROPI_LINKS = [
@@ -275,12 +275,11 @@ MOTIVO: ${form.motivo}`
               </p>
               <div className="relative rounded-xl overflow-hidden border border-[#222] bg-black">
                 <div className="aspect-video">
-                  <iframe
-                    src={`https://www.youtube.com/embed/${YOUTUBE_TUTORIAL_ID}?rel=0`}
-                    title="Tutorial: Como cambiar de comunidad en Dropi"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                    className="w-full h-full"
+                  <video
+                    src={TUTORIAL_VIDEO_URL}
+                    controls
+                    playsInline
+                    className="w-full h-full object-contain"
                   />
                 </div>
               </div>
