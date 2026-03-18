@@ -156,22 +156,46 @@ export async function executeDropPagePipeline(
 
     // Auto-fetch section images from DB if not provided (solves truncation problem)
     let sectionImageUrls = input.section_image_urls || []
-    if (sectionImageUrls.length === 0 && input.estrategas_product_id && input.user_id) {
+    if (sectionImageUrls.length === 0 && input.estrategas_product_id) {
       try {
         const serviceClient = createDirectServiceClient()
         const { data: sections } = await serviceClient
           .from('landing_sections')
           .select('generated_image_url')
           .eq('product_id', input.estrategas_product_id)
-          .eq('user_id', input.user_id)
           .eq('status', 'completed')
-          .order('sort_order', { ascending: true })
+          .order('created_at', { ascending: true })
 
         if (sections?.length) {
-          sectionImageUrls = sections
-            .map((s: any) => s.generated_image_url)
-            .filter((url: string) => url && url.startsWith('http'))
-          console.log(`[DropPagePipeline] Auto-fetched ${sectionImageUrls.length} banner URLs from landing_sections`)
+          // Upload base64 images to Storage first, keep URLs as-is
+          const resolvedUrls: string[] = []
+          for (let i = 0; i < sections.length; i++) {
+            const imgData = sections[i].generated_image_url
+            if (!imgData) continue
+            if (imgData.startsWith('http')) {
+              resolvedUrls.push(imgData)
+            } else if (imgData.startsWith('data:')) {
+              // Upload base64 to Supabase Storage
+              try {
+                const base64Match = imgData.match(/^data:[^;]+;base64,(.+)$/)
+                if (base64Match) {
+                  const buffer = Buffer.from(base64Match[1], 'base64')
+                  const fileName = `imports/${input.user_id}/${Date.now()}-${i}.webp`
+                  await serviceClient.storage
+                    .from('landing-images')
+                    .upload(fileName, buffer, { contentType: 'image/webp', upsert: true })
+                  const { data: urlData } = serviceClient.storage
+                    .from('landing-images')
+                    .getPublicUrl(fileName)
+                  resolvedUrls.push(urlData.publicUrl)
+                }
+              } catch (uploadErr: any) {
+                console.warn(`[DropPagePipeline] Failed to upload base64 banner ${i}:`, uploadErr.message)
+              }
+            }
+          }
+          sectionImageUrls = resolvedUrls
+          console.log(`[DropPagePipeline] Auto-fetched ${sectionImageUrls.length} banners from landing_sections (${sections.length} total, uploaded base64 to Storage)`)
         }
       } catch (e: any) {
         console.warn('[DropPagePipeline] Failed to auto-fetch sections:', e.message)
