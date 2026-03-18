@@ -55,17 +55,32 @@ async function optimizeAndUpload(
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    // Support both cookie-based auth and internal service key auth (for Matías pipeline)
+    let user: any = null
+    let serviceClient: any = null
 
-    if (authError || !user) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    const internalKey = request.headers.get('X-Internal-Key')
+    const internalUserId = request.headers.get('X-Internal-User-Id')
+    if (internalKey && internalUserId && internalKey === process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      // Trusted internal call from pipeline (SSE context where cookies() is unavailable)
+      const { createClient: createSupabaseClient } = await import('@supabase/supabase-js')
+      serviceClient = createSupabaseClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      )
+      user = { id: internalUserId }
+    } else {
+      const supabase = await createClient()
+      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
+      if (authError || !authUser) {
+        return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+      }
+      user = authUser
+      serviceClient = await createServiceClient()
     }
 
     const body = await request.json()
     const { section_ids, sections, metadata } = body
-
-    const serviceClient = await createServiceClient()
 
     let validSections: { url: string; category: string; order: number }[] = []
 
@@ -111,7 +126,7 @@ export async function POST(request: Request) {
           .select('id, category')
           .in('id', templateIds)
         if (templates) {
-          templateMap = Object.fromEntries(templates.map(t => [t.id, t.category]))
+          templateMap = Object.fromEntries(templates.map((t: any) => [t.id, t.category]))
         }
       }
 

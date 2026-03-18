@@ -142,31 +142,46 @@ export async function executeDropPagePipeline(
       errors.push(`Asociar producto a landing: ${assocResult.error}`)
     }
 
-    // Populate page design with banner section images
+    // Populate page design with banner section images using GrapesJS format
+    // This is the same format the DropPage constructor uses when importing via "Enviar a mi editor"
     if (input.section_image_urls?.length) {
       sendEvent({ type: 'tool_start', data: { tool_name: 'pipeline_step', tool_input: { step: 'Armando landing con banners...' } } })
 
-      const ctaText = input.cta_button_text || '¡COMPRAR AHORA!'
-      const primaryColor = '#4DBEA4'
-      const sectionsHtml = input.section_image_urls
-        .map(url => `<div style="width:100%;text-align:center;"><img src="${url}" alt="${input.product_name}" style="width:100%;max-width:1080px;height:auto;display:block;margin:0 auto;" loading="lazy" /></div>`)
-        .join('\n')
+      // Build GrapesJS components — same structure as PageDesigner.jsx import effect
+      const imageComponents = input.section_image_urls.map((url, i) => ({
+        type: 'image',
+        tagName: 'img',
+        attributes: {
+          src: url,
+          alt: `Seccion ${i + 1} - ${input.product_name}`,
+        },
+        style: {
+          width: '100%',
+          'max-width': '100%',
+          display: 'block',
+          margin: '0 auto',
+        },
+      }))
 
-      const ctaHtml = `<div style="position:fixed;bottom:0;left:0;right:0;z-index:50;padding:12px 16px;background:linear-gradient(transparent,rgba(0,0,0,0.8));text-align:center;">
-  <a href="#checkout" style="display:inline-block;width:100%;max-width:400px;padding:16px 32px;background:${primaryColor};color:#fff;font-size:18px;font-weight:700;text-decoration:none;border-radius:8px;text-transform:uppercase;animation:pulse 2s infinite;">${ctaText}</a>
-</div>`
-
-      const cssContent = `@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}} body{margin:0;padding:0;} img{max-width:100%;}`
-
-      const htmlContent = `${sectionsHtml}\n${ctaHtml}`
+      const grapesjs_data = {
+        pages: [{
+          component: {
+            type: 'wrapper',
+            components: imageComponents,
+          },
+        }],
+      }
 
       const updateResult = await dropPageClient.updatePageDesign(designId, {
-        html_content: htmlContent,
-        css_content: cssContent,
+        grapesjs_data,
+        html_content: input.section_image_urls
+          .map(url => `<img src="${url}" alt="${input.product_name}" style="width:100%;max-width:100%;display:block;margin:0 auto;" />`)
+          .join('\n'),
+        css_content: 'body{margin:0;padding:0;} img{max-width:100%;}',
         is_published: true,
         product_metadata: {
           product_name: input.product_name,
-          cta_text: ctaText,
+          cta_text: input.cta_button_text || '¡COMPRAR AHORA!',
           section_count: input.section_image_urls.length,
           generated_by: 'matias_pipeline',
         },
