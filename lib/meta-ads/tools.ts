@@ -520,21 +520,6 @@ export const META_ADS_TOOLS = [
           },
           description: 'Tipografía. Si el usuario no tiene preferencia, usa los defaults (Montserrat + Open Sans).',
         },
-        angles: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              name: { type: 'string' },
-              hook: { type: 'string' },
-              description: { type: 'string' },
-              avatarSuggestion: { type: 'string' },
-              tone: { type: 'string' },
-              salesAngle: { type: 'string' },
-            },
-          },
-          description: 'Los 6 ángulos de venta generados en L2.6. Se guardan en saved_angles para uso futuro (videos, copies, etc.).',
-        },
         existing_product_id: { type: 'string', description: 'ID producto existente (omitir para crear nuevo)' },
       },
       required: ['product_name', 'product_description', 'sections', 'product_details', 'colorPalette', 'productContext'],

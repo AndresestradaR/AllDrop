@@ -2,16 +2,8 @@
 // Deterministic pipeline for landing creation — no Claude calls needed
 // Executes: create product → generate ALL banners (parallel) → import to DropPage
 
-import { createClient } from '@supabase/supabase-js'
 import { EstrategasToolsHandler } from './estrategas-tools'
 import type { SSEEvent } from './types'
-
-function createDirectServiceClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  )
-}
 
 // Max concurrent banner generations to avoid rate limits but stay within Vercel timeout
 const MAX_CONCURRENT = 3
@@ -37,8 +29,6 @@ export interface LandingPipelineInput {
   colorPalette?: { primary: string; secondary: string; accent: string; extra?: string }
   productContext?: { description?: string; benefits?: string; problems?: string; ingredients?: string; differentiator?: string }
   typography?: { headings?: string; subheadings?: string; body?: string }
-  // All generated angles (for persistence to saved_angles table)
-  angles?: Array<{ name: string; hook: string; description?: string; avatarSuggestion?: string; tone?: string; salesAngle?: string }>
   existing_product_id?: string
 }
 
@@ -85,57 +75,6 @@ export async function executeLandingPipeline(
 
     productId = productResult.data.id
     sendEvent({ type: 'tool_result', data: { tool_name: 'pipeline_step', result: { step: 'Producto creado ✓' } } })
-  }
-
-  // Step 1.5: Persist productContext, colorPalette, pricing, country to the product
-  try {
-    const updateData: Record<string, any> = {}
-    if (input.productContext) updateData.product_context = input.productContext
-    if (input.colorPalette) updateData.color_palette = input.colorPalette
-    if (input.target_country) updateData.target_country = input.target_country
-    if (input.price_after || input.price_before) {
-      updateData.pricing = {
-        priceAfter: input.price_after,
-        priceBefore: input.price_before,
-        currencySymbol: input.currency_symbol || '$',
-      }
-    }
-
-    if (Object.keys(updateData).length > 0) {
-      const serviceClient = createDirectServiceClient()
-      await serviceClient
-        .from('products')
-        .update(updateData)
-        .eq('id', productId)
-      console.log(`[LandingPipeline] Persisted settings to product ${productId}: ${Object.keys(updateData).join(', ')}`)
-    }
-  } catch (e: any) {
-    console.warn('[LandingPipeline] Failed to persist settings:', e.message)
-    // Non-fatal — continue with banner generation
-  }
-
-  // Step 1.6: Persist angles to saved_angles table (if provided)
-  if (input.angles?.length && input.product_name) {
-    try {
-      const serviceClient = createDirectServiceClient()
-      // Delete existing angles for this product name + user
-      const userId = estrategasTools['userId'] // Access private field
-      await serviceClient
-        .from('saved_angles')
-        .delete()
-        .eq('user_id', userId)
-        .eq('product_name', input.product_name)
-
-      const rows = input.angles.map(angle => ({
-        user_id: userId,
-        product_name: input.product_name,
-        angle_data: angle,
-      }))
-      await serviceClient.from('saved_angles').insert(rows)
-      console.log(`[LandingPipeline] Saved ${rows.length} angles for "${input.product_name}"`)
-    } catch (e: any) {
-      console.warn('[LandingPipeline] Failed to save angles:', e.message)
-    }
   }
 
   // Step 2: Generate banners in parallel with semaphore (MAX_CONCURRENT at a time)

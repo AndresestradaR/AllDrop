@@ -39,7 +39,7 @@ import { SavedAnglesPanel } from '@/components/studio/SavedAnglesPanel'
 import CountrySelector from '@/components/generator/CountrySelector'
 import PricingControls, { PricingData, getDefaultPricingData } from '@/components/generator/PricingControls'
 import { ImageModelId, modelIdToProviderType } from '@/lib/image-providers/types'
-import { Country, COUNTRIES, getDefaultCountry } from '@/lib/constants/countries'
+import { Country, getDefaultCountry } from '@/lib/constants/countries'
 
 export const dynamic = 'force-dynamic'
 
@@ -250,7 +250,7 @@ export default function ProductGeneratePage() {
     fetchTemplates()
     fetchGeneratedSections()
     fetchApiKeyStatus()
-    // Load persisted product context + settings
+    // Load persisted product context
     fetch(`/api/products/context?productId=${productId}`)
       .then(r => r.json())
       .then(data => {
@@ -258,26 +258,11 @@ export default function ProductGeneratePage() {
           setProductContext(data.context)
           setShowProductContext(true)
         }
-        if (data.colorPalette) {
-          setColorPalette(prev => ({ ...prev, ...data.colorPalette }))
-          if (data.colorPalette.extra) setColorCount(4)
-        }
-        if (data.typography) setSelectedFonts(prev => ({ ...prev, ...data.typography }))
-        if (data.pricing) setPricing(prev => ({ ...prev, ...data.pricing }))
-        if (data.targetCountry) {
-          const found = COUNTRIES.find((c: any) => c.code === data.targetCountry)
-          if (found) setSelectedCountry(found)
-        }
-        if (data.productPhotos && Array.isArray(data.productPhotos)) {
-          const photos = [...data.productPhotos]
-          while (photos.length < 3) photos.push(null)
-          setProductPhotos(photos.slice(0, 3))
-        }
       })
-      .catch(() => {}) // Silently fail — columns might not exist yet
+      .catch(() => {}) // Silently fail — column might not exist yet
   }, [productId])
 
-  // Auto-save product context + settings with debounce (1.5s after last change)
+  // Auto-save product context with debounce (1.5s after last change)
   const contextSaveTimer = useRef<NodeJS.Timeout | null>(null)
   useEffect(() => {
     // Skip if all fields are empty (initial state)
@@ -286,7 +271,7 @@ export default function ProductGeneratePage() {
 
     if (contextSaveTimer.current) clearTimeout(contextSaveTimer.current)
     contextSaveTimer.current = setTimeout(() => {
-      console.log('[ProductContext] Auto-saving...', { productId })
+      console.log('[ProductContext] Auto-saving...', { productId, context: productContext })
       fetch('/api/products/context', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -299,45 +284,6 @@ export default function ProductGeneratePage() {
 
     return () => { if (contextSaveTimer.current) clearTimeout(contextSaveTimer.current) }
   }, [productContext, productId])
-
-  // Auto-save color palette, typography, pricing, country
-  const settingsSaveTimer = useRef<NodeJS.Timeout | null>(null)
-  useEffect(() => {
-    if (settingsSaveTimer.current) clearTimeout(settingsSaveTimer.current)
-    settingsSaveTimer.current = setTimeout(() => {
-      fetch('/api/products/context', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          productId,
-          colorPalette: colorCount === 4 ? colorPalette : { primary: colorPalette.primary, secondary: colorPalette.secondary, accent: colorPalette.accent },
-          typography: selectedFonts,
-          pricing,
-          targetCountry: selectedCountry?.code || null,
-        }),
-      }).catch(() => {})
-    }, 2000)
-
-    return () => { if (settingsSaveTimer.current) clearTimeout(settingsSaveTimer.current) }
-  }, [colorPalette, colorCount, selectedFonts, pricing, selectedCountry, productId])
-
-  // Auto-save product photos when they change (URLs only, not base64 blobs)
-  const photosSaveTimer = useRef<NodeJS.Timeout | null>(null)
-  useEffect(() => {
-    const photoUrls = productPhotos.filter((p): p is string => p !== null && p.startsWith('http'))
-    if (photoUrls.length === 0) return
-
-    if (photosSaveTimer.current) clearTimeout(photosSaveTimer.current)
-    photosSaveTimer.current = setTimeout(() => {
-      fetch('/api/products/context', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ productId, productPhotos: photoUrls }),
-      }).catch(() => {})
-    }, 2000)
-
-    return () => { if (photosSaveTimer.current) clearTimeout(photosSaveTimer.current) }
-  }, [productPhotos, productId])
 
   // Retry Canva upload after OAuth callback
   useEffect(() => {

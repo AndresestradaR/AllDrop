@@ -46,7 +46,7 @@ export async function GET(request: Request) {
 
     let query = supabase
       .from('products')
-      .select('id, name, product_context, color_palette, typography, pricing, target_country, product_photos')
+      .select('id, name, product_context')
       .eq('user_id', user.id)
 
     if (productId) {
@@ -64,11 +64,6 @@ export async function GET(request: Request) {
     return NextResponse.json({
       productId: product.id,
       context: product.product_context || null,
-      colorPalette: product.color_palette || null,
-      typography: product.typography || null,
-      pricing: product.pricing || null,
-      targetCountry: product.target_country || null,
-      productPhotos: product.product_photos || null,
     })
   } catch (error: any) {
     console.error('[ProductContext GET] Error:', error.message)
@@ -78,8 +73,8 @@ export async function GET(request: Request) {
 
 /**
  * PUT /api/products/context
- * Persist product context and settings (auto-saved from Banner Generator + Matías).
- * Body: { productId, context?, colorPalette?, typography?, pricing?, targetCountry?, productPhotos? }
+ * Persist product context (auto-saved from Banner Generator).
+ * Body: { productId, context: { description, benefits, problems, ingredients, differentiator } }
  */
 export async function PUT(request: Request) {
   try {
@@ -89,23 +84,9 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    const body = await request.json()
-    const { productId } = body
+    const { productId, context } = await request.json()
     if (!productId) {
       return NextResponse.json({ error: 'productId requerido' }, { status: 400 })
-    }
-
-    // Build update object with only the fields that were sent
-    const updateData: Record<string, any> = {}
-    if (body.context !== undefined) updateData.product_context = body.context
-    if (body.colorPalette !== undefined) updateData.color_palette = body.colorPalette
-    if (body.typography !== undefined) updateData.typography = body.typography
-    if (body.pricing !== undefined) updateData.pricing = body.pricing
-    if (body.targetCountry !== undefined) updateData.target_country = body.targetCountry
-    if (body.productPhotos !== undefined) updateData.product_photos = body.productPhotos
-
-    if (Object.keys(updateData).length === 0) {
-      return NextResponse.json({ success: true, rowsUpdated: 0 })
     }
 
     // Use service role to bypass RLS
@@ -116,7 +97,7 @@ export async function PUT(request: Request) {
 
     const { data: updated, error } = await adminClient
       .from('products')
-      .update(updateData)
+      .update({ product_context: context })
       .eq('id', productId)
       .eq('user_id', user.id)
       .select('id')
@@ -126,7 +107,7 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    console.log(`[ProductContext PUT] Updated ${updated?.length || 0} rows for product ${productId}, fields: ${Object.keys(updateData).join(', ')}`)
+    console.log(`[ProductContext PUT] Updated ${updated?.length || 0} rows for product ${productId}`)
 
     return NextResponse.json({ success: true, rowsUpdated: updated?.length || 0 })
   } catch (error: any) {

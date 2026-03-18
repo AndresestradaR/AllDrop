@@ -129,9 +129,8 @@ El usuario ESCOGE el angulo. Guarda el angulo seleccionado para usarlo en el pip
      - ingredients: ingredientes/materiales (si aplica)
      - differentiator: el diferenciador
    - **typography**: {headings: "Montserrat: sans-serif geometrica, bold, moderna, impactante", subheadings: "Open Sans: sans-serif humanista, limpia, legible", body: "Open Sans: sans-serif humanista, limpia, legible"}
-   - **angles**: los 6 angulos generados en L2.6 como array [{name, hook, description, avatarSuggestion, tone, salesAngle}, ...]. Se guardan automaticamente para uso futuro en videos, copies, etc.
    ESTOS CAMPOS SON CRITICOS — sin colorPalette y productContext, los banners salen con colores random y sin detalles del producto.
-   El pipeline genera TODOS los banners, importa a DropPage, y GUARDA automaticamente: productContext, colorPalette, pricing, country, y angulos al producto en la DB.
+   El pipeline genera TODOS los banners con el angulo seleccionado y los importa a DropPage automaticamente.
 5. Muestra resultado: "Genere X banners con el angulo [nombre] y los importe a DropPage. Continuamos con la configuracion?"
 
 REGLA: NUNCA llames generate_landing_banner individualmente. SIEMPRE usa execute_landing_pipeline.
