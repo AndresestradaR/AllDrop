@@ -79,19 +79,59 @@ export async function POST(request: Request) {
     const { data: { session } } = await supabase.auth.getSession()
     const supabaseAccessToken = session?.access_token || ''
 
+    // Recover product image URLs from conversation history
+    const { data: convHistory } = await serviceClient
+      .from('meta_ads_messages')
+      .select('tool_name, tool_result, role, content')
+      .eq('conversation_id', action.conversation_id)
+      .order('created_at', { ascending: true })
+
+    const productImageUrls: string[] = []
+    let lastLandingProductId: string | undefined
+    for (const msg of convHistory || []) {
+      if (msg.tool_name === 'upload_product_image' && msg.tool_result) {
+        try {
+          const r = typeof msg.tool_result === 'string' ? JSON.parse(msg.tool_result) : msg.tool_result
+          if (r.url) productImageUrls.push(r.url)
+        } catch {}
+      }
+      if (msg.role === 'user' && typeof msg.content === 'string' && msg.content.includes('[product_photos:')) {
+        const match = msg.content.match(/\[product_photos:([^\]]+)\]/)
+        if (match) {
+          const urls = match[1].split(',').map((u: string) => u.trim()).filter((u: string) => u.startsWith('http'))
+          productImageUrls.push(...urls)
+        }
+      }
+      if (msg.tool_name === 'execute_landing_pipeline' && msg.tool_result) {
+        try {
+          const r = typeof msg.tool_result === 'string' ? JSON.parse(msg.tool_result) : msg.tool_result
+          if (r.product_id) lastLandingProductId = r.product_id
+        } catch {}
+      }
+    }
+
     const estrategasTools = new EstrategasToolsHandler({
       userId: user.id,
       supabaseAccessToken,
+      productImageUrls,
     })
     const dropPageClient = new DropPageClient({ supabaseAccessToken })
+
+    // Dummy sendEvent for pipeline progress (confirm endpoint doesn't stream SSE)
+    const sendEvent = () => {}
 
     const result = await executeConfirmedAction(
       metaAccessToken,
       action.action_type,
       action.action_payload,
       {
+        userId: user.id,
+        lastLandingProductId,
         onExecuteEstrategasTool: (tn, ti) => estrategasTools.executeTool(tn, ti),
         onExecuteDropPageTool: (tn, ti) => dropPageClient.executeTool(tn, ti),
+        estrategasTools,
+        dropPageClient,
+        sendEvent,
       }
     )
 

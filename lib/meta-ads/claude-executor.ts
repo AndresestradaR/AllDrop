@@ -431,14 +431,19 @@ export async function executeChat(
   sendEvent({ type: 'done', data: { stop_reason: 'end_turn' } })
 }
 
-// Execute a confirmed write action — routes to correct handler
+// Execute a confirmed write action — routes to correct handler (including pipelines)
 export async function executeConfirmedAction(
   metaAccessToken: string,
   toolName: string,
   toolInput: Record<string, any>,
   handlers?: {
+    userId?: string
+    lastLandingProductId?: string
     onExecuteEstrategasTool?: (toolName: string, toolInput: Record<string, any>) => Promise<{ success: boolean; data?: any; error?: string }>
     onExecuteDropPageTool?: (toolName: string, toolInput: Record<string, any>) => Promise<{ success: boolean; data?: any; error?: string }>
+    estrategasTools?: import('./estrategas-tools').EstrategasToolsHandler
+    dropPageClient?: import('./droppage-client').DropPageClient
+    sendEvent?: (event: SSEEvent) => void
   }
 ): Promise<{ success: boolean; data?: any; error?: string }> {
   const metaClient = new MetaAPIClient({ accessToken: metaAccessToken })
