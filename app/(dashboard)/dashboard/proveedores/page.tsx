@@ -21,7 +21,7 @@ interface Provider {
   logo: string
   description: string
   whyChoose: string[]
-  videoId: string | null
+  videoUrl: string | null
   contacts: ProviderContact[]
   resources: ProviderResource[]
   dropiUrl: string | null
@@ -41,7 +41,7 @@ const PROVIDERS: Provider[] = [
       'Catálogo amplio: salud, belleza, hogar, consumo, nicho black — todos con registro sanitario',
       'Creativos, landing pages y Google Drive con material listo para vender',
     ],
-    videoId: 'RkCtDKuVBw0',
+    videoUrl: 'https://papfcbiswvdgalfteujm.supabase.co/storage/v1/object/public/landing-images/proveedores/kompras-plus-video.mp4',
     contacts: [
       { name: 'Juan', phone: '+573148679307', role: 'Proveeduría y desarrollo de marca' },
       { name: 'Natalia', phone: '+573242223825', role: 'Pedidos y soporte' },
@@ -105,15 +105,14 @@ export default function ProveedoresPage() {
         {/* Two-column layout: Video + PDFs */}
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-6">
           {/* Left: Video */}
-          {selectedProvider.videoId && (
+          {selectedProvider.videoUrl && (
             <div className="lg:col-span-3">
               <div className="aspect-video rounded-xl overflow-hidden border border-border bg-black">
-                <iframe
-                  src={`https://www.youtube.com/embed/${selectedProvider.videoId}`}
-                  title={selectedProvider.name}
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                  className="w-full h-full"
+                <video
+                  src={selectedProvider.videoUrl}
+                  controls
+                  playsInline
+                  className="w-full h-full object-contain"
                 />
               </div>
             </div>
@@ -258,7 +257,7 @@ export default function ProveedoresPage() {
                   <FileText className="w-3.5 h-3.5" />
                   {provider.resources.filter(r => r.type === 'pdf').length} catálogos
                 </div>
-                {provider.videoId && (
+                {provider.videoUrl && (
                   <div className="flex items-center gap-1">
                     <Play className="w-3.5 h-3.5" />
                     1 video
