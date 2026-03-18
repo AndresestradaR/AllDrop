@@ -9,7 +9,6 @@ export interface DropPagePipelineInput {
   // Product
   product_name: string
   product_description?: string
-  short_description?: string
   price: number
   compare_at_price?: number
   country?: string
@@ -21,15 +20,9 @@ export interface DropPagePipelineInput {
     price_override?: number
     dropi_variation_id?: string
   }>
-  // Product images (URLs from user uploads in chat)
-  product_image_urls?: string[]
-  // Banner/section images (from landing pipeline)
-  section_image_urls?: string[]
   // Page design
   page_title: string
   domain_id?: string
-  // CTA button text
-  cta_button_text?: string
   // Quantity offers (optional)
   quantity_offers?: {
     tiers: Array<{
@@ -86,7 +79,7 @@ export async function executeDropPagePipeline(
 
   const productResult = await dropPageClient.createProduct({
     name: input.product_name,
-    description: input.short_description || (input.product_description || '').substring(0, 200),
+    description: input.product_description,
     price: input.price,
     compare_at_price: input.compare_at_price,
     country: input.country,
@@ -100,22 +93,6 @@ export async function executeDropPagePipeline(
 
   const productId = productResult.data?.id
   sendEvent({ type: 'tool_result', data: { tool_name: 'pipeline_step', result: { step: `Producto creado ✓` } } })
-
-  // Step 1.5: Upload product images to DropPage multimedia
-  if (input.product_image_urls?.length) {
-    sendEvent({ type: 'tool_start', data: { tool_name: 'pipeline_step', tool_input: { step: `Subiendo ${input.product_image_urls.length} foto(s) del producto...` } } })
-    for (const imgUrl of input.product_image_urls) {
-      try {
-        const imgResult = await dropPageClient.uploadProductImageFromUrl(productId, imgUrl, input.product_name)
-        if (!imgResult.success) {
-          errors.push(`Foto producto: ${imgResult.error}`)
-        }
-      } catch (e: any) {
-        errors.push(`Foto producto: ${e.message}`)
-      }
-    }
-    sendEvent({ type: 'tool_result', data: { tool_name: 'pipeline_step', result: { step: 'Fotos del producto subidas ✓' } } })
-  }
 
   // Step 2: Create page design
   sendEvent({ type: 'tool_start', data: { tool_name: 'pipeline_step', tool_input: { step: 'Creando landing page...' } } })
@@ -135,49 +112,9 @@ export async function executeDropPagePipeline(
     errors.push(`Landing: ${designResult.error}`)
   }
 
-  // Step 3: Associate product to design + populate with banner images
+  // Step 3: Associate product to design
   if (designId) {
-    const assocResult = await dropPageClient.associateProductToDesign(designId, productId)
-    if (!assocResult.success) {
-      errors.push(`Asociar producto a landing: ${assocResult.error}`)
-    }
-
-    // Populate page design with banner section images
-    if (input.section_image_urls?.length) {
-      sendEvent({ type: 'tool_start', data: { tool_name: 'pipeline_step', tool_input: { step: 'Armando landing con banners...' } } })
-
-      const ctaText = input.cta_button_text || '¡COMPRAR AHORA!'
-      const primaryColor = '#4DBEA4'
-      const sectionsHtml = input.section_image_urls
-        .map(url => `<div style="width:100%;text-align:center;"><img src="${url}" alt="${input.product_name}" style="width:100%;max-width:1080px;height:auto;display:block;margin:0 auto;" loading="lazy" /></div>`)
-        .join('\n')
-
-      const ctaHtml = `<div style="position:fixed;bottom:0;left:0;right:0;z-index:50;padding:12px 16px;background:linear-gradient(transparent,rgba(0,0,0,0.8));text-align:center;">
-  <a href="#checkout" style="display:inline-block;width:100%;max-width:400px;padding:16px 32px;background:${primaryColor};color:#fff;font-size:18px;font-weight:700;text-decoration:none;border-radius:8px;text-transform:uppercase;animation:pulse 2s infinite;">${ctaText}</a>
-</div>`
-
-      const cssContent = `@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}} body{margin:0;padding:0;} img{max-width:100%;}`
-
-      const htmlContent = `${sectionsHtml}\n${ctaHtml}`
-
-      const updateResult = await dropPageClient.updatePageDesign(designId, {
-        html_content: htmlContent,
-        css_content: cssContent,
-        is_published: true,
-        product_metadata: {
-          product_name: input.product_name,
-          cta_text: ctaText,
-          section_count: input.section_image_urls.length,
-          generated_by: 'matias_pipeline',
-        },
-      })
-
-      if (updateResult.success) {
-        sendEvent({ type: 'tool_result', data: { tool_name: 'pipeline_step', result: { step: `Landing armada con ${input.section_image_urls.length} banners y publicada ✓` } } })
-      } else {
-        errors.push(`Armar landing: ${updateResult.error}`)
-      }
-    }
+    await dropPageClient.associateProductToDesign(designId, productId)
   }
 
   // Step 4: Quantity offers
@@ -185,33 +122,11 @@ export async function executeDropPagePipeline(
   if (input.quantity_offers?.tiers?.length) {
     sendEvent({ type: 'tool_start', data: { tool_name: 'pipeline_step', tool_input: { step: 'Configurando ofertas por cantidad...' } } })
 
-    // Auto-calculate discount from total_price if provided
-    const processedTiers = input.quantity_offers.tiers.map((tier: any) => {
-      const { total_price, ...tierWithoutTotalPrice } = tier
-
-      if (total_price != null && tier.quantity > 0 && input.price > 0) {
-        // Calculate fixed discount per unit from total price
-        // Example: base=$104,900, 2x total=$129,900 → per_unit=$64,950 → discount=$39,950/unit
-        const pricePerUnit = total_price / tier.quantity
-        const discountPerUnit = Math.max(0, input.price - pricePerUnit)
-        if (discountPerUnit === 0) {
-          return { ...tierWithoutTotalPrice, discount_type: 'none', discount_value: 0 }
-        }
-        return {
-          ...tierWithoutTotalPrice,
-          discount_type: 'fixed',
-          discount_value: Math.ceil(discountPerUnit),
-        }
-      }
-
-      return tierWithoutTotalPrice
-    })
-
     const offerResult = await dropPageClient.createQuantityOffer({
       name: `Ofertas ${input.product_name}`,
       is_active: true,
       product_ids: [productId],
-      tiers: processedTiers,
+      tiers: input.quantity_offers.tiers,
     })
 
     if (offerResult.success) {

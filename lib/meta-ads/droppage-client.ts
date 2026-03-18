@@ -104,13 +104,6 @@ export class DropPageClient {
     return this.request('POST', '/api/admin/products', input)
   }
 
-  async uploadProductImageFromUrl(productId: string, imageUrl: string, altText?: string) {
-    return this.request('POST', `/api/admin/products/${productId}/images/from-url`, {
-      image_url: imageUrl,
-      alt_text: altText,
-    })
-  }
-
   // ==================== PAGE DESIGNS ====================
 
   async getPageDesigns(pageType?: string) {
@@ -127,15 +120,6 @@ export class DropPageClient {
     product_metadata?: Record<string, any>
   }) {
     return this.request('POST', '/api/admin/page-designs', input)
-  }
-
-  async updatePageDesign(designId: string, input: {
-    html_content?: string
-    css_content?: string
-    is_published?: boolean
-    product_metadata?: Record<string, any>
-  }) {
-    return this.request('PUT', `/api/admin/page-designs/${designId}`, input)
   }
 
   async associateProductToDesign(designId: string, productId: string | null) {
