@@ -104,6 +104,7 @@ const ESTRATEGAS_TOOLS = [
 
 // Extended options for routing including pipeline support
 interface RouteOptions extends Pick<ExecutorOptions, 'onExecuteEstrategasTool' | 'onExecuteDropPageTool' | 'onGetProducts'> {
+  userId?: string
   estrategasTools?: import('./estrategas-tools').EstrategasToolsHandler
   dropPageClient?: import('./droppage-client').DropPageClient
   sendEvent?: (event: SSEEvent) => void
@@ -168,6 +169,7 @@ export async function executeChat(
 
   // Route options — includes pipeline support
   const routeOpts: RouteOptions = {
+    userId: opts.userId,
     onExecuteEstrategasTool: opts.onExecuteEstrategasTool,
     onExecuteDropPageTool: opts.onExecuteDropPageTool,
     onGetProducts: opts.onGetProducts,
