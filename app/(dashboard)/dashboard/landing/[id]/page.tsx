@@ -455,16 +455,37 @@ export default function ProductGeneratePage() {
     }
   }
 
-  const handlePhotoUpload = (index: number) => (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = (index: number) => async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file) {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        const newPhotos = [...productPhotos]
-        newPhotos[index] = reader.result as string
-        setProductPhotos(newPhotos)
+    if (!file) return
+
+    // Show base64 preview immediately while uploading
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      const newPhotos = [...productPhotos]
+      newPhotos[index] = reader.result as string
+      setProductPhotos(newPhotos)
+    }
+    reader.readAsDataURL(file)
+
+    // Upload to Supabase Storage in background, then replace base64 with persistent URL
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('productId', productId)
+      formData.append('index', String(index))
+
+      const res = await fetch('/api/products/upload-photo', { method: 'POST', body: formData })
+      const data = await res.json()
+      if (data.url) {
+        setProductPhotos(prev => {
+          const updated = [...prev]
+          updated[index] = data.url
+          return updated
+        })
       }
-      reader.readAsDataURL(file)
+    } catch (err) {
+      console.error('[PhotoUpload] Failed to upload to storage:', err)
     }
   }
 
