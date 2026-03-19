@@ -230,8 +230,20 @@
     <div class="noise"></div>
     <div class="particles" id="particles"></div>
 
+    <!-- NAV -->
+    <nav style="position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:1rem 2rem;background:rgba(5,5,8,0.8);backdrop-filter:blur(12px);border-bottom:1px solid rgba(255,255,255,0.05);">
+        <div style="display:flex;align-items:center;gap:0.5rem;">
+            <img src="images/logo.png" alt="AllDrop" style="width:32px;height:32px;object-fit:contain;">
+            <span style="font-weight:700;font-size:1.1rem;background:linear-gradient(135deg,#00f0ff,#8b5cf6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">AllDrop</span>
+        </div>
+        <div style="display:flex;gap:0.75rem;">
+            <a href="/login" style="padding:0.5rem 1.2rem;border-radius:8px;border:1px solid rgba(255,255,255,0.15);color:#f0f0f5;text-decoration:none;font-size:0.85rem;font-weight:500;transition:all 0.3s;">Acceder</a>
+            <a href="/register" style="padding:0.5rem 1.2rem;border-radius:8px;background:linear-gradient(135deg,#8b5cf6,#f43f8e);color:white;text-decoration:none;font-size:0.85rem;font-weight:600;transition:all 0.3s;">Registrarse</a>
+        </div>
+    </nav>
+
     <!-- HERO -->
-    <div class="hero">
+    <div class="hero" style="padding-top:5rem;">
         <div class="logo-container"><img src="images/logo.png" alt="AllDrop" class="logo-img"><div class="logo">AllDrop</div></div>
         <div class="badge"><div class="badge-dot"></div>En desarrollo</div>
         <div class="heading"><h1><span class="outline">PRÓXIMA</span><br><span class="gradient-word">MENTE</span></h1></div>
