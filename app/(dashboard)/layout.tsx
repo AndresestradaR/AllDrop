@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils/cn'
+import { BackgroundGradientAnimation } from '@/components/ui/background-gradient-animation'
 import {
   Sparkles,
   LayoutDashboard,
@@ -163,12 +164,31 @@ export default function DashboardLayout({
 
       {/* Sidebar */}
       <aside className={cn(
-        'fixed top-0 left-0 z-50 h-full w-64 bg-surface border-r border-border transform transition-transform duration-200 lg:translate-x-0',
+        'fixed top-0 left-0 z-50 h-full w-64 border-r border-border transform transition-transform duration-200 lg:translate-x-0 overflow-hidden',
         sidebarOpen ? 'translate-x-0' : '-translate-x-full'
       )}>
-        <div className="flex flex-col h-full">
+        {/* Subtle animated gradient background */}
+        <div className="absolute inset-0 opacity-[0.15]">
+          <BackgroundGradientAnimation
+            gradientBackgroundStart="rgb(10, 10, 10)"
+            gradientBackgroundEnd="rgb(15, 5, 30)"
+            firstColor="139, 92, 246"
+            secondColor="0, 240, 255"
+            thirdColor="139, 92, 246"
+            fourthColor="244, 63, 142"
+            fifthColor="0, 240, 255"
+            pointerColor="139, 92, 246"
+            size="100%"
+            blendingValue="screen"
+            interactive={false}
+            containerClassName="h-full w-full"
+          />
+        </div>
+        {/* Dark overlay to keep text readable */}
+        <div className="absolute inset-0 bg-surface/90" />
+        <div className="flex flex-col h-full relative z-10">
           {/* Logo */}
-          <div className="flex items-center gap-3 px-6 py-5 border-b border-border">
+          <div className="flex items-center gap-3 px-6 py-5 border-b border-border/50">
             <img src="/images/logo.png" alt="AllDrop" className="w-8 h-8 object-contain" />
             <span className="text-lg font-bold" style={{ background: 'linear-gradient(135deg, #00f0ff, #8b5cf6)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>AllDrop</span>
           </div>
