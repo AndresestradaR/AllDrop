@@ -47,15 +47,15 @@ h1, h2, h3, h4, h5, h6 {
   background: #363636;
 }
 
-/* Selection - turquoise accent */
+/* Selection - violet accent */
 ::selection {
-  background-color: rgba(20, 184, 166, 0.3);
+  background-color: rgba(139, 92, 246, 0.3);
   color: #FFFFFF;
 }
 
-/* Focus visible - turquoise accent */
+/* Focus visible - violet accent */
 :focus-visible {
-  outline: 2px solid #14b8a6;
+  outline: 2px solid #8b5cf6;
   outline-offset: 2px;
 }
 
@@ -80,13 +80,13 @@ h1, h2, h3, h4, h5, h6 {
   background-size: 200% 100%;
 }
 
-/* Glow effect - turquoise */
+/* Glow effect - violet */
 .glow-accent {
-  box-shadow: 0 0 20px rgba(20, 184, 166, 0.3);
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
 }
 
 .glow-accent-strong {
-  box-shadow: 0 0 30px rgba(20, 184, 166, 0.5);
+  box-shadow: 0 0 30px rgba(139, 92, 246, 0.5);
 }
 
 /* Card hover effect */
@@ -101,7 +101,7 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Gradient text */
 .gradient-text {
-  background: linear-gradient(135deg, #14b8a6 0%, #2dd4bf 100%);
+  background: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -109,14 +109,14 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Button styles */
 .btn-primary {
-  background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
   color: white;
   transition: all 0.2s ease;
 }
 
 .btn-primary:hover {
-  background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%);
-  box-shadow: 0 0 20px rgba(20, 184, 166, 0.4);
+  background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.4);
 }
 
 /* Input styles */
@@ -127,8 +127,8 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .input-dark:focus {
-  border-color: #14b8a6;
-  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.1);
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
 }
 
 .input-dark::placeholder {
@@ -147,10 +147,10 @@ h1, h2, h3, h4, h5, h6 {
 
 @keyframes pulse-glow {
   0%, 100% {
-    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
+    box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.4);
   }
   50% {
-    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0);
+    box-shadow: 0 0 0 4px rgba(139, 92, 246, 0);
   }
 }
 

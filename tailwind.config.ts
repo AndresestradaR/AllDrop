@@ -9,7 +9,7 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Dark theme colors (Komposo style)
+        // Dark theme colors
         background: '#0a0a0a',
         surface: '#121212',
         'surface-elevated': '#1a1a1a',
@@ -18,22 +18,22 @@ const config: Config = {
         'text-primary': '#FFFFFF',
         'text-secondary': '#a1a1aa',
         'text-muted': '#71717a',
-        // Brand colors (turquoise)
+        // Brand colors (violet - AllDrop identity)
         brand: {
-          50: '#f0fdfa',
-          100: '#ccfbf1',
-          200: '#99f6e4',
-          300: '#5eead4',
-          400: '#2dd4bf',
-          500: '#14b8a6',
-          600: '#0d9488',
-          700: '#0f766e',
-          800: '#115e59',
-          900: '#134e4a',
+          50: '#f5f3ff',
+          100: '#ede9fe',
+          200: '#ddd6fe',
+          300: '#c4b5fd',
+          400: '#a78bfa',
+          500: '#8b5cf6',
+          600: '#7c3aed',
+          700: '#6d28d9',
+          800: '#5b21b6',
+          900: '#4c1d95',
         },
-        accent: '#14b8a6',
-        'accent-hover': '#0d9488',
-        'accent-light': '#2dd4bf',
+        accent: '#8b5cf6',
+        'accent-hover': '#7c3aed',
+        'accent-light': '#a78bfa',
         error: '#ef4444',
         success: '#22c55e',
         warning: '#f59e0b',
@@ -52,8 +52,8 @@ const config: Config = {
       },
       keyframes: {
         glow: {
-          '0%': { boxShadow: '0 0 5px #14b8a6, 0 0 10px #14b8a6' },
-          '100%': { boxShadow: '0 0 10px #14b8a6, 0 0 20px #14b8a6, 0 0 30px #14b8a6' },
+          '0%': { boxShadow: '0 0 5px #8b5cf6, 0 0 10px #8b5cf6' },
+          '100%': { boxShadow: '0 0 10px #8b5cf6, 0 0 20px #8b5cf6, 0 0 30px #8b5cf6' },
         },
         fadeIn: {
           '0%': { opacity: '0' },
