@@ -1271,7 +1271,7 @@ export default function ProductGeneratePage() {
         product_photos: productPhotos.filter((p): p is string => p !== null),
       }
 
-      // Check if there's an existing landing in DropPage for this product
+      // Auto-detect existing landing in DropPage — send there without asking
       let existingDesignId: string | null = null
       try {
         const designsRes = await fetch('/api/minishop/import-sections', {
@@ -1282,16 +1282,7 @@ export default function ProductGeneratePage() {
         if (designsRes.ok) {
           const designsData = await designsRes.json()
           if (designsData.existing_design_id) {
-            // Ask user: send to existing or create new?
-            const useExisting = window.confirm(
-              `Ya tienes una landing "${designsData.existing_design_title}" para este producto en DropPage.\n\n` +
-              `¿Quieres AGREGAR estos banners a esa landing?\n\n` +
-              `• OK = Agregar a la landing existente\n` +
-              `• Cancelar = Crear una landing nueva`
-            )
-            if (useExisting) {
-              existingDesignId = designsData.existing_design_id
-            }
+            existingDesignId = designsData.existing_design_id
           }
         }
       } catch { /* ignore — will create new */ }
@@ -2386,19 +2377,23 @@ export default function ProductGeneratePage() {
           )}
         </div>
 
-        {/* Generate Button */}
-        <Button
-          className="w-full gap-2 py-4 text-base"
-          onClick={handleGenerate}
-          isLoading={isGenerating}
-        >
-          <Sparkles className="w-5 h-5" />
-          Generar Sección
-        </Button>
+        {/* Generate Single Section Button — only show when NOT using bulk mode */}
+        {selectedSections.size === 0 && (
+          <>
+            <Button
+              className="w-full gap-2 py-4 text-base"
+              onClick={handleGenerate}
+              isLoading={isGenerating}
+            >
+              <Sparkles className="w-5 h-5" />
+              Generar Sección
+            </Button>
 
-        <p className="text-center text-sm text-text-secondary mt-3">
-          {generatedSections.length} de 5 secciones utilizadas este periodo
-        </p>
+            <p className="text-center text-sm text-text-secondary mt-3">
+              {generatedSections.length} de 5 secciones utilizadas este periodo
+            </p>
+          </>
+        )}
       </Card>
 
       {/* Generated Sections History */}

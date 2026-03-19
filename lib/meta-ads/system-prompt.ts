@@ -133,8 +133,15 @@ El usuario ESCOGE el angulo. Guarda el angulo seleccionado para usarlo en el pip
    ESTOS CAMPOS SON CRITICOS — sin colorPalette y productContext, los banners salen con colores random y sin detalles del producto.
    El pipeline genera TODOS los banners, importa a DropPage, y GUARDA automaticamente: productContext, colorPalette, pricing, country, y angulos al producto en la DB.
 5. Muestra resultado: "Genere X banners con el angulo [nombre] y los importe a DropPage. Continuamos con la configuracion?"
+6. **Si fallaron algunos banners**: El pipeline tiene timeout de 90s por banner. Si algunos fallan:
+   - Dile al usuario: "Se generaron X de Y banners. Fallaron: [lista]. Voy a reintentar los que faltan."
+   - Llama execute_landing_pipeline DE NUEVO con SOLO las secciones faltantes y el MISMO existing_product_id
+   - El pipeline agrega los nuevos banners al mismo producto
+   - Luego execute_droppage_setup auto-busca TODOS los banners del producto (los viejos + los nuevos)
+   - NUNCA te quedes en loop consultando — si el pipeline retorna, revisa el resultado y actua
 
 REGLA: NUNCA llames generate_landing_banner individualmente. SIEMPRE usa execute_landing_pipeline.
+REGLA: Si execute_droppage_setup ya creo un design_id, guardalo. Si necesitas actualizar la landing, el pipeline auto-detecta la landing existente.
 
 #### Paso L3.5: Texto del boton CTA
 Pregunta: "Que texto quieres en el boton de compra de la landing?"

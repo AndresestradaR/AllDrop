@@ -129,22 +129,43 @@ export async function executeDropPagePipeline(
     sendEvent({ type: 'tool_result', data: { tool_name: 'pipeline_step', result: { step: 'Fotos del producto subidas ✓' } } })
   }
 
-  // Step 2: Create page design
-  sendEvent({ type: 'tool_start', data: { tool_name: 'pipeline_step', tool_input: { step: 'Creando landing page...' } } })
-
-  const designResult = await dropPageClient.createPageDesign({
-    page_type: 'product',
-    title: input.page_title,
-    product_id: productId,
-    domain_id: input.domain_id,
-  })
+  // Step 2: Find existing page design or create new one
+  sendEvent({ type: 'tool_start', data: { tool_name: 'pipeline_step', tool_input: { step: 'Buscando landing existente...' } } })
 
   let designId = ''
-  if (designResult.success) {
-    designId = designResult.data?.id
-    sendEvent({ type: 'tool_result', data: { tool_name: 'pipeline_step', result: { step: 'Landing creada ✓' } } })
-  } else {
-    errors.push(`Landing: ${designResult.error}`)
+
+  // Check if there's already a design for this product
+  try {
+    const existingDesigns = await dropPageClient.getPageDesigns('product')
+    if (existingDesigns.success && existingDesigns.data) {
+      const items = existingDesigns.data.items || existingDesigns.data || []
+      const match = items.find((d: any) =>
+        d.product_id === productId ||
+        d.title?.toLowerCase().includes(input.product_name.toLowerCase().substring(0, 20))
+      )
+      if (match) {
+        designId = match.id
+        console.log(`[DropPagePipeline] Found existing design: ${designId} "${match.title}"`)
+        sendEvent({ type: 'tool_result', data: { tool_name: 'pipeline_step', result: { step: `Landing existente encontrada: "${match.title}" ✓` } } })
+      }
+    }
+  } catch { /* ignore — will create new */ }
+
+  // Create new design if none found
+  if (!designId) {
+    const designResult = await dropPageClient.createPageDesign({
+      page_type: 'product',
+      title: input.page_title,
+      product_id: productId,
+      domain_id: input.domain_id,
+    })
+
+    if (designResult.success) {
+      designId = designResult.data?.id
+      sendEvent({ type: 'tool_result', data: { tool_name: 'pipeline_step', result: { step: 'Landing nueva creada ✓' } } })
+    } else {
+      errors.push(`Landing: ${designResult.error}`)
+    }
   }
 
   // Step 3: Associate product to design + populate with banner images
