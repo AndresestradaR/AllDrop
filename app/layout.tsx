@@ -3,12 +3,12 @@ import { Toaster } from 'react-hot-toast'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Estrategas IA - Generador de Landings',
+  title: 'AllDrop - Generador de Landings',
   description: 'Genera imágenes de producto profesionales con IA para tus landings de dropshipping',
   keywords: ['landing page', 'dropshipping', 'AI', 'product images', 'e-commerce'],
-  authors: [{ name: 'Estrategas IA' }],
+  authors: [{ name: 'AllDrop' }],
   openGraph: {
-    title: 'Estrategas IA - Generador de Landings',
+    title: 'AllDrop - Generador de Landings',
     description: 'Genera imágenes de producto profesionales con IA',
     type: 'website',
   },

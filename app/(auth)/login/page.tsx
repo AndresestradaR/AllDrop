@@ -124,11 +124,9 @@ export default function LoginPage() {
     <div className="min-h-screen bg-background flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         {/* Logo */}
-        <div className="flex items-center justify-center gap-2 mb-8">
-          <div className="w-10 h-10 bg-accent rounded-xl flex items-center justify-center">
-            <Sparkles className="w-6 h-6 text-background" />
-          </div>
-          <span className="text-2xl font-bold text-text-primary">Estrategas IA</span>
+        <div className="flex items-center justify-center gap-3 mb-8">
+          <img src="/images/logo.png" alt="AllDrop" className="w-10 h-10 object-contain" />
+          <span className="text-2xl font-bold" style={{ background: 'linear-gradient(135deg, #00f0ff, #8b5cf6)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>AllDrop</span>
         </div>
 
         <Card>
@@ -157,7 +155,7 @@ export default function LoginPage() {
                 </form>
 
                 <p className="text-center text-xs text-text-secondary mt-6">
-                  Solo miembros de Trucos Ecomm pueden acceder
+                  Solo miembros de AllDrop pueden acceder
                 </p>
               </CardContent>
             </>

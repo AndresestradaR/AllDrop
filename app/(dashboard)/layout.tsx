@@ -192,11 +192,9 @@ export default function DashboardLayout({
       )}>
         <div className="flex flex-col h-full">
           {/* Logo */}
-          <div className="flex items-center gap-2 px-6 py-5 border-b border-border">
-            <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center">
-              <Sparkles className="w-5 h-5 text-background" />
-            </div>
-            <span className="text-lg font-bold text-text-primary">Estrategas IA</span>
+          <div className="flex items-center gap-3 px-6 py-5 border-b border-border">
+            <img src="/images/logo.png" alt="AllDrop" className="w-8 h-8 object-contain" />
+            <span className="text-lg font-bold" style={{ background: 'linear-gradient(135deg, #00f0ff, #8b5cf6)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>AllDrop</span>
           </div>
 
           {/* Navigation */}
