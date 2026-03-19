@@ -2328,7 +2328,7 @@ export default function ProductGeneratePage() {
                     })}
                   </div>
 
-                  {selectedSections.size > 0 && (
+                  {selectedSections.size > 0 && !selectedTemplate && !uploadedTemplate && (
                     <div className="mt-4 pt-4 border-t border-border">
                       <button
                         onClick={handleBulkGenerate}
@@ -2377,8 +2377,8 @@ export default function ProductGeneratePage() {
           )}
         </div>
 
-        {/* Generate Single Section Button — only show when NOT using bulk mode */}
-        {selectedSections.size === 0 && (
+        {/* Generate Single Section Button — only show in Banner a Banner mode (template selected) */}
+        {(selectedTemplate || uploadedTemplate) && (
           <>
             <Button
               className="w-full gap-2 py-4 text-base"
