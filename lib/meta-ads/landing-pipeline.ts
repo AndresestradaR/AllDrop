@@ -14,8 +14,11 @@ function createDirectServiceClient() {
 }
 
 // Max concurrent banner generations — 2 to avoid rate limiting from KIE/WaveSpeed
-// (3 caused connection errors; manual UI does 1 at a time)
 const MAX_CONCURRENT = 2
+// Max time per individual banner generation (seconds)
+const BANNER_TIMEOUT_MS = 90_000  // 90s per banner
+// Total pipeline timeout — must fit within Vercel function timeout (300s)
+const PIPELINE_TIMEOUT_MS = 240_000  // 240s = 4 min, leaves 60s for response
 
 export interface LandingPipelineInput {
   product_name: string
@@ -144,35 +147,51 @@ export async function executeLandingPipeline(
     }
   }
 
-  // Step 2: Generate banners in parallel with semaphore (MAX_CONCURRENT at a time)
-  sendEvent({ type: 'tool_start', data: { tool_name: 'pipeline_step', tool_input: { step: `Generando ${input.sections.length} banners (${MAX_CONCURRENT} en paralelo)...` } } })
+  // Step 2: Generate banners with timeout protection
+  const pipelineStart = Date.now()
+  sendEvent({ type: 'tool_start', data: { tool_name: 'pipeline_step', tool_input: { step: `Generando ${input.sections.length} banners (${MAX_CONCURRENT} en paralelo, timeout ${BANNER_TIMEOUT_MS / 1000}s por banner)...` } } })
 
   let completed = 0
 
   async function generateBanner(index: number) {
+    // Check total pipeline timeout
+    if (Date.now() - pipelineStart > PIPELINE_TIMEOUT_MS) {
+      sectionsGenerated[index] = { type: input.sections[index].type, section_id: '', image_url: '', success: false, error: 'Pipeline timeout' }
+      return
+    }
+
     const section = input.sections[index]
     sendEvent({ type: 'tool_start', data: { tool_name: 'pipeline_step', tool_input: { step: `Banner ${index + 1}/${input.sections.length}: ${section.type}...` } } })
 
-    const bannerResult = await estrategasTools.executeTool('generate_landing_banner', {
-      product_id: productId,
-      product_name: input.product_name,
-      template_id: section.template_id,
-      template_url: section.template_url,
-      section_type: section.type,
-      product_details: input.product_details,
-      sales_angle: input.sales_angle,
-      target_avatar: input.target_avatar,
-      additional_instructions: input.additional_instructions,
-      price_after: input.price_after,
-      price_before: input.price_before,
-      currency_symbol: input.currency_symbol,
-      target_country: input.target_country,
-      color_palette: input.color_palette,
-      // Structured fields — same as manual Banner Generator UI
-      colorPalette: input.colorPalette,
-      productContext: input.productContext,
-      typography: input.typography,
-    })
+    // Wrap each banner in individual timeout
+    let bannerResult: any
+    try {
+      const timeoutPromise = new Promise<any>((_, reject) =>
+        setTimeout(() => reject(new Error(`Timeout: banner ${section.type} tardó más de ${BANNER_TIMEOUT_MS / 1000}s`)), BANNER_TIMEOUT_MS)
+      )
+      const generatePromise = estrategasTools.executeTool('generate_landing_banner', {
+        product_id: productId,
+        product_name: input.product_name,
+        template_id: section.template_id,
+        template_url: section.template_url,
+        section_type: section.type,
+        product_details: input.product_details,
+        sales_angle: input.sales_angle,
+        target_avatar: input.target_avatar,
+        additional_instructions: input.additional_instructions,
+        price_after: input.price_after,
+        price_before: input.price_before,
+        currency_symbol: input.currency_symbol,
+        target_country: input.target_country,
+        color_palette: input.color_palette,
+        colorPalette: input.colorPalette,
+        productContext: input.productContext,
+        typography: input.typography,
+      })
+      bannerResult = await Promise.race([generatePromise, timeoutPromise])
+    } catch (e: any) {
+      bannerResult = { success: false, error: e.message }
+    }
 
     completed++
 
@@ -193,25 +212,31 @@ export async function executeLandingPipeline(
         error: bannerResult.error,
       }
       errors.push(`Banner ${section.type}: ${bannerResult.error}`)
-      sendEvent({ type: 'tool_result', data: { tool_name: 'pipeline_step', result: { step: `Banner ${section.type} ✗: ${bannerResult.error} (${completed}/${input.sections.length})` } } })
+      sendEvent({ type: 'tool_result', data: { tool_name: 'pipeline_step', result: { step: `Banner ${section.type} ✗ (${completed}/${input.sections.length})` } } })
     }
   }
 
   // Process in batches of MAX_CONCURRENT
   for (let batchStart = 0; batchStart < input.sections.length; batchStart += MAX_CONCURRENT) {
+    if (Date.now() - pipelineStart > PIPELINE_TIMEOUT_MS) {
+      console.log(`[LandingPipeline] Pipeline timeout reached at batch ${batchStart}, stopping`)
+      break
+    }
     const batchEnd = Math.min(batchStart + MAX_CONCURRENT, input.sections.length)
     const batchIndices = Array.from({ length: batchEnd - batchStart }, (_, i) => batchStart + i)
     await Promise.all(batchIndices.map(i => generateBanner(i)))
   }
 
-  // Step 2.5: Retry failed banners ONE MORE TIME (sequentially to avoid rate limits)
+  // Step 2.5: Retry failed banners ONE MORE TIME (only if we have time)
   const failedIndices = sectionsGenerated
     .map((s, i) => (s && !s.success ? i : -1))
     .filter(i => i >= 0)
 
-  if (failedIndices.length > 0 && failedIndices.length < input.sections.length) {
-    sendEvent({ type: 'tool_start', data: { tool_name: 'pipeline_step', tool_input: { step: `Reintentando ${failedIndices.length} banner(s) fallidos...` } } })
+  const timeLeft = PIPELINE_TIMEOUT_MS - (Date.now() - pipelineStart)
+  if (failedIndices.length > 0 && failedIndices.length < input.sections.length && timeLeft > 30_000) {
+    sendEvent({ type: 'tool_start', data: { tool_name: 'pipeline_step', tool_input: { step: `Reintentando ${failedIndices.length} banner(s) fallidos (${Math.round(timeLeft / 1000)}s restantes)...` } } })
     for (const idx of failedIndices) {
+      if (Date.now() - pipelineStart > PIPELINE_TIMEOUT_MS) break
       // Remove the error from the errors array
       const section = input.sections[idx]
       const errIdx = errors.findIndex(e => e.includes(section.type))
@@ -221,9 +246,17 @@ export async function executeLandingPipeline(
     }
   }
 
-  // Step 3: Import successful sections to DropPage (in original order)
+  // Summary after generation + retry
   const successfulSections = sectionsGenerated.filter(s => s && s.success)
+  const failedFinal = sectionsGenerated.filter(s => s && !s.success)
+  const elapsed = Math.round((Date.now() - pipelineStart) / 1000)
+  console.log(`[LandingPipeline] Generation complete: ${successfulSections.length}/${input.sections.length} OK, ${failedFinal.length} failed, ${elapsed}s elapsed`)
 
+  if (successfulSections.length > 0 && failedFinal.length > 0) {
+    sendEvent({ type: 'tool_result', data: { tool_name: 'pipeline_step', result: { step: `${successfulSections.length} de ${input.sections.length} banners generados. Fallaron: ${failedFinal.map(s => s.type).join(', ')}. Continuando con los que tenemos.` } } })
+  }
+
+  // Step 3: Import successful sections to DropPage (in original order)
   if (successfulSections.length === 0) {
     return { success: false, product_id: productId, sections_generated: sectionsGenerated.filter(Boolean), errors: errors.length > 0 ? errors : ['No se generó ningún banner exitosamente'] }
   }

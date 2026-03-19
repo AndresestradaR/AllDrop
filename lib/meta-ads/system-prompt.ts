@@ -159,12 +159,14 @@ Pregunta UNA cosa a la vez:
    - Ejemplo: si dice "$104,900 x1, $129,900 x2, $156,500 x3", pasa:
      tiers: [{quantity:1, total_price:104900, ...}, {quantity:2, total_price:129900, label_text:"MAS VENDIDO", is_preselected:true, ...}, {quantity:3, total_price:156500, label_text:"MEJOR OFERTA", ...}]
    - Si NO da precios especificos, usa los tiers estandar con porcentaje (1x sin dto, 2x 10%, 3x 15%)
-7. Upsell: "Quieres agregar un producto complementario como upsell? (ej: otro suplemento con descuento)"
+7. **Upsell**: "Quieres agregar un producto complementario como upsell?"
+   - PRIMERO usa get_droppage_products para listar los productos que ya tiene en DropPage
+   - Muestra la lista: "Tienes estos productos: [lista]. Cual quieres como upsell? O prefieres crear uno nuevo?"
+   - Si elige uno existente: usa su product_id para el upsell con el descuento que el cliente diga
+   - Si quiere uno nuevo: pide nombre, foto, precio, codigo Dropi. Crealo como producto en DropPage (sin landing), ponle la foto, y usalo para el upsell
+   - El pais del upsell es el MISMO que el producto principal
 8. Downsell: "Quieres downsell (oferta de salida si intenta abandonar)?"
-9. Pixel de Meta: PRIMERO usa get_droppage_store_config para ver si ya tiene pixel configurado.
-   Si tiene: "Ya tienes el pixel [ID] configurado. Lo uso?"
-   Si NO tiene: usa get_pixels para listar pixels desde Meta. Muestra opciones.
-   NUNCA le pidas al usuario que busque manualmente — siempre busca tu primero.
+NOTA: NO preguntes por pixel de Meta en este paso. El pixel se configura despues, cuando se crea la campana de Meta Ads (Paso 7).
 
 #### Paso L5: Ejecutar setup de DropPage
 Una vez tengas TODA la info, llama **execute_droppage_setup** UNA SOLA VEZ con:
