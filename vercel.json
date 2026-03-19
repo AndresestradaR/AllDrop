@@ -59,8 +59,7 @@
     }
   },
   "rewrites": [
-    { "source": "/constructor", "destination": "https://shopiestrategas.vercel.app/constructor/" },
-    { "source": "/constructor/:path*", "destination": "https://shopiestrategas.vercel.app/constructor/:path*" },
-    { "source": "/tienda/:path*", "destination": "https://shopiestrategas-i1em.vercel.app/tienda/:path*" }
+    { "source": "/constructor", "destination": "https://alldrop-shop.vercel.app/constructor/" },
+    { "source": "/constructor/:path*", "destination": "https://alldrop-shop.vercel.app/constructor/:path*" }
   ]
 }
