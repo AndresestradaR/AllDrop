@@ -1271,10 +1271,35 @@ export default function ProductGeneratePage() {
         product_photos: productPhotos.filter((p): p is string => p !== null),
       }
 
+      // Check if there's an existing landing in DropPage for this product
+      let existingDesignId: string | null = null
+      try {
+        const designsRes = await fetch('/api/minishop/import-sections', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ section_ids, metadata, check_existing: true, product_name: product?.name }),
+        })
+        if (designsRes.ok) {
+          const designsData = await designsRes.json()
+          if (designsData.existing_design_id) {
+            // Ask user: send to existing or create new?
+            const useExisting = window.confirm(
+              `Ya tienes una landing "${designsData.existing_design_title}" para este producto en DropPage.\n\n` +
+              `¿Quieres AGREGAR estos banners a esa landing?\n\n` +
+              `• OK = Agregar a la landing existente\n` +
+              `• Cancelar = Crear una landing nueva`
+            )
+            if (useExisting) {
+              existingDesignId = designsData.existing_design_id
+            }
+          }
+        }
+      } catch { /* ignore — will create new */ }
+
       const response = await fetch('/api/minishop/import-sections', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ section_ids, metadata }),
+        body: JSON.stringify({ section_ids, metadata, existing_design_id: existingDesignId }),
       })
 
       if (!response.ok) {
@@ -2143,7 +2168,23 @@ export default function ProductGeneratePage() {
                   {showSavedAngles ? <ChevronDown className="w-4 h-4 text-text-muted" /> : <ChevronRight className="w-4 h-4 text-text-muted" />}
                 </button>
                 {showSavedAngles && (
-                  <SavedAnglesPanel selectable={false} filterByProduct={product?.name} />
+                  <SavedAnglesPanel
+                    selectable={true}
+                    filterByProduct={product?.name}
+                    selectedAngleId={selectedAngleIds.size > 0 ? Array.from(selectedAngleIds)[0] : null}
+                    onSelectAngle={(angle) => {
+                      // Populate generatedAngles with the saved angle so user can generate banners
+                      const angleWithId = { ...angle, id: angle.id || `saved-${Date.now()}` }
+                      setGeneratedAngles([angleWithId])
+                      setSelectedAngleIds(new Set([angleWithId.id]))
+                      // Auto-fill creative controls from the angle
+                      setCreativeControls(prev => ({
+                        ...prev,
+                        salesAngle: angle.salesAngle || angle.hook || '',
+                        targetAvatar: angle.avatarSuggestion || '',
+                      }))
+                    }}
+                  />
                 )}
               </div>
 
