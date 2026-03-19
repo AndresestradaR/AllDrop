@@ -52,10 +52,10 @@
       "maxDuration": 60
     },
     "app/api/meta-ads/chat/route.ts": {
-      "maxDuration": 800
+      "maxDuration": 300
     },
     "app/api/meta-ads/confirm/route.ts": {
-      "maxDuration": 800
+      "maxDuration": 300
     }
   },
   "rewrites": [

@@ -13,12 +13,13 @@ function createDirectServiceClient() {
   )
 }
 
-// Max concurrent banner generations — 2 to avoid rate limiting from KIE/WaveSpeed
-const MAX_CONCURRENT = 2
+// Max concurrent banner generations — 1 to maximize success rate
+// (2 caused KIE rate limiting; manual UI does 1 at a time and works perfectly)
+const MAX_CONCURRENT = 1
 // Max time per individual banner generation (seconds)
-const BANNER_TIMEOUT_MS = 90_000  // 90s per banner
+const BANNER_TIMEOUT_MS = 120_000  // 120s per banner (same as generate-landing maxDuration)
 // Total pipeline timeout — must fit within Vercel function timeout (300s)
-const PIPELINE_TIMEOUT_MS = 240_000  // 240s = 4 min, leaves 60s for response
+const PIPELINE_TIMEOUT_MS = 250_000  // 250s, leaves 50s for Claude response
 
 export interface LandingPipelineInput {
   product_name: string
