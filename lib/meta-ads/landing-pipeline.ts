@@ -13,13 +13,10 @@ function createDirectServiceClient() {
   )
 }
 
-// Max concurrent banner generations — 1 to maximize success rate
-// (2 caused KIE rate limiting; manual UI does 1 at a time and works perfectly)
-const MAX_CONCURRENT = 1
-// Max time per individual banner generation (seconds)
-const BANNER_TIMEOUT_MS = 120_000  // 120s per banner (same as generate-landing maxDuration)
-// Total pipeline timeout — must fit within Vercel function timeout (300s)
-const PIPELINE_TIMEOUT_MS = 250_000  // 250s, leaves 50s for Claude response
+// Polling interval for checking banner completion
+const POLL_INTERVAL_MS = 20_000  // Check DB every 20s
+// Total time to wait for banners to complete
+const MAX_WAIT_MS = 240_000  // 240s max wait, leaves 60s for import + DropPage
 
 export interface LandingPipelineInput {
   product_name: string
@@ -148,114 +145,96 @@ export async function executeLandingPipeline(
     }
   }
 
-  // Step 2: Generate banners with timeout protection
+  // Step 2: Fire ALL banner requests in parallel (each runs in its own serverless function)
+  // Then poll the DB until they complete — same pattern as manual UI
   const pipelineStart = Date.now()
-  sendEvent({ type: 'tool_start', data: { tool_name: 'pipeline_step', tool_input: { step: `Generando ${input.sections.length} banners (${MAX_CONCURRENT} en paralelo, timeout ${BANNER_TIMEOUT_MS / 1000}s por banner)...` } } })
+  sendEvent({ type: 'tool_start', data: { tool_name: 'pipeline_step', tool_input: { step: `Disparando ${input.sections.length} banners en paralelo...` } } })
 
-  let completed = 0
+  // Count existing sections BEFORE we start (so we know which ones are new)
+  const serviceClientForPoll = createDirectServiceClient()
+  const { data: existingBefore } = await serviceClientForPoll
+    .from('landing_sections')
+    .select('id')
+    .eq('product_id', productId)
+    .eq('status', 'completed')
+  const existingCount = existingBefore?.length || 0
 
-  async function generateBanner(index: number) {
-    // Check total pipeline timeout
-    if (Date.now() - pipelineStart > PIPELINE_TIMEOUT_MS) {
-      sectionsGenerated[index] = { type: input.sections[index].type, section_id: '', image_url: '', success: false, error: 'Pipeline timeout' }
-      return
-    }
-
-    const section = input.sections[index]
-    sendEvent({ type: 'tool_start', data: { tool_name: 'pipeline_step', tool_input: { step: `Banner ${index + 1}/${input.sections.length}: ${section.type}...` } } })
-
-    // Wrap each banner in individual timeout
-    let bannerResult: any
-    try {
-      const timeoutPromise = new Promise<any>((_, reject) =>
-        setTimeout(() => reject(new Error(`Timeout: banner ${section.type} tardó más de ${BANNER_TIMEOUT_MS / 1000}s`)), BANNER_TIMEOUT_MS)
-      )
-      const generatePromise = estrategasTools.executeTool('generate_landing_banner', {
-        product_id: productId,
-        product_name: input.product_name,
-        template_id: section.template_id,
-        template_url: section.template_url,
-        section_type: section.type,
-        product_details: input.product_details,
-        sales_angle: input.sales_angle,
-        target_avatar: input.target_avatar,
-        additional_instructions: input.additional_instructions,
-        price_after: input.price_after,
-        price_before: input.price_before,
-        currency_symbol: input.currency_symbol,
-        target_country: input.target_country,
-        color_palette: input.color_palette,
-        colorPalette: input.colorPalette,
-        productContext: input.productContext,
-        typography: input.typography,
-      })
-      bannerResult = await Promise.race([generatePromise, timeoutPromise])
-    } catch (e: any) {
-      bannerResult = { success: false, error: e.message }
-    }
-
-    completed++
-
-    if (bannerResult.success) {
-      sectionsGenerated[index] = {
-        type: section.type,
-        section_id: bannerResult.data.section_id,
-        image_url: bannerResult.data.image_url,
-        success: true,
+  // Fire ALL banner requests simultaneously — DON'T await individual results
+  // Each fetch() creates a separate Vercel serverless function (300s each)
+  const bannerPromises = input.sections.map((section, index) => {
+    console.log(`[LandingPipeline] Firing banner ${index + 1}/${input.sections.length}: ${section.type}`)
+    // Fire and forget — we don't await the result here
+    return estrategasTools.executeTool('generate_landing_banner', {
+      product_id: productId,
+      product_name: input.product_name,
+      template_id: section.template_id,
+      template_url: section.template_url,
+      section_type: section.type,
+      product_details: input.product_details,
+      sales_angle: input.sales_angle,
+      target_avatar: input.target_avatar,
+      additional_instructions: input.additional_instructions,
+      price_after: input.price_after,
+      price_before: input.price_before,
+      currency_symbol: input.currency_symbol,
+      target_country: input.target_country,
+      color_palette: input.color_palette,
+      colorPalette: input.colorPalette,
+      productContext: input.productContext,
+      typography: input.typography,
+    }).then(result => {
+      if (result.success) {
+        sectionsGenerated[index] = {
+          type: section.type,
+          section_id: result.data.section_id,
+          image_url: result.data.image_url,
+          success: true,
+        }
+      } else {
+        sectionsGenerated[index] = {
+          type: section.type, section_id: '', image_url: '', success: false, error: result.error,
+        }
+        errors.push(`Banner ${section.type}: ${result.error}`)
       }
-      sendEvent({ type: 'tool_result', data: { tool_name: 'pipeline_step', result: { step: `Banner ${section.type} ✓ (${completed}/${input.sections.length})` } } })
-    } else {
+      return result
+    }).catch(e => {
       sectionsGenerated[index] = {
-        type: section.type,
-        section_id: '',
-        image_url: '',
-        success: false,
-        error: bannerResult.error,
+        type: section.type, section_id: '', image_url: '', success: false, error: e.message,
       }
-      errors.push(`Banner ${section.type}: ${bannerResult.error}`)
-      sendEvent({ type: 'tool_result', data: { tool_name: 'pipeline_step', result: { step: `Banner ${section.type} ✗ (${completed}/${input.sections.length})` } } })
-    }
-  }
+      errors.push(`Banner ${section.type}: ${e.message}`)
+    })
+  })
 
-  // Process in batches of MAX_CONCURRENT
-  for (let batchStart = 0; batchStart < input.sections.length; batchStart += MAX_CONCURRENT) {
-    if (Date.now() - pipelineStart > PIPELINE_TIMEOUT_MS) {
-      console.log(`[LandingPipeline] Pipeline timeout reached at batch ${batchStart}, stopping`)
-      break
-    }
-    const batchEnd = Math.min(batchStart + MAX_CONCURRENT, input.sections.length)
-    const batchIndices = Array.from({ length: batchEnd - batchStart }, (_, i) => batchStart + i)
-    await Promise.all(batchIndices.map(i => generateBanner(i)))
-  }
+  sendEvent({ type: 'tool_result', data: { tool_name: 'pipeline_step', result: { step: `${input.sections.length} banners disparados. Esperando resultados...` } } })
 
-  // Step 2.5: Retry failed banners ONE MORE TIME (only if we have time)
-  const failedIndices = sectionsGenerated
-    .map((s, i) => (s && !s.success ? i : -1))
-    .filter(i => i >= 0)
+  // Wait for all promises to resolve (they run in parallel in separate functions)
+  // But with a total timeout so we don't exceed Vercel's 300s
+  const timeoutPromise = new Promise<void>(resolve => setTimeout(resolve, MAX_WAIT_MS))
+  await Promise.race([
+    Promise.allSettled(bannerPromises),
+    timeoutPromise,
+  ])
 
-  const timeLeft = PIPELINE_TIMEOUT_MS - (Date.now() - pipelineStart)
-  if (failedIndices.length > 0 && failedIndices.length < input.sections.length && timeLeft > 30_000) {
-    sendEvent({ type: 'tool_start', data: { tool_name: 'pipeline_step', tool_input: { step: `Reintentando ${failedIndices.length} banner(s) fallidos (${Math.round(timeLeft / 1000)}s restantes)...` } } })
-    for (const idx of failedIndices) {
-      if (Date.now() - pipelineStart > PIPELINE_TIMEOUT_MS) break
-      // Remove the error from the errors array
-      const section = input.sections[idx]
-      const errIdx = errors.findIndex(e => e.includes(section.type))
-      if (errIdx >= 0) errors.splice(errIdx, 1)
-      // Retry sequentially (1 at a time)
-      await generateBanner(idx)
-    }
-  }
-
-  // Summary after generation + retry
+  // Check results
   const successfulSections = sectionsGenerated.filter(s => s && s.success)
   const failedFinal = sectionsGenerated.filter(s => s && !s.success)
+  const notStarted = input.sections.length - sectionsGenerated.filter(Boolean).length
   const elapsed = Math.round((Date.now() - pipelineStart) / 1000)
-  console.log(`[LandingPipeline] Generation complete: ${successfulSections.length}/${input.sections.length} OK, ${failedFinal.length} failed, ${elapsed}s elapsed`)
 
-  if (successfulSections.length > 0 && failedFinal.length > 0) {
-    sendEvent({ type: 'tool_result', data: { tool_name: 'pipeline_step', result: { step: `${successfulSections.length} de ${input.sections.length} banners generados. Fallaron: ${failedFinal.map(s => s.type).join(', ')}. Continuando con los que tenemos.` } } })
+  console.log(`[LandingPipeline] Results after ${elapsed}s: ${successfulSections.length} OK, ${failedFinal.length} failed, ${notStarted} not started`)
+
+  if (notStarted > 0) {
+    // Some banners didn't even return — check DB for any that completed
+    const { data: dbSections } = await serviceClientForPoll
+      .from('landing_sections')
+      .select('id, section_type, status')
+      .eq('product_id', productId)
+      .eq('status', 'completed')
+    const newCompleted = (dbSections?.length || 0) - existingCount
+    console.log(`[LandingPipeline] DB check: ${newCompleted} new completed sections found`)
   }
+
+  sendEvent({ type: 'tool_result', data: { tool_name: 'pipeline_step', result: { step: `${successfulSections.length} de ${input.sections.length} banners completados en ${elapsed}s.${failedFinal.length > 0 ? ' Fallaron: ' + failedFinal.map(s => s.type).join(', ') : ''}` } } })
 
   // Step 3: Import successful sections to DropPage (in original order)
   if (successfulSections.length === 0) {

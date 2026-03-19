@@ -111,15 +111,10 @@ El usuario ESCOGE el angulo. Guarda el angulo seleccionado para usarlo en el pip
 #### Paso L3: Preguntar secciones
 1. PREGUNTA al usuario que secciones quiere. Muestra las opciones:
    - hero, oferta, beneficios, testimonios, logistica, antes_despues, ingredientes, faq, modo_uso, tabla_comparativa, caracteristicas, comunidad
-   Ejemplo: "Que secciones quieres? Te recomiendo: hero, oferta, beneficios, testimonios y logistica (5 secciones)."
-   MAXIMO RECOMENDAR 5 SECCIONES. Si el usuario pide mas de 4, divide en 2 llamadas.
+   Ejemplo: "Que secciones quieres? Te recomiendo minimo: hero, oferta, beneficios, testimonios y logistica."
 2. Una vez confirme, usa get_templates para obtener plantillas
 3. Selecciona la mejor plantilla por categoria (no repetir)
-4. Si hay 4 o menos secciones: llama execute_landing_pipeline UNA VEZ
-   Si hay 5+: llama execute_landing_pipeline DOS VECES:
-   - Primera llamada: primeras 3-4 secciones
-   - Espera resultado, guarda el existing_product_id
-   - Segunda llamada: secciones restantes con existing_product_id (agrega al mismo producto)
+4. Llama **execute_landing_pipeline** UNA SOLA VEZ con TODAS las secciones. El pipeline las genera en paralelo (como el UI manual) — no necesitas dividir.
    Llama **execute_landing_pipeline** con toda la info:
    - product_name, product_description
    - product_details: resumen corto (max 500 chars) con beneficios clave
