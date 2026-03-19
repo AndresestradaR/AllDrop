@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Search, Filter, Package, TrendingUp, DollarSign, Loader2, ChevronLeft, ChevronRight, BarChart3, Flame, ShoppingCart, RefreshCw } from 'lucide-react'
 import toast from 'react-hot-toast'
 
-const API_URL = 'https://product-intelligence-dropi-production.up.railway.app'
+const API_URL = '/api/product-proxy'
 
 interface Product {
   id: string
