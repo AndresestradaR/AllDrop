@@ -206,23 +206,7 @@ export default function DashboardLayout({
               </div>
             </div>
 
-            {/* Admin — only for admin email */}
-            {isAdmin && (
-              <div>
-                <p className="px-3 mb-2 text-xs font-semibold text-text-secondary/70 uppercase tracking-wider">
-                  Admin
-                </p>
-                <div className="space-y-1">
-                  {adminNavigation.map((item) => (
-                    <NavLink
-                      key={item.name}
-                      item={item}
-                      healthDot={item.href === '/dashboard/admin/monitoring' ? aiHealth : undefined}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
+            {/* Admin section hidden for now */}
           </nav>
 
           {/* Logout */}
