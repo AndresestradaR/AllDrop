@@ -167,25 +167,25 @@ export default function DashboardLayout({
         'fixed top-0 left-0 z-50 h-full w-64 border-r border-border transform transition-transform duration-200 lg:translate-x-0 overflow-hidden',
         sidebarOpen ? 'translate-x-0' : '-translate-x-full'
       )}>
-        {/* Subtle animated gradient background */}
-        <div className="absolute inset-0 opacity-[0.15]">
+        {/* Animated gradient background */}
+        <div className="absolute inset-0">
           <BackgroundGradientAnimation
-            gradientBackgroundStart="rgb(10, 10, 10)"
-            gradientBackgroundEnd="rgb(15, 5, 30)"
+            gradientBackgroundStart="rgb(5, 5, 15)"
+            gradientBackgroundEnd="rgb(10, 2, 25)"
             firstColor="139, 92, 246"
-            secondColor="0, 240, 255"
-            thirdColor="139, 92, 246"
+            secondColor="0, 200, 255"
+            thirdColor="168, 85, 247"
             fourthColor="244, 63, 142"
-            fifthColor="0, 240, 255"
+            fifthColor="0, 180, 255"
             pointerColor="139, 92, 246"
-            size="100%"
-            blendingValue="screen"
+            size="120%"
+            blendingValue="hard-light"
             interactive={false}
             containerClassName="h-full w-full"
           />
         </div>
-        {/* Dark overlay to keep text readable */}
-        <div className="absolute inset-0 bg-surface/90" />
+        {/* Semi-transparent overlay to keep text readable */}
+        <div className="absolute inset-0 bg-black/70" />
         <div className="flex flex-col h-full relative z-10">
           {/* Logo */}
           <div className="flex items-center gap-3 px-6 py-5 border-b border-border/50">
