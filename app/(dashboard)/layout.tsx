@@ -8,24 +8,18 @@ import { cn } from '@/lib/utils/cn'
 import {
   Sparkles,
   LayoutDashboard,
-  GraduationCap,
   LayoutTemplate,
   PlayCircle,
   Settings,
   LogOut,
   Menu,
-  Clock,
   Target,
   Wand2,
   Store,
   Upload,
-  Zap,
-  BookOpen,
   Bot,
   Activity,
-  School,
-  MessageCircle,
-  Package,
+  BookOpen,
   TrendingUp,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -37,28 +31,23 @@ const mainNavigation = [
 ]
 
 const creatorNavigation = [
-  { name: 'Academia', href: '/dashboard/academia', icon: School, isNew: true },
-  { name: 'Coaching', href: '/dashboard/coaching', icon: GraduationCap, isNew: true },
   { name: 'Crea tu Landing', href: '/dashboard/landing', icon: LayoutTemplate },
-  { name: 'Landing Code', href: '/dashboard/landing-ia', icon: Zap, isNew: true },
   { name: 'Estudio IA', href: '/dashboard/studio', icon: Wand2, isNew: true },
   { name: 'Encuentra tu Producto Ganador', href: '/dashboard/product-research', icon: Target, isNew: true },
-  { name: 'Agente (Beta)', href: '/dashboard/meta-ads', icon: Sparkles, isNew: true },
-  { name: 'Informe Financiero', href: '/dashboard/informe-financiero', icon: TrendingUp, isNew: true },
-  { name: 'Proveedores', href: '/dashboard/proveedores', icon: Package, isNew: true },
-  { name: 'Únete a Discord', href: 'https://discord.gg/dpxM6SaUr', icon: MessageCircle, external: true },
 ]
 
-const ADMIN_EMAIL = 'trucosecomydrop@gmail.com'
+const ADMIN_EMAIL = 'infoalldrop@gmail.com'
 
 const otherNavigation = [
-  { name: 'Mi Tienda', href: '/constructor/', icon: Store, external: true },
-  { name: 'Tutorial Herramienta', href: '/dashboard/gallery', icon: PlayCircle },
+  { name: 'AllDrop Shop', href: '/constructor/', icon: Store, external: true },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
 ]
 
 const adminNavigation = [
   { name: 'Lucio', href: '/dashboard/lucio', icon: Bot, isNew: true },
+  { name: 'Agente (Beta)', href: '/dashboard/meta-ads', icon: Sparkles, isNew: true },
+  { name: 'Landing Code', href: '/dashboard/landing-ia', icon: Sparkles, isNew: true },
+  { name: 'Informe Financiero', href: '/dashboard/informe-financiero', icon: TrendingUp, isNew: true },
   { name: 'Monitoring IA', href: '/dashboard/admin/monitoring', icon: Activity },
   { name: 'Admin Plantillas', href: '/dashboard/admin/templates', icon: Upload },
   { name: 'Admin Coaching', href: '/dashboard/admin/coaching', icon: BookOpen },
@@ -73,7 +62,6 @@ export default function DashboardLayout({
   const router = useRouter()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [userEmail, setUserEmail] = useState<string | null>(null)
-  const [isMentor, setIsMentor] = useState(false)
   const [aiHealth, setAiHealth] = useState<'green' | 'yellow' | 'red' | null>(null)
 
   useEffect(() => {
@@ -81,23 +69,11 @@ export default function DashboardLayout({
     supabase.auth.getUser().then(({ data }) => {
       const email = data.user?.email || null
       setUserEmail(email)
-      if (email) {
-        supabase
-          .from('coaching_mentors')
-          .select('id')
-          .eq('email', email)
-          .eq('is_active', true)
-          .maybeSingle()
-          .then(({ data: mentor }) => {
-            setIsMentor(!!mentor)
-          })
-        // Fetch AI health indicator for admin
-        if (email === ADMIN_EMAIL) {
-          fetch('/api/admin/monitoring?action=health')
-            .then(r => r.json())
-            .then(d => setAiHealth(d.health))
-            .catch(() => {})
-        }
+      if (email && email === ADMIN_EMAIL) {
+        fetch('/api/admin/monitoring?action=health')
+          .then(r => r.json())
+          .then(d => setAiHealth(d.health))
+          .catch(() => {})
       }
     })
   }, [])
@@ -158,7 +134,7 @@ export default function DashboardLayout({
           {item.name}
         </div>
         {item.isNew && (
-          <span className="inline-flex items-center gap-1 bg-emerald-500 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full animate-pulse-glow">
+          <span className="inline-flex items-center gap-1 bg-violet-500 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full animate-pulse-glow">
             <span className="animate-bounce-left">←</span>
             Nuevo
           </span>
@@ -179,7 +155,7 @@ export default function DashboardLayout({
     <div className="min-h-screen bg-background">
       {/* Mobile sidebar backdrop */}
       {sidebarOpen && (
-        <div 
+        <div
           className="fixed inset-0 z-40 bg-black/50 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
@@ -212,10 +188,7 @@ export default function DashboardLayout({
                 Herramientas
               </p>
               <div className="space-y-1">
-                {creatorNavigation
-                  .filter(item => item.name !== 'Landing Code' || isAdmin)
-                  .filter(item => item.name !== 'Informe Financiero' || isAdmin)
-                  .map((item) => (
+                {creatorNavigation.map((item) => (
                   <NavLink key={item.name} item={item} />
                 ))}
               </div>
@@ -232,18 +205,6 @@ export default function DashboardLayout({
                 ))}
               </div>
             </div>
-
-            {/* Mentor — only if user is a coaching mentor */}
-            {isMentor && (
-              <div>
-                <p className="px-3 mb-2 text-xs font-semibold text-text-secondary/70 uppercase tracking-wider">
-                  Mentor
-                </p>
-                <div className="space-y-1">
-                  <NavLink item={{ name: 'Panel Mentor', href: '/dashboard/coaching/mentor', icon: GraduationCap }} />
-                </div>
-              </div>
-            )}
 
             {/* Admin — only for admin email */}
             {isAdmin && (
@@ -288,9 +249,7 @@ export default function DashboardLayout({
             <Menu className="w-6 h-6" />
           </button>
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center">
-              <Sparkles className="w-5 h-5 text-background" />
-            </div>
+            <img src="/images/logo.png" alt="AllDrop" className="w-8 h-8 object-contain" />
           </div>
           <div className="w-10" />
         </header>

@@ -63,18 +63,18 @@ export default async function DashboardPage() {
         </Card>
       </div>
 
-      {/* DropPage Card */}
+      {/* AllDrop Shop Card */}
       <Card>
         <CardContent className="flex items-center gap-4 pt-6">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-teal-500/10">
-            <Store className="h-6 w-6 text-teal-500" />
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-violet-500/10">
+            <Store className="h-6 w-6 text-violet-500" />
           </div>
           <div className="flex-1">
-            <h3 className="font-semibold text-text-primary">DropPage</h3>
+            <h3 className="font-semibold text-text-primary">AllDrop Shop</h3>
             <p className="text-sm text-text-secondary">Crea tu tienda online en minutos</p>
           </div>
           <Link
-            href="https://estrategasia.com/constructor/"
+            href="/constructor/"
             target="_blank"
             rel="noopener noreferrer"
           >
