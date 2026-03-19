@@ -80,7 +80,47 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { section_ids, sections, metadata } = body
+    const { section_ids, sections, metadata, check_existing, product_name, existing_design_id } = body
+
+    // Check for existing DropPage design for this product (used by "Enviar a mi editor" to detect existing landings)
+    if (check_existing && product_name) {
+      try {
+        const DROPPAGE_API = process.env.NEXT_PUBLIC_DROPPAGE_API_URL || 'https://shopiestrategas-production.up.railway.app'
+        // SSO to DropPage
+        const { createClient: createAuthClient } = await import('@/lib/supabase/server')
+        const authClient = await createAuthClient()
+        const { data: { session } } = await authClient.auth.getSession()
+        if (session?.access_token) {
+          const ssoRes = await fetch(`${DROPPAGE_API}/api/auth/sso/verify`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ access_token: session.access_token }),
+          })
+          if (ssoRes.ok) {
+            const { access_token: jwt } = await ssoRes.json()
+            const designsRes = await fetch(`${DROPPAGE_API}/api/admin/page-designs?page_type=product`, {
+              headers: { 'Authorization': `Bearer ${jwt}` },
+            })
+            if (designsRes.ok) {
+              const designs = await designsRes.json()
+              const items = designs.items || designs.data || designs || []
+              const match = items.find((d: any) =>
+                d.product_name?.toLowerCase().includes(product_name.toLowerCase()) ||
+                d.title?.toLowerCase().includes(product_name.toLowerCase())
+              )
+              if (match) {
+                return NextResponse.json({
+                  existing_design_id: match.id,
+                  existing_design_title: match.title,
+                })
+              }
+            }
+          }
+        }
+      } catch { /* ignore */ }
+      // No existing design found — return empty so frontend creates new
+      return NextResponse.json({ existing_design_id: null })
+    }
 
     let validSections: { url: string; category: string; order: number }[] = []
 
@@ -234,9 +274,14 @@ export async function POST(request: Request) {
       )
     }
 
+    // If existing_design_id provided, redirect to that design with import flag
+    const redirectUrl = existing_design_id
+      ? `/constructor/designer/${existing_design_id}?import=${bundle.id}`
+      : `/constructor/import-sections?bundle=${bundle.id}`
+
     return NextResponse.json({
       bundle_id: bundle.id,
-      redirect_url: `/constructor/import-sections?bundle=${bundle.id}`,
+      redirect_url: redirectUrl,
     })
   } catch (error: any) {
     console.error('Import sections API error:', error)
