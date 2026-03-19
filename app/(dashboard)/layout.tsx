@@ -43,7 +43,7 @@ const creatorNavigation = [
   { name: 'Landing Code', href: '/dashboard/landing-ia', icon: Zap, isNew: true },
   { name: 'Estudio IA', href: '/dashboard/studio', icon: Wand2, isNew: true },
   { name: 'Encuentra tu Producto Ganador', href: '/dashboard/product-research', icon: Target, isNew: true },
-  { name: 'Meta Ads IA', href: '/dashboard/meta-ads', icon: Sparkles, isNew: true },
+  { name: 'Agente (Beta)', href: '/dashboard/meta-ads', icon: Sparkles, isNew: true },
   { name: 'Informe Financiero', href: '/dashboard/informe-financiero', icon: TrendingUp, isNew: true },
   { name: 'Proveedores', href: '/dashboard/proveedores', icon: Package, isNew: true },
   { name: 'Únete a Discord', href: 'https://discord.gg/dpxM6SaUr', icon: MessageCircle, external: true },
