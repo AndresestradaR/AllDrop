@@ -50,6 +50,12 @@
     },
     "app/api/studio/ebook/outline/route.ts": {
       "maxDuration": 60
+    },
+    "app/api/meta-ads/chat/route.ts": {
+      "maxDuration": 800
+    },
+    "app/api/meta-ads/confirm/route.ts": {
+      "maxDuration": 800
     }
   },
   "rewrites": [
