@@ -7,22 +7,22 @@
   ],
   "functions": {
     "app/api/studio/generate-image/route.ts": {
-      "maxDuration": 120
+      "maxDuration": 60
     },
     "app/api/studio/generate-video/route.ts": {
-      "maxDuration": 120
+      "maxDuration": 60
     },
     "app/api/studio/tools/route.ts": {
-      "maxDuration": 120
+      "maxDuration": 60
     },
     "app/api/cron/automations/route.ts": {
-      "maxDuration": 120
+      "maxDuration": 60
     },
     "app/api/generate-landing/route.ts": {
-      "maxDuration": 300
+      "maxDuration": 60
     },
     "app/api/generate/route.ts": {
-      "maxDuration": 120
+      "maxDuration": 60
     },
     "app/api/edit-section/route.ts": {
       "maxDuration": 60
@@ -31,19 +31,19 @@
       "maxDuration": 30
     },
     "app/api/competitor-analysis/route.ts": {
-      "maxDuration": 120
+      "maxDuration": 60
     },
     "app/api/minishop/import-sections/route.ts": {
       "maxDuration": 60
     },
     "app/api/landing-ia/stream/route.ts": {
-      "maxDuration": 120
+      "maxDuration": 60
     },
     "app/api/landing-ia/scrape/route.ts": {
       "maxDuration": 60
     },
     "app/api/studio/ebook/generate/route.ts": {
-      "maxDuration": 300
+      "maxDuration": 60
     },
     "app/api/studio/ebook/analyze/route.ts": {
       "maxDuration": 60
@@ -52,10 +52,10 @@
       "maxDuration": 60
     },
     "app/api/meta-ads/chat/route.ts": {
-      "maxDuration": 300
+      "maxDuration": 60
     },
     "app/api/meta-ads/confirm/route.ts": {
-      "maxDuration": 300
+      "maxDuration": 60
     }
   },
   "rewrites": [
