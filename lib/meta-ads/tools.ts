@@ -5,10 +5,11 @@ export type AgentPhase = 'initial' | 'landing_creation' | 'droppage_setup' | 'me
 
 // Tools needed per phase (names only — matched against META_ADS_TOOLS)
 const PHASE_TOOLS: Record<AgentPhase, string[]> = {
-  // Initial: basic discovery + pipelines only (no individual banner/import tools)
+  // Initial: basic discovery + landing start
   initial: [
     'get_ad_accounts', 'get_my_products', 'get_pages',
-    'upload_product_image', 'get_templates', 'get_landing_sections',
+    'create_estrategas_product', 'upload_product_image', 'get_templates',
+    'generate_landing_banner', 'get_landing_sections', 'import_sections_to_droppage',
     'execute_landing_pipeline', 'execute_droppage_setup',
     'get_droppage_domains', 'get_droppage_products',
   ],
