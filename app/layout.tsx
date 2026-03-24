@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Toaster } from 'react-hot-toast'
+import { I18nProvider } from '@/lib/i18n'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -22,6 +23,7 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body className="min-h-screen bg-background text-text-primary antialiased">
+        <I18nProvider>
         {children}
         <Toaster
           position="bottom-right"
@@ -49,6 +51,7 @@ export default function RootLayout({
             },
           }}
         />
+        </I18nProvider>
       </body>
     </html>
   )

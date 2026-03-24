@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button, Input, Card } from '@/components/ui'
+import { useI18n } from '@/lib/i18n'
 import { Plus, Trash2, LayoutTemplate, Loader2, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -19,6 +20,7 @@ interface Product {
 
 export default function LandingPage() {
   const router = useRouter()
+  const { t } = useI18n()
   const [products, setProducts] = useState<Product[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -45,7 +47,7 @@ export default function LandingPage() {
 
   const handleCreateProduct = async () => {
     if (!newProduct.name.trim()) {
-      toast.error('Ingresa el nombre del producto')
+      toast.error(t.landing.nameRequired)
       return
     }
 
@@ -60,24 +62,24 @@ export default function LandingPage() {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || 'Error al crear producto')
+        throw new Error(data.error || t.landing.createError)
       }
 
-      toast.success('Producto creado')
+      toast.success(t.landing.productCreated)
       setIsModalOpen(false)
       setNewProduct({ name: '', description: '' })
-      
+
       // Navegar a la página de generación del producto
       router.push(`/dashboard/landing/${data.product.id}`)
     } catch (error: any) {
-      toast.error(error.message || 'Error al crear producto')
+      toast.error(error.message || t.landing.createError)
     } finally {
       setIsCreating(false)
     }
   }
 
   const handleDeleteProduct = async (productId: string) => {
-    if (!confirm('¿Eliminar este producto y todas sus secciones?')) return
+    if (!confirm(t.landing.deleteConfirm)) return
 
     try {
       const response = await fetch(`/api/products/${productId}`, {
@@ -85,13 +87,13 @@ export default function LandingPage() {
       })
 
       if (!response.ok) {
-        throw new Error('Error al eliminar')
+        throw new Error(t.landing.deleteError)
       }
 
-      toast.success('Producto eliminado')
+      toast.success(t.landing.productDeleted)
       fetchProducts()
     } catch (error) {
-      toast.error('Error al eliminar producto')
+      toast.error(t.landing.deleteError)
     }
   }
 
@@ -108,14 +110,14 @@ export default function LandingPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-text-primary">Crea tu Landing</h1>
+          <h1 className="text-2xl font-bold text-text-primary">{t.landing.title}</h1>
           <p className="text-text-secondary mt-1">
-            Organiza tus productos y genera secciones de landing profesionales con IA
+            {t.landing.subtitle}
           </p>
         </div>
         <Button onClick={() => setIsModalOpen(true)} className="gap-2">
           <Plus className="w-5 h-5" />
-          Nueva Landing
+          {t.landing.newLanding}
         </Button>
       </div>
 
@@ -126,29 +128,29 @@ export default function LandingPage() {
             <LayoutTemplate className="w-8 h-8 text-accent" />
           </div>
           <h3 className="text-lg font-semibold text-text-primary mb-2">
-            No tienes productos aún
+            {t.landing.noProducts}
           </h3>
           <p className="text-text-secondary mb-6 max-w-md mx-auto">
-            Crea tu primer producto para comenzar a generar secciones de landing con IA
+            {t.landing.createFirstDesc}
           </p>
           <Button onClick={() => setIsModalOpen(true)} className="gap-2">
             <Plus className="w-5 h-5" />
-            Crear mi primer producto
+            {t.landing.createFirst}
           </Button>
         </Card>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {products.map((product) => (
-            <Card 
-              key={product.id} 
+            <Card
+              key={product.id}
               className="group relative overflow-hidden cursor-pointer hover:border-accent/50 transition-colors"
               onClick={() => router.push(`/dashboard/landing/${product.id}`)}
             >
               {/* Product Image */}
               <div className="aspect-square bg-gradient-to-br from-accent/5 to-accent/10 flex items-center justify-center">
                 {product.image_url ? (
-                  <img 
-                    src={product.image_url} 
+                  <img
+                    src={product.image_url}
                     alt={product.name}
                     className="w-full h-full object-cover"
                   />
@@ -163,7 +165,7 @@ export default function LandingPage() {
                   {product.name}
                 </h3>
                 <p className="text-sm text-text-secondary mt-1">
-                  {product.sections_count} {product.sections_count === 1 ? 'sección' : 'secciones'}
+                  {product.sections_count} {product.sections_count === 1 ? t.landing.section : t.landing.sections}
                 </p>
               </div>
 
@@ -181,15 +183,15 @@ export default function LandingPage() {
           ))}
 
           {/* Add New Product Card */}
-          <Card 
+          <Card
             className="aspect-square flex flex-col items-center justify-center cursor-pointer border-dashed hover:border-accent/50 hover:bg-accent/5 transition-colors"
             onClick={() => setIsModalOpen(true)}
           >
             <div className="w-12 h-12 bg-accent/10 rounded-xl flex items-center justify-center mb-3">
               <Plus className="w-6 h-6 text-accent" />
             </div>
-            <p className="font-medium text-text-primary">Agregar producto</p>
-            <p className="text-sm text-text-secondary">Crea un nuevo producto</p>
+            <p className="font-medium text-text-primary">{t.landing.addProduct}</p>
+            <p className="text-sm text-text-secondary">{t.landing.createNew}</p>
           </Card>
         </div>
       )}
@@ -197,7 +199,7 @@ export default function LandingPage() {
       {/* Create Product Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div 
+          <div
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={() => setIsModalOpen(false)}
           />
@@ -210,16 +212,16 @@ export default function LandingPage() {
             </button>
 
             <h2 className="text-xl font-bold text-text-primary mb-1">
-              Crear Nuevo Producto
+              {t.landing.createProduct}
             </h2>
             <p className="text-text-secondary text-sm mb-6">
-              Ingresa los detalles del producto para comenzar a generar secciones de landing
+              {t.landing.productDetails}
             </p>
 
             <div className="space-y-4">
               <Input
-                label="Nombre del Producto"
-                placeholder="Ej: Suplemento Vitamínico"
+                label={t.landing.productName}
+                placeholder={t.landing.productPlaceholder}
                 value={newProduct.name}
                 onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
                 autoFocus
@@ -227,10 +229,10 @@ export default function LandingPage() {
 
               <div>
                 <label className="block text-sm font-medium text-text-primary mb-1.5">
-                  Descripción <span className="text-text-secondary font-normal">(opcional)</span>
+                  {t.landing.description} <span className="text-text-secondary font-normal">({t.landing.optional})</span>
                 </label>
                 <textarea
-                  placeholder="Describe brevemente el producto..."
+                  placeholder={t.landing.descPlaceholder}
                   value={newProduct.description}
                   onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })}
                   className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent resize-none"
@@ -244,14 +246,14 @@ export default function LandingPage() {
                   className="flex-1"
                   onClick={() => setIsModalOpen(false)}
                 >
-                  Cancelar
+                  {t.landing.cancel}
                 </Button>
                 <Button
                   className="flex-1"
                   onClick={handleCreateProduct}
                   isLoading={isCreating}
                 >
-                  Crear Producto
+                  {t.landing.create}
                 </Button>
               </div>
             </div>

@@ -8,9 +8,11 @@ import { AudioGenerator } from '@/components/studio/AudioGenerator'
 import { CopyOptimizer } from '@/components/studio/CopyOptimizer'
 import { ToolsGrid } from '@/components/studio/ToolsGrid'
 import { DropshippingGrid } from '@/components/studio/DropshippingGrid'
+import { useI18n } from '@/lib/i18n'
 import { Wand2 } from 'lucide-react'
 
 export default function StudioPage() {
+  const { t } = useI18n()
   const [activeTab, setActiveTab] = useState<StudioTab>('imagen')
 
   return (
@@ -22,9 +24,9 @@ export default function StudioPage() {
             <Wand2 className="w-5 h-5 text-accent" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-text-primary">Estudio IA</h1>
+            <h1 className="text-2xl font-bold text-text-primary">{t.studio.title}</h1>
             <p className="text-sm text-text-secondary">
-              Crea imagenes, videos y mas con inteligencia artificial
+              {t.studio.subtitle}
             </p>
           </div>
         </div>

@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils/cn'
+import { useI18n, LOCALES } from '@/lib/i18n'
 import { BackgroundGradientAnimation } from '@/components/ui/background-gradient-animation'
 import {
   Sparkles,
@@ -22,37 +23,14 @@ import {
   Activity,
   BookOpen,
   TrendingUp,
+  Globe,
+  ChevronDown,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export const dynamic = 'force-dynamic'
 
-const mainNavigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-]
-
-const creatorNavigation = [
-  { name: 'Crea tu Landing', href: '/dashboard/landing', icon: LayoutTemplate },
-  { name: 'Estudio IA', href: '/dashboard/studio', icon: Wand2, isNew: true },
-  { name: 'Encuentra tu Producto Ganador', href: '/dashboard/product-research', icon: Target, isNew: true },
-]
-
 const ADMIN_EMAIL = 'infoalldrop@gmail.com'
-
-const otherNavigation = [
-  { name: 'AllDrop Shop', href: '/constructor/', icon: Store, external: true },
-  { name: 'Settings', href: '/dashboard/settings', icon: Settings },
-]
-
-const adminNavigation = [
-  { name: 'Lucio', href: '/dashboard/lucio', icon: Bot, isNew: true },
-  { name: 'Agente (Beta)', href: '/dashboard/meta-ads', icon: Sparkles, isNew: true },
-  { name: 'Landing Code', href: '/dashboard/landing-ia', icon: Sparkles, isNew: true },
-  { name: 'Informe Financiero', href: '/dashboard/informe-financiero', icon: TrendingUp, isNew: true },
-  { name: 'Monitoring IA', href: '/dashboard/admin/monitoring', icon: Activity },
-  { name: 'Admin Plantillas', href: '/dashboard/admin/templates', icon: Upload },
-  { name: 'Admin Coaching', href: '/dashboard/admin/coaching', icon: BookOpen },
-]
 
 export default function DashboardLayout({
   children,
@@ -61,9 +39,37 @@ export default function DashboardLayout({
 }) {
   const pathname = usePathname()
   const router = useRouter()
+  const { t, locale, setLocale } = useI18n()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [aiHealth, setAiHealth] = useState<'green' | 'yellow' | 'red' | null>(null)
+  const [langOpen, setLangOpen] = useState(false)
+  const langRef = useRef<HTMLDivElement>(null)
+
+  const mainNavigation = [
+    { name: t.nav.dashboard, href: '/dashboard', icon: LayoutDashboard },
+  ]
+
+  const creatorNavigation = [
+    { name: t.nav.createLanding, href: '/dashboard/landing', icon: LayoutTemplate },
+    { name: t.nav.studioIA, href: '/dashboard/studio', icon: Wand2, isNew: true },
+    { name: t.nav.findProduct, href: '/dashboard/product-research', icon: Target, isNew: true },
+  ]
+
+  const otherNavigation = [
+    { name: t.nav.allDropShop, href: '/constructor/', icon: Store, external: true },
+    { name: t.nav.settings, href: '/dashboard/settings', icon: Settings },
+  ]
+
+  const adminNavigation = [
+    { name: 'Lucio', href: '/dashboard/lucio', icon: Bot, isNew: true },
+    { name: 'Agente (Beta)', href: '/dashboard/meta-ads', icon: Sparkles, isNew: true },
+    { name: 'Landing Code', href: '/dashboard/landing-ia', icon: Sparkles, isNew: true },
+    { name: 'Informe Financiero', href: '/dashboard/informe-financiero', icon: TrendingUp, isNew: true },
+    { name: 'Monitoring IA', href: '/dashboard/admin/monitoring', icon: Activity },
+    { name: 'Admin Plantillas', href: '/dashboard/admin/templates', icon: Upload },
+    { name: 'Admin Coaching', href: '/dashboard/admin/coaching', icon: BookOpen },
+  ]
 
   useEffect(() => {
     const supabase = createClient()
@@ -79,17 +85,30 @@ export default function DashboardLayout({
     })
   }, [])
 
+  // Close language dropdown on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (langRef.current && !langRef.current.contains(e.target as Node)) {
+        setLangOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
   const isAdmin = userEmail === ADMIN_EMAIL
 
   const handleLogout = async () => {
     const supabase = createClient()
     await supabase.auth.signOut()
-    toast.success('Sesión cerrada')
+    toast.success(t.common.logoutSuccess)
     router.push('/login')
     router.refresh()
   }
 
-  const NavLink = ({ item, healthDot }: { item: typeof mainNavigation[0] & { soon?: boolean; isNew?: boolean; external?: boolean }, healthDot?: 'green' | 'yellow' | 'red' | null }) => {
+  const currentLocale = LOCALES.find(l => l.code === locale)
+
+  const NavLink = ({ item, healthDot }: { item: { name: string; href: string; icon: any; soon?: boolean; isNew?: boolean; external?: boolean }, healthDot?: 'green' | 'yellow' | 'red' | null }) => {
     const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
 
     if (item.soon) {
@@ -99,7 +118,7 @@ export default function DashboardLayout({
             <item.icon className="w-5 h-5" />
             {item.name}
           </div>
-          <span className="text-xs bg-border/50 px-2 py-0.5 rounded text-text-secondary/70">Pronto</span>
+          <span className="text-xs bg-border/50 px-2 py-0.5 rounded text-text-secondary/70">{t.nav.soon}</span>
         </div>
       )
     }
@@ -137,7 +156,7 @@ export default function DashboardLayout({
         {item.isNew && (
           <span className="inline-flex items-center gap-1 bg-violet-500 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full animate-pulse-glow">
             <span className="animate-bounce-left">←</span>
-            Nuevo
+            {t.nav.new}
           </span>
         )}
         {healthDot && (
@@ -198,18 +217,18 @@ export default function DashboardLayout({
             {/* Main */}
             <div className="space-y-1">
               {mainNavigation.map((item) => (
-                <NavLink key={item.name} item={item} />
+                <NavLink key={item.href} item={item} />
               ))}
             </div>
 
             {/* Creator Tools */}
             <div>
               <p className="px-3 mb-2 text-xs font-semibold text-text-secondary/70 uppercase tracking-wider">
-                Herramientas
+                {t.nav.tools}
               </p>
               <div className="space-y-1">
                 {creatorNavigation.map((item) => (
-                  <NavLink key={item.name} item={item} />
+                  <NavLink key={item.href} item={item} />
                 ))}
               </div>
             </div>
@@ -217,11 +236,11 @@ export default function DashboardLayout({
             {/* Other */}
             <div>
               <p className="px-3 mb-2 text-xs font-semibold text-text-secondary/70 uppercase tracking-wider">
-                Cuenta
+                {t.nav.account}
               </p>
               <div className="space-y-1">
                 {otherNavigation.map((item) => (
-                  <NavLink key={item.name} item={item} />
+                  <NavLink key={item.href} item={item} />
                 ))}
               </div>
             </div>
@@ -229,14 +248,52 @@ export default function DashboardLayout({
             {/* Admin section hidden for now */}
           </nav>
 
-          {/* Logout */}
-          <div className="p-4 border-t border-border">
+          {/* Language selector + Logout */}
+          <div className="p-4 border-t border-border space-y-2">
+            {/* Language selector */}
+            <div ref={langRef} className="relative">
+              <button
+                onClick={() => setLangOpen(!langOpen)}
+                className="flex items-center justify-between w-full px-3 py-2.5 rounded-lg text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-border/50 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <Globe className="w-5 h-5" />
+                  <span>{currentLocale?.flag} {currentLocale?.name}</span>
+                </div>
+                <ChevronDown className={cn('w-4 h-4 transition-transform', langOpen && 'rotate-180')} />
+              </button>
+
+              {langOpen && (
+                <div className="absolute bottom-full left-0 right-0 mb-1 bg-[#1a1a2e] border border-border rounded-lg shadow-xl overflow-hidden">
+                  {LOCALES.map((l) => (
+                    <button
+                      key={l.code}
+                      onClick={() => {
+                        setLocale(l.code)
+                        setLangOpen(false)
+                      }}
+                      className={cn(
+                        'flex items-center gap-3 w-full px-3 py-2.5 text-sm transition-colors',
+                        locale === l.code
+                          ? 'bg-accent/10 text-accent font-medium'
+                          : 'text-text-secondary hover:text-text-primary hover:bg-border/50'
+                      )}
+                    >
+                      <span className="text-base">{l.flag}</span>
+                      {l.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Logout */}
             <button
               onClick={handleLogout}
               className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-text-secondary hover:text-error hover:bg-error/10 transition-colors"
             >
               <LogOut className="w-5 h-5" />
-              Cerrar Sesión
+              {t.nav.logout}
             </button>
           </div>
         </div>

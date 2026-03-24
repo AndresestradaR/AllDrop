@@ -3,8 +3,9 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { useI18n, LOCALES } from '@/lib/i18n'
 import { Button, Input, Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui'
-import { Sparkles, ArrowLeft } from 'lucide-react'
+import { Sparkles, ArrowLeft, Globe, ChevronDown } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export const dynamic = 'force-dynamic'
@@ -13,16 +14,20 @@ type Step = 'email' | 'otp'
 
 export default function LoginPage() {
   const router = useRouter()
+  const { t, locale, setLocale } = useI18n()
   const [step, setStep] = useState<Step>('email')
   const [isLoading, setIsLoading] = useState(false)
   const [email, setEmail] = useState('')
   const [otp, setOtp] = useState('')
+  const [langOpen, setLangOpen] = useState(false)
+
+  const currentLocale = LOCALES.find(l => l.code === locale)
 
   const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!email.trim()) {
-      toast.error('Ingresa tu correo')
+      toast.error(t.login.enterEmailError)
       return
     }
 
@@ -39,7 +44,7 @@ export default function LoginPage() {
       const data = await response.json()
 
       if (!response.ok) {
-        toast.error(data.error || 'Error al verificar email')
+        toast.error(data.error || t.login.verifyEmailError)
         return
       }
 
@@ -57,10 +62,10 @@ export default function LoginPage() {
         return
       }
 
-      toast.success('¡Código enviado! Revisa tu correo')
+      toast.success(t.login.codeSent)
       setStep('otp')
     } catch (error) {
-      toast.error('Error al enviar código')
+      toast.error(t.login.sendError)
     } finally {
       setIsLoading(false)
     }
@@ -68,9 +73,9 @@ export default function LoginPage() {
 
   const handleVerifyOTP = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!otp.trim()) {
-      toast.error('Ingresa el código')
+      toast.error(t.login.enterCodeError)
       return
     }
 
@@ -85,15 +90,15 @@ export default function LoginPage() {
       })
 
       if (error) {
-        toast.error('Código inválido o expirado')
+        toast.error(t.login.invalidCode)
         return
       }
 
-      toast.success('¡Bienvenido!')
+      toast.success(t.login.welcomeBack)
       router.push('/dashboard')
       router.refresh()
     } catch (error) {
-      toast.error('Error al verificar código')
+      toast.error(t.login.verifyError)
     } finally {
       setIsLoading(false)
     }
@@ -112,9 +117,9 @@ export default function LoginPage() {
         return
       }
 
-      toast.success('Código reenviado')
+      toast.success(t.login.codeResent)
     } catch (error) {
-      toast.error('Error al reenviar')
+      toast.error(t.login.resendError)
     } finally {
       setIsLoading(false)
     }
@@ -133,38 +138,38 @@ export default function LoginPage() {
           {step === 'email' ? (
             <>
               <CardHeader className="text-center">
-                <CardTitle className="text-2xl">Bienvenido</CardTitle>
+                <CardTitle className="text-2xl">{t.login.welcome}</CardTitle>
                 <CardDescription>
-                  Ingresa tu correo para recibir un código de acceso
+                  {t.login.enterEmail}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSendOTP} className="space-y-4">
                   <Input
                     type="email"
-                    label="Correo electrónico"
-                    placeholder="tu@email.com"
+                    label={t.login.emailLabel}
+                    placeholder={t.login.emailPlaceholder}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
                     autoFocus
                   />
                   <Button type="submit" className="w-full" isLoading={isLoading}>
-                    Enviar código
+                    {t.login.sendCode}
                   </Button>
                 </form>
 
                 <p className="text-center text-xs text-text-secondary mt-6">
-                  Solo miembros de AllDrop pueden acceder
+                  {t.login.membersOnly}
                 </p>
               </CardContent>
             </>
           ) : (
             <>
               <CardHeader className="text-center">
-                <CardTitle className="text-2xl">Ingresa el código</CardTitle>
+                <CardTitle className="text-2xl">{t.login.enterCode}</CardTitle>
                 <CardDescription>
-                  Enviamos un código a<br />
+                  {t.login.sentCodeTo}<br />
                   <span className="text-text-primary font-medium">{email}</span>
                 </CardDescription>
               </CardHeader>
@@ -172,8 +177,8 @@ export default function LoginPage() {
                 <form onSubmit={handleVerifyOTP} className="space-y-4">
                   <Input
                     type="text"
-                    label="Código de verificación"
-                    placeholder="Ingresa el código del correo"
+                    label={t.login.codeLabel}
+                    placeholder={t.login.codePlaceholder}
                     value={otp}
                     onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
                     required
@@ -181,7 +186,7 @@ export default function LoginPage() {
                     className="text-center text-xl tracking-widest"
                   />
                   <Button type="submit" className="w-full" isLoading={isLoading}>
-                    Verificar código
+                    {t.login.verifyCode}
                   </Button>
                 </form>
 
@@ -192,7 +197,7 @@ export default function LoginPage() {
                     className="flex items-center gap-1 text-sm text-text-secondary hover:text-text-primary transition-colors"
                   >
                     <ArrowLeft className="w-4 h-4" />
-                    Cambiar correo
+                    {t.login.changeEmail}
                   </button>
                   <button
                     type="button"
@@ -200,13 +205,49 @@ export default function LoginPage() {
                     disabled={isLoading}
                     className="text-sm text-accent hover:text-accent-hover transition-colors disabled:opacity-50"
                   >
-                    Reenviar código
+                    {t.login.resendCode}
                   </button>
                 </div>
               </CardContent>
             </>
           )}
         </Card>
+
+        {/* Language selector at bottom of login */}
+        <div className="flex justify-center mt-6">
+          <div className="relative">
+            <button
+              onClick={() => setLangOpen(!langOpen)}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-text-secondary hover:text-text-primary transition-colors"
+            >
+              <Globe className="w-4 h-4" />
+              <span>{currentLocale?.flag} {currentLocale?.name}</span>
+              <ChevronDown className={`w-3 h-3 transition-transform ${langOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {langOpen && (
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 bg-surface border border-border rounded-lg shadow-xl overflow-hidden min-w-[160px]">
+                {LOCALES.map((l) => (
+                  <button
+                    key={l.code}
+                    onClick={() => {
+                      setLocale(l.code)
+                      setLangOpen(false)
+                    }}
+                    className={`flex items-center gap-3 w-full px-3 py-2.5 text-sm transition-colors ${
+                      locale === l.code
+                        ? 'bg-accent/10 text-accent font-medium'
+                        : 'text-text-secondary hover:text-text-primary hover:bg-border/50'
+                    }`}
+                  >
+                    <span className="text-base">{l.flag}</span>
+                    {l.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   )
