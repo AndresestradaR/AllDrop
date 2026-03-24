@@ -1,6 +1,8 @@
 import { Resend } from 'resend'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+function getResend() {
+  return new Resend(process.env.RESEND_API_KEY)
+}
 
 const NOTIFICATION_EMAIL = 'trucosecomydrop@gmail.com'
 
@@ -18,7 +20,7 @@ interface BookingDetails {
 export async function sendBookingNotification(booking: BookingDetails) {
   const hourFormatted = `${booking.slotHour}:00 - ${booking.slotHour + 1}:00`
 
-  const { error } = await resend.emails.send({
+  const { error } = await getResend().emails.send({
     from: 'Estrategas IA <noreply@estrategasia.com>',
     to: [NOTIFICATION_EMAIL, 'notificaciones@estrategasia.com', booking.mentorEmail],
     subject: `Nueva Reserva de Coaching — ${booking.topic}`,

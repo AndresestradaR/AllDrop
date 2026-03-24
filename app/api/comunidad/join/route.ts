@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+function getResend() {
+  return new Resend(process.env.RESEND_API_KEY)
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -53,7 +55,7 @@ export async function POST(req: NextRequest) {
       </div>
     `
 
-    const { error } = await resend.emails.send({
+    const { error } = await getResend().emails.send({
       from: 'Estrategas IA <noreply@estrategasia.com>',
       to: ['Leydi.bello@dropi.co', 'gabriela.marrero@dropi.co'],
       cc: ['notificaciones@estrategasia.com'],
