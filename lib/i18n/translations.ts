@@ -133,6 +133,17 @@ const _translations = {
       title: 'Estudio IA',
       subtitle: 'Crea imagenes, videos y mas con inteligencia artificial',
     },
+    // Editor (landing/[id])
+    editor: {
+      aiModel: 'Modelo de IA',
+      supportsImages: 'Soporta imágenes',
+      aspectRatio: 'Aspect ratio',
+      async: 'Async',
+      subtitles: 'Subtitulos',
+      bodyText: 'Textos',
+      example: 'Ejemplo',
+      headings: 'Titulares',
+    },
     // Country selector
     country: {
       targetCountry: 'País destino del anuncio',
@@ -254,6 +265,16 @@ const _translations = {
       title: 'AI Studio',
       subtitle: 'Create images, videos and more with artificial intelligence',
     },
+    editor: {
+      aiModel: 'AI Model',
+      supportsImages: 'Supports images',
+      aspectRatio: 'Aspect ratio',
+      async: 'Async',
+      subtitles: 'Subtitles',
+      bodyText: 'Body text',
+      example: 'Example',
+      headings: 'Headings',
+    },
     country: {
       targetCountry: 'Target country for ads',
       country: 'Country',
@@ -372,6 +393,16 @@ const _translations = {
     studio: {
       title: 'Studio IA',
       subtitle: "Créez des images, vidéos et plus avec l'intelligence artificielle",
+    },
+    editor: {
+      aiModel: 'Modèle IA',
+      supportsImages: 'Supporte les images',
+      aspectRatio: 'Format',
+      async: 'Async',
+      subtitles: 'Sous-titres',
+      bodyText: 'Textes',
+      example: 'Exemple',
+      headings: 'Titres',
     },
     country: {
       targetCountry: 'Pays cible de la publicité',
@@ -492,6 +523,16 @@ const _translations = {
       title: 'Studio IA',
       subtitle: "Crea immagini, video e altro con l'intelligenza artificiale",
     },
+    editor: {
+      aiModel: 'Modello IA',
+      supportsImages: 'Supporta immagini',
+      aspectRatio: 'Formato',
+      async: 'Async',
+      subtitles: 'Sottotitoli',
+      bodyText: 'Testi',
+      example: 'Esempio',
+      headings: 'Titoli',
+    },
     country: {
       targetCountry: 'Paese target della pubblicità',
       country: 'Paese',
@@ -611,6 +652,16 @@ const _translations = {
       title: 'Estúdio IA',
       subtitle: 'Crie imagens, vídeos e mais com inteligência artificial',
     },
+    editor: {
+      aiModel: 'Modelo IA',
+      supportsImages: 'Suporta imagens',
+      aspectRatio: 'Proporção',
+      async: 'Async',
+      subtitles: 'Subtítulos',
+      bodyText: 'Textos',
+      example: 'Exemplo',
+      headings: 'Títulos',
+    },
     country: {
       targetCountry: 'País alvo do anúncio',
       country: 'País',
@@ -729,6 +780,16 @@ const _translations = {
     studio: {
       title: 'KI-Studio',
       subtitle: 'Erstellen Sie Bilder, Videos und mehr mit künstlicher Intelligenz',
+    },
+    editor: {
+      aiModel: 'KI-Modell',
+      supportsImages: 'Unterstützt Bilder',
+      aspectRatio: 'Seitenverhältnis',
+      async: 'Async',
+      subtitles: 'Untertitel',
+      bodyText: 'Texte',
+      example: 'Beispiel',
+      headings: 'Überschriften',
     },
     country: {
       targetCountry: 'Zielland der Werbung',

@@ -12,6 +12,7 @@ import {
   STUDIO_COMPANY_GROUPS,
   ModelTag,
 } from '@/lib/image-providers/types'
+import { useI18n } from '@/lib/i18n'
 
 interface ApiKeyStatus {
   google: boolean
@@ -58,6 +59,7 @@ export default function ModelSelector({
   apiKeyStatus,
   context = 'landing', // Default to landing (filtered models)
 }: ModelSelectorProps) {
+  const { t } = useI18n()
   const [isOpen, setIsOpen] = useState(false)
   const selectedModel = IMAGE_MODELS[value]
 
@@ -88,7 +90,7 @@ export default function ModelSelector({
     <div className="relative">
       <label className="flex items-center gap-2 text-sm font-medium text-text-primary mb-2">
         <Sparkles className="w-4 h-4 text-accent" />
-        Modelo de IA
+        {t.editor.aiModel}
       </label>
 
       <button
@@ -252,7 +254,7 @@ export default function ModelSelector({
       <div className="flex flex-wrap gap-2 mt-2">
         {selectedModel.supportsImageInput && (
           <span className="px-2 py-0.5 bg-accent/10 text-accent text-xs rounded-full">
-            Soporta imágenes
+            {t.editor.supportsImages}
           </span>
         )}
         {selectedModel.supportsAspectRatio && (
@@ -286,6 +288,8 @@ export function ModelSelectorGrid({
     ? baseGroups.filter((g) => availableProviders.includes(g.id))
     : baseGroups
 
+  const { t } = useI18n()
+
   const hasApiKey = (company: ImageProviderCompany): boolean => {
     if (!apiKeyStatus) return true
     return apiKeyStatus[company]
@@ -295,7 +299,7 @@ export function ModelSelectorGrid({
     <div className="space-y-4">
       <label className="flex items-center gap-2 text-sm font-medium text-text-primary">
         <Sparkles className="w-4 h-4 text-accent" />
-        Modelo de IA
+        {t.editor.aiModel}
       </label>
 
       {filteredGroups.map((group) => {

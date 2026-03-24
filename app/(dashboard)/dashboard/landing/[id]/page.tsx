@@ -40,6 +40,7 @@ import CountrySelector from '@/components/generator/CountrySelector'
 import PricingControls, { PricingData, getDefaultPricingData } from '@/components/generator/PricingControls'
 import { ImageModelId, modelIdToProviderType } from '@/lib/image-providers/types'
 import { Country, COUNTRIES, getDefaultCountry } from '@/lib/constants/countries'
+import { useI18n } from '@/lib/i18n'
 
 export const dynamic = 'force-dynamic'
 
@@ -114,6 +115,7 @@ interface GeneratedSection {
 export default function ProductGeneratePage() {
   const params = useParams()
   const router = useRouter()
+  const { t, countryName } = useI18n()
   const productId = params.id as string
   
   const [product, setProduct] = useState<Product | null>(null)
@@ -1643,12 +1645,12 @@ export default function ProductGeneratePage() {
           {/* Typography - 3 independent dropdowns */}
           <div>
             <label className="text-xs font-medium text-text-secondary uppercase tracking-wider mb-3 block">
-              Tipografia
+              Typography
             </label>
 
             {/* Titles */}
             <div className="mb-3">
-              <span className="text-xs text-text-secondary mb-1.5 block">Titulos</span>
+              <span className="text-xs text-text-secondary mb-1.5 block">{t.editor.headings}</span>
               <div className="flex items-center gap-3">
                 <div className="relative flex-1">
                   <select
@@ -1671,7 +1673,7 @@ export default function ProductGeneratePage() {
                 </div>
                 <div className="w-28 h-12 flex items-center justify-center bg-background border border-border rounded-xl flex-shrink-0">
                   <span className="text-xl text-text-primary" style={{ fontFamily: `'${FONT_CATALOG.find(f => f.id === selectedFonts.headings)?.name}', sans-serif` }}>
-                    Ejemplo
+                    {t.editor.example}
                   </span>
                 </div>
               </div>
@@ -1679,7 +1681,7 @@ export default function ProductGeneratePage() {
 
             {/* Subtitles */}
             <div className="mb-3">
-              <span className="text-xs text-text-secondary mb-1.5 block">Subtitulos</span>
+              <span className="text-xs text-text-secondary mb-1.5 block">{t.editor.subtitles}</span>
               <div className="flex items-center gap-3">
                 <div className="relative flex-1">
                   <select
@@ -1702,7 +1704,7 @@ export default function ProductGeneratePage() {
                 </div>
                 <div className="w-28 h-12 flex items-center justify-center bg-background border border-border rounded-xl flex-shrink-0">
                   <span className="text-xl text-text-primary" style={{ fontFamily: `'${FONT_CATALOG.find(f => f.id === selectedFonts.subheadings)?.name}', sans-serif` }}>
-                    Ejemplo
+                    {t.editor.example}
                   </span>
                 </div>
               </div>
@@ -1710,7 +1712,7 @@ export default function ProductGeneratePage() {
 
             {/* Body text */}
             <div>
-              <span className="text-xs text-text-secondary mb-1.5 block">Textos</span>
+              <span className="text-xs text-text-secondary mb-1.5 block">{t.editor.bodyText}</span>
               <div className="flex items-center gap-3">
                 <div className="relative flex-1">
                   <select
@@ -1733,7 +1735,7 @@ export default function ProductGeneratePage() {
                 </div>
                 <div className="w-28 h-12 flex items-center justify-center bg-background border border-border rounded-xl flex-shrink-0">
                   <span className="text-xl text-text-primary" style={{ fontFamily: `'${FONT_CATALOG.find(f => f.id === selectedFonts.body)?.name}', sans-serif` }}>
-                    Ejemplo
+                    {t.editor.example}
                   </span>
                 </div>
               </div>
