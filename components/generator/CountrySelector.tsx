@@ -13,7 +13,6 @@ interface CountrySelectorProps {
 export default function CountrySelector({ value, onChange, disabled }: CountrySelectorProps) {
   const { t, countryName } = useI18n()
 
-  const latam = getCountriesByRegion('latam')
   const europe = getCountriesByRegion('europe')
   const northAmerica = getCountriesByRegion('north-america')
 
@@ -51,12 +50,6 @@ export default function CountrySelector({ value, onChange, disabled }: CountrySe
         <Globe className="w-4 h-4 text-accent" />
         {t.country.targetCountry}
       </label>
-
-      {/* LATAM */}
-      <div className="space-y-2">
-        <p className="text-xs font-semibold text-text-secondary/70 uppercase tracking-wider">LATAM</p>
-        {renderGroup(latam)}
-      </div>
 
       {/* Europe */}
       <div className="space-y-2">
@@ -101,13 +94,6 @@ export function CountrySelectorCompact({
           ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
         `}
       >
-        <optgroup label="LATAM">
-          {getCountriesByRegion('latam').map((country) => (
-            <option key={country.code} value={country.code}>
-              {country.flag} {countryName(country.code)} ({country.currencySymbol})
-            </option>
-          ))}
-        </optgroup>
         <optgroup label="Europe">
           {getCountriesByRegion('europe').map((country) => (
             <option key={country.code} value={country.code}>

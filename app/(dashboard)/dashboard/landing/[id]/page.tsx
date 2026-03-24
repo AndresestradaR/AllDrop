@@ -408,11 +408,11 @@ export default function ProductGeneratePage() {
       if (data.product) {
         setProduct(data.product)
       } else {
-        toast.error('Producto no encontrado')
+        toast.error(t.editor.productNotFound)
         router.push('/dashboard/landing')
       }
     } catch (error) {
-      toast.error('Error al cargar producto')
+      toast.error(t.editor.loadError)
       router.push('/dashboard/landing')
     } finally {
       setIsLoading(false)
@@ -511,12 +511,12 @@ export default function ProductGeneratePage() {
 
   const handleGenerate = async () => {
     if (!selectedTemplate && !uploadedTemplate) {
-      toast.error('Selecciona o sube una plantilla')
+      toast.error(t.editor.selectTemplateToast)
       return
     }
 
     if (!productPhotos.some(p => p !== null)) {
-      toast.error('Sube al menos una foto del producto')
+      toast.error(t.editor.uploadPhoto)
       return
     }
 
@@ -569,7 +569,7 @@ export default function ProductGeneratePage() {
       }
 
       if (data.success && data.imageUrl) {
-        toast.success('¡Sección generada!')
+        toast.success(t.editor.sectionCreated)
         // Refresh sections list
         fetchGeneratedSections()
       } else {
@@ -597,11 +597,11 @@ export default function ProductGeneratePage() {
 
   const handleEnhanceWithAI = async () => {
     if (!selectedTemplate && !uploadedTemplate) {
-      toast.error('Primero selecciona una plantilla')
+      toast.error(t.editor.selectTemplateFirst)
       return
     }
     if (!productPhotos.some(p => p !== null)) {
-      toast.error('Primero sube al menos una foto del producto')
+      toast.error(t.editor.uploadPhotoFirst)
       return
     }
 
@@ -659,15 +659,15 @@ export default function ProductGeneratePage() {
 
   const handleBulkGenerate = async () => {
     if (selectedAngleIds.size === 0) {
-      toast.error('Selecciona al menos un angulo')
+      toast.error(t.editor.selectAngle)
       return
     }
     if (selectedSections.size === 0) {
-      toast.error('Selecciona al menos una seccion')
+      toast.error(t.editor.selectSection)
       return
     }
     if (!productPhotos.some(p => p !== null)) {
-      toast.error('Sube al menos una foto del producto')
+      toast.error(t.editor.uploadPhoto)
       return
     }
 
@@ -676,7 +676,7 @@ export default function ProductGeneratePage() {
       sectionId => !sectionTemplates[sectionId] && !mainTemplate
     )
     if (sectionsWithoutTemplate.length > 0) {
-      toast.error('Asigna una plantilla a cada seccion o sube una imagen de referencia principal')
+      toast.error(t.editor.assignTemplate)
       return
     }
 
@@ -782,7 +782,7 @@ export default function ProductGeneratePage() {
 
   const handleGenerateAngles = async () => {
     if (!productPhotos.some(p => p !== null)) {
-      toast.error('Sube al menos una foto del producto')
+      toast.error(t.editor.uploadPhoto)
       return
     }
 
@@ -838,7 +838,7 @@ export default function ProductGeneratePage() {
         next.delete(angle.id)
       } else {
         if (next.size >= 4) {
-          toast.error('Maximo 4 angulos')
+          toast.error(t.editor.maxAngles)
           return prev
         }
         next.add(angle.id)
@@ -857,7 +857,7 @@ export default function ProductGeneratePage() {
 
   const handleAddManualAngle = () => {
     if (!newAngle.name.trim() || !newAngle.salesAngle.trim()) {
-      toast.error('Nombre y angulo de venta son requeridos')
+      toast.error(t.editor.nameAngleRequired)
       return
     }
 
@@ -893,10 +893,10 @@ export default function ProductGeneratePage() {
       if (data.success) {
         toast.success(`${data.count} angulos guardados para "${product.name}"`)
       } else {
-        toast.error(data.error || 'Error al guardar angulos')
+        toast.error(data.error || t.editor.saveAnglesError)
       }
     } catch {
-      toast.error('Error al guardar angulos')
+      toast.error(t.editor.saveAnglesError)
     } finally {
       setIsSavingAngles(false)
     }
@@ -906,13 +906,13 @@ export default function ProductGeneratePage() {
     <div className="p-3 rounded-xl border-2 border-dashed border-amber-500/40 bg-amber-500/5 space-y-2">
       <input
         type="text"
-        placeholder="Nombre del angulo (ej: Urgencia)"
+        placeholder={t.editor.angleNamePlaceholder}
         value={newAngle.name}
         onChange={(e) => setNewAngle(prev => ({ ...prev, name: e.target.value }))}
         className="w-full text-sm px-3 py-2 rounded-lg border border-border bg-background text-text-primary focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 outline-none"
       />
       <textarea
-        placeholder="Angulo de venta / mensaje principal"
+        placeholder={t.editor.mainMessage}
         value={newAngle.salesAngle}
         onChange={(e) => setNewAngle(prev => ({ ...prev, salesAngle: e.target.value }))}
         rows={2}
@@ -920,7 +920,7 @@ export default function ProductGeneratePage() {
       />
       <input
         type="text"
-        placeholder="Avatar / publico objetivo (opcional)"
+        placeholder={t.editor.avatarOptional}
         value={newAngle.avatarSuggestion}
         onChange={(e) => setNewAngle(prev => ({ ...prev, avatarSuggestion: e.target.value }))}
         className="w-full text-sm px-3 py-2 rounded-lg border border-border bg-background text-text-primary focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 outline-none"
@@ -930,25 +930,25 @@ export default function ProductGeneratePage() {
         onChange={(e) => setNewAngle(prev => ({ ...prev, tone: e.target.value }))}
         className="w-full text-sm px-3 py-2 rounded-lg border border-border bg-background text-text-primary focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 outline-none"
       >
-        <option value="Emocional">Emocional</option>
-        <option value="Racional">Racional</option>
-        <option value="Urgencia">Urgencia</option>
-        <option value="Aspiracional">Aspiracional</option>
-        <option value="Social Proof">Social Proof</option>
-        <option value="Educativo">Educativo</option>
+        <option value="Emocional">{t.editor.emotional}</option>
+        <option value="Racional">{t.editor.rational}</option>
+        <option value="Urgencia">{t.editor.urgency}</option>
+        <option value="Aspiracional">{t.editor.aspirational}</option>
+        <option value="Social Proof">{t.editor.socialProof}</option>
+        <option value="Educativo">{t.editor.educational}</option>
       </select>
       <div className="flex gap-2">
         <button
           onClick={handleAddManualAngle}
           className="flex-1 text-sm py-2 rounded-lg bg-amber-500 text-white font-medium hover:bg-amber-600 transition-colors"
         >
-          Agregar angulo
+          {t.editor.addAngle}
         </button>
         <button
           onClick={() => { setShowAddAngleForm(false); setNewAngle({ name: '', hook: '', salesAngle: '', avatarSuggestion: '', tone: 'Emocional' }) }}
           className="px-3 text-sm py-2 rounded-lg border border-border text-text-secondary hover:bg-background-secondary transition-colors"
         >
-          Cancelar
+          {t.editor.cancel}
         </button>
       </div>
     </div>
@@ -1135,7 +1135,7 @@ export default function ProductGeneratePage() {
 
   const handleEdit = async () => {
     if (!selectedSection || !editInstruction.trim()) {
-      toast.error('Escribe una instrucción de edición')
+      toast.error(t.editor.writeInstruction)
       return
     }
 
@@ -1157,7 +1157,7 @@ export default function ProductGeneratePage() {
       const data = await response.json()
 
       if (data.success && data.imageUrl) {
-        toast.success('¡Sección editada!')
+        toast.success(t.editor.sectionEdited)
         setShowEditModal(false)
         setShowSectionModal(false)
         setEditInstruction('')
@@ -1177,7 +1177,7 @@ export default function ProductGeneratePage() {
     if (e) {
       e.stopPropagation()
     }
-    if (!confirm('¿Eliminar esta sección?')) return
+    if (!confirm(t.editor.deleteConfirm)) return
 
     // Save previous state for rollback
     const previousSections = generatedSections
@@ -1185,7 +1185,7 @@ export default function ProductGeneratePage() {
     // Optimistic update - remove from UI immediately
     setGeneratedSections(sections => sections.filter(s => s.id !== sectionId))
     setShowSectionModal(false)
-    toast.success('Sección eliminada')
+    toast.success(t.editor.sectionDeleted)
 
     try {
       const response = await fetch(`/api/sections/${sectionId}`, {
@@ -1301,7 +1301,7 @@ export default function ProductGeneratePage() {
       }
 
       const data = await response.json()
-      toast.success('Secciones enviadas al editor')
+      toast.success(t.editor.sentToEditor)
       setSelectedForExport(new Map())
 
       // Open MiniShop constructor in new tab
@@ -1343,7 +1343,7 @@ export default function ProductGeneratePage() {
         <div>
           <p className="text-sm text-text-secondary flex items-center gap-2">
             <LayoutTemplate className="w-4 h-4" />
-            Generador de Landings
+            {t.editor.landingGenerator}
           </p>
           <h1 className="text-xl font-bold text-text-primary">{product?.name}</h1>
         </div>
@@ -1357,9 +1357,9 @@ export default function ProductGeneratePage() {
           <div className="flex-shrink-0">
             <div className="flex items-center justify-between mb-3">
               <label className="text-sm font-medium text-text-primary">
-                Fotos del Producto
+                {t.editor.productPhotos}
               </label>
-              <span className="text-xs text-text-secondary">(1-3 fotos)</span>
+              <span className="text-xs text-text-secondary">{t.editor.photoCount}</span>
             </div>
 
             <div className="flex gap-3">
@@ -1404,7 +1404,7 @@ export default function ProductGeneratePage() {
           <div className="flex-1">
             <div className="flex items-center justify-between mb-3">
               <label className="text-sm font-medium text-text-primary">
-                Plantilla de Referencia
+                {t.editor.templateRef}
               </label>
             </div>
 
@@ -1427,7 +1427,7 @@ export default function ProductGeneratePage() {
                     onClick={() => setShowTemplateGallery(true)}
                     className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-accent hover:bg-accent-hover text-background px-3 py-1 rounded-lg text-xs font-medium transition-colors"
                   >
-                    Cambiar
+                    {t.editor.change}
                   </button>
                 </>
               ) : (
@@ -1438,7 +1438,7 @@ export default function ProductGeneratePage() {
                   <LayoutTemplate className="w-8 h-8 text-accent/40" />
                   <div className="text-left">
                     <p className="text-text-primary font-medium text-sm">Seleccionar Plantilla</p>
-                    <p className="text-xs text-text-secondary">de la Galería de Diseños</p>
+                    <p className="text-xs text-text-secondary">{t.editor.fromGallery}</p>
                   </div>
                 </button>
               )}
@@ -1450,7 +1450,7 @@ export default function ProductGeneratePage() {
               className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-white text-sm font-medium transition-all hover:opacity-90 bg-gradient-to-r from-purple-500 via-pink-500 to-rose-500"
             >
               <Upload className="w-4 h-4" />
-              Subir imagen de referencia
+              {t.editor.uploadRef}
             </button>
             <input
               ref={templateInputRef}
@@ -1468,7 +1468,7 @@ export default function ProductGeneratePage() {
             <div className="flex items-center gap-2">
               <Palette className="w-4 h-4 text-accent" />
               <span className="text-sm font-medium text-text-primary">
-                Estilo Visual
+                {t.editor.visualStyle}
               </span>
             </div>
           </div>
@@ -1476,12 +1476,12 @@ export default function ProductGeneratePage() {
           {/* Color Palette */}
           <div className="mb-5">
             <label className="text-xs font-medium text-text-secondary uppercase tracking-wider mb-3 block">
-              Paleta de Colores
+              {t.editor.colorPalette}
             </label>
 
             {/* Color count selector */}
             <div className="flex items-center gap-2 mb-3">
-              <span className="text-xs text-text-secondary">Cantidad:</span>
+              <span className="text-xs text-text-secondary">{t.editor.quantity}</span>
               <div className="flex rounded-lg border border-border overflow-hidden">
                 <button
                   onClick={() => setColorCount(3)}
@@ -1491,7 +1491,7 @@ export default function ProductGeneratePage() {
                       : 'bg-background text-text-secondary hover:text-text-primary'
                   }`}
                 >
-                  3 colores
+                  {t.editor.threeColors}
                 </button>
                 <button
                   onClick={() => setColorCount(4)}
@@ -1501,7 +1501,7 @@ export default function ProductGeneratePage() {
                       : 'bg-background text-text-secondary hover:text-text-primary'
                   }`}
                 >
-                  4 colores
+                  {t.editor.fourColors}
                 </button>
               </div>
             </div>
@@ -1509,7 +1509,7 @@ export default function ProductGeneratePage() {
             <div className={`grid gap-3 ${colorCount === 4 ? 'grid-cols-4' : 'grid-cols-3'}`}>
               {/* Color 1 - Primary */}
               <div>
-                <span className="text-xs text-text-secondary mb-1.5 block">Primario</span>
+                <span className="text-xs text-text-secondary mb-1.5 block">{t.editor.primary}</span>
                 <div className="relative">
                   <input
                     type="color"
@@ -1541,7 +1541,7 @@ export default function ProductGeneratePage() {
 
               {/* Color 2 - Secondary */}
               <div>
-                <span className="text-xs text-text-secondary mb-1.5 block">Secundario</span>
+                <span className="text-xs text-text-secondary mb-1.5 block">{t.editor.secondary}</span>
                 <div className="relative">
                   <input
                     type="color"
@@ -1573,7 +1573,7 @@ export default function ProductGeneratePage() {
 
               {/* Color 3 - Accent */}
               <div>
-                <span className="text-xs text-text-secondary mb-1.5 block">Acento</span>
+                <span className="text-xs text-text-secondary mb-1.5 block">{t.editor.accent}</span>
                 <div className="relative">
                   <input
                     type="color"
@@ -1606,7 +1606,7 @@ export default function ProductGeneratePage() {
               {/* Color 4 - Extra (only if 4 colors selected) */}
               {colorCount === 4 && (
                 <div>
-                  <span className="text-xs text-text-secondary mb-1.5 block">Extra</span>
+                  <span className="text-xs text-text-secondary mb-1.5 block">{t.editor.extra}</span>
                   <div className="relative">
                     <input
                       type="color"
@@ -1638,7 +1638,7 @@ export default function ProductGeneratePage() {
               )}
             </div>
             <p className="text-xs text-text-secondary/70 mt-2">
-              Estos colores se aplicaran en todos los banners generados
+              {t.editor.colorsApplied}
             </p>
           </div>
 
@@ -1772,7 +1772,7 @@ export default function ProductGeneratePage() {
           {/* Output Size */}
           <div>
             <label className="flex items-center gap-2 text-sm font-medium text-text-primary mb-2">
-              📐 Tamaño de Salida
+              📐 {t.editor.outputSize}
             </label>
             <div className="relative">
               <select
@@ -1794,14 +1794,14 @@ export default function ProductGeneratePage() {
           {/* Language */}
           <div>
             <label className="flex items-center gap-2 text-sm font-medium text-text-primary mb-2">
-              🌐 Idioma de Salida
+              🌐 {t.editor.outputLanguage}
             </label>
             <div className="relative">
               <select
                 className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent"
                 defaultValue="es"
               >
-                <option value="es">Español</option>
+                <option value="es">{t.editor.spanish}</option>
               </select>
               <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-text-secondary pointer-events-none" />
             </div>
@@ -1817,8 +1817,8 @@ export default function ProductGeneratePage() {
           />
         </div>
 
-        <h2 className="text-xl font-bold text-text-primary mb-2 mt-2">CREA TU LANDING BANNER A BANNER</h2>
-        <p className="text-sm text-text-secondary mb-4">Personaliza cada banner individualmente con controles creativos</p>
+        <h2 className="text-xl font-bold text-text-primary mb-2 mt-2">{t.editor.createBannerByBanner}</h2>
+        <p className="text-sm text-text-secondary mb-4">{t.editor.customizeBanner}</p>
 
         {/* Creative Controls */}
         <div className="border border-border rounded-xl p-4 mb-6">
@@ -1826,7 +1826,7 @@ export default function ProductGeneratePage() {
             <div className="flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-accent" />
               <span className="text-sm font-medium text-text-primary">
-                Controles Creativos <span className="text-text-secondary font-normal">(Opcional)</span>
+                {t.editor.creativeControls} <span className="text-text-secondary font-normal">{t.editor.optional}</span>
               </span>
             </div>
             <div className="flex items-center gap-2">
@@ -1840,7 +1840,7 @@ export default function ProductGeneratePage() {
                 ) : (
                   <Sparkles className="w-4 h-4" />
                 )}
-                Mejorar con IA
+                {t.editor.enhanceWithAI}
               </button>
               <button
                 onClick={() => setShowCreativeControls(!showCreativeControls)}
@@ -1861,12 +1861,12 @@ export default function ProductGeneratePage() {
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="text-sm font-medium text-text-primary flex items-center gap-2">
-                    📄 Detalles del Producto
+                    📄 {t.editor.productDetails}
                   </label>
-                  <span className="text-xs text-text-secondary">Max. 1500 caracteres</span>
+                  <span className="text-xs text-text-secondary">{t.editor.maxChars}</span>
                 </div>
                 <textarea
-                  placeholder="Describe las características, beneficios y detalles importantes del producto..."
+                  placeholder={t.editor.descPlaceholder}
                   value={creativeControls.productDetails}
                   onChange={(e) => setCreativeControls({ ...creativeControls, productDetails: e.target.value.slice(0, 1500) })}
                   className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent resize-none"
@@ -1878,11 +1878,11 @@ export default function ProductGeneratePage() {
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="text-sm font-medium text-text-primary flex items-center gap-2">
-                    📈 Ángulo de Venta
+                    📈 {t.editor.salesAngle}
                   </label>
                 </div>
                 <textarea
-                  placeholder="Ejemplo: Potenciador de testosterona para hombres fitness"
+                  placeholder={t.editor.anglePlaceholder}
                   value={creativeControls.salesAngle}
                   onChange={(e) => setCreativeControls({ ...creativeControls, salesAngle: e.target.value.slice(0, 1500) })}
                   className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent resize-none"
@@ -1894,11 +1894,11 @@ export default function ProductGeneratePage() {
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="text-sm font-medium text-text-primary flex items-center gap-2">
-                    🎯 Avatar de Cliente Ideal
+                    🎯 {t.editor.idealAvatar}
                   </label>
                 </div>
                 <textarea
-                  placeholder="Ejemplo: Hombres 25-45 años, van al gimnasio, quieren aumentar masa muscular"
+                  placeholder={t.editor.avatarPlaceholder}
                   value={creativeControls.targetAvatar}
                   onChange={(e) => setCreativeControls({ ...creativeControls, targetAvatar: e.target.value.slice(0, 1500) })}
                   className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent resize-none"
@@ -1910,11 +1910,11 @@ export default function ProductGeneratePage() {
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="text-sm font-medium text-text-primary flex items-center gap-2">
-                    💬 Instrucciones Adicionales
+                    💬 {t.editor.additionalInstructions}
                   </label>
                 </div>
                 <textarea
-                  placeholder="Cualquier instrucción específica para la generación..."
+                  placeholder={t.editor.instructionsPlaceholder}
                   value={creativeControls.additionalInstructions}
                   onChange={(e) => setCreativeControls({ ...creativeControls, additionalInstructions: e.target.value.slice(0, 1500) })}
                   className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent resize-none"
@@ -1925,8 +1925,8 @@ export default function ProductGeneratePage() {
           )}
         </div>
 
-        <h2 className="text-xl font-bold text-text-primary mb-2 mt-2">CREA TUS LANDINGS COMPLETAS A UNOS CLICKS</h2>
-        <p className="text-sm text-text-secondary mb-4">Define el contexto, genera angulos de venta y crea landing pages completas</p>
+        <h2 className="text-xl font-bold text-text-primary mb-2 mt-2">{t.editor.createCompleteLandings}</h2>
+        <p className="text-sm text-text-secondary mb-4">{t.editor.defineContext}</p>
 
         {/* Product Context (Phase 2) */}
         <div className="border border-border rounded-xl p-4 mb-6">
@@ -1934,9 +1934,9 @@ export default function ProductGeneratePage() {
             <div className="flex items-center gap-2">
               <FileText className="w-4 h-4 text-accent" />
               <span className="text-sm font-medium text-text-primary">
-                Contexto del Producto
+                {t.editor.productContext}
               </span>
-              <span className="text-xs text-text-secondary">(Recomendado)</span>
+              <span className="text-xs text-text-secondary">{t.editor.recommended}</span>
             </div>
             <button
               onClick={() => setShowProductContext(!showProductContext)}
@@ -1953,16 +1953,16 @@ export default function ProductGeneratePage() {
           {showProductContext && (
             <div className="mt-4 space-y-4">
               <p className="text-xs text-text-secondary">
-                Entre mas contexto proporciones, mejores seran los banners y angulos generados.
+                {t.editor.moreContext}
               </p>
 
               {/* Description */}
               <div>
                 <label className="text-sm font-medium text-text-primary flex items-center gap-2 mb-1.5">
-                  📦 Descripcion del Producto
+                  📦 {t.editor.productDescription}
                 </label>
                 <textarea
-                  placeholder="Describe el producto en detalle: que es, como funciona, materiales, presentacion, cantidad, etc."
+                  placeholder={t.editor.descDetailPlaceholder}
                   value={productContext.description}
                   onChange={(e) => setProductContext({ ...productContext, description: e.target.value.slice(0, 2000) })}
                   className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent resize-none"
@@ -1974,10 +1974,10 @@ export default function ProductGeneratePage() {
               {/* Benefits */}
               <div>
                 <label className="text-sm font-medium text-text-primary flex items-center gap-2 mb-1.5">
-                  ✅ Beneficios Principales
+                  ✅ {t.editor.mainBenefits}
                 </label>
                 <textarea
-                  placeholder="Lista los beneficios clave. Ej: Reduce arrugas 67% en 28 dias, hidratacion 24h, no grasa..."
+                  placeholder={t.editor.benefitsPlaceholder}
                   value={productContext.benefits}
                   onChange={(e) => setProductContext({ ...productContext, benefits: e.target.value.slice(0, 1000) })}
                   className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent resize-none"
@@ -1988,10 +1988,10 @@ export default function ProductGeneratePage() {
               {/* Problems it solves */}
               <div>
                 <label className="text-sm font-medium text-text-primary flex items-center gap-2 mb-1.5">
-                  🎯 Problemas que Resuelve
+                  🎯 {t.editor.problemsSolved}
                 </label>
                 <textarea
-                  placeholder="Que dolor o frustracion tiene el cliente? Ej: Piel seca, arrugas prematuras, productos caros que no funcionan..."
+                  placeholder={t.editor.problemsPlaceholder}
                   value={productContext.problems}
                   onChange={(e) => setProductContext({ ...productContext, problems: e.target.value.slice(0, 1000) })}
                   className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent resize-none"
@@ -2002,10 +2002,10 @@ export default function ProductGeneratePage() {
               {/* Ingredients/Materials */}
               <div>
                 <label className="text-sm font-medium text-text-primary flex items-center gap-2 mb-1.5">
-                  🧪 Ingredientes / Materiales / Componentes
+                  🧪 {t.editor.ingredients}
                 </label>
                 <textarea
-                  placeholder="Ej: Acido hialuronico, retinol, vitamina C, extracto de aloe vera..."
+                  placeholder={t.editor.ingredientsPlaceholder}
                   value={productContext.ingredients}
                   onChange={(e) => setProductContext({ ...productContext, ingredients: e.target.value.slice(0, 500) })}
                   className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent resize-none"
@@ -2016,10 +2016,10 @@ export default function ProductGeneratePage() {
               {/* Differentiator */}
               <div>
                 <label className="text-sm font-medium text-text-primary flex items-center gap-2 mb-1.5">
-                  💎 Diferenciador
+                  💎 {t.editor.differentiator}
                 </label>
                 <textarea
-                  placeholder="Que lo hace diferente de la competencia? Ej: Unico con 20 ingredientes activos, formula patentada, resultados en 14 dias..."
+                  placeholder={t.editor.differentiatorPlaceholder}
                   value={productContext.differentiator}
                   onChange={(e) => setProductContext({ ...productContext, differentiator: e.target.value.slice(0, 500) })}
                   className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent resize-none"
@@ -2037,17 +2037,17 @@ export default function ProductGeneratePage() {
                   {isGeneratingAngles ? (
                     <>
                       <Loader2 className="w-5 h-5 animate-spin" />
-                      Generando angulos...
+                      {t.editor.generatingAngles}
                     </>
                   ) : (
                     <>
                       <Lightbulb className="w-5 h-5" />
-                      Generar Angulos de Venta con IA
+                      {t.editor.generateAngles}
                     </>
                   )}
                 </button>
                 <p className="text-xs text-text-secondary text-center mt-2">
-                  Analiza las fotos del producto + contexto para generar angulos de venta
+                  {t.editor.analyzePhotos}
                 </p>
               </div>
 
@@ -2057,14 +2057,14 @@ export default function ProductGeneratePage() {
                   <div className="flex items-center justify-between mb-3">
                     <label className="text-sm font-medium text-text-primary flex items-center gap-2">
                       <Target className="w-4 h-4 text-amber-500" />
-                      Angulos de Venta Generados
+                      {t.editor.generatedAngles}
                       {anglesAiMeta && (
                         <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
                           anglesAiMeta.fallbacks?.length
                             ? 'bg-orange-500/20 text-orange-400'
                             : 'bg-emerald-500/20 text-emerald-400'
                         }`} title={anglesAiMeta.fallbacks?.join('\n') || 'Sin fallbacks'}>
-                          {anglesAiMeta.provider}{anglesAiMeta.fallbacks?.length ? ' (fallback)' : ''}
+                          {anglesAiMeta.provider}{anglesAiMeta.fallbacks?.length ? ` (${t.editor.fallback})` : ''}
                         </span>
                       )}
                     </label>
@@ -2074,13 +2074,13 @@ export default function ProductGeneratePage() {
                       className="flex items-center gap-1 px-2 py-1 text-xs text-text-secondary hover:text-accent transition-colors"
                     >
                       <RefreshCw className={`w-3 h-3 ${isGeneratingAngles ? 'animate-spin' : ''}`} />
-                      Regenerar
+                      {t.editor.regenerate}
                     </button>
                   </div>
 
                   {selectedAngleIds.size > 0 && (
                     <p className="text-xs text-amber-500 font-medium mb-2">
-                      {selectedAngleIds.size}/4 angulos seleccionados
+                      {selectedAngleIds.size}/4 {t.editor.anglesSelected}
                     </p>
                   )}
 
@@ -2128,7 +2128,7 @@ export default function ProductGeneratePage() {
                       className="mt-3 w-full flex items-center justify-center gap-2 py-2 rounded-xl border-2 border-dashed border-border text-sm text-text-secondary hover:border-amber-500/40 hover:text-amber-600 transition-all"
                     >
                       <Plus className="w-4 h-4" />
-                      Agregar angulo manual
+                      {t.editor.addManualAngle}
                     </button>
                   )}
 
@@ -2143,7 +2143,7 @@ export default function ProductGeneratePage() {
                     ) : (
                       <Bookmark className="w-3.5 h-3.5" />
                     )}
-                    {isSavingAngles ? 'Guardando...' : 'Guardar Angulos'}
+                    {isSavingAngles ? 'Guardando...' : t.editor.saveAngles}
                   </button>
                 </div>
               )}
@@ -2156,7 +2156,7 @@ export default function ProductGeneratePage() {
                 >
                   <span className="flex items-center gap-2">
                     <Bookmark className="w-4 h-4 text-teal-500" />
-                    Angulos Guardados
+                    {t.editor.savedAngles}
                   </span>
                   {showSavedAngles ? <ChevronDown className="w-4 h-4 text-text-muted" /> : <ChevronRight className="w-4 h-4 text-text-muted" />}
                 </button>
@@ -2186,10 +2186,10 @@ export default function ProductGeneratePage() {
                 <div className="pt-4 border-t border-border">
                   <label className="text-sm font-medium text-text-primary flex items-center gap-2 mb-3">
                     <Target className="w-4 h-4 text-amber-500" />
-                    Angulos de Venta
+                    {t.editor.salesAngles}
                   </label>
                   <p className="text-xs text-text-secondary mb-3">
-                    Genera angulos con IA arriba, o agrega uno manual:
+                    {t.editor.generateOrAdd}
                   </p>
                   {showAddAngleForm ? (
                     renderAddAngleForm()
@@ -2199,7 +2199,7 @@ export default function ProductGeneratePage() {
                       className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-dashed border-amber-500/30 text-sm text-amber-600 hover:border-amber-500/50 hover:bg-amber-500/5 transition-all"
                     >
                       <Plus className="w-4 h-4" />
-                      Agregar angulo manual
+                      {t.editor.addManualAngle}
                     </button>
                   )}
                 </div>
@@ -2211,15 +2211,15 @@ export default function ProductGeneratePage() {
                   <div className="flex items-center justify-between mb-3">
                     <label className="text-sm font-medium text-text-primary flex items-center gap-2">
                       <LayoutTemplate className="w-4 h-4 text-accent" />
-                      Secciones de tu Landing
+                      {t.editor.landingSections}
                     </label>
                     <span className="text-xs text-text-secondary">
-                      {selectedSections.size} secciones seleccionadas
+                      {selectedSections.size} {t.editor.sectionsSelected}
                     </span>
                   </div>
 
                   <p className="text-xs text-text-secondary mb-3">
-                    Selecciona las secciones que quieres en tu landing y asigna una plantilla a cada una.
+                    {t.editor.selectSections}
                   </p>
 
                   <div className="space-y-2">
@@ -2304,7 +2304,7 @@ export default function ProductGeneratePage() {
                                 </div>
                               ) : (
                                 <div className="flex items-center gap-2 py-2">
-                                  <span className="text-xs text-text-secondary/70">Sin plantillas en galeria —</span>
+                                  <span className="text-xs text-text-secondary/70">{t.editor.noTemplates} —</span>
                                   <button
                                     onClick={() => {
                                       if (uploadedTemplate || selectedTemplate) {
@@ -2312,14 +2312,14 @@ export default function ProductGeneratePage() {
                                           ...prev,
                                           [category.id]: selectedTemplate || { id: 'uploaded', name: 'Subida', image_url: uploadedTemplate!, category: category.id } as Template,
                                         }))
-                                        toast.success('Plantilla principal asignada')
+                                        toast.success(t.editor.templateAssigned)
                                       } else {
-                                        toast.error('Sube una imagen de referencia arriba')
+                                        toast.error(t.editor.uploadRefFirst)
                                       }
                                     }}
                                     className="text-xs text-accent hover:underline"
                                   >
-                                    Usar plantilla principal
+                                    {t.editor.useMainTemplate}
                                   </button>
                                 </div>
                               )}
@@ -2388,11 +2388,11 @@ export default function ProductGeneratePage() {
               isLoading={isGenerating}
             >
               <Sparkles className="w-5 h-5" />
-              Generar Sección
+              {t.editor.generateSection}
             </Button>
 
             <p className="text-center text-sm text-text-secondary mt-3">
-              {generatedSections.length} de 5 secciones utilizadas este periodo
+              {generatedSections.length} de 5 {t.editor.sectionsUsed}
             </p>
           </>
         )}
@@ -2400,7 +2400,7 @@ export default function ProductGeneratePage() {
 
       {/* Generated Sections History */}
       <div className="mb-6">
-        <h2 className="text-xl font-bold text-text-primary mb-4">Secciones Generadas</h2>
+        <h2 className="text-xl font-bold text-text-primary mb-4">{t.editor.generatedSections}</h2>
         
         {isLoadingSections ? (
           <div className="flex items-center justify-center py-12">
@@ -2409,8 +2409,8 @@ export default function ProductGeneratePage() {
         ) : generatedSections.length === 0 ? (
           <Card className="p-8 text-center">
             <ImageIcon className="w-12 h-12 text-accent/30 mx-auto mb-3" />
-            <p className="text-text-secondary">Aún no has generado secciones</p>
-            <p className="text-sm text-text-secondary/70">Selecciona una plantilla y genera tu primera sección</p>
+            <p className="text-text-secondary">{t.editor.noSectionsYet}</p>
+            <p className="text-sm text-text-secondary/70">{t.editor.selectTemplate}</p>
           </Card>
         ) : (
           <div className="space-y-6">
@@ -2451,7 +2451,7 @@ export default function ProductGeneratePage() {
                             e.stopPropagation()
                             toggleSectionExport(section)
                           }}
-                          title={isSelected ? `Seccion #${exportOrder} — clic para quitar` : 'Seleccionar para enviar al editor'}
+                          title={isSelected ? `Seccion #${exportOrder} — clic para quitar` : t.editor.selectForExport}
                           className={`absolute top-2 left-2 z-10 w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold transition-all shadow-md ${
                             isSelected
                               ? 'bg-emerald-500 text-white'
@@ -2476,7 +2476,7 @@ export default function ProductGeneratePage() {
                           className="flex items-center gap-1.5 px-3 py-1.5 bg-surface border border-border rounded-lg hover:border-accent/50 hover:bg-accent/5 transition-colors text-sm text-text-secondary hover:text-text-primary"
                         >
                           <Eye className="w-4 h-4" />
-                          <span>Ver Banner</span>
+                          <span>{t.editor.viewBanner}</span>
                         </button>
                         <button
                           onClick={(e) => handleDeleteSection(section.id, e)}
@@ -2507,7 +2507,7 @@ export default function ProductGeneratePage() {
             <div className="p-4 border-b border-border flex items-center justify-between shrink-0">
               <div className="flex items-center gap-3">
                 <LayoutTemplate className="w-5 h-5 text-accent" />
-                <h2 className="text-lg font-semibold text-text-primary">Galería de Diseños</h2>
+                <h2 className="text-lg font-semibold text-text-primary">{t.editor.designGallery}</h2>
               </div>
               <button
                 onClick={() => setShowTemplateGallery(false)}
@@ -2558,7 +2558,7 @@ export default function ProductGeneratePage() {
               {filteredTemplates.length === 0 ? (
                 <div className="text-center py-12">
                   <LayoutTemplate className="w-12 h-12 text-accent/30 mx-auto mb-3" />
-                  <p className="text-text-secondary">No hay plantillas en esta categoría aún</p>
+                  <p className="text-text-secondary">{t.editor.noTemplatesInCategory}</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
@@ -2592,14 +2592,14 @@ export default function ProductGeneratePage() {
             {/* Footer */}
             <div className="p-4 border-t border-border flex items-center justify-between shrink-0">
               <p className="text-sm text-text-secondary">
-                Haz clic en un template para seleccionarlo
+                {t.editor.clickToSelect}
               </p>
               <div className="flex gap-3">
                 <Button
                   variant="secondary"
                   onClick={() => setShowTemplateGallery(false)}
                 >
-                  Cancelar
+                  {t.editor.cancel}
                 </Button>
                 <Button
                   onClick={() => {
@@ -2613,7 +2613,7 @@ export default function ProductGeneratePage() {
                   className="gap-2"
                 >
                   <Check className="w-4 h-4" />
-                  Usar Este Template
+                  {t.editor.useTemplate}
                 </Button>
               </div>
             </div>
@@ -2631,7 +2631,7 @@ export default function ProductGeneratePage() {
           <div className="relative w-full max-w-5xl max-h-[90vh] bg-surface rounded-2xl overflow-hidden z-10 flex">
             {/* Left side - Options */}
             <div className="w-80 border-r border-border p-6 flex flex-col shrink-0">
-              <h2 className="text-xl font-bold text-text-primary mb-6">Sección generada</h2>
+              <h2 className="text-xl font-bold text-text-primary mb-6">{t.editor.sectionGenerated}</h2>
               
               <div className="space-y-3 flex-1">
                 {/* Download 2K */}
@@ -2640,7 +2640,7 @@ export default function ProductGeneratePage() {
                   className="w-full flex items-center gap-3 px-4 py-3 bg-background border border-border rounded-xl hover:border-accent/50 transition-colors"
                 >
                   <Download className="w-5 h-5 text-text-secondary" />
-                  <span className="text-text-primary">Descargar en 2K</span>
+                  <span className="text-text-primary">{t.editor.download2K}</span>
                 </button>
 
                 {/* Download Optimized */}
@@ -2649,7 +2649,7 @@ export default function ProductGeneratePage() {
                   className="w-full flex items-center gap-3 px-4 py-3 bg-background border border-border rounded-xl hover:border-accent/50 transition-colors"
                 >
                   <Download className="w-5 h-5 text-text-secondary" />
-                  <span className="text-text-primary">Descargar optimizada</span>
+                  <span className="text-text-primary">{t.editor.downloadOptimized}</span>
                 </button>
 
                 {/* Edit Section */}
@@ -2658,7 +2658,7 @@ export default function ProductGeneratePage() {
                   className="w-full flex items-center gap-3 px-4 py-3 bg-background border border-border rounded-xl hover:border-accent/50 transition-colors"
                 >
                   <Edit3 className="w-5 h-5 text-text-secondary" />
-                  <span className="text-text-primary">Editar Sección</span>
+                  <span className="text-text-primary">{t.editor.editSection}</span>
                 </button>
 
                 {/* Edit in Canva */}
@@ -2673,7 +2673,7 @@ export default function ProductGeneratePage() {
                     <ExternalLink className="w-5 h-5 text-purple-500" />
                   )}
                   <span className="bg-gradient-to-r from-purple-500 to-pink-500 bg-clip-text text-transparent font-medium">
-                    {isOpeningCanva ? 'Conectando...' : 'Editar en Canva'}
+                    {isOpeningCanva ? 'Conectando...' : t.editor.editInCanva}
                   </span>
                 </button>
 
@@ -2684,7 +2684,7 @@ export default function ProductGeneratePage() {
                   className="w-full flex items-center gap-3 px-4 py-3 bg-green-500/10 border border-green-500/30 rounded-xl hover:bg-green-500/20 transition-colors disabled:opacity-50"
                 >
                   <MessageCircle className="w-5 h-5 text-green-500" />
-                  <span className="text-green-500">Compartir por WhatsApp</span>
+                  <span className="text-green-500">{t.editor.shareWhatsApp}</span>
                 </button>
               </div>
 
@@ -2742,7 +2742,7 @@ export default function ProductGeneratePage() {
                   <p className="text-sm font-semibold text-text-primary">
                     {selectedForExport.size} {selectedForExport.size === 1 ? 'seccion seleccionada' : 'secciones seleccionadas'}
                   </p>
-                  <p className="text-xs text-text-secondary">Se enviaran a tu editor DropPage</p>
+                  <p className="text-xs text-text-secondary">{t.editor.willSendToEditor}</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
@@ -2750,7 +2750,7 @@ export default function ProductGeneratePage() {
                   onClick={() => setSelectedForExport(new Map())}
                   className="px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-primary transition-colors"
                 >
-                  Cancelar
+                  {t.editor.cancel}
                 </button>
                 <button
                   onClick={handleSendToEditor}
@@ -2762,7 +2762,7 @@ export default function ProductGeneratePage() {
                   ) : (
                     <Send className="w-4 h-4" />
                   )}
-                  Enviar a mi editor
+                  {t.editor.sendToEditor}
                 </button>
               </div>
             </div>
@@ -2780,15 +2780,15 @@ export default function ProductGeneratePage() {
           <div className="relative w-full max-w-5xl max-h-[90vh] bg-surface rounded-2xl overflow-hidden z-10 flex">
             {/* Left side - Edit Form */}
             <div className="w-80 border-r border-border p-6 flex flex-col shrink-0">
-              <h2 className="text-xl font-bold text-text-primary mb-2">Editar Sección</h2>
+              <h2 className="text-xl font-bold text-text-primary mb-2">{t.editor.editSection}</h2>
               
               {/* Edit Instruction */}
               <div className="mb-4">
                 <label className="text-sm font-medium text-text-primary mb-1.5 block">
-                  Instrucción de edición:
+                  {t.editor.editInstruction}
                 </label>
                 <textarea
-                  placeholder="Describe cómo quieres editar la sección..."
+                  placeholder={t.editor.editPlaceholder}
                   value={editInstruction}
                   onChange={(e) => setEditInstruction(e.target.value)}
                   className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent resize-none"
@@ -2799,7 +2799,7 @@ export default function ProductGeneratePage() {
               {/* Reference Image Upload */}
               <div className="mb-6">
                 <label className="text-sm font-medium text-text-primary mb-1.5 block">
-                  Imagen de referencia (opcional):
+                  {t.editor.refImage}
                 </label>
                 <div className="border-2 border-dashed border-border rounded-xl p-4 text-center">
                   {editReferenceImage ? (
@@ -2822,7 +2822,7 @@ export default function ProductGeneratePage() {
                       className="flex flex-col items-center py-4 hover:text-accent transition-colors"
                     >
                       <Upload className="w-8 h-8 text-text-secondary/40 mb-2" />
-                      <span className="text-sm text-text-secondary">Subir una imagen</span>
+                      <span className="text-sm text-text-secondary">{t.editor.uploadImage}</span>
                     </button>
                   )}
                   <input
@@ -2851,14 +2851,14 @@ export default function ProductGeneratePage() {
                   className="flex-1"
                   onClick={() => setShowEditModal(false)}
                 >
-                  Cancelar
+                  {t.editor.cancel}
                 </Button>
                 <Button
                   className="flex-1"
                   onClick={handleEdit}
                   isLoading={isEditing}
                 >
-                  Aplicar Edición
+                  {t.editor.applyEdit}
                 </Button>
               </div>
             </div>

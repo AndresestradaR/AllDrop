@@ -6,21 +6,8 @@ export interface Country {
   currency: string
   currencySymbol: string
   flag: string
-  region: 'latam' | 'europe' | 'north-america'
+  region: 'europe' | 'north-america'
 }
-
-// LATAM countries
-const LATAM_COUNTRIES: Country[] = [
-  { code: 'CO', name: 'Colombia', currency: 'COP', currencySymbol: '$', flag: '🇨🇴', region: 'latam' },
-  { code: 'MX', name: 'México', currency: 'MXN', currencySymbol: '$', flag: '🇲🇽', region: 'latam' },
-  { code: 'PA', name: 'Panamá', currency: 'USD', currencySymbol: '$', flag: '🇵🇦', region: 'latam' },
-  { code: 'EC', name: 'Ecuador', currency: 'USD', currencySymbol: '$', flag: '🇪🇨', region: 'latam' },
-  { code: 'PE', name: 'Perú', currency: 'PEN', currencySymbol: 'S/', flag: '🇵🇪', region: 'latam' },
-  { code: 'CL', name: 'Chile', currency: 'CLP', currencySymbol: '$', flag: '🇨🇱', region: 'latam' },
-  { code: 'PY', name: 'Paraguay', currency: 'PYG', currencySymbol: '₲', flag: '🇵🇾', region: 'latam' },
-  { code: 'AR', name: 'Argentina', currency: 'ARS', currencySymbol: '$', flag: '🇦🇷', region: 'latam' },
-  { code: 'GT', name: 'Guatemala', currency: 'GTQ', currencySymbol: 'Q', flag: '🇬🇹', region: 'latam' },
-]
 
 // European countries
 const EUROPE_COUNTRIES: Country[] = [
@@ -38,7 +25,6 @@ const NORTH_AMERICA_COUNTRIES: Country[] = [
 ]
 
 export const COUNTRIES: Country[] = [
-  ...LATAM_COUNTRIES,
   ...EUROPE_COUNTRIES,
   ...NORTH_AMERICA_COUNTRIES,
 ]
@@ -48,7 +34,7 @@ export function getCountryByCode(code: string): Country | undefined {
 }
 
 export function getDefaultCountry(): Country {
-  return COUNTRIES[0] // Colombia
+  return COUNTRIES[0] // España
 }
 
 export function getCountriesByRegion(region: Country['region']): Country[] {
