@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils/cn'
 import { useI18n, LOCALES } from '@/lib/i18n'
 import { BackgroundGradientAnimation } from '@/components/ui/background-gradient-animation'
+import DropsBalance from '@/components/drops/DropsBalance'
 import {
   Sparkles,
   LayoutDashboard,
@@ -43,6 +44,7 @@ export default function DashboardLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [aiHealth, setAiHealth] = useState<'green' | 'yellow' | 'red' | null>(null)
+  const [userDrops, setUserDrops] = useState(0)
   const [langOpen, setLangOpen] = useState(false)
   const langRef = useRef<HTMLDivElement>(null)
 
@@ -76,6 +78,12 @@ export default function DashboardLayout({
     supabase.auth.getUser().then(({ data }) => {
       const email = data.user?.email || null
       setUserEmail(email)
+      if (data.user) {
+        supabase.from('profiles').select('drops').eq('id', data.user.id).single()
+          .then(({ data: profile }) => {
+            if (profile) setUserDrops(profile.drops || 0)
+          })
+      }
       if (email && email === ADMIN_EMAIL) {
         fetch('/api/admin/monitoring?action=health')
           .then(r => r.json())
@@ -248,8 +256,11 @@ export default function DashboardLayout({
             {/* Admin section hidden for now */}
           </nav>
 
-          {/* Language selector + Logout */}
+          {/* Drops + Language + Logout */}
           <div className="p-4 border-t border-border space-y-2">
+            {/* Drops balance */}
+            <DropsBalance drops={userDrops} />
+
             {/* Language selector */}
             <div ref={langRef} className="relative">
               <button
