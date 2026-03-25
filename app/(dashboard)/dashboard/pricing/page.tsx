@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useI18n } from '@/lib/i18n'
 import { PLANS, TOPUPS, DROP_COSTS } from '@/lib/drops/constants'
 import { Card } from '@/components/ui'
@@ -13,6 +13,7 @@ import toast from 'react-hot-toast'
 export default function PricingPage() {
   const { t } = useI18n()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [userPlan, setUserPlan] = useState<string>('free')
   const [userDrops, setUserDrops] = useState(0)
 
@@ -31,21 +32,60 @@ export default function PricingPage() {
     })
   }, [])
 
+  // Handle Stripe redirect results
+  useEffect(() => {
+    if (searchParams.get('success') === 'true') {
+      toast.success('Payment successful! Your drops have been added.')
+      window.history.replaceState({}, '', '/dashboard/pricing')
+    }
+    if (searchParams.get('canceled') === 'true') {
+      toast('Payment canceled', { icon: '\u26A0\uFE0F' })
+      window.history.replaceState({}, '', '/dashboard/pricing')
+    }
+  }, [searchParams])
+
   const hasPlan = userPlan !== 'free'
 
   const planIcons = [Zap, Sparkles, Star, Crown]
 
-  const handleChoosePlan = (planId: string) => {
-    // Stripe integration pending - show coming soon
-    toast.success(t.pricing.comingSoon)
+  const handleChoosePlan = async (planId: string) => {
+    try {
+      const res = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'plan', id: planId }),
+      })
+      const data = await res.json()
+      if (data.url) {
+        window.location.href = data.url
+      } else {
+        toast.error(data.error || 'Error creating checkout')
+      }
+    } catch (error) {
+      toast.error('Error connecting to payment')
+    }
   }
 
-  const handleBuyTopup = (topupId: string) => {
+  const handleBuyTopup = async (topupId: string) => {
     if (!hasPlan) {
       toast.error(t.pricing.topupsRequirePlan)
       return
     }
-    toast.success(t.pricing.comingSoon)
+    try {
+      const res = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'topup', id: topupId }),
+      })
+      const data = await res.json()
+      if (data.url) {
+        window.location.href = data.url
+      } else {
+        toast.error(data.error || 'Error creating checkout')
+      }
+    } catch (error) {
+      toast.error('Error connecting to payment')
+    }
   }
 
   return (
