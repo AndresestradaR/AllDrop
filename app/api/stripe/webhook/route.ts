@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { stripe } from '@/lib/stripe/client'
+import { getStripe } from '@/lib/stripe/client'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 
 // Use service role to bypass RLS — webhook has no auth context
@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
 
   try {
     if (process.env.STRIPE_WEBHOOK_SECRET && signature) {
-      event = stripe.webhooks.constructEvent(body, signature, process.env.STRIPE_WEBHOOK_SECRET)
+      event = getStripe().webhooks.constructEvent(body, signature, process.env.STRIPE_WEBHOOK_SECRET!)
     } else {
       // Fallback: parse without signature verification (for initial setup)
       event = JSON.parse(body)
@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
       const invoice = event.data.object
       // Only handle renewal invoices, not the first one (which is handled by checkout.session.completed)
       if (invoice.billing_reason === 'subscription_cycle') {
-        const subscription = await stripe.subscriptions.retrieve(invoice.subscription as string)
+        const subscription = await getStripe().subscriptions.retrieve(invoice.subscription as string)
         const { userId, drops, planId } = subscription.metadata || {}
 
         if (userId && drops) {
