@@ -7,10 +7,9 @@ import { cn } from '@/lib/utils/cn'
 interface DropsBalanceProps {
   drops: number
   className?: string
-  compact?: boolean
 }
 
-export default function DropsBalance({ drops, className, compact }: DropsBalanceProps) {
+export default function DropsBalance({ drops, className }: DropsBalanceProps) {
   const router = useRouter()
   const [displayDrops, setDisplayDrops] = useState(drops)
   const [isAnimating, setIsAnimating] = useState(false)
@@ -21,12 +20,12 @@ export default function DropsBalance({ drops, className, compact }: DropsBalance
       const isAdding = drops > prevDrops.current
       if (isAdding) {
         setIsAnimating(true)
-        setTimeout(() => setIsAnimating(false), 1500)
+        setTimeout(() => setIsAnimating(false), 2000)
       }
 
       // Counting animation
       const diff = drops - prevDrops.current
-      const steps = 30
+      const steps = 40
       const stepSize = diff / steps
       let current = prevDrops.current
       let step = 0
@@ -39,7 +38,7 @@ export default function DropsBalance({ drops, className, compact }: DropsBalance
           clearInterval(interval)
         }
         setDisplayDrops(Math.round(current))
-      }, 30)
+      }, 25)
 
       prevDrops.current = drops
       return () => clearInterval(interval)
@@ -50,51 +49,56 @@ export default function DropsBalance({ drops, className, compact }: DropsBalance
     <button
       onClick={() => router.push('/dashboard/pricing')}
       className={cn(
-        'flex items-center gap-2 px-3 py-2 rounded-lg transition-all hover:bg-border/50 group relative',
-        isAnimating && 'ring-2 ring-blue-400/50',
+        'w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all',
+        'bg-gradient-to-r from-blue-500/10 via-cyan-500/5 to-transparent',
+        'border border-blue-500/20 hover:border-blue-400/40',
+        'hover:from-blue-500/15 hover:via-cyan-500/10',
+        isAnimating && 'border-blue-400/60 from-blue-500/20 via-cyan-500/15',
         className
       )}
     >
-      {/* Star icon with animation */}
+      {/* Star icon — big with presence */}
       <div className={cn(
-        'relative w-6 h-6 flex-shrink-0 transition-transform',
+        'relative w-10 h-10 flex-shrink-0',
         isAnimating && 'animate-drops-pulse'
       )}>
         <img
           src="/images/drops.png"
           alt="Drops"
-          className="w-full h-full object-contain"
+          className={cn(
+            'w-full h-full object-contain drop-shadow-[0_0_6px_rgba(96,165,250,0.4)]',
+            isAnimating && 'drop-shadow-[0_0_12px_rgba(96,165,250,0.8)]'
+          )}
         />
-        {/* Particle effects when animating */}
+        {/* Particles on recharge */}
         {isAnimating && (
           <>
-            <span className="absolute -top-1 -right-1 w-2 h-2 bg-blue-400 rounded-full animate-drops-particle-1" />
-            <span className="absolute -top-2 left-1 w-1.5 h-1.5 bg-cyan-400 rounded-full animate-drops-particle-2" />
-            <span className="absolute top-0 -left-1 w-1.5 h-1.5 bg-blue-300 rounded-full animate-drops-particle-3" />
-            <span className="absolute -bottom-1 right-0 w-2 h-2 bg-cyan-300 rounded-full animate-drops-particle-4" />
+            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-blue-400 rounded-full animate-drops-particle-1" />
+            <span className="absolute -top-2 left-2 w-2 h-2 bg-cyan-400 rounded-full animate-drops-particle-2" />
+            <span className="absolute top-1 -left-2 w-2 h-2 bg-blue-300 rounded-full animate-drops-particle-3" />
+            <span className="absolute -bottom-1 right-1 w-2.5 h-2.5 bg-cyan-300 rounded-full animate-drops-particle-4" />
+            <span className="absolute top-[-6px] left-4 w-1.5 h-1.5 bg-white rounded-full animate-drops-particle-1" />
           </>
         )}
       </div>
 
       {/* Balance */}
-      <div className="flex flex-col items-start">
+      <div className="flex flex-col items-start min-w-0">
         <span className={cn(
-          'text-sm font-bold text-text-primary tabular-nums transition-colors',
-          isAnimating && 'text-blue-400'
+          'text-xl font-bold tabular-nums transition-colors leading-tight',
+          isAnimating ? 'text-blue-400' : 'text-text-primary'
         )}>
           {displayDrops.toLocaleString()}
         </span>
-        {!compact && (
-          <span className="text-[10px] text-text-secondary leading-none">Drops</span>
-        )}
+        <span className="text-xs text-text-secondary/70 leading-none">
+          Drops
+        </span>
       </div>
 
-      {/* "Get Drops" if 0 */}
-      {drops === 0 && !compact && (
-        <span className="ml-auto text-xs bg-blue-500 text-white px-2 py-0.5 rounded-full">
-          Get
-        </span>
-      )}
+      {/* Arrow hint */}
+      <svg className="w-4 h-4 ml-auto text-text-secondary/40 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M9 18l6-6-6-6" />
+      </svg>
     </button>
   )
 }
