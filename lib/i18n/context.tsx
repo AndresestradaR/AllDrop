@@ -17,17 +17,17 @@ const I18nContext = createContext<I18nContextType | null>(null)
 const STORAGE_KEY = 'alldrop-locale'
 
 function getInitialLocale(): Locale {
-  if (typeof window === 'undefined') return 'es'
+  if (typeof window === 'undefined') return 'en'
   const stored = localStorage.getItem(STORAGE_KEY)
   if (stored && translations[stored as Locale]) return stored as Locale
   // Try browser language
   const browserLang = navigator.language.slice(0, 2) as Locale
   if (translations[browserLang]) return browserLang
-  return 'es'
+  return 'en'
 }
 
 export function I18nProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>('es')
+  const [locale, setLocaleState] = useState<Locale>('en')
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
@@ -49,9 +49,9 @@ export function I18nProvider({ children }: { children: ReactNode }) {
 
   // Avoid hydration mismatch by using 'es' until mounted
   const value: I18nContextType = {
-    locale: mounted ? locale : 'es',
+    locale: mounted ? locale : 'en',
     setLocale,
-    t: mounted ? t : translations.es,
+    t: mounted ? t : translations.en,
     countryName,
   }
 
