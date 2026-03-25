@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useI18n } from '@/lib/i18n'
 import { PLANS, TOPUPS, DROP_COSTS } from '@/lib/drops/constants'
@@ -11,6 +11,14 @@ import { createClient } from '@/lib/supabase/client'
 import toast from 'react-hot-toast'
 
 export default function PricingPage() {
+  return (
+    <Suspense>
+      <PricingContent />
+    </Suspense>
+  )
+}
+
+function PricingContent() {
   const { t } = useI18n()
   const router = useRouter()
   const searchParams = useSearchParams()
