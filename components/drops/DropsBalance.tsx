@@ -57,9 +57,9 @@ export default function DropsBalance({ drops, className }: DropsBalanceProps) {
         className
       )}
     >
-      {/* Star icon — big with presence */}
+      {/* Star icon — BIG */}
       <div className={cn(
-        'relative w-10 h-10 flex-shrink-0',
+        'relative w-14 h-14 flex-shrink-0',
         isAnimating && 'animate-drops-pulse'
       )}>
         <img
@@ -85,7 +85,7 @@ export default function DropsBalance({ drops, className }: DropsBalanceProps) {
       {/* Balance */}
       <div className="flex flex-col items-start min-w-0">
         <span className={cn(
-          'text-xl font-bold tabular-nums transition-colors leading-tight',
+          'text-2xl font-bold tabular-nums transition-colors leading-tight',
           isAnimating ? 'text-blue-400' : 'text-text-primary'
         )}>
           {displayDrops.toLocaleString()}
