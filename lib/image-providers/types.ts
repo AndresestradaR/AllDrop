@@ -474,8 +474,9 @@ export interface GenerateImageRequest {
     priceCombo2?: string
     priceCombo3?: string
     currencySymbol?: string
-    // Country
+    // Country + language
     targetCountry?: string
+    outputLanguage?: string
     // Visual style
     colorPalette?: {
       primary: string

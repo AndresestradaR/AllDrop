@@ -148,6 +148,7 @@ export async function POST(request: Request) {
       provider = 'gemini', // Default to Gemini
       modelId, // New hierarchical model ID
       targetCountry,
+      outputLanguage,
       currencySymbol,
       priceAfter,
       priceBefore,
@@ -352,6 +353,7 @@ export async function POST(request: Request) {
         priceCombo2,
         priceCombo3,
         targetCountry,
+        outputLanguage,
         colorPalette,
         typography,
         productContext,

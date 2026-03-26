@@ -149,8 +149,20 @@ export default function ProductGeneratePage() {
     fal: false,
   })
 
-  // Country selection
+  // Country selection + output language
+  const COUNTRY_TO_LANG: Record<string, string> = {
+    ES: 'es', FR: 'fr', IT: 'it', DE: 'de', PT: 'pt', GB: 'en', US: 'en',
+  }
+  const OUTPUT_LANGUAGES = [
+    { code: 'es', name: 'Español' },
+    { code: 'en', name: 'English' },
+    { code: 'fr', name: 'Français' },
+    { code: 'it', name: 'Italiano' },
+    { code: 'pt', name: 'Português' },
+    { code: 'de', name: 'Deutsch' },
+  ]
   const [selectedCountry, setSelectedCountry] = useState<Country>(getDefaultCountry())
+  const [outputLanguage, setOutputLanguage] = useState('es')
 
   // Pricing controls
   const [pricing, setPricing] = useState<PricingData>(getDefaultPricingData())
@@ -535,8 +547,9 @@ export default function ProductGeneratePage() {
           outputSize: selectedSize.id,
           modelId: selectedModel, // Selected AI model ID
           provider: modelIdToProviderType(selectedModel), // Legacy provider type
-          // Country
+          // Country + language
           targetCountry: selectedCountry.code,
+          outputLanguage,
           // Pricing (all optional)
           currencySymbol: pricing.currencySymbol,
           priceAfter: pricing.priceAfter,
@@ -725,6 +738,7 @@ export default function ProductGeneratePage() {
               modelId: selectedModel,
               provider: modelIdToProviderType(selectedModel),
               targetCountry: selectedCountry.code,
+              outputLanguage,
               currencySymbol: pricing.currencySymbol,
               priceAfter: pricing.priceAfter,
               priceBefore: pricing.priceBefore,
@@ -811,6 +825,7 @@ export default function ProductGeneratePage() {
           productPhotos: productPhotos.filter(p => p !== null),
           productContext: showProductContext ? productContext : {},
           targetCountry: selectedCountry.code,
+          outputLanguage,
         }),
       })
 
@@ -1760,8 +1775,10 @@ export default function ProductGeneratePage() {
             value={selectedCountry.code}
             onChange={(country) => {
               setSelectedCountry(country)
-              // Update currency symbol when country changes
               setPricing(prev => ({ ...prev, currencySymbol: country.currencySymbol }))
+              // Auto-set output language based on country
+              const lang = COUNTRY_TO_LANG[country.code]
+              if (lang) setOutputLanguage(lang)
             }}
             disabled={isGenerating}
           />
@@ -1799,9 +1816,12 @@ export default function ProductGeneratePage() {
             <div className="relative">
               <select
                 className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent"
-                defaultValue="es"
+                value={outputLanguage}
+                onChange={(e) => setOutputLanguage(e.target.value)}
               >
-                <option value="es">{t.editor.spanish}</option>
+                {OUTPUT_LANGUAGES.map(lang => (
+                  <option key={lang.code} value={lang.code}>{lang.name}</option>
+                ))}
               </select>
               <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-text-secondary pointer-events-none" />
             </div>

@@ -38,8 +38,9 @@ export function buildGeminiPrompt(request: GenerateImageRequest): string {
   const { productName, creativeControls } = request
   const targetCountry = creativeControls?.targetCountry || 'ES'
 
+  const outputLanguage = creativeControls?.outputLanguage
   const { getCountryLanguage } = require('./country-language')
-  const countryInfo = getCountryLanguage(targetCountry)
+  const countryInfo = getCountryLanguage(targetCountry, outputLanguage)
   const countryName = countryInfo.countryName
 
   const pricingSection = buildPricingSection(request)

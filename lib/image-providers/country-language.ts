@@ -27,6 +27,22 @@ const COUNTRY_LANGUAGE_MAP: Record<string, CountryLanguageInfo> = {
   AR: { countryName: 'Argentina', language: 'Spanish', languageInstruction: 'ALL text in PERFECT SPANISH (Latin American)', region: 'LATAM' },
 }
 
-export function getCountryLanguage(countryCode: string): CountryLanguageInfo {
-  return COUNTRY_LANGUAGE_MAP[countryCode] || COUNTRY_LANGUAGE_MAP['US']
+// Language code to override info (when user manually selects output language)
+const LANGUAGE_OVERRIDE: Record<string, { language: string; languageInstruction: string }> = {
+  es: { language: 'Spanish', languageInstruction: 'ALL text in PERFECT SPANISH' },
+  en: { language: 'English', languageInstruction: 'ALL text in PERFECT ENGLISH' },
+  fr: { language: 'French', languageInstruction: 'ALL text in PERFECT FRENCH. Headlines, benefits, CTAs — everything in French' },
+  it: { language: 'Italian', languageInstruction: 'ALL text in PERFECT ITALIAN. Headlines, benefits, CTAs — everything in Italian' },
+  pt: { language: 'Portuguese', languageInstruction: 'ALL text in PERFECT PORTUGUESE. Headlines, benefits, CTAs — everything in Portuguese' },
+  de: { language: 'German', languageInstruction: 'ALL text in PERFECT GERMAN. Headlines, benefits, CTAs — everything in German' },
+}
+
+export function getCountryLanguage(countryCode: string, outputLanguage?: string): CountryLanguageInfo {
+  const base = COUNTRY_LANGUAGE_MAP[countryCode] || COUNTRY_LANGUAGE_MAP['US']
+  // If user manually selected a different output language, override
+  if (outputLanguage && LANGUAGE_OVERRIDE[outputLanguage]) {
+    const override = LANGUAGE_OVERRIDE[outputLanguage]
+    return { ...base, language: override.language, languageInstruction: override.languageInstruction }
+  }
+  return base
 }
