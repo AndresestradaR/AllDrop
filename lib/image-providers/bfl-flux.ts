@@ -26,17 +26,17 @@ function buildPricingSection(request: GenerateImageRequest): string {
 
 function buildPrompt(request: GenerateImageRequest): string {
   const { productName, creativeControls } = request
-  const targetCountry = creativeControls?.targetCountry || 'CO'
+  const targetCountry = creativeControls?.targetCountry || 'ES'
 
-  const countryNames: Record<string, string> = {
-    CO: 'Colombia', MX: 'Mexico', PA: 'Panama', EC: 'Ecuador', PE: 'Peru',
-    CL: 'Chile', PY: 'Paraguay', AR: 'Argentina', GT: 'Guatemala', ES: 'Espana',
-  }
-  const countryName = countryNames[targetCountry] || 'Colombia'
+  const { getCountryLanguage } = require('./country-language')
+  const countryInfo = getCountryLanguage(targetCountry)
+  const countryName = countryInfo.countryName
 
   const pricingSection = buildPricingSection(request)
 
-  return `Professional e-commerce marketing banner for "${productName}" in Spanish.
+  return `Professional e-commerce marketing banner for "${productName}".
+TARGET MARKET: ${countryName} (${countryInfo.region})
+LANGUAGE: ${countryInfo.languageInstruction}
 
 ${buildProductContextSection(request)}
 
@@ -53,9 +53,9 @@ ${pricingSection}
 ${creativeControls?.productDetails ? `- Product features: ${creativeControls.productDetails}` : ''}
 
 TEXT:
-- All text in SPANISH
-- Bold, impactful headlines
-- Trust badges at bottom (Envio Gratis, Pago Contraentrega, Garantia)
+- ${countryInfo.languageInstruction}
+- Bold, impactful headlines in ${countryInfo.language}
+- Trust badges at bottom (free shipping, guarantee, etc.) in ${countryInfo.language}
 
 ${creativeControls?.salesAngle ? `Marketing angle: ${creativeControls.salesAngle}` : ''}
 ${creativeControls?.targetAvatar ? `Target audience: ${creativeControls.targetAvatar}` : ''}
@@ -65,6 +65,8 @@ ${buildSectionTypeSection(request)}
 ${buildColorSection(request)}
 
 ${buildTypographySection(request)}
+
+CRITICAL: ALL text on the banner MUST be in ${countryInfo.language.toUpperCase()}. Not a single word in any other language.
 
 Create a stunning, professional banner ready for social media advertising.`
 }

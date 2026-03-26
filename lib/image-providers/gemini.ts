@@ -36,14 +36,11 @@ function buildPricingSection(request: GenerateImageRequest): string {
 // Exported for reuse in KIE Gemini fallback
 export function buildGeminiPrompt(request: GenerateImageRequest): string {
   const { productName, creativeControls } = request
-  const targetCountry = creativeControls?.targetCountry || 'CO'
+  const targetCountry = creativeControls?.targetCountry || 'ES'
 
-  const countryNames: Record<string, string> = {
-    CO: 'Colombia', MX: 'Mexico', PA: 'Panama', EC: 'Ecuador',
-    PE: 'Peru', CL: 'Chile', PY: 'Paraguay', AR: 'Argentina',
-    GT: 'Guatemala', ES: 'Espana',
-  }
-  const countryName = countryNames[targetCountry] || 'Colombia'
+  const { getCountryLanguage } = require('./country-language')
+  const countryInfo = getCountryLanguage(targetCountry)
+  const countryName = countryInfo.countryName
 
   const pricingSection = buildPricingSection(request)
 
@@ -52,76 +49,81 @@ export function buildGeminiPrompt(request: GenerateImageRequest): string {
   const targetAvatar = creativeControls?.targetAvatar || ''
   const additionalInstructions = creativeControls?.additionalInstructions || ''
 
-  return `Eres un director creativo experto en publicidad e-commerce para LATAM. Tu trabajo es crear banners que VENDEN.
+  return `You are an expert creative director in e-commerce advertising. Your job is to create banners that SELL.
+TARGET MARKET: ${countryName} (${countryInfo.region})
+LANGUAGE: ${countryInfo.languageInstruction}
 
 ${buildProductContextSection(request)}
 
-=== PASO 1: ANALISIS DEL PRODUCTO (PIENSA ANTES DE DISENAR) ===
+=== STEP 1: PRODUCT ANALYSIS (THINK BEFORE DESIGNING) ===
 
-Producto: ${productName}
-${productDetails ? `Detalles: ${productDetails}` : ''}
-${salesAngle ? `Angulo de venta: ${salesAngle}` : ''}
+Product: ${productName}
+${productDetails ? `Details: ${productDetails}` : ''}
+${salesAngle ? `Sales angle: ${salesAngle}` : ''}
 
-Antes de disenar, ANALIZA:
-1. Que CATEGORIA es este producto? (cocina, fitness, belleza, tecnologia, hogar, salud, etc.)
-2. En que CONTEXTO se usa? (cocina, gimnasio, bano, oficina, exterior, etc.)
-3. Que ACCION realiza la persona al usarlo? (cocinar, ejercitar, aplicar, limpiar, etc.)
-4. Que EMOCION transmite el beneficio? (energia, tranquilidad, confianza, felicidad, etc.)
+Before designing, ANALYZE:
+1. What CATEGORY is this product? (kitchen, fitness, beauty, tech, home, health, etc.)
+2. In what CONTEXT is it used? (kitchen, gym, bathroom, office, outdoors, etc.)
+3. What ACTION does the person do when using it? (cook, exercise, apply, clean, etc.)
+4. What EMOTION does the benefit convey? (energy, calm, confidence, happiness, etc.)
 
-=== PASO 2: DEFINIR LA PERSONA DEL BANNER ===
+=== STEP 2: DEFINE THE BANNER PERSON ===
 
-${targetAvatar ? `AVATAR ESPECIFICADO POR EL CLIENTE: ${targetAvatar}` : 'Persona: adulto latinoamericano apropiado para el producto'}
+${targetAvatar ? `AVATAR SPECIFIED BY CLIENT: ${targetAvatar}` : `Person: adult appropriate for the product and ${countryName} market`}
 
-REGLA CRITICA: La persona del banner debe:
-- Coincidir con el avatar especificado (edad, genero, apariencia)
-- Estar en un AMBIENTE COHERENTE con el producto
-- Realizar una ACCION que tenga sentido con el producto
-- Transmitir la emocion del beneficio
+CRITICAL RULE: The person in the banner must:
+- Match the specified avatar (age, gender, appearance)
+- Be in an ENVIRONMENT COHERENT with the product
+- Perform an ACTION that makes sense with the product
+- Convey the benefit emotion
+- LOOK LIKE someone from ${countryName} (local appearance, style)
 
-EJEMPLOS DE COHERENCIA:
-- Sarten de cocina -> Persona en COCINA, cocinando, con delantal
-- Suplemento fitness -> Persona atletica en GIMNASIO o entrenando
-- Crema facial -> Persona en BANO o ambiente spa, aplicandose crema
-- Aspiradora -> Persona en SALA/HOGAR, limpiando
-- Auriculares -> Persona relajada escuchando musica
+COHERENCE EXAMPLES:
+- Kitchen pan -> Person in KITCHEN, cooking, with apron
+- Fitness supplement -> Athletic person in GYM or training
+- Face cream -> Person in BATHROOM or spa setting, applying cream
+- Vacuum cleaner -> Person in LIVING ROOM/HOME, cleaning
+- Headphones -> Relaxed person listening to music
 
-=== PASO 3: COMPOSICION DEL BANNER ===
+=== STEP 3: BANNER COMPOSITION ===
 
-USA EL TEMPLATE (imagen 1) COMO REFERENCIA DE:
-- Estructura y layout general
-- Posicion de elementos (producto hero, badges de precio, beneficios)
-- Estilo tipografico y colores
-- Efectos visuales (splashes, brillos, decoraciones)
+USE THE TEMPLATE (image 1) AS REFERENCE FOR:
+- General structure and layout
+- Position of elements (hero product, price badges, benefits)
+- Typographic style and colors
+- Visual effects (splashes, glows, decorations)
 
-PERO ADAPTA COMPLETAMENTE:
-- La PERSONA -> debe coincidir con el avatar y contexto del producto
-- El AMBIENTE/FONDO -> debe ser coherente con el uso del producto
-- La POSE/ACCION -> debe mostrar uso natural del producto
-- Los ELEMENTOS DECORATIVOS -> deben ser relevantes al producto
+BUT FULLY ADAPT:
+- The PERSON -> must match avatar and product context
+- The BACKGROUND/ENVIRONMENT -> must be coherent with product use
+- The POSE/ACTION -> must show natural product use
+- DECORATIVE ELEMENTS -> must be relevant to the product
 
-=== PASO 4: CONTENIDO DEL BANNER ===
+=== STEP 4: BANNER CONTENT ===
 
-PRODUCTO: ${productName}
-PAIS: ${countryName}
+PRODUCT: ${productName}
+COUNTRY: ${countryName}
 
 ${pricingSection}
 
-TEXTOS:
-- TODO en ESPANOL PERFECTO, sin errores
-- Fuentes GRANDES, BOLD, legibles
-- Headlines orientados a VENTA y BENEFICIO
-- Usa los precios EXACTOS proporcionados
+TEXT:
+- ${countryInfo.languageInstruction}
+- LARGE, BOLD, readable fonts
+- Headlines focused on SALES and BENEFITS
+- Use the EXACT prices provided
 
-=== PASO 5: ELEMENTOS OBLIGATORIOS ===
+=== STEP 5: MANDATORY ELEMENTS ===
 
-1. PRODUCTO HERO: Grande, prominente, con el empaque/etiquetas EXACTOS de las imagenes del usuario
-2. PERSONA: Coherente con avatar + contexto + accion natural
-3. HEADLINE: Impactante, orientado a beneficios
-4. BENEFICIOS: 3-4 iconos con texto corto
-5. PRECIO: Badge destacado (si se proporciono)
-6. FOOTER: Sellos de confianza (envio gratis, garantia, etc.)
+1. HERO PRODUCT: Large, prominent, with EXACT packaging/labels from user images
+2. PERSON: Coherent with avatar + context + natural action + ${countryName} appearance
+3. HEADLINE: Impactful, benefit-oriented, IN ${countryInfo.language.toUpperCase()}
+4. BENEFITS: 3-4 icons with short text IN ${countryInfo.language.toUpperCase()}
+5. PRICE: Highlighted badge (if provided)
+6. FOOTER: Trust seals (free shipping, guarantee, etc.) IN ${countryInfo.language.toUpperCase()}
 
-${additionalInstructions ? `=== INSTRUCCIONES ESPECIALES DEL CLIENTE ===\n${additionalInstructions}` : ''}
+CRITICAL: Every single text element on the banner MUST be in ${countryInfo.language.toUpperCase()}. Not a single word in any other language.
+
+${additionalInstructions ? `=== SPECIAL CLIENT INSTRUCTIONS ===\n${additionalInstructions}` : ''}
 
 ${buildSectionTypeSection(request)}
 ${buildColorSection(request)}
