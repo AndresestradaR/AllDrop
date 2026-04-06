@@ -17,23 +17,28 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Plan gate
+    // Plan gate (skip for admin)
     const serviceClient = await createServiceClient()
-    const { data: profile, error: profileError } = await serviceClient
-      .from('profiles')
-      .select('plan, full_name')
-      .eq('id', user.id)
-      .single()
+    let userName = ''
 
-    if (profileError || !profile) {
-      return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
-    }
+    if (user.email !== ADMIN_EMAIL) {
+      const { data: profile, error: profileError } = await serviceClient
+        .from('profiles')
+        .select('plan, full_name')
+        .eq('id', user.id)
+        .single()
 
-    if (!ALLOWED_PLANS.includes(profile.plan) && user.email !== ADMIN_EMAIL) {
-      return NextResponse.json(
-        { error: 'This feature requires a Pro, Business, or Enterprise plan' },
-        { status: 403 }
-      )
+      if (profileError || !profile) {
+        return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
+      }
+
+      if (!ALLOWED_PLANS.includes(profile.plan)) {
+        return NextResponse.json(
+          { error: 'This feature requires a Pro, Business, or Enterprise plan' },
+          { status: 403 }
+        )
+      }
+      userName = profile.full_name || ''
     }
 
     // Parse body
@@ -94,7 +99,7 @@ export async function POST(request: Request) {
     }
 
     // Build messages array
-    const systemPrompt = buildSystemPrompt(profile.full_name)
+    const systemPrompt = buildSystemPrompt(userName)
     const messages: AgentMessage[] = [
       { role: 'system', content: systemPrompt },
       ...(history || []).map((m: { role: string; content: string }) => ({
