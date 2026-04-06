@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback, KeyboardEvent } from 'react'
 import { useI18n } from '@/lib/i18n'
-import { MessageSquare, Send, Trash2, Plus, Lock, Bot } from 'lucide-react'
+import { MessageSquare, Send, Trash2, Plus, Lock, Bot, Settings } from 'lucide-react'
+import AgentConfigModal from '@/components/agent/AgentConfigModal'
 
 interface Conversation {
   id: string
@@ -67,7 +68,7 @@ function renderMarkdown(text: string): string {
 }
 
 export default function AgentPage() {
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
 
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
@@ -78,6 +79,9 @@ export default function AgentPage() {
   const [loadingConversations, setLoadingConversations] = useState(true)
   const [loadingMessages, setLoadingMessages] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [configModalOpen, setConfigModalOpen] = useState(false)
+  const [agentName, setAgentName] = useState('AllDrop Assistant')
+  const [agentAvatarUrl, setAgentAvatarUrl] = useState<string | null>(null)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -112,6 +116,16 @@ export default function AgentPage() {
 
   useEffect(() => {
     fetchConversations()
+    // Load agent config
+    fetch('/api/agent/config')
+      .then(res => res.json())
+      .then(data => {
+        if (data && !data.error) {
+          setAgentName(data.agent_name || 'AllDrop Assistant')
+          setAgentAvatarUrl(data.agent_avatar_url || null)
+        }
+      })
+      .catch(() => {})
   }, [fetchConversations])
 
   // Load messages when conversation changes
@@ -197,6 +211,7 @@ export default function AgentPage() {
         body: JSON.stringify({
           conversation_id: activeConversationId,
           message: text,
+          locale,
         }),
         signal: controller.signal,
       })
@@ -266,7 +281,7 @@ export default function AgentPage() {
       abortRef.current = null
       fetchConversations()
     }
-  }, [inputValue, isStreaming, activeConversationId, fetchConversations])
+  }, [inputValue, isStreaming, activeConversationId, fetchConversations, locale])
 
   const handleKeyDown = useCallback((e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -372,8 +387,19 @@ export default function AgentPage() {
           >
             <MessageSquare className="w-5 h-5" />
           </button>
-          <Bot className="w-5 h-5 text-[#8b5cf6]" />
-          <h1 className="text-white font-medium">{t.agent.title}</h1>
+          {agentAvatarUrl ? (
+            <img src={agentAvatarUrl} alt="" className="w-6 h-6 rounded-full object-cover" />
+          ) : (
+            <Bot className="w-5 h-5 text-[#8b5cf6]" />
+          )}
+          <h1 className="text-white font-medium flex-1">{agentName}</h1>
+          <button
+            onClick={() => setConfigModalOpen(true)}
+            className="p-1.5 rounded-lg hover:bg-gray-800 transition-colors text-gray-400 hover:text-white"
+            aria-label={t.agent.agentSettings}
+          >
+            <Settings className="w-5 h-5" />
+          </button>
         </div>
 
         {/* Messages */}
@@ -397,8 +423,12 @@ export default function AgentPage() {
                   className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
                   {msg.role === 'assistant' && (
-                    <div className="w-7 h-7 rounded-full bg-gray-800 flex items-center justify-center mr-2 mt-1 shrink-0">
-                      <Bot className="w-4 h-4 text-[#8b5cf6]" />
+                    <div className="w-7 h-7 rounded-full bg-gray-800 flex items-center justify-center mr-2 mt-1 shrink-0 overflow-hidden">
+                      {agentAvatarUrl ? (
+                        <img src={agentAvatarUrl} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <Bot className="w-4 h-4 text-[#8b5cf6]" />
+                      )}
                     </div>
                   )}
                   <div
@@ -465,6 +495,15 @@ export default function AgentPage() {
           </div>
         </div>
       </div>
+
+      <AgentConfigModal
+        isOpen={configModalOpen}
+        onClose={() => setConfigModalOpen(false)}
+        onSaved={(config) => {
+          setAgentName(config.agent_name || 'AllDrop Assistant')
+          setAgentAvatarUrl(config.agent_avatar_url || null)
+        }}
+      />
     </div>
   )
 }
