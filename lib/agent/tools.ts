@@ -1,7 +1,11 @@
 // Agent tool definitions and handlers for AllDrop AI Agent
 // Tools use internal fetch() calls to the same app's API routes
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+function getBaseUrl(): string {
+  if (process.env.NEXT_PUBLIC_APP_URL) return process.env.NEXT_PUBLIC_APP_URL
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`
+  return 'http://localhost:3000'
+}
 
 // ---- OpenAI function calling tool definitions ----
 
@@ -175,7 +179,7 @@ function buildInternalHeaders(headers: Record<string, string>): Record<string, s
 
 async function handleGenerateSalesAngles(args: any, headers: Record<string, string>): Promise<string> {
   try {
-    const res = await fetch(`${BASE_URL}/api/generate-angles`, {
+    const res = await fetch(`${getBaseUrl()}/api/generate-angles`, {
       method: 'POST',
       headers: buildInternalHeaders(headers),
       body: JSON.stringify({
@@ -305,7 +309,7 @@ async function handleSearchProducts(args: any, headers: Record<string, string>):
     if (args.country) params.set('country', args.country)
     if (args.minSales) params.set('minSales', String(args.minSales))
 
-    const res = await fetch(`${BASE_URL}/api/productos/search?${params.toString()}`, {
+    const res = await fetch(`${getBaseUrl()}/api/productos/search?${params.toString()}`, {
       method: 'GET',
       headers: buildInternalHeaders(headers),
     })
