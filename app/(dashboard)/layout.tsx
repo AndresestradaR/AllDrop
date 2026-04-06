@@ -45,6 +45,7 @@ export default function DashboardLayout({
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [aiHealth, setAiHealth] = useState<'green' | 'yellow' | 'red' | null>(null)
   const [userDrops, setUserDrops] = useState(0)
+  const [userPlan, setUserPlan] = useState<string>('free')
   const [langOpen, setLangOpen] = useState(false)
   const langRef = useRef<HTMLDivElement>(null)
 
@@ -52,10 +53,13 @@ export default function DashboardLayout({
     { name: t.nav.dashboard, href: '/dashboard', icon: LayoutDashboard },
   ]
 
+  const hasPro = ['pro', 'business', 'enterprise'].includes(userPlan)
+
   const creatorNavigation = [
     { name: t.nav.createLanding, href: '/dashboard/landing', icon: LayoutTemplate },
     { name: t.nav.studioIA, href: '/dashboard/studio', icon: Wand2, isNew: true },
     { name: t.nav.findProduct, href: '/dashboard/product-research', icon: Target, isNew: true },
+    ...(hasPro ? [{ name: t.nav.agent || 'AI Assistant', href: '/dashboard/agent', icon: Bot, isNew: true }] : []),
   ]
 
   const otherNavigation = [
@@ -79,9 +83,12 @@ export default function DashboardLayout({
       const email = data.user?.email || null
       setUserEmail(email)
       if (data.user) {
-        supabase.from('profiles').select('drops').eq('id', data.user.id).single()
+        supabase.from('profiles').select('drops, plan').eq('id', data.user.id).single()
           .then(({ data: profile }) => {
-            if (profile) setUserDrops(profile.drops || 0)
+            if (profile) {
+              setUserDrops(profile.drops || 0)
+              setUserPlan(profile.plan || 'free')
+            }
           })
       }
       if (email && email === ADMIN_EMAIL) {
