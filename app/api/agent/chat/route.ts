@@ -6,6 +6,7 @@ import { buildSystemPrompt } from '@/lib/agent/system-prompt'
 export const maxDuration = 60
 
 const ALLOWED_PLANS = ['pro', 'business', 'enterprise']
+const ADMIN_EMAIL = 'infoalldrop@gmail.com'
 
 export async function POST(request: Request) {
   try {
@@ -28,7 +29,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
     }
 
-    if (!ALLOWED_PLANS.includes(profile.plan)) {
+    if (!ALLOWED_PLANS.includes(profile.plan) && user.email !== ADMIN_EMAIL) {
       return NextResponse.json(
         { error: 'This feature requires a Pro, Business, or Enterprise plan' },
         { status: 403 }

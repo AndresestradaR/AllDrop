@@ -53,7 +53,7 @@ export default function DashboardLayout({
     { name: t.nav.dashboard, href: '/dashboard', icon: LayoutDashboard },
   ]
 
-  const hasPro = ['pro', 'business', 'enterprise'].includes(userPlan)
+  const hasPro = userEmail === ADMIN_EMAIL || ['pro', 'business', 'enterprise'].includes(userPlan)
 
   const creatorNavigation = [
     { name: t.nav.createLanding, href: '/dashboard/landing', icon: LayoutTemplate },
