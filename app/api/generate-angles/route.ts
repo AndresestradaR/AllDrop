@@ -25,19 +25,27 @@ const COUNTRY_CONTEXT: Record<string, string> = {
   ES: 'Espana — moneda EUR, envio 2-5 dias',
 }
 
-const ANGLES_SYSTEM_PROMPT = `# ROL
-Eres un estratega de marketing senior especializado en dropshipping COD para Latinoamerica. Dominas las tecnicas de Eugene Schwartz (niveles de consciencia), David Ogilvy (headlines que venden) y Russell Brunson (funnels y angulos).
+const LANG_NAMES: Record<string, string> = {
+  es: 'Spanish', en: 'English', fr: 'French', it: 'Italian', pt: 'Portuguese', de: 'German',
+}
+
+function buildAnglesSystemPrompt(outputLanguage?: string): string {
+  const lang = LANG_NAMES[outputLanguage || 'es'] || 'Spanish'
+  const isSpanish = !outputLanguage || outputLanguage === 'es'
+
+  return `# ROL
+Eres un estratega de marketing senior especializado en dropshipping COD. Dominas las tecnicas de Eugene Schwartz (niveles de consciencia), David Ogilvy (headlines que venden) y Russell Brunson (funnels y angulos).
 
 Tu trabajo es generar ANGULOS DE VENTA diversificados para un producto. Cada angulo es una perspectiva diferente para vender el MISMO producto a DIFERENTES tipos de compradores o con DIFERENTES motivaciones.
 
 # QUE ES UN ANGULO DE VENTA
 Un angulo es la PERSPECTIVA o ENFOQUE desde el cual presentas el producto. El mismo suplemento de magnesio puede venderse como:
-- Angulo DOLOR: "Deja de sufrir calambres nocturnos"
-- Angulo RENDIMIENTO: "Duplica tu energia en el gym"
-- Angulo CIENCIA: "El mineral que el 80% de latinos no consume"
-- Angulo COMPARACION: "Mejor que cualquier multivitaminico"
-- Angulo MIEDO: "La deficiencia silenciosa que envejece tu cuerpo"
-- Angulo ASPIRACIONAL: "El secreto de los atletas olimpicos"
+- Angulo DOLOR: ${isSpanish ? '"Deja de sufrir calambres nocturnos"' : '"Stop suffering from night cramps"'}
+- Angulo RENDIMIENTO: ${isSpanish ? '"Duplica tu energia en el gym"' : '"Double your energy at the gym"'}
+- Angulo CIENCIA: ${isSpanish ? '"El mineral que el 80% de latinos no consume"' : '"The mineral 80% of people don\'t get enough of"'}
+- Angulo COMPARACION: ${isSpanish ? '"Mejor que cualquier multivitaminico"' : '"Better than any multivitamin"'}
+- Angulo MIEDO: ${isSpanish ? '"La deficiencia silenciosa que envejece tu cuerpo"' : '"The silent deficiency aging your body"'}
+- Angulo ASPIRACIONAL: ${isSpanish ? '"El secreto de los atletas olimpicos"' : '"The secret of Olympic athletes"'}
 
 # TIPOS DE ANGULO (genera variedad de estos)
 1. TRANSFORMACION: Antes/despues, resultado visible, cambio de vida
@@ -59,8 +67,9 @@ Un angulo es la PERSPECTIVA o ENFOQUE desde el cual presentas el producto. El mi
 # REGLAS
 - Generar EXACTAMENTE 6 angulos diversificados
 - Cada angulo debe ser SUFICIENTEMENTE DIFERENTE del resto
-- Los hooks deben ser cortos (max 80 chars), impactantes, en espanol
-- SIN TILDES en los hooks y salesAngle (para banners)
+- ALL hooks, names, descriptions, salesAngle and avatarSuggestion MUST be written in ${lang.toUpperCase()}
+- Los hooks deben ser cortos (max 80 chars), impactantes
+- NO ACCENTS/DIACRITICS in hooks and salesAngle (for banners)
 - El salesAngle es la version larga del hook (max 150 chars)
 - El avatarSuggestion debe ser ESPECIFICO: edad, genero, actividad, motivacion
 - El tone debe ser UNA palabra: Urgente, Aspiracional, Cientifico, Emocional, Provocador, Educativo
@@ -71,15 +80,16 @@ JSON valido con esta estructura:
   "angles": [
     {
       "id": "angle-1",
-      "name": "Nombre corto del angulo (3-5 palabras)",
-      "hook": "El gancho principal en max 80 chars SIN TILDES",
-      "description": "Descripcion de la estrategia del angulo en 1-2 oraciones",
-      "avatarSuggestion": "Perfil especifico: genero, edad, actividad, motivacion",
+      "name": "Short angle name (3-5 words) IN ${lang.toUpperCase()}",
+      "hook": "Main hook max 80 chars NO ACCENTS IN ${lang.toUpperCase()}",
+      "description": "Angle strategy description in 1-2 sentences IN ${lang.toUpperCase()}",
+      "avatarSuggestion": "Specific profile: gender, age, activity, motivation IN ${lang.toUpperCase()}",
       "tone": "Urgente|Aspiracional|Cientifico|Emocional|Provocador|Educativo",
-      "salesAngle": "Version expandida del hook para el prompt del banner, max 150 chars SIN TILDES"
+      "salesAngle": "Expanded hook for banner prompt, max 150 chars NO ACCENTS IN ${lang.toUpperCase()}"
     }
   ]
 }`
+}
 
 export async function POST(request: Request) {
   try {
@@ -102,6 +112,7 @@ export async function POST(request: Request) {
       productPhotos,
       productContext,
       targetCountry,
+      outputLanguage,
     } = body as {
       productName?: string
       productPhotos?: string[]
@@ -113,6 +124,7 @@ export async function POST(request: Request) {
         differentiator?: string
       }
       targetCountry?: string
+      outputLanguage?: string
     }
 
     // Get API keys (KIE primary, Google fallback)
@@ -174,7 +186,7 @@ export async function POST(request: Request) {
       let aiFallbacks: string[] = []
 
       const raw = await generateAIText(aiKeys, {
-        systemPrompt: ANGLES_SYSTEM_PROMPT,
+        systemPrompt: buildAnglesSystemPrompt(outputLanguage),
         userMessage: promptLines.join('\n'),
         images: images.length > 0 ? images : undefined,
         temperature: 0.9,

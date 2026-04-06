@@ -2,6 +2,7 @@
 
 import { DollarSign, Tag, Package, Info } from 'lucide-react'
 import { Input } from '@/components/ui'
+import { useI18n } from '@/lib/i18n'
 
 export interface PricingData {
   currencySymbol: string
@@ -18,6 +19,7 @@ interface PricingControlsProps {
 }
 
 export default function PricingControls({ value, onChange, disabled }: PricingControlsProps) {
+  const { t } = useI18n()
   const updateField = (field: keyof PricingData, newValue: string) => {
     onChange({ ...value, [field]: newValue })
   }
@@ -26,12 +28,12 @@ export default function PricingControls({ value, onChange, disabled }: PricingCo
     <div className="space-y-4">
       <label className="flex items-center gap-2 text-sm font-medium text-text-primary">
         <DollarSign className="w-4 h-4 text-accent" />
-        Precios del producto
+        {t.editor.productPrices}
       </label>
 
       {/* Currency Symbol */}
       <div className="space-y-2">
-        <label className="text-xs font-medium text-text-secondary">Simbolo de moneda</label>
+        <label className="text-xs font-medium text-text-secondary">{t.editor.currencySymbol}</label>
         <Input
           type="text"
           value={value.currencySymbol}
@@ -41,7 +43,7 @@ export default function PricingControls({ value, onChange, disabled }: PricingCo
           placeholder="$"
         />
         <p className="text-xs text-text-tertiary">
-          Puedes modificar el simbolo manualmente
+          {t.editor.currencyHint}
         </p>
       </div>
 
@@ -50,7 +52,7 @@ export default function PricingControls({ value, onChange, disabled }: PricingCo
         <div className="space-y-2">
           <label className="flex items-center gap-1.5 text-xs font-medium text-text-secondary">
             <Tag className="w-3.5 h-3.5 text-green-500" />
-            Precio Oferta
+            {t.editor.offerPrice}
           </label>
           <div className="flex">
             <span className="px-3 py-2.5 bg-surface border border-r-0 border-border rounded-l-xl text-text-secondary text-sm">
@@ -65,13 +67,13 @@ export default function PricingControls({ value, onChange, disabled }: PricingCo
               className="rounded-l-none flex-1"
             />
           </div>
-          <p className="text-xs text-text-tertiary">Precio principal destacado</p>
+          <p className="text-xs text-text-tertiary">{t.editor.offerPriceHint}</p>
         </div>
 
         <div className="space-y-2">
           <label className="flex items-center gap-1.5 text-xs font-medium text-text-secondary">
             <Tag className="w-3.5 h-3.5 text-red-500" />
-            Precio Antes
+            {t.editor.previousPrice}
           </label>
           <div className="flex">
             <span className="px-3 py-2.5 bg-surface border border-r-0 border-border rounded-l-xl text-text-secondary text-sm">
@@ -86,7 +88,7 @@ export default function PricingControls({ value, onChange, disabled }: PricingCo
               className="rounded-l-none flex-1"
             />
           </div>
-          <p className="text-xs text-text-tertiary">Precio tachado</p>
+          <p className="text-xs text-text-tertiary">{t.editor.previousPriceHint}</p>
         </div>
       </div>
 
@@ -95,7 +97,7 @@ export default function PricingControls({ value, onChange, disabled }: PricingCo
         <div className="space-y-2">
           <label className="flex items-center gap-1.5 text-xs font-medium text-text-secondary">
             <Package className="w-3.5 h-3.5 text-blue-500" />
-            Precio 2 Unidades
+            {t.editor.price2Units}
           </label>
           <div className="flex">
             <span className="px-3 py-2.5 bg-surface border border-r-0 border-border rounded-l-xl text-text-secondary text-sm">
@@ -115,7 +117,7 @@ export default function PricingControls({ value, onChange, disabled }: PricingCo
         <div className="space-y-2">
           <label className="flex items-center gap-1.5 text-xs font-medium text-text-secondary">
             <Package className="w-3.5 h-3.5 text-purple-500" />
-            Precio 3 Unidades
+            {t.editor.price3Units}
           </label>
           <div className="flex">
             <span className="px-3 py-2.5 bg-surface border border-r-0 border-border rounded-l-xl text-text-secondary text-sm">
@@ -137,7 +139,7 @@ export default function PricingControls({ value, onChange, disabled }: PricingCo
       <div className="flex items-start gap-2 p-3 bg-surface rounded-xl border border-border">
         <Info className="w-4 h-4 text-accent mt-0.5 flex-shrink-0" />
         <p className="text-xs text-text-secondary">
-          Los precios son opcionales. Si dejas todos vacios, el banner se generara sin precios.
+          {t.editor.pricingNote}
         </p>
       </div>
     </div>
@@ -150,6 +152,7 @@ export function PricingControlsCompact({
   onChange,
   disabled,
 }: PricingControlsProps) {
+  const { t } = useI18n()
   const updateField = (field: keyof PricingData, newValue: string) => {
     onChange({ ...value, [field]: newValue })
   }
@@ -159,7 +162,7 @@ export function PricingControlsCompact({
       <div className="flex items-center justify-between">
         <label className="flex items-center gap-2 text-sm font-medium text-text-primary">
           <DollarSign className="w-4 h-4 text-accent" />
-          Precios
+          {t.editor.prices}
         </label>
         <Input
           type="text"
@@ -177,7 +180,7 @@ export function PricingControlsCompact({
           value={value.priceAfter}
           onChange={(e) => updateField('priceAfter', e.target.value)}
           disabled={disabled}
-          placeholder="Precio oferta"
+          placeholder={t.editor.offerPrice}
           className="text-sm"
         />
         <Input
@@ -185,7 +188,7 @@ export function PricingControlsCompact({
           value={value.priceBefore}
           onChange={(e) => updateField('priceBefore', e.target.value)}
           disabled={disabled}
-          placeholder="Precio antes"
+          placeholder={t.editor.previousPrice}
           className="text-sm"
         />
         <Input
@@ -193,7 +196,7 @@ export function PricingControlsCompact({
           value={value.priceCombo2}
           onChange={(e) => updateField('priceCombo2', e.target.value)}
           disabled={disabled}
-          placeholder="2 unidades"
+          placeholder={t.editor.price2Units}
           className="text-sm"
         />
         <Input
@@ -201,7 +204,7 @@ export function PricingControlsCompact({
           value={value.priceCombo3}
           onChange={(e) => updateField('priceCombo3', e.target.value)}
           disabled={disabled}
-          placeholder="3 unidades"
+          placeholder={t.editor.price3Units}
           className="text-sm"
         />
       </div>
