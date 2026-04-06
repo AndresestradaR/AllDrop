@@ -2,13 +2,13 @@ import { NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { streamAgentResponse, type AgentMessage, type ToolCallResult } from '@/lib/agent/openrouter'
 import { buildSystemPrompt } from '@/lib/agent/system-prompt'
-import { agentToolDefinitions, executeToolCall } from '@/lib/agent/tools'
+import { agentToolDefinitions, executeToolCall, type ToolContext } from '@/lib/agent/tools'
 
 export const maxDuration = 60
 
 const ALLOWED_PLANS = ['pro', 'business', 'enterprise']
 const ADMIN_EMAIL = 'infoalldrop@gmail.com'
-const MAX_TOOL_ITERATIONS = 5
+const MAX_TOOL_ITERATIONS = 10
 
 export async function POST(request: Request) {
   try {
@@ -18,6 +18,10 @@ export async function POST(request: Request) {
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    // Get the Supabase access token for SSO bridge to DropPage
+    const { data: { session } } = await supabase.auth.getSession()
+    const supabaseAccessToken = session?.access_token || ''
 
     // Plan gate (skip for admin)
     const serviceClient = await createServiceClient()
@@ -61,6 +65,12 @@ export async function POST(request: Request) {
     if (cookie) requestHeaders['cookie'] = cookie
     const auth = request.headers.get('authorization')
     if (auth) requestHeaders['authorization'] = auth
+
+    // Build tool context with userId and access token
+    const toolContext: ToolContext = {
+      userId: user.id,
+      supabaseAccessToken,
+    }
 
     // Resolve or create conversation
     let convId = conversation_id
@@ -173,7 +183,6 @@ export async function POST(request: Request) {
                 },
                 async onDone(fullText, model) {
                   // No tool calls — final text response
-                  // Save assistant message
                   await serviceClient
                     .from('agent_messages')
                     .insert({
@@ -183,7 +192,6 @@ export async function POST(request: Request) {
                       model_used: model,
                     })
 
-                  // Update conversation updated_at
                   await serviceClient
                     .from('agent_conversations')
                     .update({ updated_at: new Date().toISOString() })
@@ -225,10 +233,16 @@ export async function POST(request: Request) {
 
                 // Execute each tool and add results
                 for (const tc of pendingToolCalls) {
-                  const result = await executeToolCall(tc.name, tc.arguments, requestHeaders)
+                  const result = await executeToolCall(tc.name, tc.arguments, requestHeaders, toolContext)
+
+                  // Truncate large results to avoid token explosion
+                  const truncatedResult = result.length > 4000
+                    ? result.substring(0, 4000) + '... [truncated]'
+                    : result
+
                   currentMessages.push({
                     role: 'tool',
-                    content: result,
+                    content: truncatedResult,
                     tool_call_id: tc.id,
                     name: tc.name,
                   })
