@@ -201,8 +201,12 @@ export default function AgentPage() {
         signal: controller.signal,
       })
 
-      if (!res.ok || !res.body) {
-        throw new Error('Stream failed')
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
+        throw new Error(errData.error || `HTTP ${res.status}`)
+      }
+      if (!res.body) {
+        throw new Error('No stream body')
       }
 
       const reader = res.body.getReader()
@@ -253,7 +257,7 @@ export default function AgentPage() {
         const updated = [...prev]
         const last = updated[updated.length - 1]
         if (last && last.role === 'assistant' && !last.content) {
-          updated[updated.length - 1] = { ...last, content: 'Error: could not get response.' }
+          updated[updated.length - 1] = { ...last, content: `Error: ${err instanceof Error ? err.message : 'could not get response.'}` }
         }
         return updated
       })
