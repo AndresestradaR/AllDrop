@@ -4,6 +4,7 @@ import { Product } from '@/lib/dropkiller/types'
 import { ExternalLink, Copy, TrendingUp, Package, DollarSign } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Image from 'next/image'
+import { useI18n } from '@/lib/i18n'
 
 interface ProductTableProps {
   products: Product[]
@@ -11,6 +12,7 @@ interface ProductTableProps {
 }
 
 export function ProductTable({ products, isLoading }: ProductTableProps) {
+  const { t } = useI18n()
   const copyLink = (url: string) => {
     navigator.clipboard.writeText(url)
     toast.success('Link copiado!')
@@ -34,7 +36,7 @@ export function ProductTable({ products, isLoading }: ProductTableProps) {
       <div className="bg-surface rounded-xl border border-border p-12">
         <div className="flex flex-col items-center justify-center gap-4">
           <div className="w-12 h-12 border-4 border-accent/30 border-t-accent rounded-full animate-spin" />
-          <p className="text-text-secondary">Buscando productos ganadores...</p>
+          <p className="text-text-secondary">{t.productResearch.searching}</p>
         </div>
       </div>
     )
@@ -46,8 +48,8 @@ export function ProductTable({ products, isLoading }: ProductTableProps) {
         <div className="flex flex-col items-center justify-center gap-4 text-center">
           <Package className="w-16 h-16 text-text-secondary/50" />
           <div>
-            <p className="text-text-primary font-medium">No hay productos</p>
-            <p className="text-text-secondary text-sm">Configura los filtros y busca productos ganadores</p>
+            <p className="text-text-primary font-medium">{t.productResearch.noProducts}</p>
+            <p className="text-text-secondary text-sm">{t.productResearch.searchProducts}</p>
           </div>
         </div>
       </div>
@@ -60,12 +62,12 @@ export function ProductTable({ products, isLoading }: ProductTableProps) {
         <table className="w-full">
           <thead className="bg-background/50">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">Producto</th>
-              <th className="px-4 py-3 text-right text-xs font-semibold text-text-secondary uppercase tracking-wider">Precio</th>
-              <th className="px-4 py-3 text-right text-xs font-semibold text-text-secondary uppercase tracking-wider">Ventas 7d</th>
-              <th className="px-4 py-3 text-right text-xs font-semibold text-text-secondary uppercase tracking-wider">Ventas 30d</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">{t.productResearch.product}</th>
+              <th className="px-4 py-3 text-right text-xs font-semibold text-text-secondary uppercase tracking-wider">{t.productResearch.price}</th>
+              <th className="px-4 py-3 text-right text-xs font-semibold text-text-secondary uppercase tracking-wider">{t.productResearch.sales7d}</th>
+              <th className="px-4 py-3 text-right text-xs font-semibold text-text-secondary uppercase tracking-wider">{t.productResearch.sales30d}</th>
               <th className="px-4 py-3 text-right text-xs font-semibold text-text-secondary uppercase tracking-wider">Stock</th>
-              <th className="px-4 py-3 text-center text-xs font-semibold text-text-secondary uppercase tracking-wider">Acciones</th>
+              <th className="px-4 py-3 text-center text-xs font-semibold text-text-secondary uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">

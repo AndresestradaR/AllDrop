@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { ProductFilters as Filters } from '@/lib/dropkiller/types'
 import { COUNTRIES, PLATFORMS } from '@/lib/dropkiller/constants'
 import { Search, Filter, ChevronDown } from 'lucide-react'
+import { useI18n } from '@/lib/i18n'
 
 interface ProductFiltersProps {
   onSearch: (filters: Filters) => void
@@ -21,6 +22,7 @@ export function ProductFilters({ onSearch, isLoading }: ProductFiltersProps) {
   })
   
   const [showAdvanced, setShowAdvanced] = useState(false)
+  const { t } = useI18n()
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -38,7 +40,7 @@ export function ProductFilters({ onSearch, isLoading }: ProductFiltersProps) {
         {/* País */}
         <div>
           <label className="block text-sm font-medium text-text-secondary mb-2">
-            País
+            {t.country.country}
           </label>
           <select
             value={filters.country}
@@ -56,7 +58,7 @@ export function ProductFilters({ onSearch, isLoading }: ProductFiltersProps) {
         {/* Plataforma */}
         <div>
           <label className="block text-sm font-medium text-text-secondary mb-2">
-            Plataforma
+            Platform
           </label>
           <select
             value={filters.platform}
@@ -74,7 +76,7 @@ export function ProductFilters({ onSearch, isLoading }: ProductFiltersProps) {
         {/* Ventas mínimas 7d */}
         <div>
           <label className="block text-sm font-medium text-text-secondary mb-2">
-            Ventas mín. (7 días)
+            {t.productResearch.minSales7d}
           </label>
           <input
             type="number"
@@ -93,7 +95,7 @@ export function ProductFilters({ onSearch, isLoading }: ProductFiltersProps) {
         className="flex items-center gap-2 text-sm text-text-secondary hover:text-accent transition-colors"
       >
         <Filter className="w-4 h-4" />
-        Filtros avanzados
+        {t.productResearch.advancedFilters}
         <ChevronDown className={`w-4 h-4 transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
       </button>
 
@@ -103,7 +105,7 @@ export function ProductFilters({ onSearch, isLoading }: ProductFiltersProps) {
           {/* Stock mínimo */}
           <div>
             <label className="block text-sm font-medium text-text-secondary mb-2">
-              Stock mín.
+              Stock min.
             </label>
             <input
               type="number"
@@ -117,7 +119,7 @@ export function ProductFilters({ onSearch, isLoading }: ProductFiltersProps) {
           {/* Precio mínimo */}
           <div>
             <label className="block text-sm font-medium text-text-secondary mb-2">
-              Precio mín.
+              {t.productResearch.minPrice}
             </label>
             <input
               type="number"
@@ -131,7 +133,7 @@ export function ProductFilters({ onSearch, isLoading }: ProductFiltersProps) {
           {/* Precio máximo */}
           <div>
             <label className="block text-sm font-medium text-text-secondary mb-2">
-              Precio máx.
+              {t.productResearch.maxPrice}
             </label>
             <input
               type="number"
@@ -145,7 +147,7 @@ export function ProductFilters({ onSearch, isLoading }: ProductFiltersProps) {
           {/* Ventas 30d mínimas */}
           <div>
             <label className="block text-sm font-medium text-text-secondary mb-2">
-              Ventas mín. (30d)
+              {t.productResearch.minSales30d}
             </label>
             <input
               type="number"
@@ -165,7 +167,7 @@ export function ProductFilters({ onSearch, isLoading }: ProductFiltersProps) {
         className="w-full md:w-auto px-6 py-3 bg-accent hover:bg-accent/90 disabled:bg-accent/50 text-background font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
       >
         <Search className="w-5 h-5" />
-        {isLoading ? 'Buscando...' : 'Buscar Productos'}
+        {isLoading ? t.productResearch.searching : t.productResearch.searchProducts}
       </button>
     </form>
   )

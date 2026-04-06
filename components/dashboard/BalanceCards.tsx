@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui'
 import { Wallet, RefreshCw, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
 import Link from 'next/link'
+import { useI18n } from '@/lib/i18n'
 
 interface BalanceData {
   kie: { credits: number } | null
@@ -32,6 +33,7 @@ function formatChars(value: number): string {
 }
 
 export default function BalanceCards() {
+  const { t } = useI18n()
   const [data, setData] = useState<BalanceData | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -70,7 +72,7 @@ export default function BalanceCards() {
             onClick={() => fetchBalances(true)}
             disabled={refreshing}
             className="p-1.5 rounded-lg text-text-secondary hover:text-text-primary hover:bg-border/50 transition-colors disabled:opacity-50"
-            title="Actualizar saldos"
+            title={t.productResearch.refreshBalances}
           >
             <RefreshCw className={cn('w-4 h-4', refreshing && 'animate-spin')} />
           </button>

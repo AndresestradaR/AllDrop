@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Search, Filter, Package, TrendingUp, DollarSign, Loader2, ChevronLeft, ChevronRight, BarChart3, Flame, ShoppingCart, RefreshCw } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { useI18n } from '@/lib/i18n'
 
 const API_URL = '/api/product-proxy'
 
@@ -41,6 +42,7 @@ interface Category {
 
 export function ProductExplorer() {
   const router = useRouter()
+  const { t } = useI18n()
 
   // State
   const [products, setProducts] = useState<Product[]>([])
@@ -162,28 +164,28 @@ export function ProductExplorer() {
           <div className="bg-surface rounded-xl border border-border p-4">
             <div className="flex items-center gap-2 text-text-secondary mb-1">
               <Package className="w-4 h-4" />
-              <span className="text-sm">Total Productos</span>
+              <span className="text-sm">{t.productResearch.totalProducts}</span>
             </div>
             <p className="text-2xl font-bold text-text-primary">{formatNumber(stats.total_productos)}</p>
           </div>
           <div className="bg-surface rounded-xl border border-border p-4">
             <div className="flex items-center gap-2 text-text-secondary mb-1">
               <ShoppingCart className="w-4 h-4" />
-              <span className="text-sm">Con Ventas</span>
+              <span className="text-sm">{t.productResearch.withSales}</span>
             </div>
             <p className="text-2xl font-bold text-accent">{formatNumber(stats.productos_con_ventas)}</p>
           </div>
           <div className="bg-surface rounded-xl border border-border p-4">
             <div className="flex items-center gap-2 text-text-secondary mb-1">
               <Flame className="w-4 h-4" />
-              <span className="text-sm">Ventas Totales</span>
+              <span className="text-sm">{t.productResearch.totalSales}</span>
             </div>
             <p className="text-2xl font-bold text-orange-500">{formatNumber(stats.ventas_total)}</p>
           </div>
           <div className="bg-surface rounded-xl border border-border p-4">
             <div className="flex items-center gap-2 text-text-secondary mb-1">
               <BarChart3 className="w-4 h-4" />
-              <span className="text-sm">Top 100+ ventas</span>
+              <span className="text-sm">{t.productResearch.topSellers}</span>
             </div>
             <p className="text-2xl font-bold text-purple-500">{formatNumber(stats.top_100_ventas)}</p>
           </div>
@@ -194,13 +196,13 @@ export function ProductExplorer() {
       <div className="bg-surface rounded-xl border border-border p-4 space-y-4">
         <div className="flex items-center gap-2 mb-2">
           <Filter className="w-5 h-5 text-accent" />
-          <h3 className="font-semibold text-text-primary">Filtros</h3>
+          <h3 className="font-semibold text-text-primary">{t.productResearch.filters}</h3>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {/* Search */}
           <div className="md:col-span-2">
-            <label className="block text-sm text-text-secondary mb-1">Buscar producto</label>
+            <label className="block text-sm text-text-secondary mb-1">{t.productResearch.searchProduct}</label>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
               <input
@@ -208,7 +210,7 @@ export function ProductExplorer() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Ej: termo, sartén, faja..."
+                placeholder={t.productResearch.searchPlaceholder}
                 className="w-full pl-10 pr-4 py-2.5 bg-background border border-border rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50"
               />
             </div>
@@ -216,13 +218,13 @@ export function ProductExplorer() {
 
           {/* Category */}
           <div>
-            <label className="block text-sm text-text-secondary mb-1">Categoría</label>
+            <label className="block text-sm text-text-secondary mb-1">{t.productResearch.category}</label>
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
               className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50"
             >
-              <option value="">Todas</option>
+              <option value="">{t.productResearch.allCategories}</option>
               {categories.map(cat => (
                 <option key={cat.name} value={cat.name}>
                   {cat.name} ({cat.count})
@@ -233,7 +235,7 @@ export function ProductExplorer() {
 
           {/* Sort */}
           <div>
-            <label className="block text-sm text-text-secondary mb-1">Ordenar por</label>
+            <label className="block text-sm text-text-secondary mb-1">{t.productResearch.orderBy}</label>
             <select
               value={`${sortBy}-${sortOrder}`}
               onChange={(e) => {
@@ -243,12 +245,12 @@ export function ProductExplorer() {
               }}
               className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50"
             >
-              <option value="soldUnitsLast30Days-desc">Más vendidos (30d)</option>
-              <option value="soldUnitsLast7Days-desc">Más vendidos (7d)</option>
-              <option value="totalSoldUnits-desc">Más vendidos (total)</option>
-              <option value="salePrice-asc">Precio: menor a mayor</option>
-              <option value="salePrice-desc">Precio: mayor a menor</option>
-              <option value="billingLast30Days-desc">Mayor facturación</option>
+              <option value="soldUnitsLast30Days-desc">{t.productResearch.bestSelling30d}</option>
+              <option value="soldUnitsLast7Days-desc">{t.productResearch.bestSelling7d}</option>
+              <option value="totalSoldUnits-desc">{t.productResearch.bestSellingTotal}</option>
+              <option value="salePrice-asc">{t.productResearch.priceLowHigh}</option>
+              <option value="salePrice-desc">{t.productResearch.priceHighLow}</option>
+              <option value="billingLast30Days-desc">{t.productResearch.highestRevenue}</option>
             </select>
           </div>
         </div>
@@ -256,7 +258,7 @@ export function ProductExplorer() {
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           {/* Min Ventas */}
           <div>
-            <label className="block text-sm text-text-secondary mb-1">Min ventas/mes</label>
+            <label className="block text-sm text-text-secondary mb-1">{t.productResearch.minSalesMonth}</label>
             <input
               type="number"
               value={minVentas}
@@ -268,19 +270,19 @@ export function ProductExplorer() {
 
           {/* Max Ventas */}
           <div>
-            <label className="block text-sm text-text-secondary mb-1">Max ventas/mes</label>
+            <label className="block text-sm text-text-secondary mb-1">{t.productResearch.maxSalesMonth}</label>
             <input
               type="number"
               value={maxVentas}
               onChange={(e) => setMaxVentas(e.target.value ? Number(e.target.value) : '')}
-              placeholder="Sin límite"
+              placeholder={t.productResearch.noLimit}
               className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50"
             />
           </div>
 
           {/* Min Precio */}
           <div>
-            <label className="block text-sm text-text-secondary mb-1">Precio mínimo</label>
+            <label className="block text-sm text-text-secondary mb-1">{t.productResearch.minPrice}</label>
             <input
               type="number"
               value={minPrecio}
@@ -292,12 +294,12 @@ export function ProductExplorer() {
 
           {/* Max Precio */}
           <div>
-            <label className="block text-sm text-text-secondary mb-1">Precio máximo</label>
+            <label className="block text-sm text-text-secondary mb-1">{t.productResearch.maxPrice}</label>
             <input
               type="number"
               value={maxPrecio}
               onChange={(e) => setMaxPrecio(e.target.value ? Number(e.target.value) : '')}
-              placeholder="Sin límite"
+              placeholder={t.productResearch.noLimit}
               className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50"
             />
           </div>
@@ -314,7 +316,7 @@ export function ProductExplorer() {
               ) : (
                 <>
                   <Search className="w-5 h-5" />
-                  Buscar
+                  {t.productResearch.search}
                 </>
               )}
             </button>
@@ -326,14 +328,14 @@ export function ProductExplorer() {
       {total > 0 && (
         <div className="flex items-center justify-between">
           <p className="text-sm text-text-secondary">
-            Mostrando {offset + 1}-{Math.min(offset + limit, total)} de <strong>{formatNumber(total)}</strong> productos
+            {t.productResearch.showing} {offset + 1}-{Math.min(offset + limit, total)} {t.productResearch.of} <strong>{formatNumber(total)}</strong> {t.productResearch.products}
           </p>
           <button
             onClick={() => loadProducts()}
             className="text-sm text-accent hover:underline flex items-center gap-1"
           >
             <RefreshCw className="w-4 h-4" />
-            Actualizar
+            {t.productResearch.refresh}
           </button>
         </div>
       )}
@@ -408,11 +410,11 @@ export function ProductExplorer() {
                 {/* Stats */}
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div className="bg-background rounded-lg p-2">
-                    <p className="text-text-secondary">Ventas 30d</p>
+                    <p className="text-text-secondary">{t.productResearch.sales30d}</p>
                     <p className="font-semibold text-text-primary">{formatNumber(product.soldUnitsLast30Days)}</p>
                   </div>
                   <div className="bg-background rounded-lg p-2">
-                    <p className="text-text-secondary">Ventas 7d</p>
+                    <p className="text-text-secondary">{t.productResearch.sales7d}</p>
                     <p className="font-semibold text-text-primary">{formatNumber(product.soldUnitsLast7Days)}</p>
                   </div>
                 </div>

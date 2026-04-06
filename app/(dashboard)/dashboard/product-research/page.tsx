@@ -9,6 +9,7 @@ import { Product, ProductFilters as Filters } from '@/lib/dropkiller/types'
 import { Target, AlertCircle, Search, Users, TrendingUp, DollarSign, ExternalLink, Loader2, CheckCircle, XCircle, BarChart3, Calculator, Truck, Package, Megaphone, PiggyBank, Flame, Sparkles, TrendingDown, Settings, Gift, Tag, Check, Square, CheckSquare, ArrowRight, Database, X, Star, Store, MessageSquare, Percent, Globe, Trophy, Play, Heart, Eye, Video } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Link from 'next/link'
+import { useI18n } from '@/lib/i18n'
 type TabType = 'catalog' | 'tiktok' | 'competitor'
 
 // FastMoss Supabase config (separate from app's Supabase)
@@ -69,27 +70,21 @@ function formatCurrency(num: number | null | undefined): string {
   return `$${num.toLocaleString()}`
 }
 
-// Category translations (English to Spanish)
-// Only categories with actual products in the database
-const CATEGORY_TRANSLATIONS: Record<string, string> = {
-  'Home': 'Hogar',
-  'Beauty': 'Belleza',
-  'Health': 'Salud',
-  'Sports': 'Deportes',
-  'Tools': 'Herramientas',
-  'Fashion': 'Moda',
-  'Bags & Luggage': 'Bolsos y Equipaje',
-  'Automotive': 'Automotriz',
-  'Kitchen': 'Cocina',
-  'Pets': 'Mascotas',
-  'Jewelry': 'Joyería',
-  'Baby': 'Bebés y Maternidad',
-  'Toys': 'Juguetes',
-}
-
-function translateCategory(category: string): string {
-  if (!category) return ''
-  return CATEGORY_TRANSLATIONS[category] || category
+// Category key mapping (English API names to translation keys)
+const CATEGORY_KEYS: Record<string, string> = {
+  'Home': 'home',
+  'Beauty': 'beauty',
+  'Health': 'health',
+  'Sports': 'sports',
+  'Tools': 'tools',
+  'Fashion': 'fashion',
+  'Bags & Luggage': 'bagsLuggage',
+  'Automotive': 'automotive',
+  'Kitchen': 'kitchen',
+  'Pets': 'pets',
+  'Jewelry': 'jewelry',
+  'Baby': 'baby',
+  'Toys': 'toys',
 }
 
 // TikTok Viral product type
@@ -206,6 +201,17 @@ interface AnalysisStats {
 }
 
 export default function ProductResearchPage() {
+  const { t } = useI18n()
+
+  const translateCategory = (category: string): string => {
+    if (!category) return ''
+    const key = CATEGORY_KEYS[category]
+    if (key && t.productResearch[key as keyof typeof t.productResearch]) {
+      return t.productResearch[key as keyof typeof t.productResearch]
+    }
+    return category
+  }
+
   const [activeTab, setActiveTab] = useState<TabType>('catalog')
   const [products, setProducts] = useState<Product[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -746,10 +752,10 @@ export default function ProductResearchPage() {
         </div>
         <div>
           <h1 className="text-2xl font-bold text-text-primary">
-            Encuentra tu Producto Ganador
+            {t.productResearch.title}
           </h1>
           <p className="text-text-secondary">
-            Explora el catálogo de Dropi, busca en tiempo real o analiza la competencia
+            {t.productResearch.subtitle}
           </p>
         </div>
       </div>
@@ -765,7 +771,7 @@ export default function ProductResearchPage() {
           }`}
         >
           <Database className="w-4 h-4" />
-          Explorar Catálogo
+          {t.productResearch.exploreCatalog}
           <span className="text-xs bg-green-500/20 text-green-500 px-1.5 py-0.5 rounded">14k+</span>
         </button>
         <button
@@ -777,7 +783,7 @@ export default function ProductResearchPage() {
           }`}
         >
           <Users className="w-4 h-4" />
-          Analizar Competencia
+          {t.productResearch.analyzeCompetition}
         </button>
         <button
           onClick={() => setActiveTab('tiktok')}
@@ -788,7 +794,7 @@ export default function ProductResearchPage() {
           }`}
         >
           <Flame className="w-4 h-4" />
-          TikTok Viral
+          {t.productResearch.tiktokViral}
           <span className="text-xs bg-orange-500/20 text-orange-500 px-1.5 py-0.5 rounded">NEW</span>
         </button>
       </div>
@@ -811,7 +817,7 @@ export default function ProductResearchPage() {
                     type="text"
                     value={tiktokSearch}
                     onChange={(e) => setTiktokSearch(e.target.value)}
-                    placeholder="Buscar producto..."
+                    placeholder={`${t.productResearch.searchProduct}...`}
                     className="w-full pl-10 pr-4 py-2.5 bg-background border border-border rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50"
                   />
                 </div>
@@ -821,7 +827,7 @@ export default function ProductResearchPage() {
                 onChange={(e) => setTiktokCategory(e.target.value)}
                 className="px-4 py-2.5 bg-background border border-border rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50"
               >
-                <option value="">Todas las categorías</option>
+                <option value="">{t.productResearch.allCategories}</option>
                 {tiktokCategories.map(cat => (
                   <option key={cat} value={cat}>{translateCategory(cat)}</option>
                 ))}
@@ -831,15 +837,15 @@ export default function ProductResearchPage() {
                 onChange={(e) => setTiktokSort(e.target.value as typeof tiktokSort)}
                 className="px-4 py-2.5 bg-background border border-border rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50"
               >
-                <option value="day7_sold_count">Ventas 7 días</option>
-                <option value="sold_count">Ventas totales</option>
-                <option value="day7_revenue">Revenue 7 días</option>
-                <option value="category_rank">Ranking Categoría</option>
+                <option value="day7_sold_count">{t.productResearch.sales7days}</option>
+                <option value="sold_count">{t.productResearch.totalSalesSort}</option>
+                <option value="day7_revenue">{t.productResearch.revenue7days}</option>
+                <option value="category_rank">{t.productResearch.categoryRanking}</option>
                 <option value="viral_index">Viral Index</option>
                 <option value="popularity_index">Popularity Index</option>
-                <option value="price_asc">Precio: Menor a Mayor</option>
-                <option value="price_desc">Precio: Mayor a Menor</option>
-                <option value="last_synced_at">Más recientes</option>
+                <option value="price_asc">{t.productResearch.priceLowHigh}</option>
+                <option value="price_desc">{t.productResearch.priceHighLow}</option>
+                <option value="last_synced_at">{t.productResearch.mostRecent}</option>
               </select>
               <button
                 onClick={loadTiktokProducts}
@@ -851,14 +857,14 @@ export default function ProductResearchPage() {
                 ) : (
                   <TrendingUp className="w-4 h-4" />
                 )}
-                Actualizar
+                {t.productResearch.refresh}
               </button>
             </div>
           </div>
 
           {/* Stats */}
           <div className="text-text-secondary text-sm">
-            {filteredTiktokProducts.length} productos encontrados
+            {filteredTiktokProducts.length} {t.productResearch.productsFound}
             {tiktokCategory && ` en ${tiktokCategory}`}
           </div>
 
@@ -866,7 +872,7 @@ export default function ProductResearchPage() {
           {tiktokLoading && (
             <div className="bg-surface rounded-xl border border-border p-12 text-center">
               <Loader2 className="w-8 h-8 text-accent animate-spin mx-auto mb-4" />
-              <p className="text-text-secondary">Cargando productos virales de TikTok...</p>
+              <p className="text-text-secondary">{t.productResearch.loadingViralProducts}</p>
             </div>
           )}
 
@@ -877,7 +883,7 @@ export default function ProductResearchPage() {
                 <Flame className="w-8 h-8 text-orange-500" />
               </div>
               <h3 className="text-lg font-semibold text-text-primary mb-2">
-                No hay productos disponibles
+                {t.productResearch.noProducts}
               </h3>
               <p className="text-text-secondary max-w-md mx-auto">
                 {tiktokSearch || tiktokCategory
@@ -921,7 +927,7 @@ export default function ProductResearchPage() {
           )}
 
           <div className="text-center text-sm text-text-secondary/70 py-4">
-            <p>Productos sincronizados desde TikTok Shop via FastMoss</p>
+            <p>{t.productResearch.syncedFromTiktok}</p>
           </div>
         </div>
       )}
@@ -935,7 +941,7 @@ export default function ProductResearchPage() {
               <div className="flex items-center gap-2 mb-4">
                 <BarChart3 className="w-5 h-5 text-accent" />
                 <h2 className="text-lg font-semibold text-text-primary">
-                  {analysisPhase === 'search' ? 'Buscar Competencia' : 'Búsqueda: ' + competitorKeyword}
+                  {analysisPhase === 'search' ? t.productResearch.searchCompetition : t.productResearch.search + ': ' + competitorKeyword}
                 </h2>
               </div>
               
@@ -950,7 +956,7 @@ export default function ProductResearchPage() {
                 <div className="md:col-span-2">
                   <label className="flex items-center gap-2 text-sm font-medium text-text-secondary mb-2">
                     <Search className="w-4 h-4" />
-                    Producto a buscar
+                    {t.productResearch.productToSearch}
                   </label>
                   <input
                     type="text"
@@ -1014,12 +1020,12 @@ export default function ProductResearchPage() {
                     {isSearching ? (
                       <>
                         <Loader2 className="w-5 h-5 animate-spin" />
-                        Buscando...
+                        {t.productResearch.searching}
                       </>
                     ) : (
                       <>
                         <Search className="w-5 h-5" />
-                        Buscar Competidores
+                        {t.productResearch.searchCompetitors}
                       </>
                     )}
                   </button>
@@ -1316,7 +1322,7 @@ export default function ProductResearchPage() {
                         />
                       </div>
                       <div>
-                        <label className="text-xs text-text-secondary">Precio 1 und *</label>
+                        <label className="text-xs text-text-secondary">{t.productResearch.price1unit}</label>
                         <input
                           type="number"
                           value={manualForm.price1}
@@ -1326,7 +1332,7 @@ export default function ProductResearchPage() {
                         />
                       </div>
                       <div>
-                        <label className="text-xs text-text-secondary">Precio 2 und</label>
+                        <label className="text-xs text-text-secondary">{t.productResearch.price2units}</label>
                         <input
                           type="number"
                           value={manualForm.price2}
@@ -1336,7 +1342,7 @@ export default function ProductResearchPage() {
                         />
                       </div>
                       <div>
-                        <label className="text-xs text-text-secondary">Precio 3 und</label>
+                        <label className="text-xs text-text-secondary">{t.productResearch.price3units}</label>
                         <input
                           type="number"
                           value={manualForm.price3}
@@ -1580,7 +1586,7 @@ export default function ProductResearchPage() {
                     <div className="space-y-4">
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-background rounded-lg">
                         <div>
-                          <p className="text-xs text-text-secondary mb-1">Costo Total (Producto + Flete)</p>
+                          <p className="text-xs text-text-secondary mb-1">{t.productResearch.totalCost}</p>
                           <p className="text-lg font-semibold text-text-primary">${marginCalc.totalCost.toLocaleString()}</p>
                         </div>
                         <div>
@@ -1589,11 +1595,11 @@ export default function ProductResearchPage() {
                           <p className="text-[10px] text-text-secondary">CPA base: ${Number(costCPA).toLocaleString()}</p>
                         </div>
                         <div>
-                          <p className="text-xs text-text-secondary mb-1">Costo Total + CPA</p>
+                          <p className="text-xs text-text-secondary mb-1">{t.productResearch.totalCostCpa}</p>
                           <p className="text-lg font-semibold text-text-primary">${Math.round(marginCalc.totalCostWithCPA).toLocaleString()}</p>
                         </div>
                         <div>
-                          <p className="text-xs text-text-secondary mb-1">Precio Mín. pa&apos; que cuadre</p>
+                          <p className="text-xs text-text-secondary mb-1">{t.productResearch.minPrice4profit}</p>
                           <p className="text-lg font-semibold text-accent">${marginCalc.minViablePrice.toLocaleString()}</p>
                         </div>
                       </div>
@@ -1785,7 +1791,7 @@ export default function ProductResearchPage() {
                   <div className="mt-6 p-4 bg-background rounded-lg border border-border">
                     <h4 className="text-sm font-medium text-text-secondary mb-4 flex items-center gap-2">
                       <DollarSign className="w-4 h-4" />
-                      Simulador de Precio - ¿A cuánto venderías?
+                      {t.productResearch.priceSimulator}
                     </h4>
 
                     {/* 3 inputs independientes */}
@@ -2026,7 +2032,7 @@ export default function ProductResearchPage() {
                 <div className="bg-[#1a1a2e] rounded-xl p-4 border border-gray-800/50">
                   <div className="flex items-center gap-2 mb-2">
                     <TrendingUp className="w-4 h-4 text-green-400" />
-                    <span className="text-xs text-gray-400">Ventas 7d</span>
+                    <span className="text-xs text-gray-400">{t.productResearch.sales7d}</span>
                   </div>
                   <p className="text-xl font-bold text-white">{formatNumber(selectedTikTokProduct.day7_sold_count)}</p>
                 </div>
@@ -2035,7 +2041,7 @@ export default function ProductResearchPage() {
                 <div className="bg-[#1a1a2e] rounded-xl p-4 border border-gray-800/50">
                   <div className="flex items-center gap-2 mb-2">
                     <TrendingUp className="w-4 h-4 text-blue-400" />
-                    <span className="text-xs text-gray-400">Ventas 28d</span>
+                    <span className="text-xs text-gray-400">{t.productResearch.sales28d}</span>
                   </div>
                   <p className="text-xl font-bold text-white">{formatNumber(selectedTikTokProduct.day28_sold_count)}</p>
                 </div>
@@ -2044,7 +2050,7 @@ export default function ProductResearchPage() {
                 <div className="bg-[#1a1a2e] rounded-xl p-4 border border-gray-800/50">
                   <div className="flex items-center gap-2 mb-2">
                     <Package className="w-4 h-4 text-purple-400" />
-                    <span className="text-xs text-gray-400">Ventas Total</span>
+                    <span className="text-xs text-gray-400">{t.productResearch.salesTotal}</span>
                   </div>
                   <p className="text-xl font-bold text-white">{formatNumber(selectedTikTokProduct.sold_count)}</p>
                 </div>
@@ -2053,7 +2059,7 @@ export default function ProductResearchPage() {
                 <div className="bg-[#1a1a2e] rounded-xl p-4 border border-gray-800/50">
                   <div className="flex items-center gap-2 mb-2">
                     <DollarSign className="w-4 h-4 text-green-400" />
-                    <span className="text-xs text-gray-400">Precio</span>
+                    <span className="text-xs text-gray-400">{t.productResearch.price}</span>
                   </div>
                   <p className="text-xl font-bold text-white">
                     ${selectedTikTokProduct.price.toLocaleString()}
@@ -2074,7 +2080,7 @@ export default function ProductResearchPage() {
                 <div className="bg-[#1a1a2e] rounded-xl p-4 border border-gray-800/50">
                   <div className="flex items-center gap-2 mb-2">
                     <DollarSign className="w-4 h-4 text-orange-400" />
-                    <span className="text-xs text-gray-400">Revenue Total</span>
+                    <span className="text-xs text-gray-400">{t.productResearch.revenueTotal}</span>
                   </div>
                   <p className="text-xl font-bold text-white">{formatCurrency(selectedTikTokProduct.sale_amount)}</p>
                 </div>
@@ -2219,7 +2225,7 @@ export default function ProductResearchPage() {
                   <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">
                     <span className="flex items-center gap-2">
                       <Video className="w-4 h-4 text-pink-400" />
-                      Top Videos Virales ({filteredVideos.length})
+                      {t.productResearch.topViralVideos} ({filteredVideos.length})
                     </span>
                   </h3>
                   <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
