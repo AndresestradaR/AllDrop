@@ -177,29 +177,18 @@ function buildInternalHeaders(headers: Record<string, string>): Record<string, s
   return h
 }
 
-async function handleGenerateSalesAngles(args: any, headers: Record<string, string>): Promise<string> {
-  try {
-    const res = await fetch(`${getBaseUrl()}/api/generate-angles`, {
-      method: 'POST',
-      headers: buildInternalHeaders(headers),
-      body: JSON.stringify({
-        productName: args.productName,
-        productDescription: args.productDescription,
-        country: args.targetCountry || 'CO',
-        language: args.outputLanguage || 'es',
-      }),
-    })
-
-    if (!res.ok) {
-      const errText = await res.text().catch(() => '')
-      return JSON.stringify({ error: `Failed to generate angles (${res.status}): ${errText}` })
-    }
-
-    const data = await res.json()
-    return JSON.stringify(data)
-  } catch (err: any) {
-    return JSON.stringify({ error: `generate_sales_angles failed: ${err.message}` })
-  }
+async function handleGenerateSalesAngles(args: any): Promise<string> {
+  // Return structured context — the LLM itself generates the angles based on this
+  return JSON.stringify({
+    instruction: `Generate exactly 6 diverse sales angles for "${args.productName}".`,
+    productDescription: args.productDescription,
+    targetCountry: args.targetCountry || 'ES',
+    outputLanguage: args.outputLanguage || 'es',
+    format: {
+      angle: { name: 'short name', hook: 'max 80 chars, no accents', description: '1-2 sentences', avatarSuggestion: 'specific buyer profile', tone: 'one word' },
+    },
+    types: ['Transformation', 'Pain/Problem', 'Authority/Science', 'Urgency', 'Comparison', 'Social Proof'],
+  })
 }
 
 async function handleGenerateLandingCopy(args: any, headers: Record<string, string>): Promise<string> {
@@ -359,7 +348,7 @@ async function handleWriteAdCopy(args: any): Promise<string> {
 // ---- Tool executor ----
 
 export const toolHandlers: Record<string, ToolHandler> = {
-  generate_sales_angles: handleGenerateSalesAngles,
+  generate_sales_angles: (args) => handleGenerateSalesAngles(args),
   generate_landing_copy: handleGenerateLandingCopy,
   calculate_costs: (args) => handleCalculateCosts(args),
   search_products: handleSearchProducts,
