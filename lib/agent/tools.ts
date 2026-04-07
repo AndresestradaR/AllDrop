@@ -716,7 +716,6 @@ async function handleExecuteLandingPipeline(args: any, headers: Record<string, s
     const existingCount = existingBefore?.length || 0
 
     // Step 3: Fire ALL banners in batches (fire-and-forget)
-    const sections = args.sections || []
     const baseUrl = getBaseUrl()
     const BATCH_SIZE = 4
     const STAGGER_WITHIN_BATCH_MS = 5000
