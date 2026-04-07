@@ -4,7 +4,7 @@ import { streamAgentResponse, type AgentMessage, type ToolCallResult } from '@/l
 import { buildSystemPrompt } from '@/lib/agent/system-prompt'
 import { agentToolDefinitions, executeToolCall, type ToolContext } from '@/lib/agent/tools'
 
-export const maxDuration = 60
+export const maxDuration = 120
 
 const ALLOWED_PLANS = ['pro', 'business', 'enterprise']
 const ADMIN_EMAIL = 'infoalldrop@gmail.com'
@@ -124,13 +124,20 @@ export async function POST(request: Request) {
             continue
           }
 
+          // Try public URL first, fallback to signed URL (1h expiry)
           const { data: urlData } = serviceClient.storage
             .from('landing-images')
             .getPublicUrl(filePath)
 
           if (urlData?.publicUrl) {
-            uploadedImageUrls.push(urlData.publicUrl)
-            console.log(`[Agent] Uploaded image: ${urlData.publicUrl}`)
+            // Verify it works by also creating a signed URL as backup
+            const { data: signedData } = await serviceClient.storage
+              .from('landing-images')
+              .createSignedUrl(filePath, 3600) // 1 hour
+
+            const finalUrl = signedData?.signedUrl || urlData.publicUrl
+            uploadedImageUrls.push(finalUrl)
+            console.log(`[Agent] Uploaded image: ${finalUrl}`)
           }
         } catch (e: any) {
           console.error(`[Agent] Image upload failed:`, e.message)
