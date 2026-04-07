@@ -161,29 +161,15 @@ export const agentToolDefinitions = [
     type: 'function' as const,
     function: {
       name: 'execute_landing_pipeline',
-      description: 'Dispara la creación de landing: crea producto y lanza TODOS los banners en paralelo. Retorna INMEDIATAMENTE con product_id, total_banners y existing_before. Los banners se generan en segundo plano (1-3 min cada uno). Después usa check_banner_status para consultar progreso.',
+      description: 'Creates a product and generates landing page banners. Call this when the user wants to create a landing. Templates are auto-selected. Banners generate in background (1-3 min each).',
       parameters: {
         type: 'object',
         properties: {
-          product_name: { type: 'string', description: 'Nombre del producto' },
-          product_description: { type: 'string', description: 'Descripción del producto' },
-          sections: {
-            type: 'array',
-            items: {
-              type: 'object',
-              properties: {
-                type: { type: 'string', description: 'Tipo de sección: hero, oferta, beneficios, testimonios, logistica, antes_despues, ingredientes, faq, modo_uso, etc.' },
-                template_id: { type: 'string', description: 'ID de la plantilla (de get_templates)' },
-                template_url: { type: 'string', description: 'URL de la plantilla (de get_templates)' },
-              },
-              required: ['type', 'template_id', 'template_url'],
-            },
-            description: 'Secciones a generar con su plantilla seleccionada',
-          },
-          product_details: { type: 'string', description: 'Resumen corto de detalles del producto (max 500 chars)' },
-          sales_angle: { type: 'string', description: 'Ángulo de venta seleccionado' },
-          target_avatar: { type: 'string', description: 'Avatar del público objetivo' },
-          additional_instructions: { type: 'string', description: 'Instrucciones adicionales para la IA (max 200 chars)' },
+          product_name: { type: 'string', description: 'Product name' },
+          product_description: { type: 'string', description: 'Product description' },
+          section_types: { type: 'string', description: 'Comma-separated section types to generate. Default: hero,beneficios,faq. Options: hero, oferta, beneficios, testimonios, antes_despues, ingredientes, faq, modo_uso' },
+          sales_angle: { type: 'string', description: 'Sales angle/hook for the banners' },
+          target_avatar: { type: 'string', description: 'Target audience description' },
           price_after: { type: 'number', description: 'Precio de venta' },
           price_before: { type: 'number', description: 'Precio anterior (tachado)' },
           currency_symbol: { type: 'string', description: 'Símbolo moneda ($)' },
@@ -675,16 +661,15 @@ async function handleExecuteLandingPipeline(args: any, headers: Record<string, s
       console.warn('[LandingPipeline] Failed to persist settings:', e.message)
     }
 
-    // Step 1.8: If no sections specified, use defaults
+    // Step 1.8: Parse section types from simple string
     let defaultTemplateId = ''
     let defaultTemplateUrl = ''
-    const sections = args.sections && args.sections.length > 0
-      ? args.sections
-      : [
-          { type: 'hero', template_id: '', template_url: '' },
-          { type: 'beneficios', template_id: '', template_url: '' },
-          { type: 'faq', template_id: '', template_url: '' },
-        ]
+    const sectionTypesStr = args.section_types || 'hero,beneficios,faq'
+    const sections = sectionTypesStr.split(',').map((s: string) => ({
+      type: s.trim(),
+      template_id: '',
+      template_url: '',
+    }))
     const needsTemplate = sections.some((s: any) => !s.template_url)
     if (needsTemplate) {
       const { data: templates } = await serviceClient
