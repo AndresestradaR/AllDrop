@@ -257,6 +257,10 @@ export async function POST(request: Request) {
         let currentMessages = [...messages]
         let iteration = 0
 
+        // Detect if user is asking to create/execute something — force tool calling
+        const userMsg = (message || '').toLowerCase()
+        const forceTools = /crea|ejecuta|genera|lanz|pipeline|landing|banner|calcul|busca|search/i.test(userMsg) && iteration === 0
+
         async function runAgentLoop(): Promise<void> {
           if (iteration >= MAX_TOOL_ITERATIONS) {
             controller.enqueue(
@@ -315,7 +319,7 @@ export async function POST(request: Request) {
                   pendingToolCalls.push(toolCall)
                 },
               },
-              { tools: agentToolDefinitions },
+              { tools: agentToolDefinitions, forceToolCall: forceTools && iteration === 1 },
             ).then(async () => {
               // After stream ends, if there were tool calls, execute them
               if (hasToolCalls && pendingToolCalls.length > 0) {

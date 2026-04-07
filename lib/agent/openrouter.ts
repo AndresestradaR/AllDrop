@@ -47,6 +47,7 @@ export interface AgentStreamCallbacks {
 
 export interface StreamOptions {
   tools?: any[]
+  forceToolCall?: boolean
 }
 
 export async function streamAgentResponse(
@@ -69,7 +70,7 @@ export async function streamAgentResponse(
 
       if (options?.tools && options.tools.length > 0) {
         createParams.tools = options.tools
-        createParams.tool_choice = 'auto'
+        createParams.tool_choice = options.forceToolCall ? 'required' : 'auto'
       }
 
       const stream = await openai.chat.completions.create(createParams) as any
