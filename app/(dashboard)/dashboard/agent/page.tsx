@@ -198,7 +198,7 @@ export default function AgentPage() {
 
   const handleSend = useCallback(async () => {
     const text = inputValue.trim()
-    if (!text || isStreaming) return
+    if ((!text && attachedImages.length === 0) || isStreaming) return
 
     // Convert images to base64
     let productImages: string[] = []
@@ -557,7 +557,7 @@ export default function AgentPage() {
               />
               <button
                 onClick={handleSend}
-                disabled={isStreaming || !inputValue.trim()}
+                disabled={isStreaming || (!inputValue.trim() && attachedImages.length === 0)}
                 className="p-2 rounded-xl bg-[#8b5cf6] hover:bg-[#7c3aed] disabled:opacity-30 disabled:cursor-not-allowed transition-all shrink-0"
                 aria-label={t.agent.send}
               >

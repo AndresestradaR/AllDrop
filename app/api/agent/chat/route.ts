@@ -49,14 +49,16 @@ export async function POST(request: Request) {
 
     // Parse body
     const body = await request.json()
-    const { conversation_id, message, locale } = body as {
+    const { conversation_id, message, locale, product_images } = body as {
       conversation_id?: string
       message: string
       locale?: string
+      product_images?: string[]
     }
 
-    if (!message || typeof message !== 'string' || message.trim().length === 0) {
-      return NextResponse.json({ error: 'Message is required' }, { status: 400 })
+    const hasImages = product_images && product_images.length > 0
+    if ((!message || typeof message !== 'string' || message.trim().length === 0) && !hasImages) {
+      return NextResponse.json({ error: 'Message or images required' }, { status: 400 })
     }
 
     // Extract request headers for internal API calls
@@ -138,6 +140,25 @@ export async function POST(request: Request) {
         content: m.content,
       })),
     ]
+
+    // If user sent images, store them in conversation context and enrich the last message
+    if (hasImages) {
+      // Store image data in conversation metadata for tools to use later
+      try {
+        await serviceClient
+          .from('agent_conversations')
+          .update({ product_images: product_images })
+          .eq('id', convId)
+      } catch {
+        // ignore — column may not exist yet
+      }
+
+      // Append image context to the user message so the agent knows photos were received
+      const lastMsg = messages[messages.length - 1]
+      if (lastMsg && lastMsg.role === 'user') {
+        lastMsg.content = `${lastMsg.content || ''}\n\n[El usuario adjuntó ${product_images!.length} foto(s) del producto. Las fotos están disponibles para usar en execute_landing_pipeline como product_image_urls. No necesitas pedir más fotos.]`.trim()
+      }
+    }
 
     // SSE stream with tool use loop
     const encoder = new TextEncoder()
