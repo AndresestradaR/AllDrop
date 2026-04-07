@@ -196,19 +196,40 @@ export default function AgentPage() {
     })
   }, [])
 
+  const compressImage = useCallback((file: File, maxDim = 800, quality = 0.7): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image()
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        let { width, height } = img
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width)
+            width = maxDim
+          } else {
+            width = Math.round((width * maxDim) / height)
+            height = maxDim
+          }
+        }
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext('2d')!
+        ctx.drawImage(img, 0, 0, width, height)
+        resolve(canvas.toDataURL('image/jpeg', quality))
+      }
+      img.src = URL.createObjectURL(file)
+    })
+  }, [])
+
   const handleSend = useCallback(async () => {
     const text = inputValue.trim()
     if ((!text && attachedImages.length === 0) || isStreaming) return
 
-    // Convert images to base64
+    // Compress and convert images to base64 (max 800px, quality 0.7 = ~100-200KB each)
     let productImages: string[] = []
     if (attachedImages.length > 0) {
       productImages = await Promise.all(
-        attachedImages.map(img => new Promise<string>((resolve) => {
-          const reader = new FileReader()
-          reader.onloadend = () => resolve(reader.result as string)
-          reader.readAsDataURL(img.file)
-        }))
+        attachedImages.map(img => compressImage(img.file))
       )
     }
 
@@ -321,7 +342,7 @@ export default function AgentPage() {
       abortRef.current = null
       fetchConversations()
     }
-  }, [inputValue, isStreaming, activeConversationId, fetchConversations, locale, attachedImages])
+  }, [inputValue, isStreaming, activeConversationId, fetchConversations, locale, attachedImages, compressImage])
 
   const handleKeyDown = useCallback((e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {

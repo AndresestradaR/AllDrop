@@ -101,28 +101,85 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Failed to save message' }, { status: 500 })
     }
 
-    // Build tool context
-    const toolContext: ToolContext = {
-      userId: user.id,
-      supabaseAccessToken,
-      conversationId: convId,
-      productImages: hasImages ? product_images : undefined,
+    // Upload images to Storage immediately and save URLs
+    let uploadedImageUrls: string[] = []
+    if (hasImages) {
+      console.log(`[Agent] Uploading ${product_images!.length} images to Storage...`)
+      for (let i = 0; i < product_images!.length; i++) {
+        try {
+          const base64 = product_images![i]
+          const match = base64.match(/^data:([^;]+);base64,(.+)$/)
+          if (!match) continue
+          const mimeType = match[1]
+          const ext = mimeType.includes('png') ? 'png' : mimeType.includes('webp') ? 'webp' : 'jpg'
+          const buffer = Buffer.from(match[2], 'base64')
+          const filePath = `agent/${user.id}/${convId}/${Date.now()}-${i}.${ext}`
+
+          const { error: uploadErr } = await serviceClient.storage
+            .from('landing-images')
+            .upload(filePath, buffer, { contentType: mimeType })
+
+          if (uploadErr) {
+            console.error(`[Agent] Upload error:`, uploadErr.message)
+            continue
+          }
+
+          const { data: urlData } = serviceClient.storage
+            .from('landing-images')
+            .getPublicUrl(filePath)
+
+          if (urlData?.publicUrl) {
+            uploadedImageUrls.push(urlData.publicUrl)
+            console.log(`[Agent] Uploaded image: ${urlData.publicUrl}`)
+          }
+        } catch (e: any) {
+          console.error(`[Agent] Image upload failed:`, e.message)
+        }
+      }
+
+      // Save URLs to conversation (not base64 — just small URL strings)
+      if (uploadedImageUrls.length > 0) {
+        try {
+          // Merge with existing images
+          const { data: existing } = await serviceClient
+            .from('agent_conversations')
+            .select('product_images')
+            .eq('id', convId)
+            .single()
+          const allUrls = [...(existing?.product_images || []), ...uploadedImageUrls]
+          await serviceClient
+            .from('agent_conversations')
+            .update({ product_images: allUrls })
+            .eq('id', convId)
+        } catch {
+          // column may not exist
+        }
+      }
     }
 
-    // Also try to load images from previous messages in this conversation
-    if (!toolContext.productImages) {
+    // Load ALL product image URLs from conversation (includes previous uploads)
+    let allProductImageUrls = [...uploadedImageUrls]
+    if (allProductImageUrls.length === 0) {
       try {
         const { data: convData } = await serviceClient
           .from('agent_conversations')
           .select('product_images')
           .eq('id', convId)
           .single()
-        if (convData?.product_images) {
-          toolContext.productImages = convData.product_images
+        if (convData?.product_images && Array.isArray(convData.product_images)) {
+          allProductImageUrls = convData.product_images
         }
       } catch {
         // column may not exist
       }
+    }
+
+    // Build tool context with URLs (not base64)
+    const toolContext: ToolContext = {
+      userId: user.id,
+      supabaseAccessToken,
+      conversationId: convId,
+      productImages: allProductImageUrls.length > 0 ? allProductImageUrls : undefined,
     }
 
     // Load last 40 messages for context
@@ -174,7 +231,10 @@ export async function POST(request: Request) {
       // Append image context to the user message so the agent knows photos were received
       const lastMsg = messages[messages.length - 1]
       if (lastMsg && lastMsg.role === 'user') {
-        lastMsg.content = `${lastMsg.content || ''}\n\n[El usuario adjuntó ${product_images!.length} foto(s) del producto. Las fotos están disponibles para usar en execute_landing_pipeline como product_image_urls. No necesitas pedir más fotos.]`.trim()
+        const imgNote = uploadedImageUrls.length > 0
+          ? `[El usuario adjuntó ${uploadedImageUrls.length} foto(s) del producto, ya subidas a Storage. URLs: ${uploadedImageUrls.join(', ')}. Las fotos están disponibles automáticamente para execute_landing_pipeline. NO pidas más fotos, ya las tienes.]`
+          : `[El usuario adjuntó foto(s) del producto. Ya están guardadas en la conversación. NO pidas más fotos.]`
+        lastMsg.content = `${lastMsg.content || ''}\n\n${imgNote}`.trim()
       }
     }
 

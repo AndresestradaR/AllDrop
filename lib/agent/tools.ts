@@ -625,44 +625,12 @@ async function handleExecuteLandingPipeline(args: any, headers: Record<string, s
   try {
     const serviceClient = createDirectServiceClient()
 
-    // Step 0: Get product images from chat conversation if not in args
+    // Step 0: Get product image URLs — already uploaded to Storage by chat endpoint
     let productImageUrls: string[] = args.product_image_urls || []
     if (productImageUrls.length === 0 && context.productImages && context.productImages.length > 0) {
-      // Upload base64 images from chat to Supabase Storage and get URLs
-      console.log(`[AgentPipeline] Uploading ${context.productImages.length} images from chat to Storage`)
-      for (let i = 0; i < context.productImages.length; i++) {
-        try {
-          const base64 = context.productImages[i]
-          // Extract mime type and data
-          const match = base64.match(/^data:([^;]+);base64,(.+)$/)
-          if (!match) continue
-          const mimeType = match[1]
-          const ext = mimeType.includes('png') ? 'png' : mimeType.includes('webp') ? 'webp' : 'jpg'
-          const buffer = Buffer.from(match[2], 'base64')
-          const filePath = `agent/${context.userId}/${Date.now()}-${i}.${ext}`
-
-          const { error: uploadErr } = await serviceClient.storage
-            .from('landing-images')
-            .upload(filePath, buffer, { contentType: mimeType })
-
-          if (uploadErr) {
-            console.error(`[AgentPipeline] Upload error:`, uploadErr.message)
-            continue
-          }
-
-          // Get public URL
-          const { data: urlData } = serviceClient.storage
-            .from('landing-images')
-            .getPublicUrl(filePath)
-
-          if (urlData?.publicUrl) {
-            productImageUrls.push(urlData.publicUrl)
-            console.log(`[AgentPipeline] Uploaded image ${i + 1}: ${urlData.publicUrl}`)
-          }
-        } catch (e: any) {
-          console.error(`[AgentPipeline] Image upload failed:`, e.message)
-        }
-      }
+      // context.productImages contains URLs (uploaded by chat endpoint), not base64
+      productImageUrls = context.productImages.filter((url: string) => url.startsWith('http'))
+      console.log(`[AgentPipeline] Using ${productImageUrls.length} image URLs from conversation`)
     }
 
     // Step 1: Create or use existing product
