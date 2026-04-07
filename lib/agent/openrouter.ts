@@ -1,9 +1,9 @@
 import OpenAI from 'openai'
 
 const MODELS = [
-  'qwen/qwen3.6-plus:free',
   'deepseek/deepseek-chat-v3.2',
   'google/gemini-2.5-flash',
+  'qwen/qwen3.6-plus:free',
 ]
 
 let client: OpenAI | null = null
