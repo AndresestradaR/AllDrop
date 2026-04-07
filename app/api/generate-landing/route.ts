@@ -159,11 +159,11 @@ export async function POST(request: Request) {
       productContext,
     } = body
 
-    if (!templateUrl) {
+    if (!templateUrl && !isInternalCall) {
       return NextResponse.json({ error: 'Plantilla requerida' }, { status: 400 })
     }
 
-    if (!productPhotos || productPhotos.length === 0) {
+    if ((!productPhotos || productPhotos.length === 0) && !isInternalCall) {
       return NextResponse.json({ error: 'Al menos una foto del producto requerida' }, { status: 400 })
     }
 
