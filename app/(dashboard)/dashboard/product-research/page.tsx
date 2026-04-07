@@ -220,7 +220,7 @@ export default function ProductResearchPage() {
   
   // State para análisis de competencia - Nuevo flujo 2 fases
   const [competitorKeyword, setCompetitorKeyword] = useState('')
-  const [competitorCountry, setCompetitorCountry] = useState('CO')
+  const [competitorCountry, setCompetitorCountry] = useState('ES')
   const [resultsLimit, setResultsLimit] = useState(10)
   const [analysisPhase, setAnalysisPhase] = useState<AnalysisPhase>('search')
   const [isSearching, setIsSearching] = useState(false)
@@ -979,15 +979,13 @@ export default function ProductResearchPage() {
                     className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50"
                     disabled={analysisPhase !== 'search'}
                   >
-                    <option value="CO">🇨🇴 Colombia</option>
-                    <option value="MX">🇲🇽 México</option>
-                    <option value="GT">🇬🇹 Guatemala</option>
-                    <option value="PE">🇵🇪 Perú</option>
-                    <option value="EC">🇪🇨 Ecuador</option>
-                    <option value="CL">🇨🇱 Chile</option>
-                    <option value="AR">🇦🇷 Argentina</option>
-                    <option value="PA">🇵🇦 Panamá</option>
-                    <option value="PY">🇵🇾 Paraguay</option>
+                    <option value="ES">🇪🇸 España</option>
+                    <option value="FR">🇫🇷 Francia</option>
+                    <option value="IT">🇮🇹 Italia</option>
+                    <option value="DE">🇩🇪 Alemania</option>
+                    <option value="PT">🇵🇹 Portugal</option>
+                    <option value="GB">🇬🇧 Reino Unido</option>
+                    <option value="US">🇺🇸 Estados Unidos</option>
                   </select>
                 </div>
 
