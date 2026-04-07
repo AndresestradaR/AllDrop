@@ -1,7 +1,7 @@
 // lib/meta-ads/droppage-client.ts
 // DropPage API client with SSO auth for Matías agent
 
-const DROPPAGE_API_BASE = process.env.NEXT_PUBLIC_DROPPAGE_API_URL || 'https://shopiestrategas-production.up.railway.app'
+const DROPPAGE_API_BASE = process.env.NEXT_PUBLIC_DROPPAGE_API_URL || 'https://alldrop-shop-production.up.railway.app'
 
 interface DropPageClientOptions {
   supabaseAccessToken: string  // From the user's Supabase session

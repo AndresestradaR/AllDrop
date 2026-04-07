@@ -85,7 +85,7 @@ export async function POST(request: Request) {
     // Check for existing DropPage design for this product (used by "Enviar a mi editor" to detect existing landings)
     if (check_existing && product_name) {
       try {
-        const DROPPAGE_API = process.env.NEXT_PUBLIC_DROPPAGE_API_URL || 'https://shopiestrategas-production.up.railway.app'
+        const DROPPAGE_API = process.env.NEXT_PUBLIC_DROPPAGE_API_URL || 'https://alldrop-shop-production.up.railway.app'
         // SSO to DropPage
         const { createClient: createAuthClient } = await import('@/lib/supabase/server')
         const authClient = await createAuthClient()

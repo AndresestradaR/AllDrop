@@ -814,7 +814,7 @@ async function handleGetDroppageStores(args: any, headers: Record<string, string
   // For now, return a message explaining the user needs to use the constructor directly
   // TODO: implement SSO bridge when DropPage API is directly callable
   try {
-    const DROPPAGE_API = process.env.NEXT_PUBLIC_DROPPAGE_API_URL || 'https://shopiestrategas-production.up.railway.app'
+    const DROPPAGE_API = process.env.NEXT_PUBLIC_DROPPAGE_API_URL || 'https://alldrop-shop-production.up.railway.app'
 
     // Try SSO auth if we have an access token
     if (!context.supabaseAccessToken) {
@@ -861,7 +861,7 @@ async function handleGetDroppageStores(args: any, headers: Record<string, string
 async function handleExecuteDroppageSetup(args: any, headers: Record<string, string>, context: ToolContext): Promise<string> {
   // This calls the DropPage pipeline via SSO
   try {
-    const DROPPAGE_API = process.env.NEXT_PUBLIC_DROPPAGE_API_URL || 'https://shopiestrategas-production.up.railway.app'
+    const DROPPAGE_API = process.env.NEXT_PUBLIC_DROPPAGE_API_URL || 'https://alldrop-shop-production.up.railway.app'
 
     if (!context.supabaseAccessToken) {
       return JSON.stringify({ success: false, error: 'No se pudo autenticar con la tienda.' })
@@ -1179,7 +1179,7 @@ async function handleGetDroppagePageDesigns(args: any, headers: Record<string, s
 // Generic DropPage GET helper with SSO
 async function handleDroppageGet(path: string, context: ToolContext): Promise<string> {
   try {
-    const DROPPAGE_API = process.env.NEXT_PUBLIC_DROPPAGE_API_URL || 'https://shopiestrategas-production.up.railway.app'
+    const DROPPAGE_API = process.env.NEXT_PUBLIC_DROPPAGE_API_URL || 'https://alldrop-shop-production.up.railway.app'
 
     if (!context.supabaseAccessToken) {
       return JSON.stringify({ success: false, error: 'No se pudo autenticar con la tienda.' })

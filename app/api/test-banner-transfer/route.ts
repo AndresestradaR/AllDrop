@@ -116,7 +116,7 @@ export async function GET(request: Request) {
 
   // Step 4: If designId provided, update via DropPage API using cookie-based auth from the user's session
   if (designId) {
-    const DROPPAGE_API = process.env.NEXT_PUBLIC_DROPPAGE_API_URL || 'https://shopiestrategas-production.up.railway.app'
+    const DROPPAGE_API = process.env.NEXT_PUBLIC_DROPPAGE_API_URL || 'https://alldrop-shop-production.up.railway.app'
 
     // Use Supabase auth from cookies to get a DropPage JWT via SSO
     const { createClient: createAuthClient } = await import('@/lib/supabase/server')
