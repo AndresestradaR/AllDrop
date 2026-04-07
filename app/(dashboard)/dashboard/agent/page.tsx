@@ -249,7 +249,7 @@ export default function AgentPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           conversation_id: activeConversationId,
-          message: text,
+          message: displayContent || 'Foto del producto adjunta',
           locale,
           ...(productImages.length > 0 && { product_images: productImages }),
         }),
