@@ -675,6 +675,38 @@ async function handleExecuteLandingPipeline(args: any, headers: Record<string, s
       console.warn('[LandingPipeline] Failed to persist settings:', e.message)
     }
 
+    // Step 1.8: If no sections specified, use defaults
+    let defaultTemplateId = ''
+    let defaultTemplateUrl = ''
+    const sections = args.sections && args.sections.length > 0
+      ? args.sections
+      : [
+          { type: 'hero', template_id: '', template_url: '' },
+          { type: 'beneficios', template_id: '', template_url: '' },
+          { type: 'faq', template_id: '', template_url: '' },
+        ]
+    const needsTemplate = sections.some((s: any) => !s.template_url)
+    if (needsTemplate) {
+      const { data: templates } = await serviceClient
+        .from('templates')
+        .select('id, image_url')
+        .eq('is_active', true)
+        .limit(1)
+      if (templates && templates.length > 0) {
+        defaultTemplateId = templates[0].id
+        defaultTemplateUrl = templates[0].image_url
+        console.log(`[AgentPipeline] Auto-selected template: ${defaultTemplateId}`)
+      }
+    }
+
+    // Fill in missing template URLs
+    for (const section of sections) {
+      if (!section.template_url && defaultTemplateUrl) {
+        section.template_url = defaultTemplateUrl
+        section.template_id = defaultTemplateId
+      }
+    }
+
     // Step 2: Count existing sections BEFORE firing
     const { data: existingBefore } = await serviceClient
       .from('landing_sections')

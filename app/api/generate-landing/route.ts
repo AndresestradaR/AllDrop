@@ -226,8 +226,8 @@ export async function POST(request: Request) {
     if (!apiKeys.wavespeed && process.env.WAVESPEED_API_KEY) {
       apiKeys.wavespeed = process.env.WAVESPEED_API_KEY
     }
-    if (!apiKeys.gemini && process.env.GEMINI_API_KEY) {
-      apiKeys.gemini = process.env.GEMINI_API_KEY
+    if (!apiKeys.gemini && (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY)) {
+      apiKeys.gemini = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY
     }
 
     console.log(`[Generate] Final keys: gemini=${!!apiKeys.gemini}, openai=${!!apiKeys.openai}, kie=${!!apiKeys.kie}, bfl=${!!apiKeys.bfl}, fal=${!!apiKeys.fal}, wavespeed=${!!apiKeys.wavespeed}, internal=${isInternalCall}, model=${modelId || 'default'}`)
