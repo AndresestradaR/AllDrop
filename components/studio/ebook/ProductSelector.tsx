@@ -22,7 +22,7 @@ interface ProductSelectorProps {
 const SOURCES: { id: ProductSource; name: string; icon: React.ElementType; description: string }[] = [
   { id: 'dropkiller', name: 'Catalogo Dropi', icon: Database, description: 'Busca en 13,500+ productos' },
   { id: 'landing', name: 'Mis Productos', icon: Package, description: 'Productos de tus landings' },
-  { id: 'droppage', name: 'Mi Tienda', icon: Store, description: 'Productos de DropPage' },
+  { id: 'droppage', name: 'Mi Tienda', icon: Store, description: 'Productos de AllDrop Shop' },
   { id: 'manual', name: 'Subir Manual', icon: Upload, description: 'Fotos + descripcion' },
 ]
 
@@ -347,7 +347,7 @@ export default function ProductSelector({ onSelect }: ProductSelectorProps) {
             <div>
               <p className="text-zinc-400 font-medium">Proximamente</p>
               <p className="text-xs text-zinc-500 mt-1 max-w-xs mx-auto">
-                Pronto podras seleccionar productos directamente de tu tienda DropPage.
+                Pronto podras seleccionar productos directamente de tu tienda AllDrop Shop.
                 Por ahora usa &quot;Mis Productos&quot; o sube manualmente.
               </p>
             </div>
