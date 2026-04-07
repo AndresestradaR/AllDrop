@@ -409,6 +409,8 @@ export type ToolHandler = (args: any, headers: Record<string, string>, context: 
 export interface ToolContext {
   userId: string
   supabaseAccessToken?: string
+  conversationId?: string
+  productImages?: string[]  // base64 images from chat
 }
 
 function buildInternalHeaders(headers: Record<string, string>): Record<string, string> {
@@ -623,10 +625,50 @@ async function handleExecuteLandingPipeline(args: any, headers: Record<string, s
   try {
     const serviceClient = createDirectServiceClient()
 
+    // Step 0: Get product images from chat conversation if not in args
+    let productImageUrls: string[] = args.product_image_urls || []
+    if (productImageUrls.length === 0 && context.productImages && context.productImages.length > 0) {
+      // Upload base64 images from chat to Supabase Storage and get URLs
+      console.log(`[AgentPipeline] Uploading ${context.productImages.length} images from chat to Storage`)
+      for (let i = 0; i < context.productImages.length; i++) {
+        try {
+          const base64 = context.productImages[i]
+          // Extract mime type and data
+          const match = base64.match(/^data:([^;]+);base64,(.+)$/)
+          if (!match) continue
+          const mimeType = match[1]
+          const ext = mimeType.includes('png') ? 'png' : mimeType.includes('webp') ? 'webp' : 'jpg'
+          const buffer = Buffer.from(match[2], 'base64')
+          const filePath = `agent/${context.userId}/${Date.now()}-${i}.${ext}`
+
+          const { error: uploadErr } = await serviceClient.storage
+            .from('landing-images')
+            .upload(filePath, buffer, { contentType: mimeType })
+
+          if (uploadErr) {
+            console.error(`[AgentPipeline] Upload error:`, uploadErr.message)
+            continue
+          }
+
+          // Get public URL
+          const { data: urlData } = serviceClient.storage
+            .from('landing-images')
+            .getPublicUrl(filePath)
+
+          if (urlData?.publicUrl) {
+            productImageUrls.push(urlData.publicUrl)
+            console.log(`[AgentPipeline] Uploaded image ${i + 1}: ${urlData.publicUrl}`)
+          }
+        } catch (e: any) {
+          console.error(`[AgentPipeline] Image upload failed:`, e.message)
+        }
+      }
+    }
+
     // Step 1: Create or use existing product
     let productId = args.existing_product_id || ''
     if (!productId) {
-      const imageUrl = args.product_image_urls?.length > 0 ? args.product_image_urls[0] : null
+      const imageUrl = productImageUrls.length > 0 ? productImageUrls[0] : null
       const { data: product, error } = await serviceClient
         .from('products')
         .insert({
@@ -696,7 +738,7 @@ async function handleExecuteLandingPipeline(args: any, headers: Record<string, s
           productName: args.product_name,
           templateId: section.template_id,
           templateUrl: section.template_url,
-          productPhotos: args.product_image_urls || [],
+          productPhotos: productImageUrls,
           modelId: 'nano-banana-2',
           outputSize: '1080x1920',
           ...(args.colorPalette && { colorPalette: args.colorPalette }),

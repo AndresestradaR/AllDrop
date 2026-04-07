@@ -68,12 +68,6 @@ export async function POST(request: Request) {
     const auth = request.headers.get('authorization')
     if (auth) requestHeaders['authorization'] = auth
 
-    // Build tool context with userId and access token
-    const toolContext: ToolContext = {
-      userId: user.id,
-      supabaseAccessToken,
-    }
-
     // Resolve or create conversation
     let convId = conversation_id
 
@@ -105,6 +99,30 @@ export async function POST(request: Request) {
     if (msgError) {
       console.error('[Agent] Failed to save user message:', msgError)
       return NextResponse.json({ error: 'Failed to save message' }, { status: 500 })
+    }
+
+    // Build tool context
+    const toolContext: ToolContext = {
+      userId: user.id,
+      supabaseAccessToken,
+      conversationId: convId,
+      productImages: hasImages ? product_images : undefined,
+    }
+
+    // Also try to load images from previous messages in this conversation
+    if (!toolContext.productImages) {
+      try {
+        const { data: convData } = await serviceClient
+          .from('agent_conversations')
+          .select('product_images')
+          .eq('id', convId)
+          .single()
+        if (convData?.product_images) {
+          toolContext.productImages = convData.product_images
+        }
+      } catch {
+        // column may not exist
+      }
     }
 
     // Load last 40 messages for context
