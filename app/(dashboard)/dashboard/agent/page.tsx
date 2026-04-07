@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, KeyboardEvent } from 'react'
 import { useI18n } from '@/lib/i18n'
-import { MessageSquare, Send, Trash2, Plus, Lock, Bot, Settings } from 'lucide-react'
+import { MessageSquare, Send, Trash2, Plus, Lock, Bot, Settings, ImagePlus, X } from 'lucide-react'
 import AgentConfigModal from '@/components/agent/AgentConfigModal'
 
 interface Conversation {
@@ -82,9 +82,11 @@ export default function AgentPage() {
   const [configModalOpen, setConfigModalOpen] = useState(false)
   const [agentName, setAgentName] = useState('AllDrop Assistant')
   const [agentAvatarUrl, setAgentAvatarUrl] = useState<string | null>(null)
+  const [attachedImages, setAttachedImages] = useState<{ file: File; preview: string }[]>([])
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const abortRef = useRef<AbortController | null>(null)
 
   const scrollToBottom = useCallback(() => {
@@ -174,18 +176,55 @@ export default function AgentPage() {
     }
   }, [t.agent.deleteConfirm, activeConversationId])
 
+  const handleImageSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    const imageFiles = files.filter(f => f.type.startsWith('image/'))
+    const newImages = imageFiles.map(file => ({
+      file,
+      preview: URL.createObjectURL(file),
+    }))
+    setAttachedImages(prev => [...prev, ...newImages].slice(0, 5))
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }, [])
+
+  const removeImage = useCallback((index: number) => {
+    setAttachedImages(prev => {
+      const updated = [...prev]
+      URL.revokeObjectURL(updated[index].preview)
+      updated.splice(index, 1)
+      return updated
+    })
+  }, [])
+
   const handleSend = useCallback(async () => {
     const text = inputValue.trim()
     if (!text || isStreaming) return
 
+    // Convert images to base64
+    let productImages: string[] = []
+    if (attachedImages.length > 0) {
+      productImages = await Promise.all(
+        attachedImages.map(img => new Promise<string>((resolve) => {
+          const reader = new FileReader()
+          reader.onloadend = () => resolve(reader.result as string)
+          reader.readAsDataURL(img.file)
+        }))
+      )
+    }
+
+    const displayContent = attachedImages.length > 0
+      ? `${text}\n\n[${attachedImages.length} imagen(es) adjunta(s)]`
+      : text
+
     const userMessage: Message = {
       id: `temp-${Date.now()}`,
       role: 'user',
-      content: text,
+      content: displayContent,
       created_at: new Date().toISOString(),
     }
     setMessages(prev => [...prev, userMessage])
     setInputValue('')
+    setAttachedImages([])
     setIsStreaming(true)
 
     // Reset textarea height
@@ -212,6 +251,7 @@ export default function AgentPage() {
           conversation_id: activeConversationId,
           message: text,
           locale,
+          ...(productImages.length > 0 && { product_images: productImages }),
         }),
         signal: controller.signal,
       })
@@ -281,7 +321,7 @@ export default function AgentPage() {
       abortRef.current = null
       fetchConversations()
     }
-  }, [inputValue, isStreaming, activeConversationId, fetchConversations, locale])
+  }, [inputValue, isStreaming, activeConversationId, fetchConversations, locale, attachedImages])
 
   const handleKeyDown = useCallback((e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -469,7 +509,39 @@ export default function AgentPage() {
         {/* Input Area */}
         <div className="border-t border-gray-800 p-4">
           <div className="max-w-3xl mx-auto">
+            {/* Image previews */}
+            {attachedImages.length > 0 && (
+              <div className="flex gap-2 mb-2 flex-wrap">
+                {attachedImages.map((img, i) => (
+                  <div key={i} className="relative group">
+                    <img src={img.preview} alt="" className="w-16 h-16 rounded-lg object-cover border border-gray-700" />
+                    <button
+                      onClick={() => removeImage(i)}
+                      className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <X className="w-3 h-3 text-white" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="flex items-end gap-2 bg-gray-900 border border-gray-700 rounded-2xl px-4 py-2 focus-within:border-[#8b5cf6] transition-colors">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={handleImageSelect}
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isStreaming}
+                className="p-1.5 rounded-lg hover:bg-gray-800 transition-colors text-gray-400 hover:text-white disabled:opacity-30 shrink-0"
+                aria-label="Attach image"
+              >
+                <ImagePlus className="w-5 h-5" />
+              </button>
               <textarea
                 ref={textareaRef}
                 value={inputValue}
