@@ -310,6 +310,7 @@ export async function POST(request: Request) {
                   resolve()
                 },
                 onToolCall(toolCall) {
+                  console.log(`[Agent] TOOL CALL: ${toolCall.name} (id=${toolCall.id})`)
                   hasToolCalls = true
                   pendingToolCalls.push(toolCall)
                 },

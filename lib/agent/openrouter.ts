@@ -1,9 +1,9 @@
 import OpenAI from 'openai'
 
 const MODELS = [
+  'openai/gpt-4.1-mini',
   'openai/gpt-5.4-nano',
   'deepseek/deepseek-chat-v3.2',
-  'google/gemini-2.5-flash',
 ]
 
 let client: OpenAI | null = null
