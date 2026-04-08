@@ -2129,7 +2129,7 @@ export default function ProductGeneratePage() {
                                       {categoryTemplates.length > 0 && (
                                         <button
                                           onClick={() => setExpandedTemplateSection(category.id)}
-                                          className="flex-shrink-0 px-4 py-3 bg-white hover:bg-gray-100 text-gray-900 rounded-xl text-sm font-semibold transition-colors whitespace-nowrap shadow-sm"
+                                          className="flex-shrink-0 px-5 py-3 bg-accent hover:bg-accent-hover text-white rounded-xl text-sm font-semibold transition-colors whitespace-nowrap shadow-sm"
                                         >
                                           {t.editor.viewAll} ({categoryTemplates.length})
                                         </button>
@@ -2181,7 +2181,7 @@ export default function ProductGeneratePage() {
                                                 }))
                                                 setExpandedTemplateSection(null)
                                               }}
-                                              className="w-full px-2 py-1.5 bg-accent hover:bg-accent-hover text-white text-xs font-medium rounded-lg transition-colors text-center"
+                                              className="w-full px-2 py-1.5 bg-white hover:bg-gray-100 text-gray-900 text-xs font-medium rounded-lg transition-colors text-center shadow-sm"
                                             >
                                               {t.editor.selectThisTemplate}
                                             </button>
