@@ -291,7 +291,11 @@ export default function ProductGeneratePage() {
         if (data.pricing) setPricing(prev => ({ ...prev, ...data.pricing }))
         if (data.targetCountry) {
           const found = COUNTRIES.find((c: any) => c.code === data.targetCountry)
-          if (found) setSelectedCountry(found)
+          if (found) {
+            setSelectedCountry(found)
+            const lang = COUNTRY_TO_LANG[found.code]
+            if (lang) setOutputLanguage(lang)
+          }
         }
         if (data.productPhotos && Array.isArray(data.productPhotos)) {
           const photos = [...data.productPhotos]
