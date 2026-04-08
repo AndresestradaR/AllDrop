@@ -144,8 +144,13 @@ const TOOLS: Tool[] = [
 
 type ActiveTool = typeof TOOLS[number]['id'] | null
 
-export function ToolsGrid() {
-  const [activeTool, setActiveTool] = useState<ActiveTool>(null)
+interface ToolsGridProps {
+  initialTool?: string | null
+  onBack?: () => void
+}
+
+export function ToolsGrid({ initialTool, onBack }: ToolsGridProps = {}) {
+  const [activeTool, setActiveTool] = useState<ActiveTool>(initialTool || null)
   const [uploadedImage, setUploadedImage] = useState<File | null>(null)
   const [uploadedAudio, setUploadedAudio] = useState<File | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
@@ -172,6 +177,15 @@ export function ToolsGrid() {
   const [infinitalkSeed, setInfinitalkSeed] = useState<number>(Math.floor(Math.random() * (1000000 - 10000 + 1)) + 10000)
 
   const currentTool = TOOLS.find((t) => t.id === activeTool)
+
+  const handleBack = () => {
+    resetTool()
+    if (onBack) {
+      onBack()
+    } else {
+      setActiveTool(null)
+    }
+  }
 
   // Fetch user email for admin check
   useEffect(() => {
@@ -371,19 +385,19 @@ export function ToolsGrid() {
 
   // Prompt Generator tools (separate full-screen components)
   if (activeTool === 'video-editor') {
-    return <VideoEditorStandalone onBack={() => { setActiveTool(null); resetTool() }} />
+    return <VideoEditorStandalone onBack={handleBack} />
   }
 
   if (activeTool === 'prompt-video') {
-    return <VideoPromptStudio onBack={() => { setActiveTool(null); resetTool() }} />
+    return <VideoPromptStudio onBack={handleBack} />
   }
 
   if (activeTool === 'prompt-bot') {
-    return <PromptBotGenerator onBack={() => { setActiveTool(null); resetTool() }} />
+    return <PromptBotGenerator onBack={handleBack} />
   }
 
   if (activeTool === 'person-descriptor') {
-    return <PersonDescriptor onBack={() => { setActiveTool(null); resetTool() }} />
+    return <PersonDescriptor onBack={handleBack} />
   }
 
   // Tool interface view
@@ -396,10 +410,7 @@ export function ToolsGrid() {
           {/* Header */}
           <div className="flex items-center gap-4 px-6 py-4 border-b border-border">
             <button
-              onClick={() => {
-                setActiveTool(null)
-                resetTool()
-              }}
+              onClick={handleBack}
               className="p-2 hover:bg-border/50 rounded-lg transition-colors"
             >
               <ArrowLeft className="w-5 h-5 text-text-secondary" />

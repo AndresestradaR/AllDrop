@@ -2209,10 +2209,21 @@ function PlaceholderTool({ toolId, onBack }: { toolId: string; onBack: () => voi
 // ============================================
 // MAIN GRID COMPONENT
 // ============================================
-export function DropshippingGrid() {
-  const [activeTool, setActiveTool] = useState<ActiveTool>(null)
+interface DropshippingGridProps {
+  initialTool?: string | null
+  onBack?: () => void
+}
 
-  const handleBack = () => setActiveTool(null)
+export function DropshippingGrid({ initialTool, onBack: onBackProp }: DropshippingGridProps = {}) {
+  const [activeTool, setActiveTool] = useState<ActiveTool>(initialTool || null)
+
+  const handleBack = () => {
+    if (onBackProp) {
+      onBackProp()
+    } else {
+      setActiveTool(null)
+    }
+  }
 
   // Render specific tool UI
   if (activeTool === 'resena-ugc') {
