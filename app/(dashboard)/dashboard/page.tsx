@@ -15,12 +15,35 @@ export default async function DashboardPage() {
     .single()
 
   // Get recent generations
-  const { data: generations } = await supabase
+  const { data: rawGenerations } = await supabase
     .from('generations')
-    .select('*')
+    .select('id, product_name, generated_image_url, status')
     .eq('user_id', user?.id)
     .order('created_at', { ascending: false })
     .limit(4)
+
+  // Resolve storage: URLs to signed URLs
+  const generations = await Promise.all(
+    (rawGenerations || []).map(async (gen) => {
+      let url = gen.generated_image_url
+      if (url?.startsWith('storage:')) {
+        const path = url.replace('storage:', '')
+        const { data: signed } = await supabase.storage
+          .from('landing-images')
+          .createSignedUrl(path, 86400)
+        url = signed?.signedUrl || null
+      } else if (url && url.includes('supabase') && url.includes('/landing-images/')) {
+        const path = url.split('/landing-images/').pop()
+        if (path) {
+          const { data: signed } = await supabase.storage
+            .from('landing-images')
+            .createSignedUrl(path, 86400)
+          if (signed?.signedUrl) url = signed.signedUrl
+        }
+      }
+      return { ...gen, generated_image_url: url }
+    })
+  )
 
   // Derive display name: full_name first word, or email username, or empty
   const displayName = profile?.full_name
