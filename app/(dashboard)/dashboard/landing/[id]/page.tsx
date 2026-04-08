@@ -34,7 +34,7 @@ import {
   Bookmark
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import ModelSelector from '@/components/generator/ModelSelector'
+// ModelSelector removed — always use nano-banana-2
 import { SavedAnglesPanel } from '@/components/studio/SavedAnglesPanel'
 import CountrySelector from '@/components/generator/CountrySelector'
 import PricingControls, { PricingData, getDefaultPricingData } from '@/components/generator/PricingControls'
@@ -522,11 +522,6 @@ export default function ProductGeneratePage() {
   const filteredTemplates = templates.filter(t => t.category === activeCategory)
 
   const handleGenerate = async () => {
-    if (!selectedTemplate && !uploadedTemplate) {
-      toast.error(t.editor.selectTemplateToast)
-      return
-    }
-
     if (!productPhotos.some(p => p !== null)) {
       toast.error(t.editor.uploadPhoto)
       return
@@ -609,10 +604,6 @@ export default function ProductGeneratePage() {
   }
 
   const handleEnhanceWithAI = async () => {
-    if (!selectedTemplate && !uploadedTemplate) {
-      toast.error(t.editor.selectTemplateFirst)
-      return
-    }
     if (!productPhotos.some(p => p !== null)) {
       toast.error(t.editor.uploadPhotoFirst)
       return
@@ -684,14 +675,7 @@ export default function ProductGeneratePage() {
       return
     }
 
-    const mainTemplate = selectedTemplate?.image_url || uploadedTemplate
-    const sectionsWithoutTemplate = Array.from(selectedSections).filter(
-      sectionId => !sectionTemplates[sectionId] && !mainTemplate
-    )
-    if (sectionsWithoutTemplate.length > 0) {
-      toast.error(t.editor.assignTemplate)
-      return
-    }
+    const mainTemplate = selectedTemplate?.image_url || uploadedTemplate || null
 
     setIsBulkGenerating(true)
     const selectedAngles = generatedAngles.filter(a => selectedAngleIds.has(a.id))
@@ -1415,66 +1399,6 @@ export default function ProductGeneratePage() {
             </div>
           </div>
 
-          {/* Template Selector - Right side, takes remaining space */}
-          <div className="flex-1">
-            <div className="flex items-center justify-between mb-3">
-              <label className="text-sm font-medium text-text-primary">
-                {t.editor.templateRef}
-              </label>
-            </div>
-
-            <div className="relative h-28 bg-gradient-to-br from-surface to-background rounded-xl border border-border overflow-hidden">
-              {selectedTemplate || uploadedTemplate ? (
-                <>
-                  {/* Dimensions badge */}
-                  <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-sm px-1.5 py-0.5 rounded text-[10px] text-white">
-                    {selectedTemplate?.dimensions || 'Custom'}
-                  </div>
-
-                  <img
-                    src={uploadedTemplate || selectedTemplate?.image_url}
-                    alt="Template"
-                    className="w-full h-full object-contain"
-                  />
-
-                  {/* Change template button */}
-                  <button
-                    onClick={() => setShowTemplateGallery(true)}
-                    className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-accent hover:bg-accent-hover text-background px-3 py-1 rounded-lg text-xs font-medium transition-colors"
-                  >
-                    {t.editor.change}
-                  </button>
-                </>
-              ) : (
-                <button
-                  onClick={() => setShowTemplateGallery(true)}
-                  className="w-full h-full flex items-center justify-center gap-3 hover:bg-accent/5 transition-colors"
-                >
-                  <LayoutTemplate className="w-8 h-8 text-accent/40" />
-                  <div className="text-left">
-                    <p className="text-text-primary font-medium text-sm">Seleccionar Plantilla</p>
-                    <p className="text-xs text-text-secondary">{t.editor.fromGallery}</p>
-                  </div>
-                </button>
-              )}
-            </div>
-
-            {/* Upload Reference Image Button - Zepol gradient style */}
-            <button
-              onClick={() => templateInputRef.current?.click()}
-              className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-white text-sm font-medium transition-all hover:opacity-90 bg-gradient-to-r from-purple-500 via-pink-500 to-rose-500"
-            >
-              <Upload className="w-4 h-4" />
-              {t.editor.uploadRef}
-            </button>
-            <input
-              ref={templateInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleTemplateUpload}
-            />
-          </div>
         </div>
 
         {/* Visual Style: Colors & Typography */}
@@ -1759,16 +1683,6 @@ export default function ProductGeneratePage() {
         </div>
 
 
-        {/* AI Model Selection */}
-        <div className="mb-6">
-          <ModelSelector
-            value={selectedModel}
-            onChange={setSelectedModel}
-            disabled={isGenerating}
-            apiKeyStatus={apiKeyStatus}
-          />
-        </div>
-
         {/* Country Selector */}
         <div className="mb-6">
           <CountrySelector
@@ -1835,114 +1749,6 @@ export default function ProductGeneratePage() {
             onChange={setPricing}
             disabled={isGenerating}
           />
-        </div>
-
-        <h2 className="text-xl font-bold text-text-primary mb-2 mt-2">{t.editor.createBannerByBanner}</h2>
-        <p className="text-sm text-text-secondary mb-4">{t.editor.customizeBanner}</p>
-
-        {/* Creative Controls */}
-        <div className="border border-border rounded-xl p-4 mb-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-accent" />
-              <span className="text-sm font-medium text-text-primary">
-                {t.editor.creativeControls} <span className="text-text-secondary font-normal">{t.editor.optional}</span>
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleEnhanceWithAI}
-                disabled={isEnhancing}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-accent/10 hover:bg-accent/20 text-accent rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
-              >
-                {isEnhancing ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Sparkles className="w-4 h-4" />
-                )}
-                {t.editor.enhanceWithAI}
-              </button>
-              <button
-                onClick={() => setShowCreativeControls(!showCreativeControls)}
-                className={`relative w-12 h-6 rounded-full transition-colors ${
-                  showCreativeControls ? 'bg-accent' : 'bg-border'
-                }`}
-              >
-                <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
-                  showCreativeControls ? 'left-7' : 'left-1'
-                }`} />
-              </button>
-            </div>
-          </div>
-
-          {showCreativeControls && (
-            <div className="mt-6 space-y-4">
-              {/* Product Details */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-sm font-medium text-text-primary flex items-center gap-2">
-                    📄 {t.editor.productDetails}
-                  </label>
-                  <span className="text-xs text-text-secondary">{t.editor.maxChars}</span>
-                </div>
-                <textarea
-                  placeholder={t.editor.descPlaceholder}
-                  value={creativeControls.productDetails}
-                  onChange={(e) => setCreativeControls({ ...creativeControls, productDetails: e.target.value.slice(0, 1500) })}
-                  className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent resize-none"
-                  rows={3}
-                />
-              </div>
-
-              {/* Sales Angle */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-sm font-medium text-text-primary flex items-center gap-2">
-                    📈 {t.editor.salesAngle}
-                  </label>
-                </div>
-                <textarea
-                  placeholder={t.editor.anglePlaceholder}
-                  value={creativeControls.salesAngle}
-                  onChange={(e) => setCreativeControls({ ...creativeControls, salesAngle: e.target.value.slice(0, 1500) })}
-                  className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent resize-none"
-                  rows={3}
-                />
-              </div>
-
-              {/* Target Avatar */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-sm font-medium text-text-primary flex items-center gap-2">
-                    🎯 {t.editor.idealAvatar}
-                  </label>
-                </div>
-                <textarea
-                  placeholder={t.editor.avatarPlaceholder}
-                  value={creativeControls.targetAvatar}
-                  onChange={(e) => setCreativeControls({ ...creativeControls, targetAvatar: e.target.value.slice(0, 1500) })}
-                  className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent resize-none"
-                  rows={3}
-                />
-              </div>
-
-              {/* Additional Instructions */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-sm font-medium text-text-primary flex items-center gap-2">
-                    💬 {t.editor.additionalInstructions}
-                  </label>
-                </div>
-                <textarea
-                  placeholder={t.editor.instructionsPlaceholder}
-                  value={creativeControls.additionalInstructions}
-                  onChange={(e) => setCreativeControls({ ...creativeControls, additionalInstructions: e.target.value.slice(0, 1500) })}
-                  className="w-full px-4 py-3 bg-background border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent resize-none"
-                  rows={3}
-                />
-              </div>
-            </div>
-          )}
         </div>
 
         <h2 className="text-xl font-bold text-text-primary mb-2 mt-2">{t.editor.createCompleteLandings}</h2>
@@ -2399,23 +2205,7 @@ export default function ProductGeneratePage() {
           )}
         </div>
 
-        {/* Generate Single Section Button — only show in Banner a Banner mode (template selected) */}
-        {(selectedTemplate || uploadedTemplate) && (
-          <>
-            <Button
-              className="w-full gap-2 py-4 text-base"
-              onClick={handleGenerate}
-              isLoading={isGenerating}
-            >
-              <Sparkles className="w-5 h-5" />
-              {t.editor.generateSection}
-            </Button>
-
-            <p className="text-center text-sm text-text-secondary mt-3">
-              {generatedSections.length} de 5 {t.editor.sectionsUsed}
-            </p>
-          </>
-        )}
+        {/* Single section generation removed — use bulk generation only */}
       </Card>
 
       {/* Generated Sections History */}
