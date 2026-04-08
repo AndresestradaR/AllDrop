@@ -106,7 +106,7 @@ function PricingContent() {
 
   const handleBuyCallTopup = async (topupId: string) => {
     if (!hasPlan) {
-      toast.error('Necesitas un plan activo para comprar minutos')
+      toast.error(t.pricing.callTopupsRequirePlan)
       return
     }
     try {
@@ -189,34 +189,34 @@ function PricingContent() {
                 <div className="flex items-center gap-2 mb-4 px-3 py-2 bg-green-500/5 rounded-lg">
                   <Phone className="w-4 h-4 text-green-400" />
                   <span className="font-bold text-green-400">{plan.callMinutes}</span>
-                  <span className="text-text-secondary text-sm">min llamadas</span>
+                  <span className="text-text-primary/70 text-sm">{t.pricing.callMinutes}</span>
                 </div>
               )}
 
               {/* What you can do */}
               <div className="space-y-2 mb-6 flex-1">
-                <p className="text-xs text-text-secondary font-medium uppercase tracking-wider">{t.pricing.whatCanYouDo}</p>
-                <div className="text-sm text-text-secondary space-y-1">
+                <p className="text-xs text-text-primary/60 font-medium uppercase tracking-wider">{t.pricing.whatCanYouDo}</p>
+                <div className="text-sm space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <span>{t.pricing.banners}</span>
-                    <span className="font-medium text-text-primary">{bannersCount}</span>
+                    <span className="text-text-primary/80">{t.pricing.banners}</span>
+                    <span className="font-semibold text-text-primary">{bannersCount}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span>{t.pricing.images}</span>
-                    <span className="font-medium text-text-primary">{imagesCount}</span>
+                    <span className="text-text-primary/80">{t.pricing.images}</span>
+                    <span className="font-semibold text-text-primary">{imagesCount}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span>{t.pricing.videos}</span>
-                    <span className="font-medium text-text-primary">{videosCount}</span>
+                    <span className="text-text-primary/80">{t.pricing.videos}</span>
+                    <span className="font-semibold text-text-primary">{videosCount}</span>
                   </div>
-                  <p className="text-xs text-text-muted pt-1">* Drops se comparten entre todos</p>
+                  <p className="text-xs text-text-primary/40 pt-1">* {t.pricing.dropsShared}</p>
                 </div>
               </div>
 
               {/* Features */}
               <div className="space-y-2 mb-6">
                 {[t.pricing.feature1, t.pricing.feature2, t.pricing.feature3, t.pricing.feature4,
-                  ...(plan.callMinutes > 0 ? ['Confirmacion por llamada'] : []),
+                  ...(plan.callMinutes > 0 ? [t.pricing.callConfirmation] : []),
                   ...(i >= 2 ? [t.pricing.feature5] : []),
                   ...(i >= 3 ? [t.pricing.feature6] : []),
                 ].map((feature, fi) => (
@@ -252,10 +252,10 @@ function PricingContent() {
         <div className="text-center mb-8">
           <h2 className="text-2xl font-bold text-text-primary flex items-center justify-center gap-2">
             <Calculator className="w-6 h-6 text-accent" />
-            Calculadora de Drops
+            {t.pricing.dropsCalculator}
           </h2>
-          <p className="text-text-secondary mt-1">
-            Calcula cuantos drops necesitas segun lo que quieras crear
+          <p className="text-text-primary/60 mt-1">
+            {t.pricing.dropsCalculatorDesc}
           </p>
         </div>
 
@@ -264,8 +264,8 @@ function PricingContent() {
             {/* Banners */}
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-text-primary">Banners</p>
-                <p className="text-xs text-text-secondary">{DROP_COSTS.banner} drops c/u</p>
+                <p className="text-sm font-medium text-text-primary">{t.pricing.banners}</p>
+                <p className="text-xs text-text-primary/50">{DROP_COSTS.banner} {t.pricing.perUnit}</p>
               </div>
               <div className="flex items-center gap-3">
                 <button
@@ -288,8 +288,8 @@ function PricingContent() {
             {/* Images */}
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-text-primary">Imagenes</p>
-                <p className="text-xs text-text-secondary">{DROP_COSTS.image} drops c/u</p>
+                <p className="text-sm font-medium text-text-primary">{t.pricing.images}</p>
+                <p className="text-xs text-text-primary/50">{DROP_COSTS.image} {t.pricing.perUnit}</p>
               </div>
               <div className="flex items-center gap-3">
                 <button
@@ -312,8 +312,8 @@ function PricingContent() {
             {/* Videos */}
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-text-primary">Videos</p>
-                <p className="text-xs text-text-secondary">{DROP_COSTS.video} drops c/u</p>
+                <p className="text-sm font-medium text-text-primary">{t.pricing.videos}</p>
+                <p className="text-xs text-text-primary/50">{DROP_COSTS.video} {t.pricing.perUnit}</p>
               </div>
               <div className="flex items-center gap-3">
                 <button
@@ -336,18 +336,18 @@ function PricingContent() {
             {/* Divider + Total */}
             <div className="border-t border-border pt-4 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-text-secondary">Total necesario</span>
+                <span className="text-sm font-medium text-text-primary/70">{t.pricing.totalNeeded}</span>
                 <span className="text-lg font-bold text-blue-400">{calcTotal.toLocaleString()} drops</span>
               </div>
               {userDrops > 0 && (
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-text-secondary">Tu saldo actual</span>
+                  <span className="text-sm text-text-primary/70">{t.pricing.yourBalance}</span>
                   <span className="text-sm font-medium text-text-primary">{userDrops.toLocaleString()} drops</span>
                 </div>
               )}
               {userDrops > 0 && (
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-text-secondary">Despues de crear</span>
+                  <span className="text-sm text-text-primary/70">{t.pricing.afterCreating}</span>
                   <span className={cn(
                     'text-sm font-bold',
                     calcRemaining >= 0 ? 'text-green-400' : 'text-red-400'
@@ -365,7 +365,7 @@ function PricingContent() {
       <div>
         <div className="text-center mb-8">
           <h2 className="text-2xl font-bold text-text-primary">{t.pricing.topups}</h2>
-          <p className="text-text-secondary mt-1">
+          <p className="text-text-primary/60 mt-1">
             {hasPlan ? t.pricing.topupsSubtitle : t.pricing.topupsRequirePlan}
           </p>
         </div>
@@ -398,10 +398,10 @@ function PricingContent() {
         <div className="text-center mb-8">
           <h2 className="text-2xl font-bold text-text-primary flex items-center justify-center gap-2">
             <Phone className="w-6 h-6 text-green-400" />
-            Recargas de Minutos
+            {t.pricing.callTopups}
           </h2>
-          <p className="text-text-secondary mt-1">
-            {hasPlan ? 'Minutos adicionales para confirmacion por llamada' : 'Necesitas un plan activo para comprar minutos'}
+          <p className="text-text-primary/60 mt-1">
+            {hasPlan ? t.pricing.callTopupsSubtitle : t.pricing.callTopupsRequirePlan}
           </p>
         </div>
 
@@ -414,7 +414,7 @@ function PricingContent() {
               <div className="flex items-center gap-2 mb-3">
                 <Phone className="w-5 h-5 text-green-400" />
                 <span className="font-bold text-green-400 text-lg">{topup.minutes}</span>
-                <span className="text-text-secondary text-sm">min</span>
+                <span className="text-text-primary/60 text-sm">{t.pricing.minutes}</span>
               </div>
               <p className="text-2xl font-bold text-text-primary mb-4">{'\u20AC'}{topup.price}</p>
               <button
@@ -422,7 +422,7 @@ function PricingContent() {
                 className="w-full py-2.5 rounded-xl bg-surface border border-border text-text-primary hover:bg-border text-sm font-medium transition-all flex items-center justify-center gap-2"
               >
                 <ShoppingCart className="w-4 h-4" />
-                Comprar
+                {t.pricing.buy || 'Comprar'}
               </button>
             </Card>
           ))}
