@@ -59,6 +59,9 @@
     }
   },
   "rewrites": [
+    { "source": "/api/admin/:path*", "destination": "https://alldrop-shop-production.up.railway.app/api/admin/:path*" },
+    { "source": "/api/auth/:path*", "destination": "https://alldrop-shop-production.up.railway.app/api/auth/:path*" },
+    { "source": "/api/store/:path*", "destination": "https://alldrop-shop-production.up.railway.app/api/store/:path*" },
     { "source": "/constructor", "destination": "https://alldrop-shop.vercel.app/constructor/" },
     { "source": "/constructor/:path*", "destination": "https://alldrop-shop.vercel.app/constructor/:path*" }
   ]
