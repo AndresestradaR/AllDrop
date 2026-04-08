@@ -2181,7 +2181,7 @@ export default function ProductGeneratePage() {
                                                 }))
                                                 setExpandedTemplateSection(null)
                                               }}
-                                              className="w-full px-2 py-1.5 bg-white hover:bg-gray-100 text-gray-900 text-xs font-medium rounded-lg transition-colors text-center shadow-sm"
+                                              className="w-full px-2 py-1.5 bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 text-xs font-medium rounded-lg transition-colors text-center border border-purple-500/30"
                                             >
                                               {t.editor.selectThisTemplate}
                                             </button>
