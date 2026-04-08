@@ -1,5 +1,4 @@
 import { createClient } from '@/lib/supabase/server'
-import BalanceCards from '@/components/dashboard/BalanceCards'
 import DashboardHome from '@/components/dashboard/DashboardHome'
 
 export const dynamic = 'force-dynamic'
@@ -11,7 +10,7 @@ export default async function DashboardPage() {
   // Get user profile
   const { data: profile } = await supabase
     .from('profiles')
-    .select('credits_used, credits_limit, plan, full_name')
+    .select('plan, full_name, drops')
     .eq('id', user?.id)
     .single()
 
@@ -31,16 +30,11 @@ export default async function DashboardPage() {
       : ''
 
   return (
-    <>
-      <DashboardHome
-        displayName={displayName}
-        plan={profile?.plan || 'Free'}
-        generations={generations || []}
-      />
-      {/* API Balances */}
-      <div className="mt-8">
-        <BalanceCards />
-      </div>
-    </>
+    <DashboardHome
+      displayName={displayName}
+      plan={profile?.plan || 'Free'}
+      drops={profile?.drops ?? 0}
+      generations={generations || []}
+    />
   )
 }

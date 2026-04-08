@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { Button, Card, CardHeader, CardTitle, CardContent } from '@/components/ui'
-import { Clock, Images, Store, ArrowRight } from 'lucide-react'
+import { Images, Store, ArrowRight, Droplets } from 'lucide-react'
 import { useI18n } from '@/lib/i18n'
 
 interface Generation {
@@ -15,10 +15,11 @@ interface Generation {
 interface DashboardHomeProps {
   displayName: string
   plan: string
+  drops: number
   generations: Generation[]
 }
 
-export default function DashboardHome({ displayName, plan, generations }: DashboardHomeProps) {
+export default function DashboardHome({ displayName, plan, drops, generations }: DashboardHomeProps) {
   const { t } = useI18n()
 
   return (
@@ -35,17 +36,17 @@ export default function DashboardHome({ displayName, plan, generations }: Dashbo
         </div>
       </div>
 
-      {/* Plan card */}
+      {/* Drops balance card */}
       <div className="grid sm:grid-cols-1 gap-4 max-w-sm">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-accent/10 rounded-xl flex items-center justify-center">
-                <Clock className="w-6 h-6 text-accent" />
+              <div className="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center">
+                <Droplets className="w-6 h-6 text-blue-400" />
               </div>
               <div>
-                <p className="text-sm text-text-secondary">{t.home.currentPlan}</p>
-                <p className="text-2xl font-bold text-text-primary capitalize">{plan}</p>
+                <p className="text-sm text-text-secondary capitalize">{plan} Plan</p>
+                <p className="text-2xl font-bold text-text-primary">{drops.toLocaleString()} <span className="text-base font-normal text-text-secondary">Drops</span></p>
               </div>
             </div>
           </CardContent>
