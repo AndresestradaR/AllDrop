@@ -44,21 +44,21 @@ import { useI18n } from '@/lib/i18n'
 
 export const dynamic = 'force-dynamic'
 
-const TEMPLATE_CATEGORIES = [
-  { id: 'hero', name: 'Hero', icon: '🏠', description: 'Banner principal con headline impactante' },
-  { id: 'oferta', name: 'Oferta', icon: '🏷️', description: 'Precios, descuentos, combos' },
-  { id: 'antes-despues', name: 'Antes/Después', icon: '🔄', description: 'Transformacion visual del resultado' },
-  { id: 'beneficios', name: 'Beneficios', icon: '✅', description: '3-4 beneficios con iconos' },
-  { id: 'tabla-comparativa', name: 'Comparativa', icon: '📊', description: 'Tu producto vs competencia' },
-  { id: 'autoridad', name: 'Autoridad', icon: '🏆', description: 'Certificaciones, estudios, respaldo' },
-  { id: 'testimonios', name: 'Testimonios', icon: '💬', description: 'Reviews y opiniones de clientes' },
-  { id: 'ingredientes', name: 'Ingredientes', icon: '🧪', description: 'Componentes, materiales, formula' },
-  { id: 'modo-uso', name: 'Modo de Uso', icon: '📋', description: 'Pasos 1-2-3 de como usar' },
-  { id: 'logistica', name: 'Logística', icon: '🚚', description: 'Envio gratis, contraentrega, tiempos' },
-  { id: 'faq', name: 'FAQ', icon: '❓', description: 'Preguntas frecuentes' },
-  { id: 'casos-uso', name: 'Casos de Uso', icon: '💡', description: 'Situaciones reales donde se usa el producto' },
-  { id: 'caracteristicas', name: 'Características', icon: '⚙️', description: 'Especificaciones y features del producto' },
-  { id: 'comunidad', name: 'Comunidad', icon: '👥', description: 'Social proof, comunidad de usuarios' },
+const TEMPLATE_CATEGORY_IDS = [
+  { id: 'hero', icon: '🏠', nameKey: 'catHeroName' as const, descKey: 'catHero' as const },
+  { id: 'oferta', icon: '🏷️', nameKey: 'catOfertaName' as const, descKey: 'catOferta' as const },
+  { id: 'antes-despues', icon: '🔄', nameKey: 'catAntesDespuesName' as const, descKey: 'catAntesDespues' as const },
+  { id: 'beneficios', icon: '✅', nameKey: 'catBeneficiosName' as const, descKey: 'catBeneficios' as const },
+  { id: 'tabla-comparativa', icon: '📊', nameKey: 'catComparativaName' as const, descKey: 'catComparativa' as const },
+  { id: 'autoridad', icon: '🏆', nameKey: 'catAutoridadName' as const, descKey: 'catAutoridad' as const },
+  { id: 'testimonios', icon: '💬', nameKey: 'catTestimoniosName' as const, descKey: 'catTestimonios' as const },
+  { id: 'ingredientes', icon: '🧪', nameKey: 'catIngredientesName' as const, descKey: 'catIngredientes' as const },
+  { id: 'modo-uso', icon: '📋', nameKey: 'catModoUsoName' as const, descKey: 'catModoUso' as const },
+  { id: 'logistica', icon: '🚚', nameKey: 'catLogisticaName' as const, descKey: 'catLogistica' as const },
+  { id: 'faq', icon: '❓', nameKey: 'catFaqName' as const, descKey: 'catFaq' as const },
+  { id: 'casos-uso', icon: '💡', nameKey: 'catCasosUsoName' as const, descKey: 'catCasosUso' as const },
+  { id: 'caracteristicas', icon: '⚙️', nameKey: 'catCaracteristicasName' as const, descKey: 'catCaracteristicas' as const },
+  { id: 'comunidad', icon: '👥', nameKey: 'catComunidadName' as const, descKey: 'catComunidad' as const },
 ]
 
 const OUTPUT_SIZES = [
@@ -117,7 +117,15 @@ export default function ProductGeneratePage() {
   const router = useRouter()
   const { t, countryName } = useI18n()
   const productId = params.id as string
-  
+
+  // Build translated template categories
+  const TEMPLATE_CATEGORIES = TEMPLATE_CATEGORY_IDS.map(cat => ({
+    id: cat.id,
+    icon: cat.icon,
+    name: (t.editor as any)[cat.nameKey] || cat.nameKey,
+    description: (t.editor as any)[cat.descKey] || cat.descKey,
+  }))
+
   const [product, setProduct] = useState<Product | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isGenerating, setIsGenerating] = useState(false)
@@ -2121,7 +2129,7 @@ export default function ProductGeneratePage() {
                                       {categoryTemplates.length > 0 && (
                                         <button
                                           onClick={() => setExpandedTemplateSection(category.id)}
-                                          className="flex-shrink-0 px-4 py-3 bg-accent/10 hover:bg-accent/20 text-accent rounded-xl text-sm font-semibold transition-colors whitespace-nowrap border border-accent/20"
+                                          className="flex-shrink-0 px-4 py-3 bg-white hover:bg-gray-100 text-gray-900 rounded-xl text-sm font-semibold transition-colors whitespace-nowrap shadow-sm"
                                         >
                                           {t.editor.viewAll} ({categoryTemplates.length})
                                         </button>
