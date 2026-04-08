@@ -1282,26 +1282,11 @@ export default function ProductGeneratePage() {
         product_photos: productPhotos.filter((p): p is string => p !== null),
       }
 
-      // Auto-detect existing landing in DropPage — send there without asking
-      let existingDesignId: string | null = null
-      try {
-        const designsRes = await fetch('/api/minishop/import-sections', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ section_ids, metadata, check_existing: true, product_name: product?.name }),
-        })
-        if (designsRes.ok) {
-          const designsData = await designsRes.json()
-          if (designsData.existing_design_id) {
-            existingDesignId = designsData.existing_design_id
-          }
-        }
-      } catch { /* ignore — will create new */ }
-
+      // Always create a fresh design — avoids reusing designs with corrupted/empty GrapesJS data
       const response = await fetch('/api/minishop/import-sections', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ section_ids, metadata, existing_design_id: existingDesignId }),
+        body: JSON.stringify({ section_ids, metadata }),
       })
 
       if (!response.ok) {
