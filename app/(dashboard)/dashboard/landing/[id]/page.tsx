@@ -177,7 +177,7 @@ export default function ProductGeneratePage() {
   })
 
   // Product context (Phase 2)
-  const [showProductContext, setShowProductContext] = useState(false)
+  const [showProductContext, setShowProductContext] = useState(true)
   const [productContext, setProductContext] = useState({
     description: '',
     benefits: '',
@@ -249,6 +249,9 @@ export default function ProductGeneratePage() {
   const [editInstruction, setEditInstruction] = useState('')
   const [editReferenceImage, setEditReferenceImage] = useState<string | null>(null)
   const [isEditing, setIsEditing] = useState(false)
+
+  // Template gallery expansion per section
+  const [expandedTemplateSection, setExpandedTemplateSection] = useState<string | null>(null)
 
   // Export to MiniShop editor
   const [selectedForExport, setSelectedForExport] = useState<Map<string, number>>(new Map())
@@ -566,7 +569,7 @@ export default function ProductGeneratePage() {
             subheadings: FONT_CATALOG.find(f => f.id === selectedFonts.subheadings)?.promptDesc || '',
             body: FONT_CATALOG.find(f => f.id === selectedFonts.body)?.promptDesc || '',
           },
-          productContext: showProductContext ? productContext : {},
+          productContext,
         }),
       })
 
@@ -620,7 +623,7 @@ export default function ProductGeneratePage() {
           templateUrl: selectedTemplate?.image_url || uploadedTemplate,
           productPhotos: productPhotos.filter(p => p !== null),
           productName: product?.name,
-          productContext: showProductContext ? productContext : {},
+          productContext,
         }),
       })
 
@@ -746,7 +749,7 @@ export default function ProductGeneratePage() {
                 subheadings: FONT_CATALOG.find(f => f.id === selectedFonts.subheadings)?.promptDesc || '',
                 body: FONT_CATALOG.find(f => f.id === selectedFonts.body)?.promptDesc || '',
               },
-              productContext: showProductContext ? productContext : {},
+              productContext,
             }),
           })
 
@@ -785,14 +788,13 @@ export default function ProductGeneratePage() {
     }
 
     // Force-save product context before generating angles
-    const ctxToSave = showProductContext ? productContext : {}
-    const hasCtx = Object.values(ctxToSave).some(v => typeof v === 'string' && v.trim() !== '')
+    const hasCtx = Object.values(productContext).some(v => typeof v === 'string' && v.trim() !== '')
     if (hasCtx) {
       try {
         await fetch('/api/products/context', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ productId, context: ctxToSave }),
+          body: JSON.stringify({ productId, context: productContext }),
         })
         console.log('[ProductContext] Forced save before angle generation')
       } catch {}
@@ -807,7 +809,7 @@ export default function ProductGeneratePage() {
         body: JSON.stringify({
           productName: product?.name,
           productPhotos: productPhotos.filter(p => p !== null),
-          productContext: showProductContext ? productContext : {},
+          productContext,
           targetCountry: selectedCountry.code,
           outputLanguage,
         }),
@@ -1350,55 +1352,51 @@ export default function ProductGeneratePage() {
 
       {/* Main Content */}
       <Card className="p-6 mb-6">
-        {/* Product Photos and Template Row - Horizontal Layout */}
-        <div className="flex gap-6 mb-6">
-          {/* Product Photos - Left side, horizontal */}
-          <div className="flex-shrink-0">
-            <div className="flex items-center justify-between mb-3">
-              <label className="text-sm font-medium text-text-primary">
-                {t.editor.productPhotos}
-              </label>
-              <span className="text-xs text-text-secondary">{t.editor.photoCount}</span>
-            </div>
-
-            <div className="flex gap-3">
-              {[0, 1, 2].map((index) => (
-                <div key={index} className="w-28 h-28 relative">
-                  {productPhotos[index] ? (
-                    <div className="w-full h-full rounded-xl overflow-hidden border border-border bg-surface">
-                      <img
-                        src={productPhotos[index]!}
-                        alt={`Producto ${index + 1}`}
-                        className="w-full h-full object-contain"
-                      />
-                      <button
-                        onClick={() => removePhoto(index)}
-                        className="absolute top-1 right-1 p-1 bg-background/80 rounded-lg hover:bg-error/20 hover:text-error transition-colors"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => photoInputRefs[index].current?.click()}
-                      className="w-full h-full rounded-xl border-2 border-dashed border-border hover:border-accent/50 hover:bg-accent/5 transition-colors flex flex-col items-center justify-center"
-                    >
-                      <ImageIcon className="w-6 h-6 text-text-secondary/40 mb-1" />
-                      <span className="text-xs text-text-secondary">{index + 1}</span>
-                    </button>
-                  )}
-                  <input
-                    ref={photoInputRefs[index]}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handlePhotoUpload(index)}
-                  />
-                </div>
-              ))}
-            </div>
+        {/* Product Photos - Full width, centered */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <label className="text-sm font-medium text-text-primary">
+              {t.editor.productPhotos}
+            </label>
+            <span className="text-xs text-text-secondary">{t.editor.photoCount}</span>
           </div>
 
+          <div className="grid grid-cols-3 gap-4">
+            {[0, 1, 2].map((index) => (
+              <div key={index} className="aspect-square relative">
+                {productPhotos[index] ? (
+                  <div className="w-full h-full rounded-xl overflow-hidden border border-border bg-surface">
+                    <img
+                      src={productPhotos[index]!}
+                      alt={`Producto ${index + 1}`}
+                      className="w-full h-full object-contain"
+                    />
+                    <button
+                      onClick={() => removePhoto(index)}
+                      className="absolute top-2 right-2 p-1.5 bg-background/80 rounded-lg hover:bg-error/20 hover:text-error transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => photoInputRefs[index].current?.click()}
+                    className="w-full h-full rounded-xl border-2 border-dashed border-border hover:border-accent/50 hover:bg-accent/5 transition-colors flex flex-col items-center justify-center"
+                  >
+                    <ImageIcon className="w-8 h-8 text-text-secondary/40 mb-2" />
+                    <span className="text-sm text-text-secondary">{index + 1}</span>
+                  </button>
+                )}
+                <input
+                  ref={photoInputRefs[index]}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handlePhotoUpload(index)}
+                />
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Visual Style: Colors & Typography */}
@@ -1754,33 +1752,19 @@ export default function ProductGeneratePage() {
         <h2 className="text-xl font-bold text-text-primary mb-2 mt-2">{t.editor.createCompleteLandings}</h2>
         <p className="text-sm text-text-secondary mb-4">{t.editor.defineContext}</p>
 
-        {/* Product Context (Phase 2) */}
+        {/* Product Context — always visible */}
         <div className="border border-border rounded-xl p-4 mb-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <FileText className="w-4 h-4 text-accent" />
-              <span className="text-sm font-medium text-text-primary">
-                {t.editor.productContext}
-              </span>
-              <span className="text-xs text-text-secondary">{t.editor.recommended}</span>
-            </div>
-            <button
-              onClick={() => setShowProductContext(!showProductContext)}
-              className={`relative w-12 h-6 rounded-full transition-colors ${
-                showProductContext ? 'bg-accent' : 'bg-border'
-              }`}
-            >
-              <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
-                showProductContext ? 'left-7' : 'left-1'
-              }`} />
-            </button>
+          <div className="flex items-center gap-2 mb-4">
+            <FileText className="w-4 h-4 text-accent" />
+            <span className="text-sm font-medium text-text-primary">
+              {t.editor.productContext}
+            </span>
           </div>
 
-          {showProductContext && (
-            <div className="mt-4 space-y-4">
-              <p className="text-xs text-text-secondary">
-                {t.editor.moreContext}
-              </p>
+          <div className="space-y-4">
+            <p className="text-xs text-text-secondary">
+              {t.editor.moreContext}
+            </p>
 
               {/* Description */}
               <div>
@@ -2105,49 +2089,104 @@ export default function ProductGeneratePage() {
                           {isSelected && (
                             <div className="px-3 pb-3">
                               {categoryTemplates.length > 0 ? (
-                                <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-                                  {categoryTemplates.map((template) => (
-                                    <button
-                                      key={template.id}
-                                      onClick={() => setSectionTemplates(prev => ({
-                                        ...prev,
-                                        [category.id]: prev[category.id]?.id === template.id ? null : template,
-                                      }))}
-                                      className={`flex-shrink-0 w-16 h-24 rounded-lg overflow-hidden border-2 transition-all ${
-                                        assignedTemplate?.id === template.id
-                                          ? 'border-accent ring-1 ring-accent/30'
-                                          : 'border-border hover:border-accent/30'
-                                      }`}
-                                    >
-                                      <img
-                                        src={template.image_url}
-                                        alt={template.name}
-                                        className="w-full h-full object-cover"
-                                        loading="lazy"
-                                      />
-                                    </button>
-                                  ))}
-                                </div>
+                                <>
+                                  {/* Compact row with first few templates + "Ver todos" */}
+                                  {expandedTemplateSection !== category.id ? (
+                                    <div className="flex gap-2 items-center">
+                                      <div className="flex gap-2 overflow-hidden flex-1">
+                                        {categoryTemplates.slice(0, 5).map((template) => (
+                                          <button
+                                            key={template.id}
+                                            onClick={() => {
+                                              setSectionTemplates(prev => ({
+                                                ...prev,
+                                                [category.id]: prev[category.id]?.id === template.id ? null : template,
+                                              }))
+                                            }}
+                                            className={`flex-shrink-0 w-20 h-28 rounded-lg overflow-hidden border-2 transition-all ${
+                                              assignedTemplate?.id === template.id
+                                                ? 'border-accent ring-1 ring-accent/30'
+                                                : 'border-border hover:border-accent/30'
+                                            }`}
+                                          >
+                                            <img
+                                              src={template.image_url}
+                                              alt={template.name}
+                                              className="w-full h-full object-cover"
+                                              loading="lazy"
+                                            />
+                                          </button>
+                                        ))}
+                                      </div>
+                                      {categoryTemplates.length > 5 && (
+                                        <button
+                                          onClick={() => setExpandedTemplateSection(category.id)}
+                                          className="flex-shrink-0 px-3 py-2 bg-accent/10 hover:bg-accent/20 text-accent rounded-lg text-xs font-medium transition-colors whitespace-nowrap"
+                                        >
+                                          {'Ver todos'} ({categoryTemplates.length})
+                                        </button>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    /* Expanded grid view */
+                                    <div className="space-y-3">
+                                      <div className="flex items-center justify-between">
+                                        <span className="text-xs font-medium text-text-secondary">
+                                          {categoryTemplates.length} {'plantillas disponibles'}
+                                        </span>
+                                        <button
+                                          onClick={() => setExpandedTemplateSection(null)}
+                                          className="p-1 text-text-secondary hover:text-text-primary hover:bg-border/50 rounded-lg transition-colors"
+                                        >
+                                          <X className="w-4 h-4" />
+                                        </button>
+                                      </div>
+                                      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+                                        {categoryTemplates.map((template) => (
+                                          <div key={template.id} className="flex flex-col items-center gap-1.5">
+                                            <button
+                                              onClick={() => {
+                                                setSectionTemplates(prev => ({
+                                                  ...prev,
+                                                  [category.id]: template,
+                                                }))
+                                                setExpandedTemplateSection(null)
+                                              }}
+                                              className={`w-full aspect-[9/16] rounded-xl overflow-hidden border-2 transition-all hover:scale-[1.02] ${
+                                                assignedTemplate?.id === template.id
+                                                  ? 'border-accent ring-2 ring-accent/30'
+                                                  : 'border-border hover:border-accent/50'
+                                              }`}
+                                            >
+                                              <img
+                                                src={template.image_url}
+                                                alt={template.name}
+                                                className="w-full h-full object-cover"
+                                                loading="lazy"
+                                              />
+                                            </button>
+                                            <button
+                                              onClick={() => {
+                                                setSectionTemplates(prev => ({
+                                                  ...prev,
+                                                  [category.id]: template,
+                                                }))
+                                                setExpandedTemplateSection(null)
+                                              }}
+                                              className="w-full px-2 py-1.5 bg-accent hover:bg-accent-hover text-white text-xs font-medium rounded-lg transition-colors text-center"
+                                            >
+                                              {'¡Sí, este!'}
+                                            </button>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </>
                               ) : (
-                                <div className="flex items-center gap-2 py-2">
-                                  <span className="text-xs text-text-secondary/70">{t.editor.noTemplates} —</span>
-                                  <button
-                                    onClick={() => {
-                                      if (uploadedTemplate || selectedTemplate) {
-                                        setSectionTemplates(prev => ({
-                                          ...prev,
-                                          [category.id]: selectedTemplate || { id: 'uploaded', name: 'Subida', image_url: uploadedTemplate!, category: category.id } as Template,
-                                        }))
-                                        toast.success(t.editor.templateAssigned)
-                                      } else {
-                                        toast.error(t.editor.uploadRefFirst)
-                                      }
-                                    }}
-                                    className="text-xs text-accent hover:underline"
-                                  >
-                                    {t.editor.useMainTemplate}
-                                  </button>
-                                </div>
+                                <p className="text-xs text-text-secondary/70 py-2">
+                                  {t.editor.noTemplates || 'Sin plantillas para esta sección'}
+                                </p>
                               )}
                             </div>
                           )}
@@ -2202,7 +2241,6 @@ export default function ProductGeneratePage() {
                 </div>
               )}
             </div>
-          )}
         </div>
 
         {/* Single section generation removed — use bulk generation only */}

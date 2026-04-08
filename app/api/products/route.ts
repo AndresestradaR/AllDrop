@@ -18,6 +18,7 @@ export async function GET() {
         name,
         description,
         image_url,
+        product_photos,
         created_at,
         sections:landing_sections(count)
       `)
@@ -29,9 +30,12 @@ export async function GET() {
       return NextResponse.json({ error: 'Error al obtener productos' }, { status: 500 })
     }
 
-    // Transform to include sections count
+    // Transform to include sections count and resolve product photo
     const transformedProducts = products?.map(p => ({
       ...p,
+      // Use first product_photo as image_url if image_url is empty
+      image_url: p.image_url || (Array.isArray(p.product_photos) && p.product_photos.length > 0 ? p.product_photos[0] : null),
+      product_photos: undefined,
       sections_count: p.sections?.[0]?.count || 0,
       sections: undefined,
     })) || []
