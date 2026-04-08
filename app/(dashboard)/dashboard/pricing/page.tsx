@@ -3,9 +3,9 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useI18n } from '@/lib/i18n'
-import { PLANS, TOPUPS, DROP_COSTS } from '@/lib/drops/constants'
+import { PLANS, TOPUPS, CALL_TOPUPS, DROP_COSTS } from '@/lib/drops/constants'
 import { Card } from '@/components/ui'
-import { Check, Sparkles, Zap, Star, Crown, ShoppingCart } from 'lucide-react'
+import { Check, Sparkles, Zap, Star, Crown, ShoppingCart, Phone, Calculator, Minus, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
 import { createClient } from '@/lib/supabase/client'
 import toast from 'react-hot-toast'
@@ -24,6 +24,14 @@ function PricingContent() {
   const searchParams = useSearchParams()
   const [userPlan, setUserPlan] = useState<string>('free')
   const [userDrops, setUserDrops] = useState(0)
+
+  // Calculator state
+  const [calcBanners, setCalcBanners] = useState(10)
+  const [calcImages, setCalcImages] = useState(5)
+  const [calcVideos, setCalcVideos] = useState(1)
+
+  const calcTotal = calcBanners * DROP_COSTS.banner + calcImages * DROP_COSTS.image + calcVideos * DROP_COSTS.video
+  const calcRemaining = userDrops - calcTotal
 
   useEffect(() => {
     const supabase = createClient()
@@ -96,6 +104,28 @@ function PricingContent() {
     }
   }
 
+  const handleBuyCallTopup = async (topupId: string) => {
+    if (!hasPlan) {
+      toast.error('Necesitas un plan activo para comprar minutos')
+      return
+    }
+    try {
+      const res = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'call-topup', id: topupId }),
+      })
+      const data = await res.json()
+      if (data.url) {
+        window.location.href = data.url
+      } else {
+        toast.error(data.error || 'Error creating checkout')
+      }
+    } catch (error) {
+      toast.error('Error connecting to payment')
+    }
+  }
+
   return (
     <div className="max-w-6xl mx-auto space-y-12">
       {/* Header */}
@@ -148,25 +178,45 @@ function PricingContent() {
               </div>
 
               {/* Drops */}
-              <div className="flex items-center gap-2 mb-4 px-3 py-2 bg-blue-500/5 rounded-lg">
+              <div className="flex items-center gap-2 mb-3 px-3 py-2 bg-blue-500/5 rounded-lg">
                 <img src="/images/drops.png" alt="Drops" className="w-5 h-5" />
                 <span className="font-bold text-blue-400">{plan.drops.toLocaleString()}</span>
                 <span className="text-text-secondary text-sm">{t.pricing.drops}</span>
               </div>
 
+              {/* Call minutes */}
+              {plan.callMinutes > 0 && (
+                <div className="flex items-center gap-2 mb-4 px-3 py-2 bg-green-500/5 rounded-lg">
+                  <Phone className="w-4 h-4 text-green-400" />
+                  <span className="font-bold text-green-400">{plan.callMinutes}</span>
+                  <span className="text-text-secondary text-sm">min llamadas</span>
+                </div>
+              )}
+
               {/* What you can do */}
               <div className="space-y-2 mb-6 flex-1">
                 <p className="text-xs text-text-secondary font-medium uppercase tracking-wider">{t.pricing.whatCanYouDo}</p>
                 <div className="text-sm text-text-secondary space-y-1">
-                  <p>~{bannersCount} {t.pricing.banners}</p>
-                  <p>~{imagesCount} {t.pricing.images}</p>
-                  <p>~{videosCount} {t.pricing.videos}</p>
+                  <div className="flex items-center justify-between">
+                    <span>{t.pricing.banners}</span>
+                    <span className="font-medium text-text-primary">{bannersCount}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>{t.pricing.images}</span>
+                    <span className="font-medium text-text-primary">{imagesCount}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>{t.pricing.videos}</span>
+                    <span className="font-medium text-text-primary">{videosCount}</span>
+                  </div>
+                  <p className="text-xs text-text-muted pt-1">* Drops se comparten entre todos</p>
                 </div>
               </div>
 
               {/* Features */}
               <div className="space-y-2 mb-6">
                 {[t.pricing.feature1, t.pricing.feature2, t.pricing.feature3, t.pricing.feature4,
+                  ...(plan.callMinutes > 0 ? ['Confirmacion por llamada'] : []),
                   ...(i >= 2 ? [t.pricing.feature5] : []),
                   ...(i >= 3 ? [t.pricing.feature6] : []),
                 ].map((feature, fi) => (
@@ -197,7 +247,121 @@ function PricingContent() {
         })}
       </div>
 
-      {/* Top-ups Section */}
+      {/* Drops Calculator */}
+      <div>
+        <div className="text-center mb-8">
+          <h2 className="text-2xl font-bold text-text-primary flex items-center justify-center gap-2">
+            <Calculator className="w-6 h-6 text-accent" />
+            Calculadora de Drops
+          </h2>
+          <p className="text-text-secondary mt-1">
+            Calcula cuantos drops necesitas segun lo que quieras crear
+          </p>
+        </div>
+
+        <Card className="max-w-2xl mx-auto p-6">
+          <div className="space-y-5">
+            {/* Banners */}
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-text-primary">Banners</p>
+                <p className="text-xs text-text-secondary">{DROP_COSTS.banner} drops c/u</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setCalcBanners(Math.max(0, calcBanners - 5))}
+                  className="w-8 h-8 rounded-lg bg-surface-elevated border border-border flex items-center justify-center hover:bg-border transition-colors"
+                >
+                  <Minus className="w-4 h-4 text-text-secondary" />
+                </button>
+                <span className="text-lg font-bold text-text-primary w-12 text-center">{calcBanners}</span>
+                <button
+                  onClick={() => setCalcBanners(calcBanners + 5)}
+                  className="w-8 h-8 rounded-lg bg-surface-elevated border border-border flex items-center justify-center hover:bg-border transition-colors"
+                >
+                  <Plus className="w-4 h-4 text-text-secondary" />
+                </button>
+                <span className="text-sm text-text-secondary w-20 text-right">{(calcBanners * DROP_COSTS.banner).toLocaleString()} drops</span>
+              </div>
+            </div>
+
+            {/* Images */}
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-text-primary">Imagenes</p>
+                <p className="text-xs text-text-secondary">{DROP_COSTS.image} drops c/u</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setCalcImages(Math.max(0, calcImages - 5))}
+                  className="w-8 h-8 rounded-lg bg-surface-elevated border border-border flex items-center justify-center hover:bg-border transition-colors"
+                >
+                  <Minus className="w-4 h-4 text-text-secondary" />
+                </button>
+                <span className="text-lg font-bold text-text-primary w-12 text-center">{calcImages}</span>
+                <button
+                  onClick={() => setCalcImages(calcImages + 5)}
+                  className="w-8 h-8 rounded-lg bg-surface-elevated border border-border flex items-center justify-center hover:bg-border transition-colors"
+                >
+                  <Plus className="w-4 h-4 text-text-secondary" />
+                </button>
+                <span className="text-sm text-text-secondary w-20 text-right">{(calcImages * DROP_COSTS.image).toLocaleString()} drops</span>
+              </div>
+            </div>
+
+            {/* Videos */}
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-text-primary">Videos</p>
+                <p className="text-xs text-text-secondary">{DROP_COSTS.video} drops c/u</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setCalcVideos(Math.max(0, calcVideos - 1))}
+                  className="w-8 h-8 rounded-lg bg-surface-elevated border border-border flex items-center justify-center hover:bg-border transition-colors"
+                >
+                  <Minus className="w-4 h-4 text-text-secondary" />
+                </button>
+                <span className="text-lg font-bold text-text-primary w-12 text-center">{calcVideos}</span>
+                <button
+                  onClick={() => setCalcVideos(calcVideos + 1)}
+                  className="w-8 h-8 rounded-lg bg-surface-elevated border border-border flex items-center justify-center hover:bg-border transition-colors"
+                >
+                  <Plus className="w-4 h-4 text-text-secondary" />
+                </button>
+                <span className="text-sm text-text-secondary w-20 text-right">{(calcVideos * DROP_COSTS.video).toLocaleString()} drops</span>
+              </div>
+            </div>
+
+            {/* Divider + Total */}
+            <div className="border-t border-border pt-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-text-secondary">Total necesario</span>
+                <span className="text-lg font-bold text-blue-400">{calcTotal.toLocaleString()} drops</span>
+              </div>
+              {userDrops > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-text-secondary">Tu saldo actual</span>
+                  <span className="text-sm font-medium text-text-primary">{userDrops.toLocaleString()} drops</span>
+                </div>
+              )}
+              {userDrops > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-text-secondary">Despues de crear</span>
+                  <span className={cn(
+                    'text-sm font-bold',
+                    calcRemaining >= 0 ? 'text-green-400' : 'text-red-400'
+                  )}>
+                    {calcRemaining >= 0 ? calcRemaining.toLocaleString() : calcRemaining.toLocaleString()} drops
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      {/* Drops Top-ups */}
       <div>
         <div className="text-center mb-8">
           <h2 className="text-2xl font-bold text-text-primary">{t.pricing.topups}</h2>
@@ -222,7 +386,43 @@ function PricingContent() {
                 className="w-full py-2.5 rounded-xl bg-surface border border-border text-text-primary hover:bg-border text-sm font-medium transition-all flex items-center justify-center gap-2"
               >
                 <ShoppingCart className="w-4 h-4" />
-                {t.pricing.buy}
+                {t.pricing.buy || 'Comprar'}
+              </button>
+            </Card>
+          ))}
+        </div>
+      </div>
+
+      {/* Call Minutes Top-ups */}
+      <div>
+        <div className="text-center mb-8">
+          <h2 className="text-2xl font-bold text-text-primary flex items-center justify-center gap-2">
+            <Phone className="w-6 h-6 text-green-400" />
+            Recargas de Minutos
+          </h2>
+          <p className="text-text-secondary mt-1">
+            {hasPlan ? 'Minutos adicionales para confirmacion por llamada' : 'Necesitas un plan activo para comprar minutos'}
+          </p>
+        </div>
+
+        <div className={cn(
+          'grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto',
+          !hasPlan && 'opacity-50 pointer-events-none'
+        )}>
+          {CALL_TOPUPS.map((topup) => (
+            <Card key={topup.id} className="p-5 flex flex-col items-center text-center hover:border-green-500/50 transition-all">
+              <div className="flex items-center gap-2 mb-3">
+                <Phone className="w-5 h-5 text-green-400" />
+                <span className="font-bold text-green-400 text-lg">{topup.minutes}</span>
+                <span className="text-text-secondary text-sm">min</span>
+              </div>
+              <p className="text-2xl font-bold text-text-primary mb-4">{'\u20AC'}{topup.price}</p>
+              <button
+                onClick={() => handleBuyCallTopup(topup.id)}
+                className="w-full py-2.5 rounded-xl bg-surface border border-border text-text-primary hover:bg-border text-sm font-medium transition-all flex items-center justify-center gap-2"
+              >
+                <ShoppingCart className="w-4 h-4" />
+                Comprar
               </button>
             </Card>
           ))}

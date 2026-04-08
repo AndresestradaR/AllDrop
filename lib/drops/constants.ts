@@ -7,6 +7,7 @@ export const PLANS = [
     drops: 2000,
     dropsPerEuro: 51,
     popular: false,
+    callMinutes: 0,
   },
   {
     id: 'pro',
@@ -16,6 +17,7 @@ export const PLANS = [
     drops: 5000,
     dropsPerEuro: 63,
     popular: true,
+    callMinutes: 100,
   },
   {
     id: 'business',
@@ -25,6 +27,7 @@ export const PLANS = [
     drops: 13000,
     dropsPerEuro: 87,
     popular: false,
+    callMinutes: 300,
   },
   {
     id: 'enterprise',
@@ -34,6 +37,7 @@ export const PLANS = [
     drops: 32000,
     dropsPerEuro: 107,
     popular: false,
+    callMinutes: 1000,
   },
 ] as const
 
@@ -44,6 +48,12 @@ export const TOPUPS = [
   { id: 'ultra', name: 'Ultra', price: 99, currency: 'EUR', drops: 6000 },
 ] as const
 
+export const CALL_TOPUPS = [
+  { id: 'calls-100', name: '100 Minutos', price: 15, currency: 'EUR', minutes: 100 },
+  { id: 'calls-200', name: '200 Minutos', price: 25, currency: 'EUR', minutes: 200 },
+  { id: 'calls-500', name: '500 Minutos', price: 50, currency: 'EUR', minutes: 500 },
+] as const
+
 export const DROP_COSTS = {
   banner: 9,
   image: 18,
@@ -52,3 +62,4 @@ export const DROP_COSTS = {
 
 export type PlanId = typeof PLANS[number]['id']
 export type TopupId = typeof TOPUPS[number]['id']
+export type CallTopupId = typeof CALL_TOPUPS[number]['id']
