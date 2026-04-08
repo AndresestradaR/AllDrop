@@ -2094,7 +2094,7 @@ export default function ProductGeneratePage() {
                                   {expandedTemplateSection !== category.id ? (
                                     <div className="flex gap-2 items-center">
                                       <div className="flex gap-2 overflow-hidden flex-1">
-                                        {categoryTemplates.slice(0, 5).map((template) => (
+                                        {categoryTemplates.slice(0, 8).map((template) => (
                                           <button
                                             key={template.id}
                                             onClick={() => {
@@ -2118,12 +2118,12 @@ export default function ProductGeneratePage() {
                                           </button>
                                         ))}
                                       </div>
-                                      {categoryTemplates.length > 5 && (
+                                      {categoryTemplates.length > 0 && (
                                         <button
                                           onClick={() => setExpandedTemplateSection(category.id)}
-                                          className="flex-shrink-0 px-3 py-2 bg-accent/10 hover:bg-accent/20 text-accent rounded-lg text-xs font-medium transition-colors whitespace-nowrap"
+                                          className="flex-shrink-0 px-4 py-3 bg-accent/10 hover:bg-accent/20 text-accent rounded-xl text-sm font-semibold transition-colors whitespace-nowrap border border-accent/20"
                                         >
-                                          {'Ver todos'} ({categoryTemplates.length})
+                                          {t.editor.viewAll} ({categoryTemplates.length})
                                         </button>
                                       )}
                                     </div>
@@ -2132,7 +2132,7 @@ export default function ProductGeneratePage() {
                                     <div className="space-y-3">
                                       <div className="flex items-center justify-between">
                                         <span className="text-xs font-medium text-text-secondary">
-                                          {categoryTemplates.length} {'plantillas disponibles'}
+                                          {categoryTemplates.length} {t.editor.templatesAvailable}
                                         </span>
                                         <button
                                           onClick={() => setExpandedTemplateSection(null)}
@@ -2175,7 +2175,7 @@ export default function ProductGeneratePage() {
                                               }}
                                               className="w-full px-2 py-1.5 bg-accent hover:bg-accent-hover text-white text-xs font-medium rounded-lg transition-colors text-center"
                                             >
-                                              {'¡Sí, este!'}
+                                              {t.editor.selectThisTemplate}
                                             </button>
                                           </div>
                                         ))}
