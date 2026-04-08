@@ -38,15 +38,22 @@ async function optimizeAndUpload(
       return imageUrl
     }
 
+    // Try public URL first, fallback to signed URL (24h) if bucket is not public
     const { data: urlData } = serviceClient.storage
       .from('landing-images')
       .getPublicUrl(fileName)
+
+    // Also generate a signed URL as fallback (valid 24h) — more reliable
+    const { data: signedData } = await serviceClient.storage
+      .from('landing-images')
+      .createSignedUrl(fileName, 86400) // 24 hours
 
     const originalKB = Math.round(imageBuffer.length / 1024)
     const optimizedKB = Math.round(optimized.length / 1024)
     console.log(`[import-sections] Optimized image ${index}: ${originalKB}KB → ${optimizedKB}KB`)
 
-    return urlData.publicUrl
+    // Prefer signed URL (works even if bucket is not public)
+    return signedData?.signedUrl || urlData.publicUrl
   } catch (e: any) {
     console.error('[import-sections] Optimize exception:', e.message)
     return imageUrl
