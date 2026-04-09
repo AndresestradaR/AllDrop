@@ -308,22 +308,6 @@ export function Step1Design({
       {/* CREATE TAB */}
       {tab === 'create' && (
         <div className="space-y-4">
-          {/* Model selector */}
-          <div>
-            <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">{s.aiModel}</label>
-            <select
-              value={modelId}
-              onChange={(e) => onModelChange(e.target.value as ImageModelId)}
-              className="w-full px-3 py-2 bg-surface-elevated border border-border rounded-xl text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50"
-            >
-              {availableModels.map(m => (
-                <option key={m.id} value={m.id}>
-                  {m.name} — {m.description}
-                </option>
-              ))}
-            </select>
-          </div>
-
           {/* Gender */}
           <div>
             <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">{s.gender}</label>

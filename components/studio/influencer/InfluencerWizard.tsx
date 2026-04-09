@@ -69,7 +69,7 @@ export function InfluencerWizard({ onBack }: { onBack: () => void }) {
   const [realisticImageMime, setRealisticImageMime] = useState<string>('image/png')
 
   // Model selection (persists across steps)
-  const [modelId, setModelId] = useState<ImageModelId>('gemini-3-pro-image')
+  const [modelId, setModelId] = useState<ImageModelId>('nano-banana-2')
 
   // Video editor clips (from gallery selection)
   const [editorClips, setEditorClips] = useState<{ url: string; label: string }[] | null>(null)
