@@ -62,9 +62,9 @@ export default function SettingsPage() {
     })
   }, [])
 
-  const fetchKeys = async () => {
+  const fetchKeys = async (reveal = false) => {
     try {
-      const response = await fetch('/api/keys')
+      const response = await fetch(`/api/keys${reveal ? '?reveal=true' : ''}`)
       const data = await response.json()
 
       if (data.hasGoogleApiKey) {
@@ -341,7 +341,11 @@ export default function SettingsPage() {
       {/* Toggle show/hide API keys */}
       <div className="mb-4 flex justify-end">
         <button
-          onClick={() => setShowKeys(!showKeys)}
+          onClick={() => {
+            const next = !showKeys
+            setShowKeys(next)
+            fetchKeys(next)
+          }}
           className="flex items-center gap-2 text-xs text-text-muted hover:text-text-primary transition-colors px-3 py-1.5 rounded-lg border border-border hover:border-accent/50"
         >
           {showKeys ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}

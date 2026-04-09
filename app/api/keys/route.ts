@@ -2,8 +2,11 @@ import { NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { encrypt, decrypt, mask } from '@/lib/services/encryption'
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url)
+    const reveal = searchParams.get('reveal') === 'true'
+
     const supabase = await createClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 
@@ -61,53 +64,59 @@ export async function GET() {
       }
     }
 
+    // Show key: masked or full depending on reveal param
+    const showKey = (key: string | null) => {
+      if (reveal) return safeDecrypt(key)
+      return safeMask(key)
+    }
+
     // Return masked keys
     return NextResponse.json({
       // Google/Gemini
-      maskedGoogleApiKey: safeMask(profile.google_api_key),
+      maskedGoogleApiKey: showKey(profile.google_api_key),
       hasGoogleApiKey: !!profile.google_api_key,
       // OpenAI
-      maskedOpenaiApiKey: safeMask(profile.openai_api_key),
+      maskedOpenaiApiKey: showKey(profile.openai_api_key),
       hasOpenaiApiKey: !!profile.openai_api_key,
       // KIE.ai
-      maskedKieApiKey: safeMask(profile.kie_api_key),
+      maskedKieApiKey: showKey(profile.kie_api_key),
       hasKieApiKey: !!profile.kie_api_key,
       // BFL
-      maskedBflApiKey: safeMask(profile.bfl_api_key),
+      maskedBflApiKey: showKey(profile.bfl_api_key),
       hasBflApiKey: !!profile.bfl_api_key,
       // fal.ai
-      maskedFalApiKey: safeMask(profile.fal_api_key),
+      maskedFalApiKey: showKey(profile.fal_api_key),
       hasFalApiKey: !!profile.fal_api_key,
       // WaveSpeed
-      maskedWavespeedApiKey: safeMask(profile.wavespeed_api_key),
+      maskedWavespeedApiKey: showKey(profile.wavespeed_api_key),
       hasWavespeedApiKey: !!profile.wavespeed_api_key,
       // ElevenLabs
-      maskedElevenlabsApiKey: safeMask(profile.elevenlabs_api_key),
+      maskedElevenlabsApiKey: showKey(profile.elevenlabs_api_key),
       hasElevenlabsApiKey: !!profile.elevenlabs_api_key,
       // Apify
-      maskedApifyApiKey: safeMask(profile.apify_api_key),
+      maskedApifyApiKey: showKey(profile.apify_api_key),
       hasApifyApiKey: !!profile.apify_api_key,
       // Browserless
-      maskedBrowserlessApiKey: safeMask(profile.browserless_api_key),
+      maskedBrowserlessApiKey: showKey(profile.browserless_api_key),
       hasBrowserlessApiKey: !!profile.browserless_api_key,
       // Cloudflare R2
       hasR2: !!profile.cf_account_id,
       r2AccountId: safeDecrypt(profile.cf_account_id),
       r2BucketName: safeDecrypt(profile.cf_bucket_name),
       r2PublicUrl: safeDecrypt(profile.cf_public_url),
-      maskedR2AccessKeyId: safeMask(profile.cf_access_key_id),
+      maskedR2AccessKeyId: showKey(profile.cf_access_key_id),
       hasR2AccessKeyId: !!profile.cf_access_key_id,
-      maskedR2SecretAccessKey: safeMask(profile.cf_secret_access_key),
+      maskedR2SecretAccessKey: showKey(profile.cf_secret_access_key),
       hasR2SecretAccessKey: !!profile.cf_secret_access_key,
       // Publer
-      maskedPublerApiKey: safeMask(profile.publer_api_key),
+      maskedPublerApiKey: showKey(profile.publer_api_key),
       publerWorkspaceId: safeDecrypt(profile.publer_workspace_id),
       hasPubler: !!(profile.publer_api_key && profile.publer_workspace_id),
       // Meta Ads
-      maskedMetaAccessToken: safeMask(profile.meta_access_token),
+      maskedMetaAccessToken: showKey(profile.meta_access_token),
       hasMetaAccessToken: !!profile.meta_access_token,
       // Anthropic
-      maskedAnthropicApiKey: safeMask(profile.anthropic_api_key),
+      maskedAnthropicApiKey: showKey(profile.anthropic_api_key),
       hasAnthropicApiKey: !!profile.anthropic_api_key,
     })
   } catch (error: any) {
