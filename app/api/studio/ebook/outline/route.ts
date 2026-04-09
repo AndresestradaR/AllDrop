@@ -69,6 +69,7 @@ export async function POST(request: Request) {
       productDescription,
       selectedIdea,
       chaptersCount = 5,
+      language,
     } = body as {
       productName: string
       productDescription: string
@@ -79,6 +80,7 @@ export async function POST(request: Request) {
         category: string
       }
       chaptersCount?: number
+      language?: string
     }
 
     // Validate required fields
@@ -105,6 +107,13 @@ export async function POST(request: Request) {
     requireAIKeys(keys)
 
     // Build user message
+    // Language override instruction
+    const langNames: Record<string, string> = { es: 'Spanish', en: 'English', fr: 'French', it: 'Italian', pt: 'Portuguese', de: 'German' }
+    const targetLang = langNames[language || 'en'] || 'English'
+    const langInstruction = language && language !== 'es'
+      ? `\n**CRITICAL: ALL text content (title, subtitle, introduction, chapter titles, summaries, conclusion) MUST be written in ${targetLang}. Do NOT write in Spanish. Write everything in ${targetLang}. Only imageKeyword stays in English.**`
+      : ''
+
     const userMessage = [
       `Producto: ${productName}`,
       productDescription ? `Descripcion: ${productDescription}` : '',
@@ -117,6 +126,7 @@ export async function POST(request: Request) {
       ``,
       `Genera un ebook con EXACTAMENTE ${chapters} capitulos.`,
       `Sigue el flujo logico: conceptos basicos → conocimiento profundo → tips practicos → avanzado → plan de accion.`,
+      langInstruction,
     ].filter(Boolean).join('\n')
 
     console.log(`[EbookOutline] User: ${user.id.substring(0, 8)}..., Product: ${productName}, Chapters: ${chapters}`)

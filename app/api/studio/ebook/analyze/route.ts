@@ -103,10 +103,11 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { productName, productDescription, productImages } = body as {
+    const { productName, productDescription, productImages, language } = body as {
       productName: string
       productDescription: string
       productImages?: string[]
+      language?: string
     }
 
     if (!productName?.trim()) {
@@ -148,7 +149,13 @@ export async function POST(request: Request) {
       promptParts.push(`\nSe adjunta 1 imagen del producto. Analiza el empaque, textos visibles, ingredientes, marca y beneficios impresos para mejorar tus sugerencias.`)
     }
 
-    promptParts.push(`\nAnaliza este producto y sugiere 3 ideas creativas de ebook complementario. Responde en JSON.`)
+    // Language-specific instructions
+    const langNames: Record<string, string> = { es: 'Spanish', en: 'English', fr: 'French', it: 'Italian', pt: 'Portuguese', de: 'German' }
+    const targetLang = langNames[language || 'en'] || 'English'
+    if (language && language !== 'es') {
+      promptParts.push(`\n**CRITICAL: ALL text content in your response (analysis, titles, subtitles, descriptions, targetAudience) MUST be written in ${targetLang}. Do NOT write in Spanish. Write everything in ${targetLang}.**`)
+    }
+    promptParts.push(`\nAnalyze this product and suggest 3 creative complementary ebook ideas. Respond in JSON.`)
 
     // Build images array for multimodal input (first image only)
     const images: { mimeType: string; base64: string }[] = []

@@ -1,9 +1,18 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { ArrowLeft, Loader2, BookOpen } from 'lucide-react'
+import { ArrowLeft, Loader2, BookOpen, Globe } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useI18n } from '@/lib/i18n'
+
+const EBOOK_LANGUAGES = [
+  { code: 'en', label: 'English', flag: '🇬🇧' },
+  { code: 'es', label: 'Español', flag: '🇪🇸' },
+  { code: 'fr', label: 'Français', flag: '🇫🇷' },
+  { code: 'it', label: 'Italiano', flag: '🇮🇹' },
+  { code: 'pt', label: 'Português', flag: '🇧🇷' },
+  { code: 'de', label: 'Deutsch', flag: '🇩🇪' },
+] as const
 import EbookLibrary from './EbookLibrary'
 import ProductSelector from './ProductSelector'
 import IdeaSelector from './IdeaSelector'
@@ -30,6 +39,9 @@ interface EbookGeneratorProps {
 export default function EbookGenerator({ onBack }: EbookGeneratorProps) {
   const { t, locale } = useI18n()
   const se = t.studio.ebook
+
+  // Ebook content language (independent from UI locale)
+  const [ebookLang, setEbookLang] = useState(locale || 'en')
 
   // Wizard state
   const [step, setStep] = useState<WizardStep>('library')
@@ -80,6 +92,7 @@ export default function EbookGenerator({ onBack }: EbookGeneratorProps) {
           productName: p.name,
           productDescription: p.description,
           productImages: images.length > 0 ? images : undefined,
+          language: ebookLang,
         }),
       })
 
@@ -127,6 +140,7 @@ export default function EbookGenerator({ onBack }: EbookGeneratorProps) {
           productDescription: product!.description,
           selectedIdea: selectedIdea,
           chaptersCount: 5,
+          language: ebookLang,
         }),
       })
 
@@ -165,7 +179,7 @@ export default function EbookGenerator({ onBack }: EbookGeneratorProps) {
           template: selectedTemplate,
           logoUrl,
           productName: product!.name,
-          language: locale || 'en',
+          language: ebookLang,
         }),
         signal: abortRef.current.signal,
       })
@@ -294,6 +308,24 @@ export default function EbookGenerator({ onBack }: EbookGeneratorProps) {
             {se.title}
           </h2>
         </div>
+
+        {/* Language selector for ebook content */}
+        {step !== 'generating' && step !== 'done' && (
+          <div className="relative">
+            <select
+              value={ebookLang}
+              onChange={(e) => setEbookLang(e.target.value)}
+              className="appearance-none bg-zinc-800 border border-zinc-600 text-white text-sm rounded-lg px-3 py-1.5 pr-8 cursor-pointer hover:border-emerald-500/50 transition-colors"
+            >
+              {EBOOK_LANGUAGES.map((lang) => (
+                <option key={lang.code} value={lang.code}>
+                  {lang.flag} {lang.label}
+                </option>
+              ))}
+            </select>
+            <Globe className="w-3.5 h-3.5 text-zinc-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
+        )}
       </div>
 
       {/* Step indicators */}
