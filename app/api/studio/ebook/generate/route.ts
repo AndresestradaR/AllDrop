@@ -136,21 +136,19 @@ async function generateIllustration(
   keyword: string,
   ebookTitle: string,
   userId: string,
+  baseUrl: string,
   modelId: ImageModelId = 'nano-banana-2',
   timeoutMs: number = 50000
 ): Promise<string | null> {
   try {
     const prompt = `Professional high-quality stock photography for an ebook about "${ebookTitle}": ${keyword}. Photorealistic, real people if appropriate, natural lighting, editorial magazine quality. Crisp detail, vibrant colors, modern lifestyle feel. No text overlay, no watermarks, no AI artifacts, no logos.`
 
-    // Use internal HTTP call to /api/studio/generate-image which handles auth + cascade properly
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'
-
-    console.log(`[Ebook:Image] START keyword="${keyword.substring(0, 50)}" via ${appUrl}/api/studio/generate-image`)
+    console.log(`[Ebook:Image] START keyword="${keyword.substring(0, 50)}" via ${baseUrl}/api/studio/generate-image`)
 
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), timeoutMs)
 
-    const res = await fetch(`${appUrl}/api/studio/generate-image`, {
+    const res = await fetch(`${baseUrl}/api/studio/generate-image`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -194,6 +192,11 @@ export async function POST(request: Request) {
     if (authError || !user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
+
+    // Extract base URL from request for internal HTTP calls
+    const reqUrl = new URL(request.url)
+    const baseUrl = `${reqUrl.protocol}//${reqUrl.host}`
+    console.log(`[Ebook] baseUrl for internal calls: ${baseUrl}`)
 
     const body = await request.json()
     const {
@@ -258,6 +261,7 @@ export async function POST(request: Request) {
             `Dramatic cinematic cover photo for premium digital guide about "${productName}". Photorealistic, stunning composition, professional editorial photography. Hero shot with dramatic lighting, rich colors, emotional impact. Magazine cover quality. No text, no watermarks.`,
             outline.title,
             user.id,
+            baseUrl,
             imageModel,
             60000
           ).catch((err: any) => {
@@ -324,6 +328,7 @@ ${i === chaptersWithContent.length - 1 ? li.last : ''}`,
                   chapter.imageKeyword,
                   outline.title,
                   user.id,
+                  baseUrl,
                   imageModel,
                   Math.max(50000, imgTimeout)
                 ).catch((err: any) => {
