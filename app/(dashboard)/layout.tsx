@@ -59,7 +59,7 @@ export default function DashboardLayout({
     { name: t.nav.createLanding, href: '/dashboard/landing', icon: LayoutTemplate },
     { name: t.nav.studioIA, href: '/dashboard/studio', icon: Wand2, isNew: true },
     { name: t.nav.findProduct, href: '/dashboard/product-research', icon: Target, isNew: true },
-    ...(hasPro ? [{ name: t.nav.agent || 'AI Assistant', href: '/dashboard/agent', icon: Bot, isNew: true }] : []),
+    ...(hasPro ? [{ name: t.nav.agent || 'AI Assistant', href: '#confirma', icon: Bot, isNew: true, isConfirma: true }] : []),
   ]
 
   const otherNavigation = [
@@ -123,7 +123,7 @@ export default function DashboardLayout({
 
   const currentLocale = LOCALES.find(l => l.code === locale)
 
-  const NavLink = ({ item, healthDot }: { item: { name: string; href: string; icon: any; soon?: boolean; isNew?: boolean; external?: boolean }, healthDot?: 'green' | 'yellow' | 'red' | null }) => {
+  const NavLink = ({ item, healthDot }: { item: { name: string; href: string; icon: any; soon?: boolean; isNew?: boolean; external?: boolean; isConfirma?: boolean }, healthDot?: 'green' | 'yellow' | 'red' | null }) => {
     const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
 
     if (item.soon) {
@@ -135,6 +135,26 @@ export default function DashboardLayout({
           </div>
           <span className="text-xs bg-border/50 px-2 py-0.5 rounded text-text-secondary/70">{t.nav.soon}</span>
         </div>
+      )
+    }
+
+    if (item.isConfirma) {
+      const openConfirma = async () => {
+        setSidebarOpen(false)
+        const supabase = createClient()
+        const { data } = await supabase.auth.getSession()
+        const token = data.session?.access_token || ''
+        window.open(`https://alldrop-confirma.vercel.app?token=${token}`, '_blank')
+      }
+      return (
+        <button
+          onClick={openConfirma}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-text-secondary hover:text-text-primary hover:bg-border/50"
+        >
+          <item.icon className="w-5 h-5" />
+          {item.name}
+          {item.isNew && <span className="text-[10px] bg-accent/20 text-accent px-1.5 py-0.5 rounded-full font-semibold">New</span>}
+        </button>
       )
     }
 
