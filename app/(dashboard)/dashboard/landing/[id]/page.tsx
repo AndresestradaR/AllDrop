@@ -391,14 +391,14 @@ export default function ProductGeneratePage() {
           if (editUrl) {
             // Can't window.open here (popup blocker), so copy to clipboard
             navigator.clipboard?.writeText(editUrl).catch(() => {})
-            toast.success('Canva listo! Haz clic en "Editar en Canva" de nuevo.', { id: 'canva', duration: 5000 })
+            toast.success(t.editor.canvaReady, { id: 'canva', duration: 5000 })
           }
         })
         .catch(() => {
-          toast.error('No se pudo subir a Canva. Intenta de nuevo.', { id: 'canva' })
+          toast.error(t.editor.canvaUploadError, { id: 'canva' })
         })
     } else {
-      toast.success('Canva conectado. Haz clic en "Editar en Canva" de nuevo.', { id: 'canva', duration: 4000 })
+      toast.success(t.editor.canvaConnected, { id: 'canva', duration: 4000 })
     }
   }, [])
 
@@ -588,7 +588,7 @@ export default function ProductGeneratePage() {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || 'Error al generar')
+        throw new Error(data.error || t.editor.errorGenerating)
       }
 
       if (data.success && data.imageUrl) {
@@ -612,7 +612,7 @@ export default function ProductGeneratePage() {
         }
       }
     } catch (error: any) {
-      toast.error(error.message || 'Error al generar sección')
+      toast.error(error.message || t.editor.errorGenerating)
     } finally {
       setIsGenerating(false)
     }
@@ -642,7 +642,7 @@ export default function ProductGeneratePage() {
       const data = await response.json()
 
       if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Error al mejorar')
+        throw new Error(data.error || t.editor.errorEnhancing)
       }
 
       // Auto-fill creative controls
@@ -668,9 +668,9 @@ export default function ProductGeneratePage() {
         setShowProductContext(true)
       }
 
-      toast.success('¡Campos completados con IA!', { id: 'enhance' })
+      toast.success(t.editor.fieldsCompletedAI, { id: 'enhance' })
     } catch (error: any) {
-      toast.error(error.message || 'Error al mejorar', { id: 'enhance' })
+      toast.error(error.message || t.editor.errorEnhancing, { id: 'enhance' })
     } finally {
       setIsEnhancing(false)
     }
@@ -787,9 +787,9 @@ export default function ProductGeneratePage() {
     fetchGeneratedSections()
 
     if (failed === 0) {
-      toast.success(`${completed} banners generados exitosamente!`)
+      toast.success(`${completed} ${t.editor.bannersGeneratedSuccess}`)
     } else {
-      toast.success(`${completed} banners generados, ${failed} fallaron`)
+      toast.success(`${completed} ${t.editor.bannersGeneratedPartial} ${failed} ${t.editor.failedSuffix}`)
     }
   }
 
@@ -830,15 +830,15 @@ export default function ProductGeneratePage() {
       const data = await response.json()
 
       if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Error al generar angulos')
+        throw new Error(data.error || t.editor.errorGeneratingAngles)
       }
 
       setGeneratedAngles(data.angles)
       setSelectedAngleIds(new Set())
       setAnglesAiMeta(data._ai || null)
-      toast.success(`${data.angles.length} angulos generados!`)
+      toast.success(`${data.angles.length} ${t.editor.anglesGeneratedCount}`)
     } catch (error: any) {
-      toast.error(error.message || 'Error al generar angulos')
+      toast.error(error.message || t.editor.errorGeneratingAngles)
     } finally {
       setIsGeneratingAngles(false)
     }
@@ -887,7 +887,7 @@ export default function ProductGeneratePage() {
     setGeneratedAngles(prev => [...prev, manualAngle])
     setNewAngle({ name: '', hook: '', salesAngle: '', avatarSuggestion: '', tone: 'Emocional' })
     setShowAddAngleForm(false)
-    toast.success(`Angulo "${manualAngle.name}" agregado`)
+    toast.success(`${t.editor.angleAdded}: "${manualAngle.name}"`)
   }
 
   const handleSaveAngles = async () => {
@@ -904,7 +904,7 @@ export default function ProductGeneratePage() {
       })
       const data = await res.json()
       if (data.success) {
-        toast.success(`${data.count} angulos guardados para "${product.name}"`)
+        toast.success(`${data.count} ${t.editor.anglesCount} "${product.name}"`)
       } else {
         toast.error(data.error || t.editor.saveAnglesError)
       }
@@ -1032,7 +1032,7 @@ export default function ProductGeneratePage() {
       )
     } catch (error) {
       console.error('Download error:', error)
-      toast.error('Error al descargar. Intenta de nuevo.', { id: 'download' })
+      toast.error(t.editor.errorDownloading, { id: 'download' })
     }
   }
 
@@ -1053,7 +1053,7 @@ export default function ProductGeneratePage() {
       const data = await response.json()
 
       if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Error al subir imagen')
+        throw new Error(data.error || t.editor.errorUploadingImage)
       }
 
       const message = encodeURIComponent(
@@ -1064,10 +1064,10 @@ export default function ProductGeneratePage() {
       )
       
       window.open(`https://wa.me/?text=${message}`, '_blank')
-      toast.success('¡Abriendo WhatsApp!', { id: 'share' })
+      toast.success(t.editor.openingWhatsApp, { id: 'share' })
     } catch (error: any) {
       console.error('Share error:', error)
-      toast.error(error.message || 'Error al compartir', { id: 'share' })
+      toast.error(error.message || t.editor.errorSharing, { id: 'share' })
     } finally {
       setIsSharing(false)
     }
@@ -1106,7 +1106,7 @@ export default function ProductGeneratePage() {
     }
 
     if (!data.success) {
-      throw new Error(data.error || 'Error al conectar con Canva')
+      throw new Error(data.error || t.editor.errorCanvaConnect)
     }
 
     return data.editUrl as string
@@ -1127,7 +1127,7 @@ export default function ProductGeneratePage() {
       )
 
       if (editUrl) {
-        toast.success('Abriendo Canva!', { id: 'canva' })
+        toast.success(t.editor.openingCanva, { id: 'canva' })
         if (canvaWindow) {
           canvaWindow.location.href = editUrl
         } else {
@@ -1140,7 +1140,7 @@ export default function ProductGeneratePage() {
     } catch (error: any) {
       console.error('Canva upload error:', error?.message || error)
       canvaWindow?.close()
-      toast.error(`Error con Canva: ${error?.message || 'Intenta de nuevo'}`, { id: 'canva', duration: 5000 })
+      toast.error(`${t.editor.canvaError}: ${error?.message || t.editor.tryAgain}`, { id: 'canva', duration: 5000 })
     } finally {
       setIsOpeningCanva(false)
     }
@@ -1177,10 +1177,10 @@ export default function ProductGeneratePage() {
         setEditReferenceImage(null)
         fetchGeneratedSections()
       } else {
-        throw new Error(data.error || 'Error al editar')
+        throw new Error(data.error || t.editor.errorEditing)
       }
     } catch (error: any) {
-      toast.error(error.message || 'Error al editar sección')
+      toast.error(error.message || t.editor.errorEditingSection)
     } finally {
       setIsEditing(false)
     }
@@ -1209,13 +1209,13 @@ export default function ProductGeneratePage() {
       console.log('[Frontend] Delete response:', data)
 
       if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Error al eliminar')
+        throw new Error(data.error || t.editor.errorDeleting)
       }
     } catch (error: any) {
       // Rollback on error
       console.error('[Frontend] Delete failed, rolling back:', error)
       setGeneratedSections(previousSections)
-      toast.error(error.message || 'Error al eliminar sección')
+      toast.error(error.message || t.editor.errorDeletingSection)
     }
   }
 
@@ -1295,7 +1295,7 @@ export default function ProductGeneratePage() {
 
       if (!response.ok) {
         const err = await response.json()
-        throw new Error(err.error || 'Error al enviar')
+        throw new Error(err.error || t.editor.errorSending)
       }
 
       const data = await response.json()
@@ -1306,7 +1306,7 @@ export default function ProductGeneratePage() {
       window.open(data.redirect_url, '_blank')
     } catch (error: any) {
       console.error('Error sending to editor:', error)
-      toast.error(error.message || 'Error al enviar secciones')
+      toast.error(error.message || t.editor.errorSendingSections)
     } finally {
       setIsSendingToEditor(false)
     }
@@ -1457,7 +1457,7 @@ export default function ProductGeneratePage() {
                   >
                     <span
                       className="relative z-10 text-xs font-mono text-white drop-shadow-md bg-black/30 px-2 py-0.5 rounded cursor-copy hover:bg-black/50 transition-colors"
-                      onClick={(e) => { e.stopPropagation(); e.preventDefault(); navigator.clipboard.writeText(colorPalette.primary.toUpperCase()); toast.success('Copiado ' + colorPalette.primary.toUpperCase()) }}
+                      onClick={(e) => { e.stopPropagation(); e.preventDefault(); navigator.clipboard.writeText(colorPalette.primary.toUpperCase()); toast.success(t.editor.copied + ' ' + colorPalette.primary.toUpperCase()) }}
                     >
                       {colorPalette.primary.toUpperCase()}
                     </span>
@@ -1489,7 +1489,7 @@ export default function ProductGeneratePage() {
                   >
                     <span
                       className="relative z-10 text-xs font-mono text-white drop-shadow-md bg-black/30 px-2 py-0.5 rounded cursor-copy hover:bg-black/50 transition-colors"
-                      onClick={(e) => { e.stopPropagation(); e.preventDefault(); navigator.clipboard.writeText(colorPalette.secondary.toUpperCase()); toast.success('Copiado ' + colorPalette.secondary.toUpperCase()) }}
+                      onClick={(e) => { e.stopPropagation(); e.preventDefault(); navigator.clipboard.writeText(colorPalette.secondary.toUpperCase()); toast.success(t.editor.copied + ' ' + colorPalette.secondary.toUpperCase()) }}
                     >
                       {colorPalette.secondary.toUpperCase()}
                     </span>
@@ -1521,7 +1521,7 @@ export default function ProductGeneratePage() {
                   >
                     <span
                       className="relative z-10 text-xs font-mono text-white drop-shadow-md bg-black/30 px-2 py-0.5 rounded cursor-copy hover:bg-black/50 transition-colors"
-                      onClick={(e) => { e.stopPropagation(); e.preventDefault(); navigator.clipboard.writeText(colorPalette.accent.toUpperCase()); toast.success('Copiado ' + colorPalette.accent.toUpperCase()) }}
+                      onClick={(e) => { e.stopPropagation(); e.preventDefault(); navigator.clipboard.writeText(colorPalette.accent.toUpperCase()); toast.success(t.editor.copied + ' ' + colorPalette.accent.toUpperCase()) }}
                     >
                       {colorPalette.accent.toUpperCase()}
                     </span>
@@ -1554,7 +1554,7 @@ export default function ProductGeneratePage() {
                     >
                       <span
                         className="relative z-10 text-xs font-mono text-white drop-shadow-md bg-black/30 px-2 py-0.5 rounded cursor-copy hover:bg-black/50 transition-colors"
-                        onClick={(e) => { e.stopPropagation(); e.preventDefault(); navigator.clipboard.writeText(colorPalette.extra.toUpperCase()); toast.success('Copiado ' + colorPalette.extra.toUpperCase()) }}
+                        onClick={(e) => { e.stopPropagation(); e.preventDefault(); navigator.clipboard.writeText(colorPalette.extra.toUpperCase()); toast.success(t.editor.copied + ' ' + colorPalette.extra.toUpperCase()) }}
                       >
                         {colorPalette.extra.toUpperCase()}
                       </span>

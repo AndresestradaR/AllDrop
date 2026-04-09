@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { ChevronDown, ChevronUp, Trash2, Loader2, Copy, Check } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { useI18n } from '@/lib/i18n'
 
 interface AngleData {
   id: string
@@ -43,6 +44,7 @@ const TONE_COLORS: Record<string, string> = {
 }
 
 export function SavedAnglesPanel({ onSelectAngle, selectable = false, selectedAngleId, filterByProduct, showProductFilter = false }: SavedAnglesPanelProps) {
+  const { t } = useI18n()
   const [groups, setGroups] = useState<AngleGroup[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [expandedProduct, setExpandedProduct] = useState<string | null>(null)
@@ -84,12 +86,12 @@ export function SavedAnglesPanel({ onSelectAngle, selectable = false, selectedAn
       const data = await res.json()
       if (data.success) {
         setGroups(prev => prev.filter(g => g.productName !== productName))
-        toast.success('Angulos eliminados')
+        toast.success(t.editor.anglesDeleted)
       } else {
-        toast.error(data.error || 'Error al eliminar')
+        toast.error(data.error || t.editor.errorDeletingAngles)
       }
     } catch {
-      toast.error('Error al eliminar angulos')
+      toast.error(t.editor.errorDeletingAngles)
     } finally {
       setDeletingProduct(null)
     }
@@ -101,17 +103,17 @@ export function SavedAnglesPanel({ onSelectAngle, selectable = false, selectedAn
 
 Hook: "${angle.hook}"
 
-Angulo de Venta:
+${t.editor.salesAngleLabel}:
 ${angle.salesAngle}
 
-Descripcion:
+${t.editor.descriptionLabel}:
 ${angle.description}
 
-Publico Objetivo: ${angle.avatarSuggestion}`
+${t.editor.targetAudience}: ${angle.avatarSuggestion}`
 
     navigator.clipboard.writeText(text)
     setCopiedAngleId(angle.id)
-    toast.success('Angulo copiado')
+    toast.success(t.editor.angleCopied)
     setTimeout(() => setCopiedAngleId(null), 2000)
   }
 
@@ -135,7 +137,7 @@ Publico Objetivo: ${angle.avatarSuggestion}`
   if (groups.length === 0) {
     return (
       <p className="text-xs text-text-muted text-center py-4">
-        No tienes angulos guardados. Genera angulos en el Generador de Banners.
+        {t.editor.noSavedAngles}
       </p>
     )
   }

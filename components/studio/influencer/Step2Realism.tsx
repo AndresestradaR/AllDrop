@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils/cn'
 import { Sparkles, Loader2, RefreshCw, Check } from 'lucide-react'
 import { IMAGE_MODELS, STUDIO_COMPANY_GROUPS, type ImageModelId } from '@/lib/image-providers/types'
+import { useI18n } from '@/lib/i18n'
 
 interface Step2RealismProps {
   influencerId: string
@@ -26,6 +27,9 @@ export function Step2Realism({
   onComplete,
   onBack,
 }: Step2RealismProps) {
+  const { t } = useI18n()
+  const s = t.studio.influencer.step2
+
   const [isGenerating, setIsGenerating] = useState(false)
   const [resultImage, setResultImage] = useState<string | null>(null)
   const [resultBase64, setResultBase64] = useState<string | null>(null)
@@ -85,12 +89,12 @@ export function Step2Realism({
   return (
     <div className="max-w-3xl mx-auto">
       <p className="text-sm text-text-secondary mb-5">
-        Vamos a darle hiperrealismo a tu influencer con tecnicas de fotografia profesional.
+        {s.description}
       </p>
 
       {/* Model selector */}
       <div className="mb-4">
-        <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">Modelo de IA</label>
+        <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">{s.aiModel}</label>
         <select
           value={modelId}
           onChange={(e) => onModelChange(e.target.value as ImageModelId)}
@@ -107,7 +111,7 @@ export function Step2Realism({
       {/* Before / After comparison */}
       <div className="grid grid-cols-2 gap-4 mb-4">
         <div>
-          <p className="text-xs text-text-muted uppercase tracking-wide mb-2 text-center">Imagen base</p>
+          <p className="text-xs text-text-muted uppercase tracking-wide mb-2 text-center">{s.baseImage}</p>
           <div className="rounded-xl overflow-hidden bg-surface-elevated border border-border aspect-[9/16]">
             <img
               src={baseImageUrl}
@@ -118,7 +122,7 @@ export function Step2Realism({
         </div>
         <div>
           <p className="text-xs text-text-muted uppercase tracking-wide mb-2 text-center">
-            {resultImage ? 'Hiperrealista' : 'Resultado'}
+            {resultImage ? s.hyperrealistic : s.result}
           </p>
           <div className="rounded-xl overflow-hidden bg-surface-elevated border border-border aspect-[9/16] flex items-center justify-center">
             {resultImage ? (
@@ -130,11 +134,11 @@ export function Step2Realism({
             ) : isGenerating ? (
               <div className="text-center p-4">
                 <Loader2 className="w-8 h-8 text-accent animate-spin mx-auto mb-2" />
-                <p className="text-xs text-text-secondary">Aplicando hiperrealismo...</p>
+                <p className="text-xs text-text-secondary">{s.applyingHyperrealism}</p>
               </div>
             ) : (
               <p className="text-xs text-text-muted text-center px-4">
-                Presiona el boton para aplicar hiperrealismo
+                {s.pressButton}
               </p>
             )}
           </div>
@@ -154,7 +158,7 @@ export function Step2Realism({
             className="flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold bg-accent hover:bg-accent-hover text-background shadow-lg shadow-accent/25 transition-all"
           >
             <Check className="w-5 h-5" />
-            Continuar
+            {s.continue}
           </button>
           <button
             onClick={handleGenerate}
@@ -162,7 +166,7 @@ export function Step2Realism({
             className="flex items-center gap-2 px-4 py-3 rounded-xl font-medium bg-surface-elevated border border-border text-text-secondary hover:text-text-primary transition-all"
           >
             {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-            Regenerar
+            {s.regenerate}
           </button>
         </div>
       ) : (
@@ -179,12 +183,12 @@ export function Step2Realism({
           {isGenerating ? (
             <>
               <Loader2 className="w-5 h-5 animate-spin" />
-              Aplicando hiperrealismo...
+              {s.applyingHyperrealism}
             </>
           ) : (
             <>
               <Sparkles className="w-5 h-5" />
-              Aplicar Hiperrealismo
+              {s.applyHyperrealism}
             </>
           )}
         </button>

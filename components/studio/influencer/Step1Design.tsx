@@ -4,6 +4,7 @@ import { useState, useRef } from 'react'
 import { cn } from '@/lib/utils/cn'
 import { Sparkles, Loader2, RefreshCw, Check, Upload, Pencil } from 'lucide-react'
 import { IMAGE_MODELS, STUDIO_COMPANY_GROUPS, type ImageModelId } from '@/lib/image-providers/types'
+import { useI18n } from '@/lib/i18n'
 
 interface FormData {
   gender: string
@@ -41,6 +42,9 @@ export function Step1Design({
   onComplete,
   onUploadComplete,
 }: Step1DesignProps) {
+  const { t } = useI18n()
+  const s = t.studio.influencer.step1
+
   const [tab, setTab] = useState<'create' | 'upload'>('create')
 
   // Form state
@@ -238,7 +242,7 @@ export function Step1Design({
         <div className="relative rounded-2xl overflow-hidden bg-surface-elevated border border-border">
           <img
             src={generatedImage}
-            alt="Influencer generado"
+            alt={s.generatedAlt}
             className="w-full max-h-[500px] object-contain"
           />
         </div>
@@ -255,7 +259,7 @@ export function Step1Design({
             className="flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold bg-accent hover:bg-accent-hover text-background shadow-lg shadow-accent/25 transition-all"
           >
             <Check className="w-5 h-5" />
-            Me gusta, continuar
+            {s.iLikeContinue}
           </button>
           <button
             onClick={handleRegenerate}
@@ -263,14 +267,14 @@ export function Step1Design({
             className="flex items-center gap-2 px-4 py-3 rounded-xl font-medium bg-surface-elevated border border-border text-text-secondary hover:text-text-primary hover:border-text-muted transition-all"
           >
             {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-            Regenerar
+            {s.regenerate}
           </button>
           <button
             onClick={handleEditForm}
             className="flex items-center gap-2 px-4 py-3 rounded-xl font-medium bg-surface-elevated border border-border text-text-secondary hover:text-text-primary hover:border-text-muted transition-all"
           >
             <Pencil className="w-4 h-4" />
-            Editar
+            {s.edit}
           </button>
         </div>
       </div>
@@ -288,7 +292,7 @@ export function Step1Design({
             tab === 'create' ? 'bg-accent text-background shadow-lg shadow-accent/25' : 'bg-surface-elevated text-text-secondary hover:text-text-primary'
           )}
         >
-          Crear desde cero
+          {s.createFromScratch}
         </button>
         <button
           onClick={() => setTab('upload')}
@@ -297,7 +301,7 @@ export function Step1Design({
             tab === 'upload' ? 'bg-accent text-background shadow-lg shadow-accent/25' : 'bg-surface-elevated text-text-secondary hover:text-text-primary'
           )}
         >
-          Subir imagen existente
+          {s.uploadExisting}
         </button>
       </div>
 
@@ -306,7 +310,7 @@ export function Step1Design({
         <div className="space-y-4">
           {/* Model selector */}
           <div>
-            <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">Modelo de IA</label>
+            <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">{s.aiModel}</label>
             <select
               value={modelId}
               onChange={(e) => onModelChange(e.target.value as ImageModelId)}
@@ -322,12 +326,12 @@ export function Step1Design({
 
           {/* Gender */}
           <div>
-            <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">Genero</label>
+            <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">{s.gender}</label>
             <div className="flex gap-2">
               {[
-                { value: 'female', label: 'Femenino' },
-                { value: 'male', label: 'Masculino' },
-                { value: 'non-binary', label: 'No binario' },
+                { value: 'female', label: s.female },
+                { value: 'male', label: s.male },
+                { value: 'non-binary', label: s.nonBinary },
               ].map(opt => (
                 <button
                   key={opt.value}
@@ -342,7 +346,7 @@ export function Step1Design({
 
           {/* Age Range */}
           <div>
-            <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">Edad</label>
+            <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">{s.age}</label>
             <div className="flex gap-2">
               {['18-25', '25-30', '30-40', '40-50'].map(age => (
                 <button
@@ -359,62 +363,62 @@ export function Step1Design({
           {/* Skin Tone + Hair Color + Hair Style */}
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">Tono de piel</label>
+              <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">{s.skinTone}</label>
               <select
                 value={form.skin_tone}
                 onChange={(e) => updateField('skin_tone', e.target.value)}
                 className="w-full px-3 py-2 bg-surface-elevated border border-border rounded-xl text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50"
               >
-                <option value="">Seleccionar...</option>
+                <option value="">{s.select}</option>
                 {[
-                  { v: 'fair', l: 'Clara' },
-                  { v: 'light', l: 'Ligera' },
-                  { v: 'olive', l: 'Oliva' },
-                  { v: 'medium', l: 'Media' },
-                  { v: 'tan', l: 'Bronceada' },
-                  { v: 'dark', l: 'Oscura' },
-                  { v: 'deep', l: 'Muy Oscura' },
+                  { v: 'fair', l: s.skinFair },
+                  { v: 'light', l: s.skinLight },
+                  { v: 'olive', l: s.skinOlive },
+                  { v: 'medium', l: s.skinMedium },
+                  { v: 'tan', l: s.skinTan },
+                  { v: 'dark', l: s.skinDark },
+                  { v: 'deep', l: s.skinDeep },
                 ].map(t => (
                   <option key={t.v} value={t.v}>{t.l}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">Color cabello</label>
+              <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">{s.hairColor}</label>
               <select
                 value={form.hair_color}
                 onChange={(e) => updateField('hair_color', e.target.value)}
                 className="w-full px-3 py-2 bg-surface-elevated border border-border rounded-xl text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50"
               >
-                <option value="">Seleccionar...</option>
+                <option value="">{s.select}</option>
                 {[
-                  { v: 'black', l: 'Negro' },
-                  { v: 'dark brown', l: 'Castano oscuro' },
-                  { v: 'light brown', l: 'Castano claro' },
-                  { v: 'blonde', l: 'Rubio' },
-                  { v: 'red', l: 'Pelirrojo' },
-                  { v: 'gray', l: 'Gris' },
+                  { v: 'black', l: s.hairBlack },
+                  { v: 'dark brown', l: s.hairDarkBrown },
+                  { v: 'light brown', l: s.hairLightBrown },
+                  { v: 'blonde', l: s.hairBlonde },
+                  { v: 'red', l: s.hairRed },
+                  { v: 'gray', l: s.hairGray },
                 ].map(h => (
                   <option key={h.v} value={h.v}>{h.l}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">Estilo cabello</label>
+              <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">{s.hairStyle}</label>
               <select
                 value={form.hair_style}
                 onChange={(e) => updateField('hair_style', e.target.value)}
                 className="w-full px-3 py-2 bg-surface-elevated border border-border rounded-xl text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50"
               >
-                <option value="">Seleccionar...</option>
+                <option value="">{s.select}</option>
                 {[
-                  { v: 'short straight', l: 'Liso corto' },
-                  { v: 'long straight', l: 'Liso largo' },
-                  { v: 'wavy', l: 'Ondulado' },
-                  { v: 'curly', l: 'Rizado' },
-                  { v: 'afro', l: 'Afro' },
-                  { v: 'buzzcut', l: 'Rapado' },
-                  { v: 'messy', l: 'Messy' },
+                  { v: 'short straight', l: s.hairShortStraight },
+                  { v: 'long straight', l: s.hairLongStraight },
+                  { v: 'wavy', l: s.hairWavy },
+                  { v: 'curly', l: s.hairCurly },
+                  { v: 'afro', l: s.hairAfro },
+                  { v: 'buzzcut', l: s.hairBuzzcut },
+                  { v: 'messy', l: s.hairMessy },
                 ].map(h => (
                   <option key={h.v} value={h.v}>{h.l}</option>
                 ))}
@@ -425,32 +429,32 @@ export function Step1Design({
           {/* Eye Color + Build */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">Color de ojos</label>
+              <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">{s.eyeColor}</label>
               <select
                 value={form.eye_color}
                 onChange={(e) => updateField('eye_color', e.target.value)}
                 className="w-full px-3 py-2 bg-surface-elevated border border-border rounded-xl text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50"
               >
-                <option value="">Seleccionar...</option>
+                <option value="">{s.select}</option>
                 {[
-                  { v: 'brown', l: 'Marron' },
-                  { v: 'green', l: 'Verde' },
-                  { v: 'blue', l: 'Azul' },
-                  { v: 'gray', l: 'Gris' },
-                  { v: 'hazel', l: 'Miel' },
+                  { v: 'brown', l: s.eyeBrown },
+                  { v: 'green', l: s.eyeGreen },
+                  { v: 'blue', l: s.eyeBlue },
+                  { v: 'gray', l: s.eyeGray },
+                  { v: 'hazel', l: s.eyeHazel },
                 ].map(e => (
                   <option key={e.v} value={e.v}>{e.l}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">Contextura</label>
+              <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">{s.bodyType}</label>
               <div className="flex gap-2 flex-wrap">
                 {[
-                  { v: 'delgada', l: 'Delgada' },
-                  { v: 'atletica', l: 'Atletica' },
-                  { v: 'media', l: 'Media' },
-                  { v: 'robusta', l: 'Robusta' },
+                  { v: 'delgada', l: s.slim },
+                  { v: 'atletica', l: s.athletic },
+                  { v: 'media', l: s.medium },
+                  { v: 'robusta', l: s.robust },
                 ].map(opt => (
                   <button
                     key={opt.v}
@@ -466,15 +470,22 @@ export function Step1Design({
 
           {/* Style Vibe */}
           <div>
-            <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">Estilo</label>
+            <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">{s.style}</label>
             <div className="flex gap-2 flex-wrap">
-              {['Casual', 'Profesional', 'Bohemio', 'Deportivo', 'Elegante', 'Streetwear'].map(s => (
+              {[
+                { value: 'casual', label: s.casual },
+                { value: 'profesional', label: s.professional },
+                { value: 'bohemio', label: s.bohemian },
+                { value: 'deportivo', label: s.sporty },
+                { value: 'elegante', label: s.elegant },
+                { value: 'streetwear', label: s.streetwear },
+              ].map(st => (
                 <button
-                  key={s}
-                  onClick={() => updateField('style_vibe', s.toLowerCase())}
-                  className={cn(TOGGLE_CLASS, form.style_vibe === s.toLowerCase() ? ACTIVE_TOGGLE : INACTIVE_TOGGLE)}
+                  key={st.value}
+                  onClick={() => updateField('style_vibe', st.value)}
+                  className={cn(TOGGLE_CLASS, form.style_vibe === st.value ? ACTIVE_TOGGLE : INACTIVE_TOGGLE)}
                 >
-                  {s}
+                  {st.label}
                 </button>
               ))}
             </div>
@@ -482,14 +493,14 @@ export function Step1Design({
 
           {/* Accessories */}
           <div>
-            <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">Accesorios</label>
+            <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">{s.accessories}</label>
             <div className="flex gap-2 flex-wrap">
               {[
-                { v: 'piercing_nariz', l: 'Piercing nariz' },
-                { v: 'aretes', l: 'Aretes' },
-                { v: 'gafas', l: 'Gafas' },
-                { v: 'tatuajes', l: 'Tatuajes' },
-                { v: 'panuelo', l: 'Panuelo/Bandana' },
+                { v: 'piercing_nariz', l: s.nosePiercing },
+                { v: 'aretes', l: s.earrings },
+                { v: 'gafas', l: s.glasses },
+                { v: 'tatuajes', l: s.tattoos },
+                { v: 'panuelo', l: s.bandana },
               ].map(acc => (
                 <button
                   key={acc.v}
@@ -504,11 +515,11 @@ export function Step1Design({
 
           {/* Custom Details */}
           <div>
-            <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">Detalles extra (opcional)</label>
+            <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">{s.extraDetails}</label>
             <textarea
               value={form.custom_details}
               onChange={(e) => updateField('custom_details', e.target.value)}
-              placeholder="Agrega detalles especificos..."
+              placeholder={s.extraDetailsPlaceholder}
               rows={2}
               className="w-full px-3 py-2 bg-surface-elevated border border-border rounded-xl text-sm text-text-primary placeholder:text-text-muted resize-none focus:outline-none focus:ring-2 focus:ring-accent/50"
             />
@@ -534,12 +545,12 @@ export function Step1Design({
             {isGenerating ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
-                Generando imagen...
+                {s.generatingImage}
               </>
             ) : (
               <>
                 <Sparkles className="w-5 h-5" />
-                Generar Imagen Base
+                {s.generateBaseImage}
               </>
             )}
           </button>
@@ -550,7 +561,7 @@ export function Step1Design({
       {tab === 'upload' && (
         <div className="space-y-4">
           <p className="text-sm text-text-secondary">
-            Ya tienes una imagen de tu influencer? Subela aqui para continuar con el proceso de mejora.
+            {s.uploadDescription}
           </p>
 
           {uploadPreview ? (
@@ -567,8 +578,8 @@ export function Step1Design({
             <label className="flex flex-col items-center justify-center h-64 border-2 border-dashed border-border hover:border-accent/50 rounded-xl cursor-pointer transition-colors">
               <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
               <Upload className="w-12 h-12 text-text-secondary mb-3" />
-              <p className="text-text-primary font-medium">Subir imagen de referencia</p>
-              <p className="text-xs text-text-secondary mt-1">Cara frontal, buena iluminacion, JPG/PNG</p>
+              <p className="text-text-primary font-medium">{s.uploadReference}</p>
+              <p className="text-xs text-text-secondary mt-1">{s.uploadHint}</p>
             </label>
           )}
 
@@ -591,12 +602,12 @@ export function Step1Design({
             {isUploading ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
-                Subiendo...
+                {s.uploading}
               </>
             ) : (
               <>
                 <Check className="w-5 h-5" />
-                Subir y continuar
+                {s.uploadAndContinue}
               </>
             )}
           </button>
