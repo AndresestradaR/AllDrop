@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { ArrowLeft, Check, Loader2, Film } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { useI18n } from '@/lib/i18n'
 
 interface VideoClipSelectorProps {
   onClipsSelected: (clips: { url: string; label: string }[]) => void
@@ -19,6 +20,7 @@ interface VideoEntry {
 }
 
 export function VideoClipSelector({ onClipsSelected, onBack }: VideoClipSelectorProps) {
+  const { t } = useI18n()
   const [videos, setVideos] = useState<VideoEntry[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
@@ -125,8 +127,8 @@ export function VideoClipSelector({ onClipsSelected, onBack }: VideoClipSelector
             <Film className="w-4 h-4 text-white" />
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-text-primary">Seleccionar Clips</h2>
-            <p className="text-xs text-text-secondary">Elige videos de tu galeria (max 10)</p>
+            <h2 className="text-lg font-semibold text-text-primary">{t.studio.videoPrompt.selectClips}</h2>
+            <p className="text-xs text-text-secondary">{t.studio.videoPrompt.selectClipsDesc}</p>
           </div>
         </div>
       </div>
@@ -136,8 +138,8 @@ export function VideoClipSelector({ onClipsSelected, onBack }: VideoClipSelector
         {videos.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-text-secondary">
             <Film className="w-12 h-12 mb-3 opacity-50" />
-            <p className="text-sm font-medium">No hay videos disponibles</p>
-            <p className="text-xs mt-1">Genera videos en Video Prompt Studio primero</p>
+            <p className="text-sm font-medium">{t.studio.videoPrompt.noVideos}</p>
+            <p className="text-xs mt-1">{t.studio.videoPrompt.noVideosHint}</p>
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
@@ -196,14 +198,13 @@ export function VideoClipSelector({ onClipsSelected, onBack }: VideoClipSelector
       {selected.size > 0 && (
         <div className="mt-3 flex items-center justify-between bg-surface rounded-xl border border-border px-4 py-3">
           <span className="text-sm text-text-primary font-medium">
-            {selected.size} clip{selected.size !== 1 ? 's' : ''} seleccionado
-            {selected.size !== 1 ? 's' : ''}
+            {t.studio.videoPrompt.clipsSelected.replace('{count}', String(selected.size))}
           </span>
           <button
             onClick={handleContinue}
             className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-pink-600 to-rose-600 text-white rounded-xl text-sm font-bold hover:from-pink-500 hover:to-rose-500 transition-all"
           >
-            Continuar al Editor
+            {t.studio.videoPrompt.continueToEditor}
           </button>
         </div>
       )}

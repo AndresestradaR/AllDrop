@@ -7,6 +7,7 @@ import { StandaloneVideoManager } from './StandaloneVideoManager'
 import { VideoEditor } from './VideoEditor'
 import { VIDEO_MODELS, VIDEO_COMPANY_GROUPS } from '@/lib/video-providers/types'
 import type { VideoModelId } from '@/lib/video-providers/types'
+import { useI18n } from '@/lib/i18n'
 
 type Step = 'script' | 'configure' | 'generate' | 'edit'
 
@@ -15,6 +16,7 @@ interface VideoPromptStudioProps {
 }
 
 export function VideoPromptStudio({ onBack }: VideoPromptStudioProps) {
+  const { t } = useI18n()
   const [step, setStep] = useState<Step>('script')
   const [scenes, setScenes] = useState<SceneData[]>([])
   const [modelId, setModelId] = useState<VideoModelId>('veo-3.1')
@@ -48,12 +50,12 @@ export function VideoPromptStudio({ onBack }: VideoPromptStudioProps) {
             <Film className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-text-primary">Video Prompt Studio</h2>
+            <h2 className="text-lg font-semibold text-text-primary">{t.studio.videoPrompt.title}</h2>
             <p className="text-sm text-text-secondary">
-              {step === 'script' && 'Genera guiones por escenas con IA'}
-              {step === 'configure' && 'Configura modelo y parametros de video'}
-              {step === 'generate' && 'Generando videos en paralelo'}
-              {step === 'edit' && 'Edita y exporta tu video final'}
+              {step === 'script' && t.studio.videoPrompt.stepScript}
+              {step === 'configure' && t.studio.videoPrompt.stepConfigure}
+              {step === 'generate' && t.studio.videoPrompt.stepGenerate}
+              {step === 'edit' && t.studio.videoPrompt.stepEdit}
             </p>
           </div>
         </div>
@@ -95,7 +97,7 @@ export function VideoPromptStudio({ onBack }: VideoPromptStudioProps) {
           <div className="space-y-6 max-w-3xl">
             {/* Model selector */}
             <div className="bg-surface rounded-2xl border border-border p-6">
-              <h3 className="text-sm font-semibold text-text-primary mb-4">Modelo de Video</h3>
+              <h3 className="text-sm font-semibold text-text-primary mb-4">{t.studio.videoPrompt.videoModel}</h3>
               <div className="space-y-4">
                 {VIDEO_COMPANY_GROUPS.map(group => (
                   <div key={group.id}>
@@ -144,10 +146,10 @@ export function VideoPromptStudio({ onBack }: VideoPromptStudioProps) {
 
             {/* Aspect ratio & audio */}
             <div className="bg-surface rounded-2xl border border-border p-6">
-              <h3 className="text-sm font-semibold text-text-primary mb-4">Configuracion</h3>
+              <h3 className="text-sm font-semibold text-text-primary mb-4">{t.studio.videoPrompt.configuration}</h3>
               <div className="flex gap-6">
                 <div className="flex-1">
-                  <label className="block text-xs font-medium text-text-secondary mb-2">Aspect Ratio</label>
+                  <label className="block text-xs font-medium text-text-secondary mb-2">{t.studio.videoPrompt.aspectRatio}</label>
                   <div className="flex gap-2">
                     {(['16:9', '9:16', '1:1'] as const).map(ratio => (
                       <button
@@ -165,7 +167,7 @@ export function VideoPromptStudio({ onBack }: VideoPromptStudioProps) {
                   </div>
                 </div>
                 <div className="flex-1">
-                  <label className="block text-xs font-medium text-text-secondary mb-2">Audio</label>
+                  <label className="block text-xs font-medium text-text-secondary mb-2">{t.studio.videoPrompt.audio}</label>
                   <button
                     onClick={() => setEnableAudio(!enableAudio)}
                     disabled={!selectedModel?.supportsAudio}
@@ -177,7 +179,7 @@ export function VideoPromptStudio({ onBack }: VideoPromptStudioProps) {
                           : 'border-border bg-surface-elevated text-text-secondary hover:border-accent/50'
                     }`}
                   >
-                    {!selectedModel?.supportsAudio ? 'No soportado' : enableAudio ? 'Activado' : 'Desactivado'}
+                    {!selectedModel?.supportsAudio ? t.studio.videoPrompt.notSupported : enableAudio ? t.studio.videoPrompt.enabled : t.studio.videoPrompt.disabled}
                   </button>
                 </div>
               </div>
@@ -185,23 +187,23 @@ export function VideoPromptStudio({ onBack }: VideoPromptStudioProps) {
 
             {/* Summary & Generate */}
             <div className="bg-surface rounded-2xl border border-border p-6">
-              <h3 className="text-sm font-semibold text-text-primary mb-3">Resumen</h3>
+              <h3 className="text-sm font-semibold text-text-primary mb-3">{t.studio.videoPrompt.summary}</h3>
               <div className="grid grid-cols-2 gap-3 text-xs mb-4">
                 <div className="p-2.5 bg-surface-elevated rounded-lg">
-                  <span className="text-text-muted">Escenas</span>
-                  <p className="text-text-primary font-medium">{scenes.length} escenas · {scenes.length * 8}s</p>
+                  <span className="text-text-muted">{t.studio.videoPrompt.scenes}</span>
+                  <p className="text-text-primary font-medium">{t.studio.videoPrompt.scenesTime.replace('{count}', String(scenes.length)).replace('{seconds}', String(scenes.length * 8))}</p>
                 </div>
                 <div className="p-2.5 bg-surface-elevated rounded-lg">
-                  <span className="text-text-muted">Modelo</span>
+                  <span className="text-text-muted">{t.studio.videoPrompt.model}</span>
                   <p className="text-text-primary font-medium">{selectedModel?.name || modelId}</p>
                 </div>
                 <div className="p-2.5 bg-surface-elevated rounded-lg">
-                  <span className="text-text-muted">Aspect Ratio</span>
+                  <span className="text-text-muted">{t.studio.videoPrompt.aspectRatio}</span>
                   <p className="text-text-primary font-medium">{aspectRatio}</p>
                 </div>
                 <div className="p-2.5 bg-surface-elevated rounded-lg">
-                  <span className="text-text-muted">Audio</span>
-                  <p className="text-text-primary font-medium">{enableAudio ? 'Si' : 'No'}</p>
+                  <span className="text-text-muted">{t.studio.videoPrompt.audio}</span>
+                  <p className="text-text-primary font-medium">{enableAudio ? t.studio.videoPrompt.yes : t.studio.videoPrompt.no}</p>
                 </div>
               </div>
               <button
@@ -209,7 +211,7 @@ export function VideoPromptStudio({ onBack }: VideoPromptStudioProps) {
                 className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-xl text-sm font-bold hover:from-violet-500 hover:to-purple-500 transition-all shadow-lg shadow-violet-500/25"
               >
                 <Sparkles className="w-4 h-4" />
-                Generar Todos ({scenes.length} videos)
+                {t.studio.videoPrompt.generateAll.replace('{count}', String(scenes.length))}
               </button>
             </div>
           </div>
@@ -236,7 +238,7 @@ export function VideoPromptStudio({ onBack }: VideoPromptStudioProps) {
                   if (el.src) {
                     clips.push({
                       url: el.src,
-                      label: `Escena ${scenes[i]?.sceneNumber || i + 1}`,
+                      label: `${t.studio.videoPrompt.scene} ${scenes[i]?.sceneNumber || i + 1}`,
                     })
                   }
                 })
@@ -249,7 +251,7 @@ export function VideoPromptStudio({ onBack }: VideoPromptStudioProps) {
                     if (el.src && !el.closest('[data-export-result]')) {
                       clips.push({
                         url: el.src,
-                        label: `Clip ${i + 1}`,
+                        label: `${t.studio.videoPrompt.clip} ${i + 1}`,
                       })
                     }
                   })
@@ -263,7 +265,7 @@ export function VideoPromptStudio({ onBack }: VideoPromptStudioProps) {
               className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-pink-600 to-rose-600 text-white rounded-xl text-sm font-bold hover:from-pink-500 hover:to-rose-500 transition-all shadow-lg shadow-pink-500/25"
             >
               <Film className="w-4 h-4" />
-              Editar Video Final
+              {t.studio.videoPrompt.editFinalVideo}
             </button>
           </div>
         )}
@@ -272,7 +274,7 @@ export function VideoPromptStudio({ onBack }: VideoPromptStudioProps) {
           <VideoEditor
             initialClips={Array.from(completedClipUrls.entries()).map(([i, url]) => ({
               url,
-              label: `Escena ${scenes[i]?.sceneNumber || i + 1}`,
+              label: `${t.studio.videoPrompt.scene} ${scenes[i]?.sceneNumber || i + 1}`,
             }))}
             onBack={() => setStep('generate')}
           />

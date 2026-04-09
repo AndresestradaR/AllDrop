@@ -28,6 +28,7 @@ import {
   ImagePlus,
   X,
 } from 'lucide-react'
+import { useI18n } from '@/lib/i18n'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -136,6 +137,7 @@ const CURRENCIES = ['COP', 'MXN', 'USD', 'GTQ', 'PEN', 'CLP', 'PYG', 'PAB']
 // ---------------------------------------------------------------------------
 
 export function CopyOptimizer() {
+  const { t } = useI18n()
   // Mode
   const [mode, setMode] = useState<CopyMode>('from_scratch')
 
@@ -389,9 +391,9 @@ export function CopyOptimizer() {
       <div className="w-[420px] flex-shrink-0 bg-surface rounded-2xl border border-border p-5 overflow-y-auto">
         <div className="space-y-4">
           <div>
-            <h3 className="text-lg font-semibold text-text-primary mb-1">Textos para Banners</h3>
+            <h3 className="text-lg font-semibold text-text-primary mb-1">{t.studio.copyOpt.title}</h3>
             <p className="text-xs text-text-secondary">
-              Genera Controles Creativos optimizados para las 10 secciones de tu landing.
+              {t.studio.copyOpt.subtitle}
             </p>
           </div>
 
@@ -407,7 +409,7 @@ export function CopyOptimizer() {
               )}
             >
               <FileText className="w-4 h-4" />
-              Desde Landing
+              {t.studio.copyOpt.fromLanding}
             </button>
             <button
               onClick={() => setMode('from_scratch')}
@@ -419,7 +421,7 @@ export function CopyOptimizer() {
               )}
             >
               <PenTool className="w-4 h-4" />
-              Desde Cero
+              {t.studio.copyOpt.fromScratch}
             </button>
           </div>
 
@@ -427,21 +429,21 @@ export function CopyOptimizer() {
           {mode === 'from_landing' && (
             <div>
               <label className="block text-sm font-medium text-text-secondary mb-1.5">
-                Selecciona tu landing *
+                {t.studio.copyOpt.selectLanding}
               </label>
               {isLoadingLandings ? (
                 <div className="flex items-center gap-2 px-4 py-3 bg-surface-elevated border border-border rounded-xl">
                   <Loader2 className="w-4 h-4 animate-spin text-text-muted" />
-                  <span className="text-sm text-text-muted">Cargando landings...</span>
+                  <span className="text-sm text-text-muted">{t.studio.copyOpt.loadingLandings}</span>
                 </div>
               ) : landings.length === 0 ? (
                 <div className="px-4 py-3 bg-surface-elevated border border-border rounded-xl">
-                  <p className="text-sm text-text-muted">No tienes landings creadas aun.</p>
+                  <p className="text-sm text-text-muted">{t.studio.copyOpt.noLandings}</p>
                   <a
                     href="/dashboard/landing"
                     className="text-xs text-accent hover:underline mt-1 inline-flex items-center gap-1"
                   >
-                    Crear landing <ExternalLink className="w-3 h-3" />
+                    {t.studio.copyOpt.createLanding} <ExternalLink className="w-3 h-3" />
                   </a>
                 </div>
               ) : (
@@ -450,7 +452,7 @@ export function CopyOptimizer() {
                   onChange={(e) => setSelectedLandingId(e.target.value)}
                   className="w-full px-4 py-2.5 bg-surface-elevated border border-border rounded-xl text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all"
                 >
-                  <option value="">Selecciona una landing...</option>
+                  <option value="">{t.studio.copyOpt.selectLandingPh}</option>
                   {landings.map((l) => (
                     <option key={l.id} value={l.id}>
                       {l.name} ({l.sections_count} secciones)
@@ -568,7 +570,7 @@ export function CopyOptimizer() {
           {mode === 'from_scratch' && (
             <div>
               <label className="block text-sm font-medium text-text-secondary mb-1.5">
-                Nombre del producto *
+                {t.studio.copyOpt.productName}
               </label>
               <input
                 value={productName}
@@ -583,7 +585,7 @@ export function CopyOptimizer() {
           <div className="flex gap-3">
             <div className="flex-1">
               <label className="block text-sm font-medium text-text-secondary mb-1.5">
-                Precio
+                {t.studio.copyOpt.price}
               </label>
               <input
                 type="text"
@@ -596,7 +598,7 @@ export function CopyOptimizer() {
             </div>
             <div className="w-28">
               <label className="block text-sm font-medium text-text-secondary mb-1.5">
-                Moneda
+                {t.studio.copyOpt.currency}
               </label>
               <select
                 value={currency}
@@ -613,7 +615,7 @@ export function CopyOptimizer() {
           {/* Problem Solved */}
           <div>
             <label className="block text-sm font-medium text-text-secondary mb-1.5">
-              Problema que resuelve
+              {t.studio.copyOpt.problemSolved}
             </label>
             <input
               value={problemSolved}
@@ -626,7 +628,7 @@ export function CopyOptimizer() {
           {/* Target Audience */}
           <div>
             <label className="block text-sm font-medium text-text-secondary mb-1.5">
-              Publico objetivo
+              {t.studio.copyOpt.targetAudience}
             </label>
             <input
               value={targetAudience}
@@ -639,7 +641,7 @@ export function CopyOptimizer() {
           {/* Tone Selector */}
           <div>
             <label className="block text-sm font-medium text-text-secondary mb-1.5">
-              Tono
+              {t.studio.copyOpt.tone}
             </label>
             <div className="grid grid-cols-4 gap-2">
               {TONES.map((t) => {
@@ -712,7 +714,7 @@ export function CopyOptimizer() {
                 className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-dashed border-border hover:border-accent/50 text-text-muted hover:text-text-secondary transition-all"
               >
                 <ImagePlus className="w-4 h-4" />
-                <span className="text-sm">Subir fotos del producto</span>
+                <span className="text-sm">{t.studio.copyOpt.uploadPhotos}</span>
               </button>
             )}
             <input
@@ -746,12 +748,12 @@ export function CopyOptimizer() {
             {isGenerating ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
-                Generando textos...
+                {t.studio.copyOpt.generating}
               </>
             ) : (
               <>
                 <Sparkles className="w-5 h-5" />
-                Generar Textos para Banners
+                {t.studio.copyOpt.generateBtn}
               </>
             )}
           </button>
@@ -767,10 +769,10 @@ export function CopyOptimizer() {
                 <Sparkles className="w-8 h-8 text-text-secondary" />
               </div>
               <p className="text-text-secondary">
-                Tus Controles Creativos apareceran aqui
+                {t.studio.copyOpt.placeholder}
               </p>
               <p className="text-xs text-text-muted mt-1">
-                10 secciones: Hero, Oferta, Beneficios, Testimonios y mas
+                {t.studio.copyOpt.placeholderDesc}
               </p>
             </div>
           </div>
@@ -852,19 +854,19 @@ export function CopyOptimizer() {
                     {copiedField === 'all' ? (
                       <>
                         <Check className="w-4 h-4" />
-                        Copiado
+                        {t.studio.copyOpt.copiedAll}
                       </>
                     ) : (
                       <>
                         <Copy className="w-4 h-4" />
-                        Copiar los 4 campos
+                        {t.studio.copyOpt.copyAll}
                       </>
                     )}
                   </button>
                 </>
               ) : (
                 <div className="flex items-center justify-center h-32">
-                  <p className="text-sm text-text-muted">No hay datos para esta seccion</p>
+                  <p className="text-sm text-text-muted">{t.studio.copyOpt.noSectionData}</p>
                 </div>
               )}
 
@@ -875,7 +877,7 @@ export function CopyOptimizer() {
                     onClick={() => setShowAnalysis(!showAnalysis)}
                     className="w-full flex items-center justify-between p-4 hover:bg-surface-elevated/50 transition-colors"
                   >
-                    <span className="text-sm font-medium text-text-secondary">Analisis del Producto</span>
+                    <span className="text-sm font-medium text-text-secondary">{t.studio.copyOpt.productAnalysis}</span>
                     {showAnalysis ? (
                       <ChevronUp className="w-4 h-4 text-text-muted" />
                     ) : (

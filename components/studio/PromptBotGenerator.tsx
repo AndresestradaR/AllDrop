@@ -23,6 +23,7 @@ import {
   Trash2,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { useI18n } from '@/lib/i18n'
 
 interface ReviewData {
   title: string
@@ -91,6 +92,7 @@ const COUNTRIES = [
 ]
 
 export function PromptBotGenerator({ onBack }: { onBack: () => void }) {
+  const { t } = useI18n()
   // Product inputs
   const [productName, setProductName] = useState('')
   const [agentName, setAgentName] = useState('')
@@ -139,7 +141,7 @@ export function PromptBotGenerator({ onBack }: { onBack: () => void }) {
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'Error al obtener reviews')
       setAmazonData(data)
-      toast.success(`${data.total_reviews} reviews encontradas`)
+      toast.success(t.studio.promptBot.reviewsFound.replace('{count}', String(data.total_reviews)))
     } catch (err: any) {
       setAmazonError(err.message)
     } finally {
@@ -195,7 +197,7 @@ export function PromptBotGenerator({ onBack }: { onBack: () => void }) {
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'Error al generar prompt')
       setResult(data)
-      toast.success('Prompt generado')
+      toast.success(t.studio.promptBot.promptGenerated)
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -206,7 +208,7 @@ export function PromptBotGenerator({ onBack }: { onBack: () => void }) {
   const copyToClipboard = async (text: string, fieldId: string) => {
     await navigator.clipboard.writeText(text)
     setCopiedField(fieldId)
-    toast.success('Copiado')
+    toast.success(t.studio.promptBot.copied)
     setTimeout(() => setCopiedField(null), 2000)
   }
 
@@ -231,8 +233,8 @@ export function PromptBotGenerator({ onBack }: { onBack: () => void }) {
               <MessageSquare className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-text-primary">Prompt Generator Pro</h2>
-              <p className="text-sm text-text-secondary">Genera prompts brutales para bots de ventas con reviews de Amazon</p>
+              <h2 className="text-lg font-semibold text-text-primary">{t.studio.promptBot.title}</h2>
+              <p className="text-sm text-text-secondary">{t.studio.promptBot.subtitle}</p>
             </div>
           </div>
         </div>
@@ -246,13 +248,13 @@ export function PromptBotGenerator({ onBack }: { onBack: () => void }) {
             <div className="p-4 bg-amber-500/5 border border-amber-500/20 rounded-xl">
               <label className="flex items-center gap-2 text-sm font-medium text-amber-400 mb-2">
                 <Search className="w-4 h-4" />
-                Reviews de Amazon (opcional)
+                {t.studio.promptBot.amazonReviews}
               </label>
               <div className="flex gap-2">
                 <input
                   value={amazonUrl}
                   onChange={(e) => setAmazonUrl(e.target.value)}
-                  placeholder="URL de Amazon o ASIN (ej: B0DCCXW835)"
+                  placeholder={t.studio.promptBot.amazonPh}
                   className="flex-1 px-3 py-2 bg-surface border border-border rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-amber-500/50 text-sm"
                 />
                 <button
@@ -265,7 +267,7 @@ export function PromptBotGenerator({ onBack }: { onBack: () => void }) {
                       : 'bg-amber-500 hover:bg-amber-600 text-black'
                   )}
                 >
-                  {isScrapingAmazon ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Buscar'}
+                  {isScrapingAmazon ? <Loader2 className="w-4 h-4 animate-spin" /> : t.studio.promptBot.search}
                 </button>
               </div>
               {amazonError && <p className="text-xs text-red-400 mt-2">{amazonError}</p>}
@@ -301,7 +303,7 @@ export function PromptBotGenerator({ onBack }: { onBack: () => void }) {
                       )
                     })}
                   </div>
-                  <p className="text-xs text-green-400 mt-2">Reviews listas para enriquecer tu prompt</p>
+                  <p className="text-xs text-green-400 mt-2">{t.studio.promptBot.reviewsReady}</p>
                 </div>
               )}
             </div>
@@ -309,7 +311,7 @@ export function PromptBotGenerator({ onBack }: { onBack: () => void }) {
             {/* Agent Name + Product */}
             <div className="flex gap-3">
               <div className="flex-1">
-                <label className="block text-sm font-medium text-text-secondary mb-1.5">Nombre del agente *</label>
+                <label className="block text-sm font-medium text-text-secondary mb-1.5">{t.studio.promptBot.agentName}</label>
                 <input
                   value={agentName}
                   onChange={(e) => setAgentName(e.target.value)}
@@ -318,7 +320,7 @@ export function PromptBotGenerator({ onBack }: { onBack: () => void }) {
                 />
               </div>
               <div className="flex-1">
-                <label className="block text-sm font-medium text-text-secondary mb-1.5">Negocio</label>
+                <label className="block text-sm font-medium text-text-secondary mb-1.5">{t.studio.promptBot.business}</label>
                 <input
                   value={businessName}
                   onChange={(e) => setBusinessName(e.target.value)}
@@ -330,7 +332,7 @@ export function PromptBotGenerator({ onBack }: { onBack: () => void }) {
 
             {/* Product Name */}
             <div>
-              <label className="block text-sm font-medium text-text-secondary mb-1.5">Producto *</label>
+              <label className="block text-sm font-medium text-text-secondary mb-1.5">{t.studio.promptBot.product}</label>
               <input
                 value={productName}
                 onChange={(e) => setProductName(e.target.value)}
@@ -341,7 +343,7 @@ export function PromptBotGenerator({ onBack }: { onBack: () => void }) {
 
             {/* Benefits */}
             <div>
-              <label className="block text-sm font-medium text-text-secondary mb-1.5">Beneficios principales</label>
+              <label className="block text-sm font-medium text-text-secondary mb-1.5">{t.studio.promptBot.benefits}</label>
               <textarea
                 value={productBenefits}
                 onChange={(e) => setProductBenefits(e.target.value)}
@@ -353,7 +355,7 @@ export function PromptBotGenerator({ onBack }: { onBack: () => void }) {
 
             {/* Pricing Tiers */}
             <div>
-              <label className="block text-sm font-medium text-text-secondary mb-1.5">Precios y ofertas *</label>
+              <label className="block text-sm font-medium text-text-secondary mb-1.5">{t.studio.promptBot.pricingTiers}</label>
               <textarea
                 value={pricingTiers}
                 onChange={(e) => setPricingTiers(e.target.value)}
@@ -366,7 +368,7 @@ export function PromptBotGenerator({ onBack }: { onBack: () => void }) {
             {/* Shipping + Guarantee */}
             <div className="flex gap-3">
               <div className="flex-1">
-                <label className="block text-sm font-medium text-text-secondary mb-1.5">Envio</label>
+                <label className="block text-sm font-medium text-text-secondary mb-1.5">{t.studio.promptBot.shipping}</label>
                 <input
                   value={shippingInfo}
                   onChange={(e) => setShippingInfo(e.target.value)}
@@ -375,7 +377,7 @@ export function PromptBotGenerator({ onBack }: { onBack: () => void }) {
                 />
               </div>
               <div className="flex-1">
-                <label className="block text-sm font-medium text-text-secondary mb-1.5">Garantia</label>
+                <label className="block text-sm font-medium text-text-secondary mb-1.5">{t.studio.promptBot.guarantee}</label>
                 <input
                   value={guarantee}
                   onChange={(e) => setGuarantee(e.target.value)}
@@ -388,7 +390,7 @@ export function PromptBotGenerator({ onBack }: { onBack: () => void }) {
             {/* Platform + Country */}
             <div className="flex gap-3">
               <div className="flex-1">
-                <label className="block text-sm font-medium text-text-secondary mb-1.5">Plataforma</label>
+                <label className="block text-sm font-medium text-text-secondary mb-1.5">{t.studio.promptBot.platform}</label>
                 <select
                   value={platform}
                   onChange={(e) => setPlatform(e.target.value)}
@@ -398,7 +400,7 @@ export function PromptBotGenerator({ onBack }: { onBack: () => void }) {
                 </select>
               </div>
               <div className="flex-1">
-                <label className="block text-sm font-medium text-text-secondary mb-1.5">Pais</label>
+                <label className="block text-sm font-medium text-text-secondary mb-1.5">{t.studio.promptBot.country}</label>
                 <select
                   value={country}
                   onChange={(e) => setCountry(e.target.value)}
@@ -411,7 +413,7 @@ export function PromptBotGenerator({ onBack }: { onBack: () => void }) {
 
             {/* Tone */}
             <div>
-              <label className="block text-sm font-medium text-text-secondary mb-1.5">Tono</label>
+              <label className="block text-sm font-medium text-text-secondary mb-1.5">{t.studio.promptBot.toneLabel}</label>
               <div className="flex gap-2">
                 {TONES.map((t) => (
                   <button
@@ -441,7 +443,7 @@ export function PromptBotGenerator({ onBack }: { onBack: () => void }) {
               >
                 <span className="flex items-center gap-2">
                   <Image className="w-4 h-4" />
-                  Imagenes y videos del producto
+                  {t.studio.promptBot.mediaTitle}
                   {mediaItems.filter(m => m.url.trim()).length > 0 && (
                     <span className="text-[10px] bg-blue-500/20 px-1.5 py-0.5 rounded-full">
                       {mediaItems.filter(m => m.url.trim()).length}
@@ -527,7 +529,7 @@ export function PromptBotGenerator({ onBack }: { onBack: () => void }) {
                 className="flex items-center gap-2 text-sm text-text-secondary hover:text-text-primary transition-colors"
               >
                 {showExistingPrompt ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                Ya tengo un prompt (mejorarlo)
+                {t.studio.promptBot.existingPrompt}
               </button>
               {showExistingPrompt && (
                 <textarea
@@ -559,9 +561,9 @@ export function PromptBotGenerator({ onBack }: { onBack: () => void }) {
               )}
             >
               {isGenerating ? (
-                <><Loader2 className="w-5 h-5 animate-spin" />Generando prompt...</>
+                <><Loader2 className="w-5 h-5 animate-spin" />{t.studio.promptBot.generatingPrompt}</>
               ) : (
-                <><Sparkles className="w-5 h-5" />Generar Prompt Brutal</>
+                <><Sparkles className="w-5 h-5" />{t.studio.promptBot.generateBtn}</>
               )}
             </button>
           </div>
@@ -572,8 +574,8 @@ export function PromptBotGenerator({ onBack }: { onBack: () => void }) {
               <div className="flex-1 flex items-center justify-center bg-surface-elevated rounded-xl">
                 <div className="text-center p-8">
                   <MessageSquare className="w-12 h-12 text-text-secondary mx-auto mb-3" />
-                  <p className="text-text-secondary">El prompt aparecera aqui</p>
-                  <p className="text-xs text-text-muted mt-1">Prompt completo + analisis + bienvenida + objeciones</p>
+                  <p className="text-text-secondary">{t.studio.promptBot.promptPlaceholder}</p>
+                  <p className="text-xs text-text-muted mt-1">{t.studio.promptBot.promptPlaceholderDesc}</p>
                 </div>
               </div>
             ) : (
@@ -581,7 +583,7 @@ export function PromptBotGenerator({ onBack }: { onBack: () => void }) {
                 {/* Prompt Completo — THE MAIN OUTPUT */}
                 <div className="p-5 bg-surface-elevated rounded-xl border border-accent/30">
                   <div className="flex items-center justify-between mb-3">
-                    <span className="text-xs font-bold text-accent uppercase tracking-wider">Prompt Completo — Copiar a Chatea Pro / Lucid</span>
+                    <span className="text-xs font-bold text-accent uppercase tracking-wider">{t.studio.promptBot.fullPromptLabel}</span>
                     <CopyBtn text={result.prompt_completo} id="prompt" />
                   </div>
                   <pre className="text-sm text-text-primary leading-relaxed whitespace-pre-wrap font-sans max-h-[400px] overflow-y-auto">
@@ -592,7 +594,7 @@ export function PromptBotGenerator({ onBack }: { onBack: () => void }) {
                 {/* Welcome Message */}
                 <div className="p-4 bg-surface-elevated rounded-xl border border-border">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-medium text-text-muted uppercase tracking-wider">Mensaje de bienvenida</span>
+                    <span className="text-xs font-medium text-text-muted uppercase tracking-wider">{t.studio.promptBot.welcomeMessage}</span>
                     <CopyBtn text={result.welcome_message} id="welcome" />
                   </div>
                   <div className="p-3 bg-green-500/5 border border-green-500/20 rounded-lg">
@@ -607,7 +609,7 @@ export function PromptBotGenerator({ onBack }: { onBack: () => void }) {
                     {result.analysis.pain_points?.length > 0 && (
                       <CollapsibleCard
                         icon={<AlertTriangle className="w-4 h-4 text-red-400" />}
-                        title="Puntos de dolor"
+                        title={t.studio.promptBot.painPoints}
                         count={result.analysis.pain_points.length}
                         id="pain"
                         expanded={expandedSection}
@@ -627,7 +629,7 @@ export function PromptBotGenerator({ onBack }: { onBack: () => void }) {
                     {result.analysis.sales_angles?.length > 0 && (
                       <CollapsibleCard
                         icon={<ShoppingCart className="w-4 h-4 text-green-400" />}
-                        title="Angulos de venta"
+                        title={t.studio.promptBot.salesAngles}
                         count={result.analysis.sales_angles.length}
                         id="angles"
                         expanded={expandedSection}
@@ -647,7 +649,7 @@ export function PromptBotGenerator({ onBack }: { onBack: () => void }) {
                     {result.analysis.common_questions?.length > 0 && (
                       <CollapsibleCard
                         icon={<HelpCircle className="w-4 h-4 text-blue-400" />}
-                        title="Preguntas frecuentes"
+                        title={t.studio.promptBot.faq}
                         count={result.analysis.common_questions.length}
                         id="questions"
                         expanded={expandedSection}
@@ -667,7 +669,7 @@ export function PromptBotGenerator({ onBack }: { onBack: () => void }) {
                     {result.analysis.objection_handlers?.length > 0 && (
                       <CollapsibleCard
                         icon={<Shield className="w-4 h-4 text-purple-400" />}
-                        title="Manejo de objeciones"
+                        title={t.studio.promptBot.objectionHandling}
                         count={result.analysis.objection_handlers.length}
                         id="objections"
                         expanded={expandedSection}
@@ -699,7 +701,7 @@ export function PromptBotGenerator({ onBack }: { onBack: () => void }) {
                   }}
                   className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-accent/30 text-accent hover:bg-accent/10 font-medium text-sm transition-colors"
                 >
-                  {copiedField === 'all' ? <><Check className="w-4 h-4" />Copiado</> : <><Copy className="w-4 h-4" />Copiar todo</>}
+                  {copiedField === 'all' ? <><Check className="w-4 h-4" />{t.studio.promptBot.copied}</> : <><Copy className="w-4 h-4" />{t.studio.promptBot.copyAll}</>}
                 </button>
               </div>
             )}

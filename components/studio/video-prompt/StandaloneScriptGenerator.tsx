@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Loader2, Film, Sparkles, ChevronDown, ChevronUp, Copy, Check, ArrowRight } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { SavedAnglesPanel } from '@/components/studio/SavedAnglesPanel'
+import { useI18n } from '@/lib/i18n'
 
 interface AngleData {
   id: string
@@ -29,6 +30,7 @@ interface StandaloneScriptGeneratorProps {
 }
 
 export function StandaloneScriptGenerator({ onScenesGenerated }: StandaloneScriptGeneratorProps) {
+  const { t } = useI18n()
   // Step 1: Angle selection
   const [selectedAngle, setSelectedAngle] = useState<AngleData | null>(null)
   const [showAngleSelector, setShowAngleSelector] = useState(true)
@@ -46,11 +48,11 @@ export function StandaloneScriptGenerator({ onScenesGenerated }: StandaloneScrip
 
   const handleGenerate = async () => {
     if (!selectedAngle) {
-      toast.error('Selecciona un angulo de venta primero')
+      toast.error(t.studio.videoPrompt.selectAngleError)
       return
     }
     if (!productDescription.trim()) {
-      toast.error('Describe el producto')
+      toast.error(t.studio.videoPrompt.describeProduct)
       return
     }
 
@@ -82,9 +84,9 @@ export function StandaloneScriptGenerator({ onScenesGenerated }: StandaloneScrip
 
       setScenes(data.scenes)
       setExpandedScene(0)
-      toast.success(`Guion generado con ${data.scenes.length} escenas`)
+      toast.success(t.studio.videoPrompt.scriptGenerated.replace('{count}', String(data.scenes.length)))
     } catch (error: any) {
-      toast.error(error.message || 'Error al generar guion')
+      toast.error(error.message || t.studio.videoPrompt.scriptGenError)
     } finally {
       setIsGenerating(false)
     }
@@ -98,10 +100,10 @@ export function StandaloneScriptGenerator({ onScenesGenerated }: StandaloneScrip
     try {
       await navigator.clipboard.writeText(prompt)
       setCopiedIndex(index)
-      toast.success('Prompt copiado')
+      toast.success(t.studio.videoPrompt.promptCopied)
       setTimeout(() => setCopiedIndex(null), 2000)
     } catch {
-      toast.error('Error al copiar')
+      toast.error(t.studio.videoPrompt.copyError)
     }
   }
 
@@ -115,7 +117,7 @@ export function StandaloneScriptGenerator({ onScenesGenerated }: StandaloneScrip
         >
           <span className="flex items-center gap-2">
             <span className="w-6 h-6 rounded-full bg-accent/20 text-accent text-xs font-bold flex items-center justify-center">1</span>
-            Selecciona un Angulo de Venta
+            {t.studio.videoPrompt.selectAngle}
           </span>
           {showAngleSelector ? <ChevronUp className="w-4 h-4 text-text-secondary" /> : <ChevronDown className="w-4 h-4 text-text-secondary" />}
         </button>
@@ -130,7 +132,7 @@ export function StandaloneScriptGenerator({ onScenesGenerated }: StandaloneScrip
                     onClick={() => setSelectedAngle(null)}
                     className="text-xs text-text-secondary hover:text-error transition-colors"
                   >
-                    Cambiar
+                    {t.studio.videoPrompt.change}
                   </button>
                 </div>
                 <p className="text-xs text-text-secondary mt-1 line-clamp-2">{selectedAngle.salesAngle}</p>
@@ -155,18 +157,18 @@ export function StandaloneScriptGenerator({ onScenesGenerated }: StandaloneScrip
       <div className="bg-surface rounded-2xl border border-border p-6">
         <div className="flex items-center gap-2 mb-4">
           <span className="w-6 h-6 rounded-full bg-accent/20 text-accent text-xs font-bold flex items-center justify-center">2</span>
-          <span className="text-sm font-semibold text-text-primary">Configura el Guion</span>
+          <span className="text-sm font-semibold text-text-primary">{t.studio.videoPrompt.configureScript}</span>
         </div>
 
         <div className="space-y-4">
           <div>
             <label className="block text-xs font-medium text-text-secondary mb-1.5">
-              Descripcion del Producto
+              {t.studio.videoPrompt.productDescription}
             </label>
             <textarea
               value={productDescription}
               onChange={(e) => setProductDescription(e.target.value)}
-              placeholder="Describe el producto: que es, que hace, para quien es, precio..."
+              placeholder={t.studio.videoPrompt.productDescPh}
               rows={3}
               className="w-full px-3 py-2 bg-surface-elevated border border-border rounded-xl text-sm text-text-primary placeholder:text-text-muted resize-none focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent"
             />
@@ -175,20 +177,20 @@ export function StandaloneScriptGenerator({ onScenesGenerated }: StandaloneScrip
           <div className="flex gap-4">
             <div className="flex-1">
               <label className="block text-xs font-medium text-text-secondary mb-1.5">
-                Genero de Voz
+                {t.studio.videoPrompt.voiceGender}
               </label>
               <select
                 value={voiceGender}
                 onChange={(e) => setVoiceGender(e.target.value as 'femenina' | 'masculina')}
                 className="w-full px-3 py-2 bg-surface-elevated border border-border rounded-xl text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent"
               >
-                <option value="femenina">Femenina</option>
-                <option value="masculina">Masculina</option>
+                <option value="femenina">{t.studio.videoPrompt.female}</option>
+                <option value="masculina">{t.studio.videoPrompt.male}</option>
               </select>
             </div>
             <div className="flex-1">
               <label className="block text-xs font-medium text-text-secondary mb-1.5">
-                Escenas: {numberOfScenes}
+                {t.studio.videoPrompt.scenesLabel.replace('{count}', String(numberOfScenes))}
               </label>
               <input
                 type="range"
@@ -217,12 +219,12 @@ export function StandaloneScriptGenerator({ onScenesGenerated }: StandaloneScrip
           {isGenerating ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin" />
-              Generando guion...
+              {t.studio.videoPrompt.generatingScript}
             </>
           ) : (
             <>
               <Sparkles className="w-4 h-4" />
-              Generar Guion ({numberOfScenes} escenas)
+              {t.studio.videoPrompt.generateScript.replace('{count}', String(numberOfScenes))}
             </>
           )}
         </button>
@@ -233,8 +235,8 @@ export function StandaloneScriptGenerator({ onScenesGenerated }: StandaloneScrip
         <div className="bg-surface rounded-2xl border border-border p-6">
           <div className="flex items-center gap-2 mb-4">
             <span className="w-6 h-6 rounded-full bg-accent/20 text-accent text-xs font-bold flex items-center justify-center">3</span>
-            <span className="text-sm font-semibold text-text-primary">Escenas Generadas</span>
-            <span className="text-xs text-text-secondary ml-auto">{scenes.length} escenas · {scenes.length * 8}s total</span>
+            <span className="text-sm font-semibold text-text-primary">{t.studio.videoPrompt.generatedScenes}</span>
+            <span className="text-xs text-text-secondary ml-auto">{t.studio.videoPrompt.scenesTotal.replace('{count}', String(scenes.length)).replace('{seconds}', String(scenes.length * 8))}</span>
           </div>
 
           <div className="space-y-2">
@@ -265,20 +267,20 @@ export function StandaloneScriptGenerator({ onScenesGenerated }: StandaloneScrip
                   {isExpanded && (
                     <div className="px-4 pb-4 space-y-3">
                       <div>
-                        <span className="text-[10px] font-semibold text-text-muted uppercase tracking-wide">Accion</span>
+                        <span className="text-[10px] font-semibold text-text-muted uppercase tracking-wide">{t.studio.videoPrompt.action}</span>
                         <p className="text-xs text-text-secondary mt-0.5">{scene.action}</p>
                       </div>
                       <div>
-                        <span className="text-[10px] font-semibold text-text-muted uppercase tracking-wide">Dialogo</span>
+                        <span className="text-[10px] font-semibold text-text-muted uppercase tracking-wide">{t.studio.videoPrompt.dialogue}</span>
                         <p className="text-xs text-amber-500/80 italic mt-0.5">&quot;{scene.dialogue}&quot;</p>
                       </div>
                       <div className="flex gap-4">
                         <div className="flex-1">
-                          <span className="text-[10px] font-semibold text-text-muted uppercase tracking-wide">Camara</span>
+                          <span className="text-[10px] font-semibold text-text-muted uppercase tracking-wide">{t.studio.videoPrompt.camera}</span>
                           <p className="text-[11px] text-text-secondary mt-0.5">{scene.camera}</p>
                         </div>
                         <div className="flex-1">
-                          <span className="text-[10px] font-semibold text-text-muted uppercase tracking-wide">Sonido</span>
+                          <span className="text-[10px] font-semibold text-text-muted uppercase tracking-wide">{t.studio.videoPrompt.sound}</span>
                           <p className="text-[11px] text-text-secondary mt-0.5">{scene.sound}</p>
                         </div>
                       </div>
@@ -300,12 +302,12 @@ export function StandaloneScriptGenerator({ onScenesGenerated }: StandaloneScrip
                             {copiedIndex === i ? (
                               <>
                                 <Check className="w-3 h-3" />
-                                Copiado
+                                {t.studio.videoPrompt.copied}
                               </>
                             ) : (
                               <>
                                 <Copy className="w-3 h-3" />
-                                Copiar
+                                {t.studio.videoPrompt.copy}
                               </>
                             )}
                           </button>
@@ -324,7 +326,7 @@ export function StandaloneScriptGenerator({ onScenesGenerated }: StandaloneScrip
             className="w-full mt-4 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-xl text-sm font-bold hover:from-violet-500 hover:to-purple-500 transition-all shadow-lg shadow-violet-500/25"
           >
             <ArrowRight className="w-4 h-4" />
-            Continuar — Configurar Video
+            {t.studio.videoPrompt.continueConfig}
           </button>
         </div>
       )}

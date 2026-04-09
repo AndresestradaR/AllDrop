@@ -4,12 +4,14 @@ import { useState, useRef } from 'react'
 import { cn } from '@/lib/utils/cn'
 import { ArrowLeft, Upload, Loader2, Copy, Check, ChevronDown, ChevronUp, X, Search } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { useI18n } from '@/lib/i18n'
 
 interface PersonDescriptorProps {
   onBack: () => void
 }
 
 export function PersonDescriptor({ onBack }: PersonDescriptorProps) {
+  const { t } = useI18n()
   const [uploadedImage, setUploadedImage] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
@@ -56,10 +58,10 @@ export function PersonDescriptor({ onBack }: PersonDescriptorProps) {
     try {
       await navigator.clipboard.writeText(text)
       setCopiedField(field)
-      toast.success('Copiado al portapapeles')
+      toast.success(t.studio.descriptor.copiedClipboard)
       setTimeout(() => setCopiedField(null), 2000)
     } catch {
-      toast.error('Error al copiar')
+      toast.error(t.studio.descriptor.copyError)
     }
   }
 
@@ -75,14 +77,14 @@ export function PersonDescriptor({ onBack }: PersonDescriptorProps) {
       formData.append('image', uploadedImage)
       const res = await fetch('/api/studio/tools/describe-person', { method: 'POST', body: formData })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Error al analizar')
+      if (!res.ok) throw new Error(data.error || t.studio.descriptor.analyzeError)
       // Technique 1
       setT1Descriptor(data.technique1?.prompt_descriptor || '')
       setT1FullAnalysis(data.technique1?.visual_dna || '')
       // Technique 2
       setT2Descriptor8k(data.technique2?.prompt_descriptor_8k || '')
       setT2FullProfile(data.technique2?.facial_profile || '')
-      toast.success('Analisis completado — 2 tecnicas generadas')
+      toast.success(t.studio.descriptor.analysisComplete)
     } catch (err: any) {
       toast.error(err.message)
     } finally {
@@ -105,8 +107,8 @@ export function PersonDescriptor({ onBack }: PersonDescriptorProps) {
               <Search className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-text-primary">Descriptor de Persona</h2>
-              <p className="text-sm text-text-secondary">Genera descriptores ultra-detallados para videos IA</p>
+              <h2 className="text-lg font-semibold text-text-primary">{t.studio.descriptor.title}</h2>
+              <p className="text-sm text-text-secondary">{t.studio.descriptor.subtitle}</p>
             </div>
           </div>
         </div>
@@ -154,8 +156,8 @@ export function PersonDescriptor({ onBack }: PersonDescriptorProps) {
                   className="flex flex-col items-center justify-center py-16 border-2 border-dashed border-border hover:border-accent/50 rounded-xl cursor-pointer transition-colors bg-surface-elevated"
                 >
                   <Upload className="w-10 h-10 text-text-secondary mb-3" />
-                  <p className="text-text-primary font-medium text-sm">Arrastra o haz click para subir una foto</p>
-                  <p className="text-xs text-text-secondary mt-1">PNG, JPG hasta 10MB</p>
+                  <p className="text-text-primary font-medium text-sm">{t.studio.descriptor.dragOrClick}</p>
+                  <p className="text-xs text-text-secondary mt-1">{t.studio.descriptor.fileLimit}</p>
                 </div>
               )}
 
@@ -173,12 +175,12 @@ export function PersonDescriptor({ onBack }: PersonDescriptorProps) {
                 {isAnalyzing ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin" />
-                    Analizando... (2 tecnicas en paralelo)
+                    {t.studio.descriptor.analyzing}
                   </>
                 ) : (
                   <>
                     <Search className="w-5 h-5" />
-                    Analizar Persona
+                    {t.studio.descriptor.analyzeBtn}
                   </>
                 )}
               </button>
@@ -198,7 +200,7 @@ export function PersonDescriptor({ onBack }: PersonDescriptorProps) {
                         : 'bg-surface-elevated border-border text-text-secondary hover:border-text-muted'
                     )}
                   >
-                    Tecnica 1 — Visual
+                    {t.studio.descriptor.technique1}
                   </button>
                   <button
                     onClick={() => setActiveTab('t2')}
@@ -209,7 +211,7 @@ export function PersonDescriptor({ onBack }: PersonDescriptorProps) {
                         : 'bg-surface-elevated border-border text-text-secondary hover:border-text-muted'
                     )}
                   >
-                    Tecnica 2 — Facial 8K
+                    {t.studio.descriptor.technique2}
                   </button>
                 </div>
 
@@ -231,7 +233,7 @@ export function PersonDescriptor({ onBack }: PersonDescriptorProps) {
                       </div>
                     ) : (
                       <div className="p-4 bg-surface-elevated border border-border rounded-xl mb-4">
-                        <p className="text-sm text-text-muted">No se pudo extraer el descriptor. Revisa el analisis completo.</p>
+                        <p className="text-sm text-text-muted">{t.studio.descriptor.noDescriptor}</p>
                       </div>
                     )}
 
@@ -242,7 +244,7 @@ export function PersonDescriptor({ onBack }: PersonDescriptorProps) {
                           className="flex items-center gap-2 text-xs text-text-secondary hover:text-text-primary font-medium transition-colors"
                         >
                           {showT1Full ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                          {showT1Full ? 'Ocultar analisis visual completo' : 'Ver analisis visual completo'}
+                          {showT1Full ? t.studio.descriptor.hideVisualAnalysis : t.studio.descriptor.showVisualAnalysis}
                         </button>
                         {showT1Full && (
                           <div className="mt-3 p-4 bg-surface-elevated border border-border rounded-xl">
@@ -262,7 +264,7 @@ export function PersonDescriptor({ onBack }: PersonDescriptorProps) {
 
                     <div className="p-3 bg-accent/5 rounded-lg">
                       <p className="text-[11px] text-accent/70">
-                        Ideal para generar imagenes y videos donde necesitas consistencia visual del personaje.
+                        {t.studio.descriptor.t1Hint}
                       </p>
                     </div>
                   </div>
@@ -286,7 +288,7 @@ export function PersonDescriptor({ onBack }: PersonDescriptorProps) {
                       </div>
                     ) : (
                       <div className="p-4 bg-surface-elevated border border-border rounded-xl mb-4">
-                        <p className="text-sm text-text-muted">No se pudo extraer el descriptor 8K. Revisa el perfil completo.</p>
+                        <p className="text-sm text-text-muted">{t.studio.descriptor.noDescriptor8k}</p>
                       </div>
                     )}
 
@@ -297,7 +299,7 @@ export function PersonDescriptor({ onBack }: PersonDescriptorProps) {
                           className="flex items-center gap-2 text-xs text-text-secondary hover:text-text-primary font-medium transition-colors"
                         >
                           {showT2Full ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                          {showT2Full ? 'Ocultar perfil facial completo' : 'Ver perfil facial completo'}
+                          {showT2Full ? t.studio.descriptor.hideFacialProfile : t.studio.descriptor.showFacialProfile}
                         </button>
                         {showT2Full && (
                           <div className="mt-3 p-4 bg-surface-elevated border border-border rounded-xl">
@@ -317,7 +319,7 @@ export function PersonDescriptor({ onBack }: PersonDescriptorProps) {
 
                     <div className="p-3 bg-purple-500/5 rounded-lg">
                       <p className="text-[11px] text-purple-400/70">
-                        Tecnica avanzada de ingenieria facial con prompting cinematografico 8K. Ideal para Sora y Veo cuando necesitas maxima calidad y consistencia.
+                        {t.studio.descriptor.t2Hint}
                       </p>
                     </div>
                   </div>

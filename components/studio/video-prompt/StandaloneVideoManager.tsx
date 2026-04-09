@@ -6,6 +6,7 @@ import toast from 'react-hot-toast'
 import { VIDEO_MODELS } from '@/lib/video-providers/types'
 import type { VideoModelId } from '@/lib/video-providers/types'
 import type { SceneData } from './StandaloneScriptGenerator'
+import { useI18n } from '@/lib/i18n'
 
 type SceneStatus = 'pending' | 'generating' | 'polling' | 'completed' | 'error'
 
@@ -38,6 +39,7 @@ export function StandaloneVideoManager({
   enableAudio,
   onBack,
 }: StandaloneVideoManagerProps) {
+  const { t } = useI18n()
   const [sceneStates, setSceneStates] = useState<Map<number, SceneState>>(() => {
     const map = new Map<number, SceneState>()
     scenes.forEach((_, i) => {
@@ -83,7 +85,7 @@ export function StandaloneVideoManager({
     const poll = async (): Promise<void> => {
       if (cancelledRef.current || pollCount >= MAX_POLLS) {
         if (pollCount >= MAX_POLLS) {
-          updateScene(index, { status: 'error', error: 'Timeout: el video tardo demasiado' })
+          updateScene(index, { status: 'error', error: t.studio.videoPrompt.videoTimeout })
         }
         return
       }
@@ -109,7 +111,7 @@ export function StandaloneVideoManager({
         }
 
         if (data.status === 'failed') {
-          updateScene(index, { status: 'error', error: data.error || 'Video fallo' })
+          updateScene(index, { status: 'error', error: data.error || t.studio.videoPrompt.videoFailed })
           return
         }
 
@@ -152,7 +154,7 @@ export function StandaloneVideoManager({
       const data = await res.json()
 
       if (!res.ok || (!data.success && !data.taskId)) {
-        throw new Error(data.error || 'Error al generar video')
+        throw new Error(data.error || t.studio.videoPrompt.videoGenError)
       }
 
       if (data.taskId) {
@@ -162,7 +164,7 @@ export function StandaloneVideoManager({
         updateScene(index, { status: 'completed', videoUrl: data.videoUrl })
       }
     } catch (err: any) {
-      updateScene(index, { status: 'error', error: err.message || 'Error desconocido' })
+      updateScene(index, { status: 'error', error: err.message || t.studio.videoPrompt.unknownError })
     } finally {
       activeCountRef.current--
     }
@@ -203,7 +205,7 @@ export function StandaloneVideoManager({
       const data = await res.json()
 
       if (!data.success || !data.taskId) {
-        throw new Error(data.error || 'Error al extender video')
+        throw new Error(data.error || t.studio.videoPrompt.extendError)
       }
 
       // Poll the extended video
@@ -219,7 +221,7 @@ export function StandaloneVideoManager({
       await pollScene(index, data.taskId, { ...scenes[index], veoPrompt: prompt })
       activeCountRef.current--
     } catch (err: any) {
-      toast.error(err.message || 'Error al extender video')
+      toast.error(err.message || t.studio.videoPrompt.extendError)
       updateScene(index, { isExtending: false })
     }
   }
@@ -227,9 +229,9 @@ export function StandaloneVideoManager({
   const handleCopyUrl = async (url: string) => {
     try {
       await navigator.clipboard.writeText(url)
-      toast.success('URL copiada')
+      toast.success(t.studio.videoPrompt.urlCopied)
     } catch {
-      toast.error('Error al copiar')
+      toast.error(t.studio.videoPrompt.copyError)
     }
   }
 
@@ -241,9 +243,9 @@ export function StandaloneVideoManager({
       if (allDone) {
         const completedCount = states.filter(s => s.status === 'completed').length
         if (completedCount === states.length) {
-          toast.success(`${completedCount} videos generados!`)
+          toast.success(t.studio.videoPrompt.videosGenerated.replace('{count}', String(completedCount)))
         } else {
-          toast.success(`${completedCount}/${states.length} videos completados`)
+          toast.success(t.studio.videoPrompt.videosCompleted.replace('{done}', String(completedCount)).replace('{total}', String(states.length)))
         }
         return
       }
@@ -278,10 +280,10 @@ export function StandaloneVideoManager({
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
           <Film className="w-4 h-4 text-accent" />
-          Generacion Paralela — {modelConfig?.name || modelId}
+          {t.studio.videoPrompt.parallelGen} — {modelConfig?.name || modelId}
         </h3>
         <span className="text-sm text-text-primary font-mono">
-          {completedCount}/{totalCount} completadas
+          {t.studio.videoPrompt.completed.replace('{done}', String(completedCount)).replace('{total}', String(totalCount))}
         </span>
       </div>
 
@@ -314,9 +316,9 @@ export function StandaloneVideoManager({
               }`}
             >
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold text-text-primary">Escena {scene.sceneNumber}</span>
+                <span className="text-xs font-bold text-text-primary">{t.studio.videoPrompt.scene} {scene.sceneNumber}</span>
                 {state.status === 'pending' && (
-                  <span className="text-[10px] text-text-muted">Pendiente</span>
+                  <span className="text-[10px] text-text-muted">{t.studio.videoPrompt.pending}</span>
                 )}
                 {state.status === 'generating' && (
                   <Loader2 className="w-3.5 h-3.5 text-amber-400 animate-spin" />
@@ -352,7 +354,7 @@ export function StandaloneVideoManager({
                       className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-surface border border-border rounded-lg text-[10px] font-medium text-text-secondary hover:text-text-primary hover:border-accent/50 transition-colors"
                     >
                       <Copy className="w-3 h-3" />
-                      Copiar URL
+                      {t.studio.videoPrompt.copyUrl}
                     </button>
                     {supportsExtend && state.taskId && (
                       <button
@@ -360,7 +362,7 @@ export function StandaloneVideoManager({
                         className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-violet-500/10 border border-violet-500/30 rounded-lg text-[10px] font-medium text-violet-400 hover:bg-violet-500/20 transition-colors"
                       >
                         <FastForward className="w-3 h-3" />
-                        Extender
+                        {t.studio.videoPrompt.extend}
                       </button>
                     )}
                   </div>
@@ -371,7 +373,7 @@ export function StandaloneVideoManager({
                       <textarea
                         value={state.extendPrompt}
                         onChange={(e) => updateScene(i, { extendPrompt: e.target.value })}
-                        placeholder="Prompt para continuacion (vacio = usa prompt original)"
+                        placeholder={t.studio.videoPrompt.extendPromptPh}
                         rows={2}
                         maxLength={400}
                         className="w-full px-2 py-1.5 bg-background border border-border rounded-lg text-[11px] text-text-primary placeholder:text-text-muted resize-none focus:outline-none focus:ring-1 focus:ring-violet-500/50"
@@ -381,7 +383,7 @@ export function StandaloneVideoManager({
                         className="w-full flex items-center justify-center gap-1 px-2 py-1.5 bg-violet-600 text-white rounded-lg text-[11px] font-semibold hover:bg-violet-500 transition-colors"
                       >
                         <FastForward className="w-3 h-3" />
-                        Generar Extension
+                        {t.studio.videoPrompt.generateExtension}
                       </button>
                     </div>
                   )}
@@ -396,7 +398,7 @@ export function StandaloneVideoManager({
                     className="flex items-center gap-1 text-[11px] text-red-400 hover:text-red-300 font-medium transition-colors"
                   >
                     <RefreshCw className="w-3 h-3" />
-                    Reintentar
+                    {t.studio.videoPrompt.retry}
                   </button>
                 </div>
               )}
@@ -411,7 +413,7 @@ export function StandaloneVideoManager({
         className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-surface-elevated text-text-secondary border border-border rounded-xl text-sm font-medium hover:text-text-primary hover:border-accent/50 transition-colors"
       >
         <ArrowLeft className="w-4 h-4" />
-        Volver a Configuracion
+        {t.studio.videoPrompt.backToConfig}
       </button>
     </div>
   )

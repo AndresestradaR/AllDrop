@@ -6,6 +6,7 @@ import toast from 'react-hot-toast'
 import { createClient } from '@/lib/supabase/client'
 import { FFmpeg } from '@ffmpeg/ffmpeg'
 import { fetchFile, toBlobURL } from '@ffmpeg/util'
+import { useI18n } from '@/lib/i18n'
 
 interface VideoEditorProps {
   initialClips: { url: string; label: string }[]
@@ -26,6 +27,7 @@ const MAX_HISTORY = 50
 const FFMPEG_BASE = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd'
 
 export function VideoEditor({ initialClips, onBack, onExported, influencerId }: VideoEditorProps) {
+  const { t } = useI18n()
   const [clips, setClips] = useState<ClipState[]>([])
   const [isPlaying, setIsPlaying] = useState(false)
   const [activeClipIndex, setActiveClipIndex] = useState(0)
@@ -84,7 +86,7 @@ export function VideoEditor({ initialClips, onBack, onExported, influencerId }: 
     isUndoRedoRef.current = true
     const i = historyIndex - 1
     setHistoryIndex(i); setClips(history[i])
-    toast('Deshacer', { duration: 1000 })
+    toast(t.studio.videoPrompt.undo, { duration: 1000 })
   }, [canUndo, historyIndex, history])
 
   const redo = useCallback(() => {
@@ -92,7 +94,7 @@ export function VideoEditor({ initialClips, onBack, onExported, influencerId }: 
     isUndoRedoRef.current = true
     const i = historyIndex + 1
     setHistoryIndex(i); setClips(history[i])
-    toast('Rehacer', { duration: 1000 })
+    toast(t.studio.videoPrompt.redo, { duration: 1000 })
   }, [canRedo, historyIndex, history])
 
   useEffect(() => {
@@ -257,7 +259,7 @@ export function VideoEditor({ initialClips, onBack, onExported, influencerId }: 
   }
 
   const removeClip = (index: number) => {
-    if (clips.length <= 1) { toast.error('No puedes eliminar el unico clip'); return }
+    if (clips.length <= 1) { toast.error(t.studio.videoPrompt.cannotDeleteOnly); return }
     setClips(prev => prev.filter((_, i) => i !== index))
     if (selectedClipIndex === index) setSelectedClipIndex(null)
     if (activeClipIndex >= index && activeClipIndex > 0) setActiveClipIndex(prev => prev - 1)
@@ -279,7 +281,7 @@ export function VideoEditor({ initialClips, onBack, onExported, influencerId }: 
         const sp = Math.round((clip.startTime + (globalTime - map.globalStart)) * 100) / 100
         setClips(prev => [...prev.slice(0, i), { ...clip, endTime: sp }, { ...clip, startTime: sp, label: clip.label + ' (B)' }, ...prev.slice(i + 1)])
         setSelectedClipIndex(i + 1); setSelectedTrack('video')
-        toast.success('Clip dividido en ' + fmtTime(sp))
+        toast.success(t.studio.videoPrompt.clipSplitAt + ' ' + fmtTime(sp))
         return
       }
     }
@@ -287,10 +289,10 @@ export function VideoEditor({ initialClips, onBack, onExported, influencerId }: 
     if (musicFile && musicTrimmedDuration > 0 && globalTime > 0.5 && globalTime < musicTrimmedDuration - 0.5) {
       setMusicEndTime(Math.round((musicStartTime + globalTime) * 10) / 10)
       setSelectedTrack('audio')
-      toast.success('Audio recortado en ' + fmtTime(globalTime))
+      toast.success(t.studio.videoPrompt.audioTrimmedAt + ' ' + fmtTime(globalTime))
       return
     }
-    toast.error('Mueve el playhead al punto donde quieres cortar')
+    toast.error(t.studio.videoPrompt.movePlayhead)
   }, [clips, clipTimeMap, globalTime, musicFile, musicStartTime, musicTrimmedDuration])
 
   const handleMusicUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -399,7 +401,7 @@ export function VideoEditor({ initialClips, onBack, onExported, influencerId }: 
     const ff = new FFmpeg()
     ff.on('log', ({ message }) => console.log('[ffmpeg]', message))
     ff.on('progress', ({ progress }) => {
-      if (progress > 0 && progress <= 1) setExportProgress('Procesando... ' + Math.round(progress * 100) + '%')
+      if (progress > 0 && progress <= 1) setExportProgress(t.studio.videoPrompt.processing.replace('{pct}', String(Math.round(progress * 100))))
     })
     await ff.load({
       coreURL: await toBlobURL(FFMPEG_BASE + '/ffmpeg-core.js', 'text/javascript'),
@@ -413,27 +415,27 @@ export function VideoEditor({ initialClips, onBack, onExported, influencerId }: 
     if (clips.length === 0) return
     setIsExporting(true); setSavedToPizarra(false)
     try {
-      setExportProgress('Cargando motor de video...')
+      setExportProgress(t.studio.videoPrompt.loadingEngine)
       let ff: FFmpeg
       try { ff = await loadFFmpeg() }
-      catch { toast.error('No se pudo cargar el motor de video. Recarga la pagina.'); return }
+      catch { toast.error(t.studio.videoPrompt.engineError); return }
 
       // Download clips via proxy (avoids CORS)
       for (let i = 0; i < clips.length; i++) {
-        setExportProgress('Descargando clip ' + (i + 1) + ' de ' + clips.length + '...')
+        setExportProgress(t.studio.videoPrompt.downloadingClip.replace('{n}', String(i + 1)).replace('{total}', String(clips.length)))
         try {
           const proxyUrl = '/api/studio/video-editor/proxy?url=' + encodeURIComponent(clips[i].url)
           await ff.writeFile('in' + i + '.mp4', await fetchFile(proxyUrl))
         } catch {
           try { await ff.writeFile('in' + i + '.mp4', await fetchFile(clips[i].url)) }
-          catch { toast.error('No se pudo descargar el clip ' + (i + 1)); return }
+          catch { toast.error(t.studio.videoPrompt.downloadClipError.replace('{n}', String(i + 1))); return }
         }
       }
 
       // Trim clips — always re-encode for consistent codec (ffmpeg.wasm can't copy VP9/H.265)
       for (let i = 0; i < clips.length; i++) {
         const c = clips[i]
-        setExportProgress('Procesando clip ' + (i + 1) + ' de ' + clips.length + '...')
+        setExportProgress(t.studio.videoPrompt.processingClip.replace('{n}', String(i + 1)).replace('{total}', String(clips.length)))
         // Re-encode to H.264 + AAC — preserves both video and audio
         const code = await ff.exec([
           '-i', 'in' + i + '.mp4',
@@ -456,7 +458,7 @@ export function VideoEditor({ initialClips, onBack, onExported, influencerId }: 
       }
 
       // Concat
-      setExportProgress('Uniendo clips...')
+      setExportProgress(t.studio.videoPrompt.joiningClips)
       const needsAudio = !!musicFile || voiceVolume !== 100
       const concatOut = needsAudio ? 'joined.mp4' : 'final.mp4'
 
@@ -478,7 +480,7 @@ export function VideoEditor({ initialClips, onBack, onExported, influencerId }: 
         }
 
         if (needsReencode) {
-          setExportProgress('Re-codificando clips...')
+          setExportProgress(t.studio.videoPrompt.reEncodingClips)
           for (let i = 0; i < clips.length; i++) {
             await ff.exec(['-i', 'tr' + i + '.mp4', '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '28', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k', '-ar', '44100', '-ac', '2', '-r', '30', 'enc' + i + '.mp4'])
           }
@@ -490,7 +492,7 @@ export function VideoEditor({ initialClips, onBack, onExported, influencerId }: 
 
       // Audio mixing
       if (musicFile) {
-        setExportProgress('Procesando musica...')
+        setExportProgress(t.studio.videoPrompt.processingMusic)
         await ff.writeFile('music_raw.mp3', await fetchFile(musicFile))
         // Trim music if user adjusted start/end
         if (musicStartTime > 0.1 || (musicDuration > 0 && musicEndTime < musicDuration - 0.1)) {
@@ -499,7 +501,7 @@ export function VideoEditor({ initialClips, onBack, onExported, influencerId }: 
         } else {
           const d = await ff.readFile('music_raw.mp3'); await ff.writeFile('music.mp3', d)
         }
-        setExportProgress('Mezclando musica...')
+        setExportProgress(t.studio.videoPrompt.mixingMusic)
         const vv = (voiceVolume / 100).toFixed(2)
         const mv = (musicVolume / 100).toFixed(2)
 
@@ -521,11 +523,11 @@ export function VideoEditor({ initialClips, onBack, onExported, influencerId }: 
             // Last resort: video without music
             const d = await ff.readFile('joined.mp4')
             await ff.writeFile('final.mp4', d)
-            toast('Video exportado sin musica (formato no compatible)', { icon: '⚠️' })
+            toast(t.studio.videoPrompt.exportNoMusic, { icon: '⚠️' })
           }
         }
       } else if (voiceVolume !== 100) {
-        setExportProgress('Ajustando volumen...')
+        setExportProgress(t.studio.videoPrompt.adjustingVolume)
         const code = await ff.exec(['-i', 'joined.mp4', '-af', 'volume=' + (voiceVolume / 100).toFixed(2), '-c:v', 'copy', '-c:a', 'aac', 'final.mp4'])
         if (code !== 0) {
           const d = await ff.readFile('joined.mp4')
@@ -534,14 +536,14 @@ export function VideoEditor({ initialClips, onBack, onExported, influencerId }: 
       }
 
       // Read output
-      setExportProgress('Preparando video...')
+      setExportProgress(t.studio.videoPrompt.preparingVideo)
       const outData = await ff.readFile('final.mp4')
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const blob = new Blob([outData as any], { type: 'video/mp4' })
       const localUrl = URL.createObjectURL(blob)
 
       // Upload to Supabase Storage
-      setExportProgress('Subiendo a la nube...')
+      setExportProgress(t.studio.videoPrompt.uploadingCloud)
       const supabase = createClient()
       const storagePath = 'editor/' + Date.now() + '_edited.mp4'
       const { error: upErr } = await supabase.storage.from('landing-images').upload(storagePath, blob, { contentType: 'video/mp4', upsert: true })
@@ -551,7 +553,7 @@ export function VideoEditor({ initialClips, onBack, onExported, influencerId }: 
       if (!upErr) {
         // Save to pizarra with signed URL
         if (influencerId) {
-          setExportProgress('Guardando en la pizarra...')
+          setExportProgress(t.studio.videoPrompt.savingBoard)
           const { data: signedData } = await supabase.storage.from('landing-images').createSignedUrl(storagePath, 86400)
           const signedUrl = signedData?.signedUrl || localUrl
           const saveResp = await fetch('/api/studio/influencer/gallery', {
@@ -567,18 +569,18 @@ export function VideoEditor({ initialClips, onBack, onExported, influencerId }: 
               prompt_used: clips.map(c => c.label).join(' + '),
             })
           })
-          if (saveResp.ok) { setSavedToPizarra(true); toast.success('Guardado en la pizarra') }
+          if (saveResp.ok) { setSavedToPizarra(true); toast.success(t.studio.videoPrompt.savedBoard) }
         }
       } else {
         console.error('Upload error:', upErr)
-        toast.error('Video listo pero no se pudo subir a la nube')
+        toast.error(t.studio.videoPrompt.uploadError)
       }
 
       // Use local blob URL — works instantly, no CORS, no auth needed
       setExportedVideoUrl(localUrl)
       setShowExportOverlay(true)
       onExported?.(localUrl)
-      toast.success('Video exportado!')
+      toast.success(t.studio.videoPrompt.exportSuccess)
 
       // Cleanup
       for (let i = 0; i < clips.length; i++) {
@@ -591,7 +593,7 @@ export function VideoEditor({ initialClips, onBack, onExported, influencerId }: 
       }
     } catch (err: any) {
       console.error('Export error:', err)
-      toast.error(err.message || 'Error al exportar video')
+      toast.error(err.message || t.studio.videoPrompt.exportError)
     } finally {
       setIsExporting(false); setExportProgress('')
     }
@@ -609,8 +611,8 @@ export function VideoEditor({ initialClips, onBack, onExported, influencerId }: 
 
   const handleCopyUrl = async () => {
     if (!exportedVideoUrl) return
-    try { await navigator.clipboard.writeText(exportedVideoUrl); toast.success('URL copiada') }
-    catch { toast.error('Error al copiar') }
+    try { await navigator.clipboard.writeText(exportedVideoUrl); toast.success(t.studio.videoPrompt.urlCopied) }
+    catch { toast.error(t.studio.videoPrompt.copyError) }
   }
 
   const fmtTime = (s: number) => { const m = Math.floor(s / 60); const sec = Math.floor(s % 60); return m + ':' + sec.toString().padStart(2, '0') }
@@ -626,23 +628,23 @@ export function VideoEditor({ initialClips, onBack, onExported, influencerId }: 
       <div className="flex items-center justify-between px-4 py-1.5 bg-surface border-b border-border flex-shrink-0 rounded-t-2xl">
         <div className="flex items-center gap-3">
           <button onClick={onBack} className="flex items-center gap-1.5 px-3 py-1 hover:bg-border/50 rounded-lg transition-colors text-text-secondary hover:text-text-primary">
-            <ArrowLeft className="w-4 h-4" /><span className="text-xs font-medium">Volver</span>
+            <ArrowLeft className="w-4 h-4" /><span className="text-xs font-medium">{t.studio.videoPrompt.back}</span>
           </button>
           <div className="w-px h-4 bg-border" />
           <div className="flex items-center gap-2">
             <div className="w-5 h-5 rounded flex items-center justify-center bg-gradient-to-br from-pink-500 to-rose-500"><Film className="w-3 h-3 text-white" /></div>
-            <span className="text-sm font-semibold text-text-primary">Editor</span>
+            <span className="text-sm font-semibold text-text-primary">{t.studio.videoPrompt.editor}</span>
             <span className="text-[10px] text-text-muted">{clips.length} clips &middot; {fmtTime(totalDuration)}</span>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-0.5">
-            <button onClick={undo} disabled={!canUndo} className="p-1.5 hover:bg-border/50 rounded-lg disabled:opacity-20 transition-colors" title="Deshacer (Ctrl+Z)"><Undo2 className="w-4 h-4 text-text-secondary" /></button>
-            <button onClick={redo} disabled={!canRedo} className="p-1.5 hover:bg-border/50 rounded-lg disabled:opacity-20 transition-colors" title="Rehacer (Ctrl+Shift+Z)"><Redo2 className="w-4 h-4 text-text-secondary" /></button>
+            <button onClick={undo} disabled={!canUndo} className="p-1.5 hover:bg-border/50 rounded-lg disabled:opacity-20 transition-colors" title={t.studio.videoPrompt.undo + ' (Ctrl+Z)'}><Undo2 className="w-4 h-4 text-text-secondary" /></button>
+            <button onClick={redo} disabled={!canRedo} className="p-1.5 hover:bg-border/50 rounded-lg disabled:opacity-20 transition-colors" title={t.studio.videoPrompt.redo + ' (Ctrl+Shift+Z)'}><Redo2 className="w-4 h-4 text-text-secondary" /></button>
           </div>
           <button onClick={handleExport} disabled={clips.length === 0 || isExporting}
             className={'flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ' + (isExporting ? 'bg-border text-text-muted cursor-not-allowed' : 'bg-gradient-to-r from-pink-600 to-rose-600 text-white hover:from-pink-500 hover:to-rose-500 shadow-lg shadow-pink-500/20')}>
-            {isExporting ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />{exportProgress}</> : <><Film className="w-3.5 h-3.5" />Exportar</>}
+            {isExporting ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />{exportProgress}</> : <><Film className="w-3.5 h-3.5" />{t.studio.videoPrompt.export}</>}
           </button>
         </div>
       </div>
@@ -676,7 +678,7 @@ export function VideoEditor({ initialClips, onBack, onExported, influencerId }: 
         {/* Audio Panel */}
         <div className="w-52 border-l border-[#222] bg-[#111] flex flex-col flex-shrink-0">
           <div className="px-3 py-1.5 border-b border-[#222]">
-            <div className="flex items-center gap-2"><Music className="w-3 h-3 text-gray-400" /><span className="text-[11px] font-semibold text-white">Audio</span></div>
+            <div className="flex items-center gap-2"><Music className="w-3 h-3 text-gray-400" /><span className="text-[11px] font-semibold text-white">{t.studio.videoPrompt.audio}</span></div>
           </div>
           <div className="flex-1 overflow-y-auto p-2.5 space-y-2.5">
             {musicFile ? (
@@ -691,14 +693,14 @@ export function VideoEditor({ initialClips, onBack, onExported, influencerId }: 
             ) : (
               <label className="flex flex-col items-center justify-center h-14 border border-dashed border-[#333] hover:border-emerald-500/50 rounded-lg cursor-pointer transition-colors bg-[#1a1a1a]/50">
                 <input type="file" accept="audio/mp3,audio/wav,audio/m4a,audio/mpeg,audio/*" className="hidden" onChange={handleMusicUpload} />
-                <Upload className="w-3.5 h-3.5 text-gray-500 mb-0.5" /><p className="text-[9px] text-gray-400 font-medium">Subir musica</p>
+                <Upload className="w-3.5 h-3.5 text-gray-500 mb-0.5" /><p className="text-[9px] text-gray-400 font-medium">{t.studio.videoPrompt.uploadMusic}</p>
               </label>
             )}
-            {musicFile && <p className="text-[9px] text-emerald-400/70 text-center">Suena al reproducir el video</p>}
+            {musicFile && <p className="text-[9px] text-emerald-400/70 text-center">{t.studio.videoPrompt.musicPlays}</p>}
             <div className="space-y-2">
               <div>
                 <div className="flex items-center justify-between mb-0.5">
-                  <label className="text-[10px] font-medium text-gray-400 flex items-center gap-1"><Volume2 className="w-2.5 h-2.5" />Voz</label>
+                  <label className="text-[10px] font-medium text-gray-400 flex items-center gap-1"><Volume2 className="w-2.5 h-2.5" />{t.studio.videoPrompt.voice}</label>
                   <span className="text-[9px] text-gray-500 font-mono">{voiceVolume}%</span>
                 </div>
                 <input type="range" min={0} max={200} value={voiceVolume} onChange={e => setVoiceVolume(parseInt(e.target.value))}
@@ -706,7 +708,7 @@ export function VideoEditor({ initialClips, onBack, onExported, influencerId }: 
               </div>
               <div>
                 <div className="flex items-center justify-between mb-0.5">
-                  <label className="text-[10px] font-medium text-gray-400 flex items-center gap-1"><Music className="w-2.5 h-2.5" />Musica</label>
+                  <label className="text-[10px] font-medium text-gray-400 flex items-center gap-1"><Music className="w-2.5 h-2.5" />{t.studio.videoPrompt.music}</label>
                   <span className="text-[9px] text-gray-500 font-mono">{musicVolume}%</span>
                 </div>
                 <input type="range" min={0} max={200} value={musicVolume} onChange={e => setMusicVolume(parseInt(e.target.value))}
@@ -734,7 +736,7 @@ export function VideoEditor({ initialClips, onBack, onExported, influencerId }: 
           <div className="w-px h-4 bg-[#2a2a2a] mx-1.5" />
           <button onClick={splitAtPlayhead}
             className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium bg-[#1a1a1a] hover:bg-[#252525] text-orange-400 hover:text-orange-300 transition-colors border border-[#333] hover:border-orange-500/30"
-            title="Cortar en la posicion del playhead"><Scissors className="w-3.5 h-3.5" />Cortar aqui</button>
+            title={t.studio.videoPrompt.cutHere}><Scissors className="w-3.5 h-3.5" />{t.studio.videoPrompt.cutHere}</button>
           <div className="flex-1" />
           {/* Video clip selected */}
           {selectedClipIndex !== null && clips[selectedClipIndex] && selectedTrack !== 'audio' && (
@@ -820,7 +822,7 @@ export function VideoEditor({ initialClips, onBack, onExported, influencerId }: 
                 </div>
               ) : (
                 <div className="h-full rounded-md border border-dashed border-[#222] flex items-center justify-center" style={{ width: ((totalDuration / timelineMaxDuration) * 100) + '%', minWidth: 48 }}>
-                  <span className="text-[8px] text-gray-700">Sin musica</span>
+                  <span className="text-[8px] text-gray-700">{t.studio.videoPrompt.noMusic}</span>
                 </div>
               )}
             </div>
@@ -883,15 +885,15 @@ export function VideoEditor({ initialClips, onBack, onExported, influencerId }: 
           <div className="bg-[#1a1a1a] border border-[#333] rounded-2xl p-6 max-w-lg w-full mx-4 shadow-2xl">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h3 className="text-sm font-semibold text-green-400">Video Exportado</h3>
-                {savedToPizarra && <p className="text-[11px] text-emerald-400/80 mt-0.5">Guardado en la pizarra</p>}
+                <h3 className="text-sm font-semibold text-green-400">{t.studio.videoPrompt.videoExported}</h3>
+                {savedToPizarra && <p className="text-[11px] text-emerald-400/80 mt-0.5">{t.studio.videoPrompt.savedToBoard}</p>}
               </div>
               <button onClick={() => setShowExportOverlay(false)} className="p-1 hover:bg-white/10 rounded transition-colors"><X className="w-4 h-4 text-gray-400" /></button>
             </div>
             <video src={exportedVideoUrl} controls className="w-full rounded-xl aspect-video object-contain bg-black mb-4" />
             <div className="flex gap-2">
-              <button onClick={handleDownload} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-500 text-white rounded-xl text-xs font-semibold transition-colors"><Download className="w-4 h-4" />Descargar</button>
-              <button onClick={handleCopyUrl} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-[#222] border border-[#333] hover:border-gray-500 text-white rounded-xl text-xs font-semibold transition-colors"><Copy className="w-4 h-4" />Copiar URL</button>
+              <button onClick={handleDownload} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-500 text-white rounded-xl text-xs font-semibold transition-colors"><Download className="w-4 h-4" />{t.studio.videoPrompt.download}</button>
+              <button onClick={handleCopyUrl} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-[#222] border border-[#333] hover:border-gray-500 text-white rounded-xl text-xs font-semibold transition-colors"><Copy className="w-4 h-4" />{t.studio.videoPrompt.copyUrlBtn}</button>
             </div>
           </div>
         </div>

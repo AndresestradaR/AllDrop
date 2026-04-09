@@ -13,6 +13,7 @@ import {
   ArrowRight,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { useI18n } from '@/lib/i18n'
 
 interface PromptResult {
   prompt: string
@@ -31,19 +32,23 @@ const VIDEO_MODELS = [
   { id: 'hunyuan', label: 'Hunyuan' },
 ]
 
-const STYLES = [
-  { id: 'ugc_tiktok', label: 'UGC / TikTok', desc: 'Estilo casual, persona a camara' },
-  { id: 'professional', label: 'Profesional', desc: 'Corporativo, limpio' },
-  { id: 'product_showcase', label: 'Producto', desc: 'Close-ups, texturas, detalles' },
-  { id: 'testimonial', label: 'Testimonial', desc: 'Persona hablando, confianza' },
-  { id: 'asmr', label: 'ASMR', desc: 'Sonidos, close-ups satisfactorios' },
-  { id: 'cinematic', label: 'Cinematico', desc: 'Cine, movimientos de camara' },
-]
+// Style keys mapped to translation keys
+const STYLE_IDS = ['ugc_tiktok', 'professional', 'product_showcase', 'testimonial', 'asmr', 'cinematic'] as const
 
 export function PromptGenerator({ onBack, onUseInVideo }: {
   onBack: () => void
   onUseInVideo?: (prompt: string) => void
 }) {
+  const { t } = useI18n()
+
+  const STYLES = [
+    { id: 'ugc_tiktok', label: t.studio.promptGen.styleUgc, desc: t.studio.promptGen.styleUgcDesc },
+    { id: 'professional', label: t.studio.promptGen.styleProfessional, desc: t.studio.promptGen.styleProfessionalDesc },
+    { id: 'product_showcase', label: t.studio.promptGen.styleProduct, desc: t.studio.promptGen.styleProductDesc },
+    { id: 'testimonial', label: t.studio.promptGen.styleTestimonial, desc: t.studio.promptGen.styleTestimonialDesc },
+    { id: 'asmr', label: t.studio.promptGen.styleAsmr, desc: t.studio.promptGen.styleAsmrDesc },
+    { id: 'cinematic', label: t.studio.promptGen.styleCinematic, desc: t.studio.promptGen.styleCinematicDesc },
+  ]
   const [description, setDescription] = useState('')
   const [model, setModel] = useState('kling')
   const [style, setStyle] = useState('cinematic')
@@ -91,7 +96,7 @@ export function PromptGenerator({ onBack, onUseInVideo }: {
   const copyToClipboard = async (text: string, fieldId: string) => {
     await navigator.clipboard.writeText(text)
     setCopiedField(fieldId)
-    toast.success('Copiado')
+    toast.success(t.studio.promptGen.copied)
     setTimeout(() => setCopiedField(null), 2000)
   }
 
@@ -108,8 +113,8 @@ export function PromptGenerator({ onBack, onUseInVideo }: {
               <Video className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-text-primary">Prompt Generator Video</h2>
-              <p className="text-sm text-text-secondary">Genera prompts cinematicos optimizados por modelo</p>
+              <h2 className="text-lg font-semibold text-text-primary">{t.studio.promptGen.title}</h2>
+              <p className="text-sm text-text-secondary">{t.studio.promptGen.subtitle}</p>
             </div>
           </div>
         </div>
@@ -121,12 +126,12 @@ export function PromptGenerator({ onBack, onUseInVideo }: {
             {/* Description */}
             <div>
               <label className="block text-sm font-medium text-text-secondary mb-1.5">
-                Describe tu video en espanol *
+                {t.studio.promptGen.describeVideo}
               </label>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Ej: Una mujer joven usando un serum facial, se ve como le brilla la piel, en un baño moderno con buena iluminacion..."
+                placeholder={t.studio.promptGen.describeVideoPh}
                 rows={4}
                 className="w-full px-4 py-3 bg-surface-elevated border border-border rounded-xl text-text-primary placeholder:text-text-muted resize-none focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all text-sm"
               />
@@ -134,7 +139,7 @@ export function PromptGenerator({ onBack, onUseInVideo }: {
 
             {/* Model */}
             <div>
-              <label className="block text-sm font-medium text-text-secondary mb-1.5">Modelo de video</label>
+              <label className="block text-sm font-medium text-text-secondary mb-1.5">{t.studio.promptGen.videoModel}</label>
               <select
                 value={model}
                 onChange={(e) => setModel(e.target.value)}
@@ -148,7 +153,7 @@ export function PromptGenerator({ onBack, onUseInVideo }: {
 
             {/* Style */}
             <div>
-              <label className="block text-sm font-medium text-text-secondary mb-1.5">Estilo</label>
+              <label className="block text-sm font-medium text-text-secondary mb-1.5">{t.studio.promptGen.style}</label>
               <div className="grid grid-cols-2 gap-2">
                 {STYLES.map((s) => (
                   <button
@@ -173,21 +178,21 @@ export function PromptGenerator({ onBack, onUseInVideo }: {
             {/* Duration + Audio */}
             <div className="flex gap-3">
               <div className="flex-1">
-                <label className="block text-sm font-medium text-text-secondary mb-1.5">Duracion</label>
+                <label className="block text-sm font-medium text-text-secondary mb-1.5">{t.studio.promptGen.duration}</label>
                 <select
                   value={duration}
                   onChange={(e) => setDuration(Number(e.target.value))}
                   className="w-full px-3 py-2.5 bg-surface-elevated border border-border rounded-xl text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50 text-sm"
                 >
-                  <option value={3}>3 seg</option>
-                  <option value={5}>5 seg</option>
-                  <option value={8}>8 seg</option>
-                  <option value={10}>10 seg</option>
-                  <option value={15}>15 seg</option>
+                  <option value={3}>{t.studio.promptGen.sec3}</option>
+                  <option value={5}>{t.studio.promptGen.sec5}</option>
+                  <option value={8}>{t.studio.promptGen.sec8}</option>
+                  <option value={10}>{t.studio.promptGen.sec10}</option>
+                  <option value={15}>{t.studio.promptGen.sec15}</option>
                 </select>
               </div>
               <div className="flex-1">
-                <label className="block text-sm font-medium text-text-secondary mb-1.5">Audio</label>
+                <label className="block text-sm font-medium text-text-secondary mb-1.5">{t.studio.promptGen.audioLabel}</label>
                 <button
                   onClick={() => setWithAudio(!withAudio)}
                   className={cn(
@@ -197,7 +202,7 @@ export function PromptGenerator({ onBack, onUseInVideo }: {
                       : 'border-border bg-surface-elevated text-text-secondary hover:border-accent/50'
                   )}
                 >
-                  {withAudio ? 'Con audio' : 'Sin audio'}
+                  {withAudio ? t.studio.promptGen.withAudio : t.studio.promptGen.withoutAudio}
                 </button>
               </div>
             </div>
@@ -223,12 +228,12 @@ export function PromptGenerator({ onBack, onUseInVideo }: {
               {isGenerating ? (
                 <>
                   <Loader2 className="w-5 h-5 animate-spin" />
-                  Generando prompt...
+                  {t.studio.promptGen.generatingPrompt}
                 </>
               ) : (
                 <>
                   <Sparkles className="w-5 h-5" />
-                  Generar Prompt
+                  {t.studio.promptGen.generateBtn}
                 </>
               )}
             </button>
@@ -240,8 +245,8 @@ export function PromptGenerator({ onBack, onUseInVideo }: {
               <div className="flex-1 flex items-center justify-center bg-surface-elevated rounded-xl">
                 <div className="text-center p-8">
                   <Video className="w-12 h-12 text-text-secondary mx-auto mb-3" />
-                  <p className="text-text-secondary">El prompt optimizado aparecera aqui</p>
-                  <p className="text-xs text-text-muted mt-1">Escribe en espanol, el prompt sale en ingles</p>
+                  <p className="text-text-secondary">{t.studio.promptGen.placeholder}</p>
+                  <p className="text-xs text-text-muted mt-1">{t.studio.promptGen.placeholderDesc}</p>
                 </div>
               </div>
             ) : (
@@ -257,7 +262,7 @@ export function PromptGenerator({ onBack, onUseInVideo }: {
                           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent/10 text-accent hover:bg-accent/20 text-xs font-medium transition-colors"
                         >
                           <ArrowRight className="w-3.5 h-3.5" />
-                          Usar en Video
+                          {t.studio.promptGen.useInVideo}
                         </button>
                       )}
                       <button
@@ -316,7 +321,7 @@ export function PromptGenerator({ onBack, onUseInVideo }: {
                 {/* Model Notes */}
                 {result.model_specific_notes && (
                   <div className="p-4 bg-surface-elevated rounded-xl border border-border">
-                    <span className="text-xs font-medium text-text-muted uppercase tracking-wider block mb-2">Notas del modelo</span>
+                    <span className="text-xs font-medium text-text-muted uppercase tracking-wider block mb-2">{t.studio.promptGen.modelNotes}</span>
                     <p className="text-sm text-text-secondary">{result.model_specific_notes}</p>
                   </div>
                 )}
