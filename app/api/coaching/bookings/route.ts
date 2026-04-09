@@ -2,8 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { sendBookingNotification } from '@/lib/email/send-booking-notification'
-
-const ADMIN_EMAIL = 'trucosecomydrop@gmail.com'
+import { isAdmin } from '@/lib/admin'
 
 function getAdminClient() {
   return createSupabaseClient(
@@ -32,7 +31,7 @@ export async function GET() {
       `)
       .order('slot_date', { ascending: false })
 
-    if (user.email !== ADMIN_EMAIL) {
+    if (!isAdmin(user.email)) {
       query = query.eq('user_id', user.id)
     }
 

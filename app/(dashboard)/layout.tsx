@@ -31,7 +31,7 @@ import toast from 'react-hot-toast'
 
 export const dynamic = 'force-dynamic'
 
-const ADMIN_EMAIL = 'infoalldrop@gmail.com'
+import { isAdmin as isAdminEmail } from '@/lib/admin'
 
 export default function DashboardLayout({
   children,
@@ -53,7 +53,7 @@ export default function DashboardLayout({
     { name: t.nav.dashboard, href: '/dashboard', icon: LayoutDashboard },
   ]
 
-  const hasPro = userEmail === ADMIN_EMAIL || ['pro', 'business', 'enterprise'].includes(userPlan)
+  const hasPro = isAdminEmail(userEmail) || ['pro', 'business', 'enterprise'].includes(userPlan)
 
   const creatorNavigation = [
     { name: t.nav.createLanding, href: '/dashboard/landing', icon: LayoutTemplate },
@@ -64,7 +64,7 @@ export default function DashboardLayout({
 
   const otherNavigation = [
     { name: t.nav.allDropShop, href: '/constructor/', icon: Store, external: true },
-    { name: t.nav.settings, href: '/dashboard/settings', icon: Settings },
+    ...(isAdminEmail(userEmail) ? [{ name: t.nav.settings, href: '/dashboard/settings', icon: Settings }] : []),
   ]
 
   const adminNavigation = [
@@ -91,7 +91,7 @@ export default function DashboardLayout({
             }
           })
       }
-      if (email && email === ADMIN_EMAIL) {
+      if (email && isAdminEmail(email)) {
         fetch('/api/admin/monitoring?action=health')
           .then(r => r.json())
           .then(d => setAiHealth(d.health))
@@ -111,7 +111,7 @@ export default function DashboardLayout({
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
 
-  const isAdmin = userEmail === ADMIN_EMAIL
+  const isAdmin = isAdminEmail(userEmail)
 
   const handleLogout = async () => {
     const supabase = createClient()

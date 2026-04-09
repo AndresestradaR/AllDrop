@@ -4,8 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Activity, RefreshCw, Trash2, Clock, AlertTriangle, CheckCircle, XCircle } from 'lucide-react'
-
-const ADMIN_EMAIL = 'trucosecomydrop@gmail.com'
+import { isAdmin as isAdminEmail } from '@/lib/admin'
 
 interface ProviderHealth {
   provider: string
@@ -87,7 +86,7 @@ export default function MonitoringPage() {
   useEffect(() => {
     const supabase = createClient()
     supabase.auth.getUser().then(({ data }) => {
-      if (data.user?.email === ADMIN_EMAIL) {
+      if (isAdminEmail(data.user?.email)) {
         setAuthorized(true)
       } else {
         router.push('/dashboard')

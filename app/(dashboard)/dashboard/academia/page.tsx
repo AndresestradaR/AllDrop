@@ -18,8 +18,7 @@ import {
 } from 'lucide-react'
 import { extractYouTubeId } from '@/lib/utils/youtube'
 import toast from 'react-hot-toast'
-
-const ADMIN_EMAIL = 'trucosecomydrop@gmail.com'
+import { isAdmin as isAdminEmail } from '@/lib/admin'
 
 type Tab = 'cursos' | 'comunidad'
 
@@ -63,7 +62,7 @@ export default function AcademiaPage() {
     const supabase = createClient()
     supabase.auth.getUser().then(({ data }) => {
       const email = data.user?.email || null
-      setIsAdmin(email === ADMIN_EMAIL)
+      setIsAdmin(isAdminEmail(email))
       setUserId(data.user?.id || null)
     })
   }, [])

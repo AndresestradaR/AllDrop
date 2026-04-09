@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
-
-const ADMIN_EMAIL = 'trucosecomydrop@gmail.com'
+import { isAdmin } from '@/lib/admin'
 
 export async function POST(request: Request) {
   try {
@@ -13,7 +12,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    if (user.email !== ADMIN_EMAIL) {
+    if (!isAdmin(user.email)) {
       return NextResponse.json({ error: 'Solo administradores' }, { status: 403 })
     }
 

@@ -8,8 +8,7 @@ import {
   Check, X, Camera
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-
-const ADMIN_EMAIL = 'trucosecomydrop@gmail.com'
+import { isAdmin as isAdminEmail } from '@/lib/admin'
 
 interface Mentor {
   id: string
@@ -58,7 +57,7 @@ export default function AdminCoachingPage() {
   useEffect(() => {
     const supabase = createClient()
     supabase.auth.getUser().then(({ data }) => {
-      if (data.user?.email !== ADMIN_EMAIL) {
+      if (!isAdminEmail(data.user?.email)) {
         router.push('/dashboard')
         return
       }

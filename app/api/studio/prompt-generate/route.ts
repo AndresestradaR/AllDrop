@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { generateAIText, getAIKeys, requireAIKeys, extractJSON } from '@/lib/services/ai-text'
+import { isAdmin } from '@/lib/admin'
 
 export const maxDuration = 30
 
@@ -44,7 +45,7 @@ export async function POST(request: Request) {
     }
 
     // Admin-only: feature in development
-    if (user.email !== 'trucosecomydrop@gmail.com') {
+    if (!isAdmin(user.email)) {
       return NextResponse.json({ error: 'Esta herramienta estará disponible próximamente' }, { status: 403 })
     }
 

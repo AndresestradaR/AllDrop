@@ -6,7 +6,7 @@ import { Key, ExternalLink, Check, Loader2, Sparkles, Zap, Image as ImageIcon, P
 import toast from 'react-hot-toast'
 import { createClient } from '@/lib/supabase/client'
 
-const ADMIN_EMAIL = 'trucosecomydrop@gmail.com'
+import { isAdmin as isAdminEmail } from '@/lib/admin'
 
 export const dynamic = 'force-dynamic'
 
@@ -58,7 +58,7 @@ export default function SettingsPage() {
   useEffect(() => {
     fetchKeys()
     createClient().auth.getUser().then(({ data }) => {
-      if (data.user?.email === ADMIN_EMAIL) setIsAdmin(true)
+      if (isAdminEmail(data.user?.email)) setIsAdmin(true)
     })
   }, [])
 

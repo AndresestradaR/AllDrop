@@ -43,7 +43,7 @@ const LIP_SYNC_MODEL_DEFS = [
   { id: 'infinitalk' as LipSyncModel, nameKey: 'Infinitalk', descKey: 'lipSyncAdvanced' as const, apiModel: 'infinitalk/from-audio' },
 ]
 
-const ADMIN_EMAIL = 'trucosecomydrop@gmail.com'
+import { isAdmin as isAdminEmail } from '@/lib/admin'
 
 interface ToolDef {
   id: string
@@ -98,7 +98,7 @@ export function ToolsGrid({ initialTool, onBack }: ToolsGridProps = {}) {
   const audioPreviewRef = useRef<HTMLAudioElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const pollingRef = useRef<NodeJS.Timeout | null>(null)
-  const isAdmin = userEmail === ADMIN_EMAIL
+  const isAdmin = isAdminEmail(userEmail)
 
   // Lip Sync specific state
   const [lipSyncModel, setLipSyncModel] = useState<LipSyncModel>('kling')

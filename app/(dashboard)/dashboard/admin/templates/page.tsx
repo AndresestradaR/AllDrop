@@ -6,8 +6,7 @@ import { Button } from '@/components/ui'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
-
-const ADMIN_EMAIL = 'trucosecomydrop@gmail.com'
+import { isAdmin as isAdminEmail } from '@/lib/admin'
 
 // Map folder names to template categories
 const FOLDER_TO_CATEGORY: Record<string, string> = {
@@ -73,7 +72,7 @@ export default function AdminTemplatesPage() {
   useEffect(() => {
     const supabase = createClient()
     supabase.auth.getUser().then(({ data }) => {
-      if (data.user?.email === ADMIN_EMAIL) {
+      if (isAdminEmail(data.user?.email)) {
         setIsAdmin(true)
       } else {
         setIsAdmin(false)
