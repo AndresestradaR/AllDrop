@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils/cn'
 import { ArrowLeft, Sparkles, Loader2, UserCircle, Trash2, ChevronRight } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { useI18n } from '@/lib/i18n'
 import { StepperHeader } from './StepperHeader'
 import { Step1Design } from './Step1Design'
 import { Step2Realism } from './Step2Realism'
@@ -49,6 +50,9 @@ interface Influencer {
 type WizardView = 'list' | 'wizard' | 'summary' | 'board' | 'editor'
 
 export function InfluencerWizard({ onBack }: { onBack: () => void }) {
+  const { t } = useI18n()
+  const sinf = t.studio.influencer
+
   const [view, setView] = useState<WizardView>('list')
   const [currentStep, setCurrentStep] = useState(1)
   const [completedSteps, setCompletedSteps] = useState(0)
@@ -94,7 +98,7 @@ export function InfluencerWizard({ onBack }: { onBack: () => void }) {
       const res = await fetch(`/api/studio/influencer?id=${id}`, { method: 'DELETE' })
       if (res.ok) {
         setInfluencers(prev => prev.filter(i => i.id !== id))
-        toast.success('Eliminado')
+        toast.success(sinf.deleted)
       }
     } catch (err) {
       console.error('Delete error:', err)
@@ -197,7 +201,7 @@ export function InfluencerWizard({ onBack }: { onBack: () => void }) {
         body: JSON.stringify({ id: activeInfluencer.id, name: newName }),
       })
       setActiveInfluencer(prev => prev ? { ...prev, name: newName } : null)
-      toast.success('Nombre actualizado')
+      toast.success(sinf.nameUpdated)
       fetchInfluencers()
     } catch (err) {
       console.error('Error updating name:', err)
@@ -227,14 +231,14 @@ export function InfluencerWizard({ onBack }: { onBack: () => void }) {
   // HEADER for wizard view
   const getStepTitle = () => {
     switch (currentStep) {
-      case 1: return 'Diseña tu Influencer'
-      case 2: return 'Mejorar Realismo'
-      case 3: return 'Grid de Rostro'
-      case 4: return 'Grid de Cuerpo'
-      case 5: return 'Analisis Visual'
-      case 6: return 'Galeria de Contenido'
-      case 7: return 'Crear Video'
-      default: return 'Mi Influencer'
+      case 1: return sinf.steps.design
+      case 2: return sinf.steps.realism
+      case 3: return sinf.steps.faceGrid
+      case 4: return sinf.steps.bodyGrid
+      case 5: return sinf.steps.analysis
+      case 6: return sinf.steps.gallery
+      case 7: return sinf.steps.video
+      default: return sinf.title
     }
   }
 
@@ -256,8 +260,8 @@ export function InfluencerWizard({ onBack }: { onBack: () => void }) {
                 <span className="text-xl">👤</span>
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-text-primary">Mi Influencer</h2>
-                <p className="text-sm text-text-secondary">Tus personajes virtuales</p>
+                <h2 className="text-lg font-semibold text-text-primary">{sinf.title}</h2>
+                <p className="text-sm text-text-secondary">{sinf.subtitle}</p>
               </div>
             </div>
           </div>
@@ -266,14 +270,14 @@ export function InfluencerWizard({ onBack }: { onBack: () => void }) {
           <div className="flex-1 p-6 overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-semibold text-text-primary uppercase tracking-wide">
-                Mis Influencers ({influencers.length})
+                {sinf.myInfluencers} ({influencers.length})
               </h3>
               <button
                 onClick={handleCreateNew}
                 className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-hover text-background rounded-xl text-sm font-semibold transition-colors"
               >
                 <Sparkles className="w-4 h-4" />
-                Crear nuevo
+                {sinf.createNew}
               </button>
             </div>
 
@@ -284,14 +288,14 @@ export function InfluencerWizard({ onBack }: { onBack: () => void }) {
             ) : influencers.length === 0 ? (
               <div className="text-center py-16">
                 <UserCircle className="w-16 h-16 text-text-secondary mx-auto mb-4" />
-                <p className="text-text-secondary mb-2">No tienes influencers creados</p>
-                <p className="text-xs text-text-muted mb-4">Crea un personaje virtual consistente para tus videos y contenido</p>
+                <p className="text-text-secondary mb-2">{sinf.noInfluencers}</p>
+                <p className="text-xs text-text-muted mb-4">{sinf.noInfluencersDesc}</p>
                 <button
                   onClick={handleCreateNew}
                   className="inline-flex items-center gap-2 px-6 py-3 bg-accent hover:bg-accent-hover text-background rounded-xl font-semibold transition-colors"
                 >
                   <Sparkles className="w-5 h-5" />
-                  Crear Influencer
+                  {sinf.createInfluencer}
                 </button>
               </div>
             ) : (
@@ -328,7 +332,7 @@ export function InfluencerWizard({ onBack }: { onBack: () => void }) {
                           <div className="flex items-center gap-2 mt-2">
                             {isComplete ? (
                               <span className="text-[10px] px-2 py-0.5 bg-accent/15 text-accent rounded-full font-medium">
-                                Completo
+                                {sinf.complete}
                               </span>
                             ) : (
                               <span className="text-[10px] px-2 py-0.5 bg-amber-500/15 text-amber-400 rounded-full font-medium">
@@ -346,7 +350,7 @@ export function InfluencerWizard({ onBack }: { onBack: () => void }) {
                           className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-accent/10 hover:bg-accent/20 text-accent rounded-lg text-xs font-medium transition-all"
                         >
                           <ChevronRight className="w-3.5 h-3.5" />
-                          {isComplete ? 'Ver resumen' : 'Continuar'}
+                          {isComplete ? sinf.viewSummary : sinf.continue}
                         </button>
                       </div>
 

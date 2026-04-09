@@ -27,6 +27,7 @@ import {
   Wand2,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { useI18n } from '@/lib/i18n'
 
 // =============================================
 // TYPES
@@ -133,6 +134,9 @@ interface AutoPublisherToolProps {
 }
 
 export function AutoPublisherTool({ onBack }: AutoPublisherToolProps) {
+  const { t } = useI18n()
+  const sap = t.studio.autoPub
+
   const [view, setView] = useState<'list' | 'create' | 'edit' | 'runs'>('list')
   const [flows, setFlows] = useState<AutomationFlow[]>([])
   const [runs, setRuns] = useState<AutomationRun[]>([])
@@ -215,29 +219,29 @@ export function AutoPublisherTool({ onBack }: AutoPublisherToolProps) {
         setFlows(prev => prev.map(f =>
           f.id === flow.id ? { ...f, is_active: !f.is_active } : f
         ))
-        toast.success(flow.is_active ? 'Automatizacion pausada' : 'Automatizacion activada')
+        toast.success(flow.is_active ? sap.paused : sap.activated)
       }
     } catch {
-      toast.error('Error al cambiar estado')
+      toast.error(sap.stateError)
     }
   }
 
   const handleDeleteFlow = async (flowId: string) => {
-    if (!confirm('¿Eliminar esta automatizacion?')) return
+    if (!confirm(sap.deleteConfirm)) return
     try {
       const res = await fetch(`/api/studio/automations?id=${flowId}`, { method: 'DELETE' })
       if (res.ok) {
         setFlows(prev => prev.filter(f => f.id !== flowId))
-        toast.success('Automatizacion eliminada')
+        toast.success(sap.flowDeleted)
       }
     } catch {
-      toast.error('Error al eliminar')
+      toast.error(sap.deleteError)
     }
   }
 
   const handleExecuteNow = async (flowId: string) => {
     try {
-      toast.loading('Ejecutando flujo...', { id: 'execute-now' })
+      toast.loading(sap.executing, { id: 'execute-now' })
       const flow = flows.find(f => f.id === flowId)
       const isPremium = flow?.video_preset === 'premium'
       const res = await fetch('/api/studio/automations/execute-now', {
@@ -254,10 +258,10 @@ export function AutoPublisherTool({ onBack }: AutoPublisherToolProps) {
           pollVideoCompletion(data.taskId, data.runId, isPremium)
         }
       } else {
-        toast.error(data.error || 'Error al ejecutar', { id: 'execute-now' })
+        toast.error(data.error || sap.execError, { id: 'execute-now' })
       }
     } catch {
-      toast.error('Error al ejecutar', { id: 'execute-now' })
+      toast.error(sap.execError, { id: 'execute-now' })
     }
   }
 
@@ -316,13 +320,13 @@ export function AutoPublisherTool({ onBack }: AutoPublisherToolProps) {
       })
       const data = await res.json()
       if (res.ok) {
-        toast.success('Publicado exitosamente')
+        toast.success(sap.published)
         await loadRuns()
       } else {
         toast.error(data.error || 'Error')
       }
     } catch {
-      toast.error('Error al aprobar')
+      toast.error(sap.approveError)
     }
   }
 
@@ -333,10 +337,10 @@ export function AutoPublisherTool({ onBack }: AutoPublisherToolProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ run_id: runId, action: 'reject' }),
       })
-      toast.success('Rechazado')
+      toast.success(sap.rejected)
       await loadRuns()
     } catch {
-      toast.error('Error al rechazar')
+      toast.error(sap.rejectError)
     }
   }
 
@@ -347,10 +351,10 @@ export function AutoPublisherTool({ onBack }: AutoPublisherToolProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ run_id: runId, action: 'delete' }),
       })
-      toast.success('Eliminado')
+      toast.success(sap.itemDeleted)
       await loadRuns()
     } catch {
-      toast.error('Error al eliminar')
+      toast.error(sap.itemDeleteError)
     }
   }
 
@@ -405,7 +409,7 @@ export function AutoPublisherTool({ onBack }: AutoPublisherToolProps) {
                 <span className="text-xl">🚀</span>
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-text-primary">Auto Publicar</h2>
+                <h2 className="text-lg font-semibold text-text-primary">{sap.title}</h2>
                 <p className="text-sm text-text-secondary">
                   {flows.length} flujo{flows.length !== 1 ? 's' : ''} · {flows.filter(f => f.is_active).length} activo{flows.filter(f => f.is_active).length !== 1 ? 's' : ''}
                 </p>
@@ -418,7 +422,7 @@ export function AutoPublisherTool({ onBack }: AutoPublisherToolProps) {
             className="flex items-center gap-2 px-4 py-2.5 bg-accent hover:bg-accent-hover text-background rounded-xl text-sm font-semibold transition-all shadow-lg shadow-accent/25"
           >
             <Plus className="w-4 h-4" />
-            Nuevo flujo
+            {sap.newFlow}
           </button>
         </div>
 
@@ -434,7 +438,7 @@ export function AutoPublisherTool({ onBack }: AutoPublisherToolProps) {
                 <div>
                   <h3 className="text-xs font-semibold text-orange-400 uppercase tracking-wide mb-3 flex items-center gap-2">
                     <Eye className="w-3.5 h-3.5" />
-                    Esperando aprobacion ({pendingRuns.length})
+                    {sap.waitingApproval} ({pendingRuns.length})
                   </h3>
                   <div className="space-y-2">
                     {pendingRuns.map(run => (
@@ -453,19 +457,19 @@ export function AutoPublisherTool({ onBack }: AutoPublisherToolProps) {
               {/* Flows List */}
               <div>
                 <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-3">
-                  Automatizaciones
+                  {sap.automations}
                 </h3>
 
                 {flows.length === 0 ? (
                   <div className="text-center py-12">
                     <Zap className="w-12 h-12 text-text-muted mx-auto mb-3" />
-                    <p className="text-text-secondary font-medium mb-1">No hay automatizaciones</p>
-                    <p className="text-sm text-text-muted mb-4">Crea tu primer flujo para publicar videos automaticamente</p>
+                    <p className="text-text-secondary font-medium mb-1">{sap.noAutomations}</p>
+                    <p className="text-sm text-text-muted mb-4">{sap.noAutomationsDesc}</p>
                     <button
                       onClick={() => { setEditingFlow(null); setView('create') }}
                       className="px-4 py-2 bg-accent/10 text-accent rounded-xl text-sm font-medium hover:bg-accent/20 transition-colors"
                     >
-                      Crear automatizacion
+                      {sap.createAutomation}
                     </button>
                   </div>
                 ) : (

@@ -3,6 +3,7 @@
 import { useState, useMemo, createContext, useContext } from 'react'
 import { ArrowLeft, Sun, Moon } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
+import { useI18n } from '@/lib/i18n'
 
 // ── Theme context ────────────────────────────────────────
 type Theme = 'light' | 'dark'
@@ -215,6 +216,8 @@ function InsetBox({ children, className }: { children: React.ReactNode; classNam
 
 // ── Calculator mode ──────────────────────────────────────
 function CalculatorMode({ country }: { country: CountryConfig }) {
+  const { t } = useI18n()
+  const sc = t.studio.costeo
   const theme = useCalcTheme()
   const fmt = (n: number) => `${country.symbol} ${country.formatNumber(Math.round(n))}`
 
@@ -281,7 +284,7 @@ function CalculatorMode({ country }: { country: CountryConfig }) {
     <div className="space-y-5 overflow-y-auto max-h-[calc(100vh-280px)] pr-2 pb-6 custom-scrollbar">
       {/* Section 1: Product Costing */}
       <SectionCard>
-        <SectionHeader step={1} title="Costeo del Producto" subtitle="Precio de venta, producto y flete" />
+        <SectionHeader step={1} title={sc.title} subtitle={sc.subtitle} />
         <div className="flex flex-wrap gap-4 mb-4">
           <CurrencyInput label="💰 Costo Producto" value={cost} onChange={setCost} hint="Lo que pagas al proveedor" symbol={country.symbol} />
           <CurrencyInput label="🚚 Flete Promedio" value={shipping} onChange={setShipping} hint={country.shippingHint} symbol={country.symbol} />
@@ -289,7 +292,7 @@ function CalculatorMode({ country }: { country: CountryConfig }) {
         </div>
 
         <ResultCard
-          title="Tu Margen Bruto"
+          title={sc.grossMargin}
           value={`${calc.marginPct.toFixed(1)}% — ${marginLabel}`}
           subtitle={`Costo total: ${fmt(calc.totalCost)} · Ganancia por unidad: ${fmt(calc.profit)}`}
           variant={marginVariant as any}
@@ -303,7 +306,7 @@ function CalculatorMode({ country }: { country: CountryConfig }) {
 
       {/* Section 2: Sales Simulation */}
       <SectionCard>
-        <SectionHeader step={2} title="Simulación de Ventas" subtitle="Cancelaciones, devoluciones y margen bruto real" />
+        <SectionHeader step={2} title={sc.salesSim} subtitle={sc.salesSimSub} />
 
         <div className="flex flex-wrap gap-4 mb-4">
           <NumberInput label="📦 Pedidos / Día" value={ordersPerDay} onChange={setOrdersPerDay} />
@@ -328,10 +331,10 @@ function CalculatorMode({ country }: { country: CountryConfig }) {
 
       {/* Section 3: Ad Budget Calculator */}
       <SectionCard>
-        <SectionHeader step={3} title="Calculadora de Pauta" subtitle="CPA ideal y utilidad operacional" />
+        <SectionHeader step={3} title={sc.adCalc} subtitle={sc.adCalcSub} />
 
         <InsetBox className="mb-4">
-          <p className={cn('text-[10px] font-bold uppercase tracking-wider mb-1', theme === 'dark' && 'text-text-secondary')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>Resumen del Escenario</p>
+          <p className={cn('text-[10px] font-bold uppercase tracking-wider mb-1', theme === 'dark' && 'text-text-secondary')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>{sc.scenarioSummary}</p>
           <div className={cn('flex flex-wrap gap-x-4 gap-y-0.5 text-xs', theme === 'dark' && 'text-text-secondary')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>
             <span>Precio venta: <b style={theme === 'light' ? { color: '#111827' } : undefined} className={theme === 'dark' ? 'text-text-primary' : undefined}>{fmt(price)}</b></span>
             <span>Costo total: <b style={theme === 'light' ? { color: '#111827' } : undefined} className={theme === 'dark' ? 'text-text-primary' : undefined}>{fmt(calc.totalCost)}</b></span>
@@ -391,7 +394,7 @@ function CalculatorMode({ country }: { country: CountryConfig }) {
 
       {/* Golden Rules */}
       <SectionCard>
-        <p className={cn('text-xs font-bold uppercase tracking-wider mb-3', theme === 'dark' && 'text-text-secondary')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>{'📚'} Reglas de Oro</p>
+        <p className={cn('text-xs font-bold uppercase tracking-wider mb-3', theme === 'dark' && 'text-text-secondary')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>{'📚'} {sc.goldenRules}</p>
         <div className="grid grid-cols-3 gap-3">
           {[
             { emoji: '🎯', title: 'Regla del 50%', desc: 'Costo total = máximo 50% del precio de venta.' },
@@ -418,6 +421,8 @@ function CalculatorMode({ country }: { country: CountryConfig }) {
 
 // ── Real mode ────────────────────────────────────────────
 function RealMode({ country }: { country: CountryConfig }) {
+  const { t } = useI18n()
+  const sc = t.studio.costeo
   const theme = useCalcTheme()
   const fmt = (n: number) => `${country.symbol} ${country.formatNumber(Math.round(n))}`
 
@@ -511,7 +516,7 @@ function RealMode({ country }: { country: CountryConfig }) {
           </SectionCard>
 
           <SectionCard>
-            <SectionHeader step={4} title="Tu Rentabilidad Real" subtitle="Ingresos − costos − pauta" />
+            <SectionHeader step={4} title={sc.realProfitability} subtitle={sc.realProfitabilitySub} />
 
             <div className="grid grid-cols-2 gap-3 mb-3">
               <ResultCard title="Ingresos Entregados" value={fmt(calc.deliveredRevenue)} />

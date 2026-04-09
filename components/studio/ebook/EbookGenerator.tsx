@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react'
 import { ArrowLeft, Loader2, BookOpen } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { useI18n } from '@/lib/i18n'
 import ProductSelector from './ProductSelector'
 import IdeaSelector from './IdeaSelector'
 import TemplateSelector from './TemplateSelector'
@@ -26,6 +27,9 @@ interface EbookGeneratorProps {
 }
 
 export default function EbookGenerator({ onBack }: EbookGeneratorProps) {
+  const { t } = useI18n()
+  const se = t.studio.ebook
+
   // Wizard state
   const [step, setStep] = useState<WizardStep>('product')
   const [loading, setLoading] = useState(false)
@@ -80,7 +84,7 @@ export default function EbookGenerator({ onBack }: EbookGeneratorProps) {
 
       if (!res.ok) {
         const err = await res.json()
-        throw new Error(err.error || 'Error al analizar producto')
+        throw new Error(err.error || se.analyzeError)
       }
 
       const data = await res.json()
@@ -89,7 +93,7 @@ export default function EbookGenerator({ onBack }: EbookGeneratorProps) {
       setSuggestedTemplateCat(data.suggestedTemplate || suggestTemplate(p.name))
       setStep('idea')
     } catch (err: any) {
-      toast.error(err.message || 'Error al analizar producto')
+      toast.error(err.message || se.analyzeError)
     } finally {
       setLoading(false)
     }
@@ -127,14 +131,14 @@ export default function EbookGenerator({ onBack }: EbookGeneratorProps) {
 
       if (!res.ok) {
         const err = await res.json()
-        throw new Error(err.error || 'Error al generar estructura')
+        throw new Error(err.error || se.outlineError)
       }
 
       const data = await res.json()
       setOutline(data)
       setStep('outline')
     } catch (err: any) {
-      toast.error(err.message || 'Error al generar estructura')
+      toast.error(err.message || se.outlineError)
     } finally {
       setLoading(false)
     }
@@ -165,12 +169,12 @@ export default function EbookGenerator({ onBack }: EbookGeneratorProps) {
       })
 
       if (!res.ok) {
-        throw new Error('Error al iniciar generacion')
+        throw new Error(se.genError)
       }
 
       // Read SSE stream
       const reader = res.body?.getReader()
-      if (!reader) throw new Error('No se pudo leer la respuesta')
+      if (!reader) throw new Error(se.readError)
 
       const decoder = new TextDecoder()
       let buffer = ''
@@ -217,19 +221,19 @@ export default function EbookGenerator({ onBack }: EbookGeneratorProps) {
 
       // Stream ended without result — server likely timed out
       if (!gotResult) {
-        toast.error('La generacion tardo demasiado. Intenta con menos capitulos.')
+        toast.error(se.timeoutError)
         setCurrentGenStep({
           type: 'error',
-          message: 'El servidor agoto el tiempo. Intenta con menos capitulos (5-6).',
+          message: se.serverTimeout,
           progress: 0,
         })
       }
     } catch (err: any) {
       if (err.name === 'AbortError') return
-      toast.error(err.message || 'Error en la generacion')
+      toast.error(err.message || se.genStepError)
       setCurrentGenStep({
         type: 'error',
-        message: err.message || 'Error en la generacion',
+        message: err.message || se.genStepError,
         progress: 0,
       })
     }
@@ -256,12 +260,12 @@ export default function EbookGenerator({ onBack }: EbookGeneratorProps) {
   // Step indicator
   // ============================================
   const stepLabels: Record<WizardStep, string> = {
-    product: 'Producto',
-    idea: 'Idea',
-    template: 'Estilo',
-    outline: 'Estructura',
-    generating: 'Generando',
-    done: 'Listo',
+    product: se.steps.product,
+    idea: se.steps.idea,
+    template: se.steps.style,
+    outline: se.steps.structure,
+    generating: se.steps.generating,
+    done: se.steps.done,
   }
   const stepOrder: WizardStep[] = ['product', 'idea', 'template', 'outline', 'generating', 'done']
   const currentIdx = stepOrder.indexOf(step)
@@ -284,7 +288,7 @@ export default function EbookGenerator({ onBack }: EbookGeneratorProps) {
         <div className="flex-1">
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
             <BookOpen className="w-5 h-5 text-emerald-400" />
-            Generador de Ebooks
+            {se.title}
           </h2>
         </div>
       </div>
@@ -306,7 +310,7 @@ export default function EbookGenerator({ onBack }: EbookGeneratorProps) {
         <div className="flex flex-col items-center justify-center py-16 gap-4">
           <Loader2 className="w-10 h-10 text-emerald-400 animate-spin" />
           <p className="text-sm text-zinc-400">
-            {step === 'product' ? 'Analizando producto...' : 'Generando estructura...'}
+            {step === 'product' ? se.analyzing : se.generatingOutline}
           </p>
         </div>
       )}
