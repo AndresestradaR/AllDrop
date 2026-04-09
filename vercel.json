@@ -59,6 +59,8 @@
     }
   },
   "rewrites": [
+    { "source": "/api/health", "destination": "https://alldrop-shop-production.up.railway.app/api/health" },
+    { "source": "/api/webhooks/:path*", "destination": "https://alldrop-shop-production.up.railway.app/api/webhooks/:path*" },
     { "source": "/api/admin/:path*", "destination": "https://alldrop-shop-production.up.railway.app/api/admin/:path*" },
     { "source": "/api/auth/:path*", "destination": "https://alldrop-shop-production.up.railway.app/api/auth/:path*" },
     { "source": "/api/store/:path*", "destination": "https://alldrop-shop-production.up.railway.app/api/store/:path*" },
