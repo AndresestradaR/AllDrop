@@ -2262,7 +2262,7 @@ export default function ProductGeneratePage() {
             {Object.entries(sectionsByCategory).map(([category, sections]) => (
               <div key={category}>
                 <div className="flex items-center gap-2 mb-3">
-                  <h3 className="text-lg font-semibold text-text-primary capitalize">{category}</h3>
+                  <h3 className="text-lg font-semibold text-text-primary capitalize">{(() => { const cat = TEMPLATE_CATEGORY_IDS.find(c => c.id === category); return cat ? (t.editor as any)[cat.nameKey] || category : category })()}</h3>
                   <div className="h-px flex-1 bg-border" />
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
