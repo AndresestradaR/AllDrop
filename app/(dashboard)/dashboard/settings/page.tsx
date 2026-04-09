@@ -383,7 +383,7 @@ export default function SettingsPage() {
         <CardContent className="space-y-4">
           <div className="flex gap-2">
             <Input
-              type={showKeys ? "text" : "password"}
+              type="text"
               placeholder="AIzaSy..."
               value={googleKey.value}
               onChange={(e) => setGoogleKey(prev => ({ ...prev, value: e.target.value }))}
@@ -429,7 +429,7 @@ export default function SettingsPage() {
         <CardContent className="space-y-4">
           <div className="flex gap-2">
             <Input
-              type={showKeys ? "text" : "password"}
+              type="text"
               placeholder="sk-..."
               value={openaiKey.value}
               onChange={(e) => setOpenaiKey(prev => ({ ...prev, value: e.target.value }))}
@@ -475,7 +475,7 @@ export default function SettingsPage() {
         <CardContent className="space-y-4">
           <div className="flex gap-2">
             <Input
-              type={showKeys ? "text" : "password"}
+              type="text"
               placeholder="kie_..."
               value={kieKey.value}
               onChange={(e) => setKieKey(prev => ({ ...prev, value: e.target.value }))}
@@ -521,7 +521,7 @@ export default function SettingsPage() {
         <CardContent className="space-y-4">
           <div className="flex gap-2">
             <Input
-              type={showKeys ? "text" : "password"}
+              type="text"
               placeholder="fal_..."
               value={falKey.value}
               onChange={(e) => setFalKey(prev => ({ ...prev, value: e.target.value }))}
@@ -567,7 +567,7 @@ export default function SettingsPage() {
         <CardContent className="space-y-4">
           <div className="flex gap-2">
             <Input
-              type={showKeys ? "text" : "password"}
+              type="text"
               placeholder="Tu WaveSpeed API Key"
               value={wavespeedKey.value}
               onChange={(e) => setWavespeedKey(prev => ({ ...prev, value: e.target.value }))}
@@ -621,7 +621,7 @@ export default function SettingsPage() {
         <CardContent className="space-y-4">
           <div className="flex gap-2">
             <Input
-              type={showKeys ? "text" : "password"}
+              type="text"
               placeholder="apify_api_..."
               value={apifyKey.value}
               onChange={(e) => setApifyKey(prev => ({ ...prev, value: e.target.value }))}
@@ -668,7 +668,7 @@ export default function SettingsPage() {
           <CardContent className="space-y-4">
             <div className="flex gap-2">
               <Input
-                type={showKeys ? "text" : "password"}
+                type="text"
                 placeholder="..."
                 value={browserlessKey.value}
                 onChange={(e) => setBrowserlessKey(prev => ({ ...prev, value: e.target.value }))}
@@ -715,7 +715,7 @@ export default function SettingsPage() {
         <CardContent className="space-y-4">
           <div className="flex gap-2">
             <Input
-              type={showKeys ? "text" : "password"}
+              type="text"
               placeholder="sk_..."
               value={elevenlabsKey.value}
               onChange={(e) => setElevenlabsKey(prev => ({ ...prev, value: e.target.value }))}
@@ -778,7 +778,7 @@ export default function SettingsPage() {
           <div>
             <label className="text-xs text-text-secondary mb-1 block">Access Key ID</label>
             <Input
-              type={showKeys ? "text" : "password"}
+              type="text"
               placeholder="R2 Access Key ID"
               value={r2AccessKeyId}
               onChange={(e) => setR2AccessKeyId(e.target.value)}
@@ -787,7 +787,7 @@ export default function SettingsPage() {
           <div>
             <label className="text-xs text-text-secondary mb-1 block">Secret Access Key</label>
             <Input
-              type={showKeys ? "text" : "password"}
+              type="text"
               placeholder="R2 Secret Access Key"
               value={r2SecretAccessKey}
               onChange={(e) => setR2SecretAccessKey(e.target.value)}
@@ -870,7 +870,7 @@ export default function SettingsPage() {
           <div>
             <label className="block text-xs font-medium text-text-secondary mb-1">API Key *</label>
             <Input
-              type={showKeys ? "text" : "password"}
+              type="text"
               placeholder="Tu Publer API Key"
               value={publerApiKey.value}
               onChange={(e) => setPublerApiKey(prev => ({ ...prev, value: e.target.value }))}
@@ -943,7 +943,7 @@ export default function SettingsPage() {
           <div>
             <label className="block text-xs font-medium text-text-secondary mb-1">Meta Access Token *</label>
             <Input
-              type={showKeys ? "text" : "password"}
+              type="text"
               placeholder="Tu token de acceso de Meta"
               value={metaAccessToken.value}
               onChange={(e) => setMetaAccessToken(prev => ({ ...prev, value: e.target.value }))}
@@ -955,7 +955,7 @@ export default function SettingsPage() {
           <div>
             <label className="block text-xs font-medium text-text-secondary mb-1">Anthropic API Key (Claude) *</label>
             <Input
-              type={showKeys ? "text" : "password"}
+              type="text"
               placeholder="sk-ant-..."
               value={anthropicApiKey.value}
               onChange={(e) => setAnthropicApiKey(prev => ({ ...prev, value: e.target.value }))}
