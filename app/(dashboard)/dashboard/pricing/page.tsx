@@ -30,7 +30,7 @@ function PricingContent() {
   const [calcImages, setCalcImages] = useState(5)
   const [calcVideos, setCalcVideos] = useState(1)
 
-  const calcTotal = calcBanners * DROP_COSTS.banner + calcImages * DROP_COSTS.image + calcVideos * DROP_COSTS.video
+  const calcTotal = calcBanners * DROP_COSTS.image + calcImages * DROP_COSTS.image + calcVideos * DROP_COSTS.video
   const calcRemaining = userDrops - calcTotal
 
   useEffect(() => {
@@ -139,7 +139,7 @@ function PricingContent() {
         {PLANS.map((plan, i) => {
           const Icon = planIcons[i]
           const isCurrent = userPlan === plan.id
-          const bannersCount = Math.floor(plan.drops / DROP_COSTS.banner)
+          const bannersCount = Math.floor(plan.drops / DROP_COSTS.image)
           const imagesCount = Math.floor(plan.drops / DROP_COSTS.image)
           const videosCount = Math.floor(plan.drops / DROP_COSTS.video)
 
@@ -265,7 +265,7 @@ function PricingContent() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-text-primary">{t.pricing.banners}</p>
-                <p className="text-xs text-text-primary/50">{DROP_COSTS.banner} {t.pricing.perUnit}</p>
+                <p className="text-xs text-text-primary/50">{DROP_COSTS.image} {t.pricing.perUnit}</p>
               </div>
               <div className="flex items-center gap-3">
                 <button
@@ -281,7 +281,7 @@ function PricingContent() {
                 >
                   <Plus className="w-4 h-4 text-text-secondary" />
                 </button>
-                <span className="text-sm text-text-secondary w-20 text-right">{(calcBanners * DROP_COSTS.banner).toLocaleString()} drops</span>
+                <span className="text-sm text-text-secondary w-20 text-right">{(calcBanners * DROP_COSTS.image).toLocaleString()} drops</span>
               </div>
             </div>
 

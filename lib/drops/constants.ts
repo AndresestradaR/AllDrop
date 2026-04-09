@@ -55,8 +55,7 @@ export const CALL_TOPUPS = [
 ] as const
 
 export const DROP_COSTS = {
-  banner: 9,
-  image: 18,
+  image: 9,
   video: 250,
 } as const
 
