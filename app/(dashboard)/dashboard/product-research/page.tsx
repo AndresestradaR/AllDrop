@@ -10,7 +10,7 @@ import { Target, AlertCircle, Search, Users, TrendingUp, DollarSign, ExternalLin
 import toast from 'react-hot-toast'
 import Link from 'next/link'
 import { useI18n } from '@/lib/i18n'
-type TabType = 'catalog' | 'tiktok' | 'competitor'
+type TabType = 'catalog' | 'tiktok'
 
 // FastMoss Supabase config (separate from app's Supabase)
 const FASTMOSS_SUPABASE_URL = 'https://papfcbiswvdgalfteujm.supabase.co'
@@ -775,17 +775,6 @@ export default function ProductResearchPage() {
           <span className="text-xs bg-green-500/20 text-green-500 px-1.5 py-0.5 rounded">14k+</span>
         </button>
         <button
-          onClick={() => setActiveTab('competitor')}
-          className={`px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 ${
-            activeTab === 'competitor'
-              ? 'bg-accent text-background'
-              : 'text-text-secondary hover:text-text-primary hover:bg-background'
-          }`}
-        >
-          <Users className="w-4 h-4" />
-          {t.productResearch.analyzeCompetition}
-        </button>
-        <button
           onClick={() => setActiveTab('tiktok')}
           className={`px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 ${
             activeTab === 'tiktok'
@@ -932,8 +921,8 @@ export default function ProductResearchPage() {
         </div>
       )}
 
-      {/* Tab Content: Analizar Competencia */}
-      {activeTab === 'competitor' && (
+      {/* Analizar Competencia tab removed */}
+      {(false as boolean) && (activeTab as string) === 'competitor' && (
         <div className="space-y-6">
           {/* Search Form - Siempre visible excepto en resultados */}
           {analysisPhase !== 'results' && (
