@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { cn } from '@/lib/utils/cn'
+import { useI18n } from '@/lib/i18n'
 import {
   Star,
   Drama,
@@ -27,6 +28,8 @@ import CosteoCalculator from './CosteoCalculator'
 
 interface DropshippingTool {
   id: string
+  nameKey: string
+  descKey: string
   name: string
   description: string
   icon: React.ElementType
@@ -36,70 +39,14 @@ interface DropshippingTool {
 }
 
 const DROPSHIPPING_TOOLS: DropshippingTool[] = [
-  {
-    id: 'resena-ugc',
-    name: 'Resena UGC',
-    description: 'Genera resenas realistas con IA',
-    icon: Star,
-    color: 'from-yellow-500 to-amber-500',
-    emoji: '⭐',
-  },
-  {
-    id: 'deep-face',
-    name: 'Deep Face',
-    description: 'Cambia cara y voz de videos',
-    icon: Drama,
-    color: 'from-purple-500 to-pink-500',
-    emoji: '🎭',
-  },
-  {
-    id: 'clonar-viral',
-    name: 'Clonar Viral',
-    description: 'Recrea videos virales para tu producto',
-    icon: RefreshCw,
-    color: 'from-blue-500 to-cyan-500',
-    emoji: '🔄',
-  },
-  {
-    id: 'video-producto',
-    name: 'Video Producto',
-    description: 'Crea videos de tu producto con IA',
-    icon: Video,
-    color: 'from-red-500 to-orange-500',
-    emoji: '🎥',
-  },
-  {
-    id: 'mi-influencer',
-    name: 'Mi Influencer',
-    description: 'Crea y guarda personajes consistentes',
-    icon: UserCircle,
-    color: 'from-green-500 to-emerald-500',
-    emoji: '👤',
-  },
-  {
-    id: 'auto-publicar',
-    name: 'Auto Publicar',
-    description: 'Automatiza generacion y publicacion de videos',
-    icon: Zap,
-    color: 'from-orange-500 to-red-500',
-    emoji: '🚀',
-  },
-  {
-    id: 'ebook-generator',
-    name: 'Ebook Generator',
-    description: 'Crea ebooks profesionales para tus productos',
-    icon: BookOpen,
-    color: 'from-teal-500 to-cyan-500',
-    emoji: '📚',
-  },
-  {
-    id: 'costeo-calculator',
-    name: 'Calculadora Costeo',
-    description: 'Rentabilidad, CPA y simulación de ventas COD',
-    icon: Calculator,
-    color: 'from-amber-500 to-yellow-500',
-    emoji: '📊',
-  },
+  { id: 'resena-ugc', nameKey: 'resenaUgc', descKey: 'resenaUgc', name: 'Resena UGC', description: 'Genera resenas realistas con IA', icon: Star, color: 'from-yellow-500 to-amber-500', emoji: '⭐' },
+  { id: 'deep-face', nameKey: 'deepFace', descKey: 'deepFace', name: 'Deep Face', description: 'Cambia cara y voz de videos', icon: Drama, color: 'from-purple-500 to-pink-500', emoji: '🎭' },
+  { id: 'clonar-viral', nameKey: 'clonarViral', descKey: 'clonarViral', name: 'Clonar Viral', description: 'Recrea videos virales para tu producto', icon: RefreshCw, color: 'from-blue-500 to-cyan-500', emoji: '🔄' },
+  { id: 'video-producto', nameKey: 'videoProducto', descKey: 'videoProducto', name: 'Video Producto', description: 'Crea videos de tu producto con IA', icon: Video, color: 'from-red-500 to-orange-500', emoji: '🎥' },
+  { id: 'mi-influencer', nameKey: 'miInfluencer', descKey: 'miInfluencer', name: 'Mi Influencer', description: 'Crea y guarda personajes consistentes', icon: UserCircle, color: 'from-green-500 to-emerald-500', emoji: '👤' },
+  { id: 'auto-publicar', nameKey: 'autoPublicar', descKey: 'autoPublicar', name: 'Auto Publicar', description: 'Automatiza generacion y publicacion de videos', icon: Zap, color: 'from-orange-500 to-red-500', emoji: '🚀' },
+  { id: 'ebook-generator', nameKey: 'ebookGenerator', descKey: 'ebookGenerator', name: 'Ebook Generator', description: 'Crea ebooks profesionales para tus productos', icon: BookOpen, color: 'from-teal-500 to-cyan-500', emoji: '📚' },
+  { id: 'costeo-calculator', nameKey: 'costeoCalculator', descKey: 'costeoCalculator', name: 'Calculadora Costeo', description: 'Rentabilidad, CPA y simulación de ventas COD', icon: Calculator, color: 'from-amber-500 to-yellow-500', emoji: '📊' },
 ]
 
 type ActiveTool = typeof DROPSHIPPING_TOOLS[number]['id'] | null
@@ -2216,6 +2163,9 @@ interface DropshippingGridProps {
 
 export function DropshippingGrid({ initialTool, onBack: onBackProp }: DropshippingGridProps = {}) {
   const [activeTool, setActiveTool] = useState<ActiveTool>(initialTool || null)
+  const { t } = useI18n()
+  const tn = t.studio.toolNames as Record<string, string>
+  const td = t.studio.toolDescs as Record<string, string>
 
   const handleBack = () => {
     if (onBackProp) {
@@ -2266,9 +2216,9 @@ export function DropshippingGrid({ initialTool, onBack: onBackProp }: Dropshippi
   return (
     <div className="h-[calc(100vh-200px)] min-h-[600px]">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-text-primary mb-2">Herramientas Dropshipping</h2>
+        <h2 className="text-2xl font-bold text-text-primary mb-2">{t.studio.toolsHeading}</h2>
         <p className="text-text-secondary">
-          Herramientas de IA especializadas para crear contenido de ventas
+          {t.studio.toolsSubheading}
         </p>
       </div>
 
@@ -2299,9 +2249,9 @@ export function DropshippingGrid({ initialTool, onBack: onBackProp }: Dropshippi
               <span className="text-2xl">{tool.emoji}</span>
             </div>
             <h3 className="text-lg font-semibold text-text-primary mb-1">
-              {tool.name}
+              {tn[tool.nameKey] || tool.nameKey}
             </h3>
-            <p className="text-sm text-text-secondary">{tool.description}</p>
+            <p className="text-sm text-text-secondary">{td[tool.descKey] || tool.descKey}</p>
           </button>
         ))}
       </div>

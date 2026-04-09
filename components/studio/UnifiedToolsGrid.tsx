@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { ToolsGrid } from './ToolsGrid'
 import { DropshippingGrid } from './DropshippingGrid'
 import { cn } from '@/lib/utils/cn'
+import { useI18n } from '@/lib/i18n'
 import {
   Calculator,
   BookOpen,
@@ -17,87 +18,30 @@ import {
 
 type ToolSource = 'tools' | 'dropshipping'
 
-interface ToolCard {
+interface ToolDef {
   id: string
-  name: string
-  description: string
+  nameKey: string
+  descKey: string
   icon: React.ElementType
   color: string
   source: ToolSource
   outputsVideo?: boolean
 }
 
-const UNIFIED_TOOLS: ToolCard[] = [
-  {
-    id: 'costeo-calculator',
-    name: 'Calculadora Costeo',
-    description: 'Rentabilidad, CPA y simulación de ventas COD',
-    icon: Calculator,
-    color: 'from-amber-500 to-yellow-500',
-    source: 'dropshipping',
-  },
-  {
-    id: 'ebook-generator',
-    name: 'Ebook Generator',
-    description: 'Crea ebooks profesionales para tus productos',
-    icon: BookOpen,
-    color: 'from-teal-500 to-cyan-500',
-    source: 'dropshipping',
-  },
-  {
-    id: 'mi-influencer',
-    name: 'Mi Influencer',
-    description: 'Crea y guarda personajes consistentes',
-    icon: UserCircle,
-    color: 'from-green-500 to-emerald-500',
-    source: 'dropshipping',
-  },
-  {
-    id: 'upscale',
-    name: 'Mejorar Imagen',
-    description: 'Aumenta la resolucion (Upscaler)',
-    icon: Maximize2,
-    color: 'from-green-500 to-emerald-500',
-    source: 'tools',
-  },
-  {
-    id: 'remove-bg',
-    name: 'Quitar Fondo',
-    description: 'Elimina el fondo de imagenes',
-    icon: Eraser,
-    color: 'from-purple-500 to-pink-500',
-    source: 'tools',
-  },
-  {
-    id: 'mockup',
-    name: 'Mockup Generator',
-    description: 'Crea mockups de productos',
-    icon: Smartphone,
-    color: 'from-indigo-500 to-violet-500',
-    source: 'tools',
-  },
-  {
-    id: 'lip-sync',
-    name: 'Lip Sync',
-    description: 'Sincroniza labios con audio',
-    icon: Mic2,
-    color: 'from-rose-500 to-pink-500',
-    source: 'tools',
-    outputsVideo: true,
-  },
-  {
-    id: 'video-editor',
-    name: 'Editor de Video',
-    description: 'Corta, une clips y agrega musica de fondo',
-    icon: Film,
-    color: 'from-pink-500 to-rose-500',
-    source: 'tools',
-    outputsVideo: true,
-  },
+const UNIFIED_TOOLS: ToolDef[] = [
+  { id: 'costeo-calculator', nameKey: 'costeoCalculator', descKey: 'costeoCalculator', icon: Calculator, color: 'from-amber-500 to-yellow-500', source: 'dropshipping' },
+  { id: 'ebook-generator', nameKey: 'ebookGenerator', descKey: 'ebookGenerator', icon: BookOpen, color: 'from-teal-500 to-cyan-500', source: 'dropshipping' },
+  { id: 'mi-influencer', nameKey: 'miInfluencer', descKey: 'miInfluencer', icon: UserCircle, color: 'from-green-500 to-emerald-500', source: 'dropshipping' },
+  { id: 'upscale', nameKey: 'upscale', descKey: 'upscale', icon: Maximize2, color: 'from-green-500 to-emerald-500', source: 'tools' },
+  { id: 'remove-bg', nameKey: 'removeBg', descKey: 'removeBg', icon: Eraser, color: 'from-purple-500 to-pink-500', source: 'tools' },
+  { id: 'mockup', nameKey: 'mockup', descKey: 'mockup', icon: Smartphone, color: 'from-indigo-500 to-violet-500', source: 'tools' },
+  { id: 'lip-sync', nameKey: 'lipSync', descKey: 'lipSync', icon: Mic2, color: 'from-rose-500 to-pink-500', source: 'tools', outputsVideo: true },
+  { id: 'video-editor', nameKey: 'videoEditor', descKey: 'videoEditor', icon: Film, color: 'from-pink-500 to-rose-500', source: 'tools', outputsVideo: true },
 ]
 
 export function UnifiedToolsGrid() {
   const [activeTool, setActiveTool] = useState<{ id: string; source: ToolSource } | null>(null)
+  const { t } = useI18n()
 
   if (activeTool?.source === 'tools') {
     return (
@@ -117,12 +61,15 @@ export function UnifiedToolsGrid() {
     )
   }
 
+  const tn = t.studio.toolNames as Record<string, string>
+  const td = t.studio.toolDescs as Record<string, string>
+
   return (
     <div>
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-text-primary mb-2">Herramientas</h2>
+        <h2 className="text-2xl font-bold text-text-primary mb-2">{t.studio.toolsHeading}</h2>
         <p className="text-text-secondary">
-          Herramientas de IA para edición, contenido y negocio
+          {t.studio.toolsSubheading}
         </p>
       </div>
 
@@ -147,9 +94,9 @@ export function UnifiedToolsGrid() {
               <tool.icon className="w-6 h-6 text-white" />
             </div>
             <h3 className="text-lg font-semibold text-text-primary mb-1">
-              {tool.name}
+              {tn[tool.nameKey] || tool.nameKey}
             </h3>
-            <p className="text-sm text-text-secondary">{tool.description}</p>
+            <p className="text-sm text-text-secondary">{td[tool.descKey] || tool.descKey}</p>
           </button>
         ))}
       </div>

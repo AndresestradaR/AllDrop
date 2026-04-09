@@ -2,6 +2,7 @@
 
 import { cn } from '@/lib/utils/cn'
 import { ImageIcon, Video, Wrench } from 'lucide-react'
+import { useI18n } from '@/lib/i18n'
 
 export type StudioTab = 'imagen' | 'video' | 'herramientas'
 
@@ -10,13 +11,15 @@ interface StudioTabsProps {
   onTabChange: (tab: StudioTab) => void
 }
 
-const tabs: { id: StudioTab; label: string; icon: React.ElementType }[] = [
-  { id: 'imagen', label: 'Imagen', icon: ImageIcon },
-  { id: 'video', label: 'Video', icon: Video },
-  { id: 'herramientas', label: 'Herramientas', icon: Wrench },
-]
-
 export function StudioTabs({ activeTab, onTabChange }: StudioTabsProps) {
+  const { t } = useI18n()
+
+  const tabs: { id: StudioTab; label: string; icon: React.ElementType }[] = [
+    { id: 'imagen', label: t.studio.tabs.image, icon: ImageIcon },
+    { id: 'video', label: t.studio.tabs.video, icon: Video },
+    { id: 'herramientas', label: t.studio.tabs.tools, icon: Wrench },
+  ]
+
   return (
     <div className="flex items-center gap-1 p-1 bg-surface rounded-xl border border-border">
       {tabs.map((tab) => {
