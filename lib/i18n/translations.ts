@@ -318,6 +318,17 @@ const _translations = {
         downloadError: 'Error al descargar',
         downloadLinkError: 'Error al obtener enlace de descarga',
         urlNotAvailable: 'URL no disponible',
+        // EbookLibrary
+        myEbooks: 'Mis Ebooks',
+        ebooksGenerated: '{count} ebook{s} generado{s}',
+        createNewEbook: 'Crear nuevo ebook',
+        noEbooksYet: 'No tienes ebooks todavía',
+        noEbooksDesc: 'Crea tu primer ebook profesional con IA para complementar tus productos',
+        createFirstEbook: 'Crear mi primer ebook',
+        deleteConfirm: '¿Eliminar este ebook?',
+        deleted: 'Ebook eliminado',
+        download: 'Descargar',
+        chapterCount: 'cap.',
       },
       // Tools Grid (internal tools)
       toolsInternal: {
@@ -2135,6 +2146,17 @@ const _translations = {
         downloadError: 'Error downloading',
         downloadLinkError: 'Error getting download link',
         urlNotAvailable: 'URL not available',
+        // EbookLibrary
+        myEbooks: 'My Ebooks',
+        ebooksGenerated: '{count} ebook{s} generated',
+        createNewEbook: 'Create new ebook',
+        noEbooksYet: 'No ebooks yet',
+        noEbooksDesc: 'Create your first professional AI ebook to complement your products',
+        createFirstEbook: 'Create my first ebook',
+        deleteConfirm: 'Delete this ebook?',
+        deleted: 'Ebook deleted',
+        download: 'Download',
+        chapterCount: 'ch.',
       },
       // Tools Grid (internal tools)
       toolsInternal: {
@@ -3922,6 +3944,17 @@ const _translations = {
         downloadError: 'Erreur lors du téléchargement',
         downloadLinkError: 'Erreur lors de l\'obtention du lien de téléchargement',
         urlNotAvailable: 'URL non disponible',
+        // EbookLibrary
+        myEbooks: 'Mes Ebooks',
+        ebooksGenerated: '{count} ebook{s} généré{s}',
+        createNewEbook: 'Créer un nouvel ebook',
+        noEbooksYet: 'Pas encore d\'ebooks',
+        noEbooksDesc: 'Créez votre premier ebook professionnel avec l\'IA pour compléter vos produits',
+        createFirstEbook: 'Créer mon premier ebook',
+        deleteConfirm: 'Supprimer cet ebook ?',
+        deleted: 'Ebook supprimé',
+        download: 'Télécharger',
+        chapterCount: 'ch.',
       },
       // Tools Grid (internal tools)
       toolsInternal: {
@@ -5708,6 +5741,17 @@ const _translations = {
         downloadError: 'Errore nel download',
         downloadLinkError: 'Errore nell\'ottenere il link di download',
         urlNotAvailable: 'URL non disponibile',
+        // EbookLibrary
+        myEbooks: 'I Miei Ebook',
+        ebooksGenerated: '{count} ebook generato/i',
+        createNewEbook: 'Crea nuovo ebook',
+        noEbooksYet: 'Nessun ebook ancora',
+        noEbooksDesc: 'Crea il tuo primo ebook professionale con l\'IA per completare i tuoi prodotti',
+        createFirstEbook: 'Crea il mio primo ebook',
+        deleteConfirm: 'Eliminare questo ebook?',
+        deleted: 'Ebook eliminato',
+        download: 'Scarica',
+        chapterCount: 'cap.',
       },
       // Tools Grid (internal tools)
       toolsInternal: {
@@ -7494,6 +7538,17 @@ const _translations = {
         downloadError: 'Erro ao baixar',
         downloadLinkError: 'Erro ao obter link de download',
         urlNotAvailable: 'URL não disponível',
+        // EbookLibrary
+        myEbooks: 'Meus Ebooks',
+        ebooksGenerated: '{count} ebook{s} gerado{s}',
+        createNewEbook: 'Criar novo ebook',
+        noEbooksYet: 'Nenhum ebook ainda',
+        noEbooksDesc: 'Crie seu primeiro ebook profissional com IA para complementar seus produtos',
+        createFirstEbook: 'Criar meu primeiro ebook',
+        deleteConfirm: 'Excluir este ebook?',
+        deleted: 'Ebook excluído',
+        download: 'Baixar',
+        chapterCount: 'cap.',
       },
       // Tools Grid (internal tools)
       toolsInternal: {
@@ -9280,6 +9335,17 @@ const _translations = {
         downloadError: 'Fehler beim Download',
         downloadLinkError: 'Fehler beim Abrufen des Download-Links',
         urlNotAvailable: 'URL nicht verfügbar',
+        // EbookLibrary
+        myEbooks: 'Meine Ebooks',
+        ebooksGenerated: '{count} Ebook{s} generiert',
+        createNewEbook: 'Neues Ebook erstellen',
+        noEbooksYet: 'Noch keine Ebooks',
+        noEbooksDesc: 'Erstellen Sie Ihr erstes professionelles KI-Ebook als Ergänzung für Ihre Produkte',
+        createFirstEbook: 'Mein erstes Ebook erstellen',
+        deleteConfirm: 'Dieses Ebook löschen?',
+        deleted: 'Ebook gelöscht',
+        download: 'Herunterladen',
+        chapterCount: 'Kap.',
       },
       // Tools Grid (internal tools)
       toolsInternal: {

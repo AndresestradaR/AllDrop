@@ -14,7 +14,9 @@ export const maxDuration = 300 // 5 minutes
 // ============================================
 // SYSTEM PROMPT — Chapter Content Generation
 // ============================================
-const CHAPTER_SYSTEM_PROMPT = `Eres un escritor profesional de ebooks educativos en español para audiencia LATAM.
+// Language-aware system prompts for chapter content
+const CHAPTER_PROMPTS: Record<string, string> = {
+  es: `Eres un escritor profesional de ebooks educativos en español para audiencia LATAM.
 
 REGLAS:
 - Escribe contenido PROFESIONAL, educativo y atractivo
@@ -31,7 +33,102 @@ REGLAS:
 - Relaciona siempre el contenido con el uso práctico del producto
 - Incluye al menos un consejo práctico "pro tip" por capítulo
 
-Responde SOLO con el texto del capítulo. Sin títulos, sin headers, solo el contenido.`
+Responde SOLO con el texto del capítulo. Sin títulos, sin headers, solo el contenido.`,
+  en: `You are a professional educational ebook writer in English.
+
+RULES:
+- Write PROFESSIONAL, educational and engaging content
+- All in clear, modern English
+- Use well-developed paragraphs (3-5 sentences each)
+- Include relevant data, practical examples and actionable tips
+- Tone should be approachable yet expert, like a knowledgeable teacher
+- DO NOT use markdown, headers or bullets — only flowing paragraphs
+- DO NOT use emojis
+- Separate paragraphs with double line breaks
+- Each chapter should be 400-600 words (3-4 concise but substantial paragraphs)
+- Content must be UNIQUE and USEFUL — not generic filler
+- Be DIRECT and CONCISE — every sentence should add value
+- Always relate content to practical use of the product
+- Include at least one practical "pro tip" per chapter
+
+Respond ONLY with the chapter text. No titles, no headers, just the content.`,
+  fr: `Vous êtes un rédacteur professionnel d'ebooks éducatifs en français.
+
+RÈGLES:
+- Rédigez du contenu PROFESSIONNEL, éducatif et engageant
+- Tout en français clair et moderne
+- Utilisez des paragraphes bien développés (3-5 phrases chacun)
+- Incluez des données pertinentes, des exemples pratiques et des conseils actionnables
+- Le ton doit être accessible mais expert
+- N'utilisez PAS de markdown, titres ou listes — uniquement des paragraphes fluides
+- N'utilisez PAS d'emojis
+- Séparez les paragraphes par un double saut de ligne
+- Chaque chapitre doit contenir 400-600 mots
+- Le contenu doit être UNIQUE et UTILE
+- Soyez DIRECT et CONCIS
+- Reliez toujours le contenu à l'utilisation pratique du produit
+- Incluez au moins un conseil pratique par chapitre
+
+Répondez UNIQUEMENT avec le texte du chapitre. Sans titres, sans en-têtes, juste le contenu.`,
+  it: `Sei uno scrittore professionista di ebook educativi in italiano.
+
+REGOLE:
+- Scrivi contenuto PROFESSIONALE, educativo e coinvolgente
+- Tutto in italiano chiaro e moderno
+- Usa paragrafi ben sviluppati (3-5 frasi ciascuno)
+- Includi dati rilevanti, esempi pratici e consigli attuabili
+- Il tono deve essere accessibile ma esperto
+- NON usare markdown, titoli o elenchi — solo paragrafi fluidi
+- NON usare emoji
+- Separa i paragrafi con doppio a capo
+- Ogni capitolo deve avere 400-600 parole
+- Il contenuto deve essere UNICO e UTILE
+- Sii DIRETTO e CONCISO
+- Relaziona sempre il contenuto all'uso pratico del prodotto
+- Includi almeno un consiglio pratico per capitolo
+
+Rispondi SOLO con il testo del capitolo. Senza titoli, senza intestazioni, solo il contenuto.`,
+  pt: `Você é um escritor profissional de ebooks educacionais em português.
+
+REGRAS:
+- Escreva conteúdo PROFISSIONAL, educativo e envolvente
+- Tudo em português claro e moderno
+- Use parágrafos bem desenvolvidos (3-5 frases cada)
+- Inclua dados relevantes, exemplos práticos e dicas acionáveis
+- O tom deve ser acessível mas especializado
+- NÃO use markdown, títulos ou listas — apenas parágrafos fluidos
+- NÃO use emojis
+- Separe parágrafos com quebra de linha dupla
+- Cada capítulo deve ter 400-600 palavras
+- O conteúdo deve ser ÚNICO e ÚTIL
+- Seja DIRETO e CONCISO
+- Relacione sempre o conteúdo ao uso prático do produto
+- Inclua pelo menos uma dica prática por capítulo
+
+Responda APENAS com o texto do capítulo. Sem títulos, sem cabeçalhos, apenas o conteúdo.`,
+  de: `Sie sind ein professioneller Autor von Bildungs-Ebooks auf Deutsch.
+
+REGELN:
+- Schreiben Sie PROFESSIONELLEN, lehrreichen und ansprechenden Inhalt
+- Alles in klarem, modernem Deutsch
+- Verwenden Sie gut entwickelte Absätze (3-5 Sätze pro Absatz)
+- Fügen Sie relevante Daten, praktische Beispiele und umsetzbare Tipps ein
+- Der Ton sollte zugänglich aber fachkundig sein
+- Verwenden Sie KEIN Markdown, keine Überschriften oder Aufzählungen — nur fließende Absätze
+- Verwenden Sie KEINE Emojis
+- Trennen Sie Absätze mit doppeltem Zeilenumbruch
+- Jedes Kapitel sollte 400-600 Wörter umfassen
+- Der Inhalt muss EINZIGARTIG und NÜTZLICH sein
+- Seien Sie DIREKT und PRÄZISE
+- Beziehen Sie den Inhalt immer auf die praktische Nutzung des Produkts
+- Fügen Sie mindestens einen praktischen Tipp pro Kapitel ein
+
+Antworten Sie NUR mit dem Kapiteltext. Keine Titel, keine Überschriften, nur der Inhalt.`,
+}
+
+function getChapterPrompt(language?: string): string {
+  return CHAPTER_PROMPTS[language || 'es'] || CHAPTER_PROMPTS.en
+}
 
 // ============================================
 // Helper: Get image API keys from profile
@@ -123,12 +220,24 @@ export async function POST(request: Request) {
       template,
       logoUrl,
       productName,
+      language,
     } = body as {
       outline: EbookOutline
       template: EbookTemplate
       logoUrl?: string
       productName: string
+      language?: string
     }
+
+    const ebookMessages: Record<string, Record<string, string>> = {
+      es: { cover: 'Creando portada profesional...', writing: 'Escribiendo e ilustrando capitulo', writingFast: 'Escribiendo capitulo', fastMode: '(modo rapido)', compiling: 'Compilando PDF profesional...', done: 'Ebook generado exitosamente' },
+      en: { cover: 'Creating professional cover...', writing: 'Writing and illustrating chapter', writingFast: 'Writing chapter', fastMode: '(fast mode)', compiling: 'Compiling professional PDF...', done: 'Ebook generated successfully' },
+      fr: { cover: 'Création de la couverture...', writing: 'Écriture et illustration du chapitre', writingFast: 'Écriture du chapitre', fastMode: '(mode rapide)', compiling: 'Compilation du PDF...', done: 'Ebook généré avec succès' },
+      it: { cover: 'Creazione copertina professionale...', writing: 'Scrittura e illustrazione capitolo', writingFast: 'Scrittura capitolo', fastMode: '(modalità rapida)', compiling: 'Compilazione PDF professionale...', done: 'Ebook generato con successo' },
+      pt: { cover: 'Criando capa profissional...', writing: 'Escrevendo e ilustrando capítulo', writingFast: 'Escrevendo capítulo', fastMode: '(modo rápido)', compiling: 'Compilando PDF profissional...', done: 'Ebook gerado com sucesso' },
+      de: { cover: 'Erstelle professionelles Cover...', writing: 'Schreibe und illustriere Kapitel', writingFast: 'Schreibe Kapitel', fastMode: '(Schnellmodus)', compiling: 'Kompiliere professionelles PDF...', done: 'Ebook erfolgreich generiert' },
+    }
+    const msg = ebookMessages[language || 'es'] || ebookMessages.es
 
     if (!outline || !template || !outline.chapters?.length) {
       return NextResponse.json({ error: 'Outline y template son requeridos' }, { status: 400 })
@@ -161,7 +270,7 @@ export async function POST(request: Request) {
           currentStep++
           sendProgress({
             type: 'cover',
-            message: 'Creando portada profesional...',
+            message: msg.cover,
             progress: Math.round((currentStep / totalSteps) * 100),
           })
 
@@ -198,19 +307,30 @@ export async function POST(request: Request) {
               chapter: i + 1,
               totalChapters: chaptersWithContent.length,
               message: skipImages
-                ? `Escribiendo capitulo ${i + 1}: ${chapter.title} (modo rapido)...`
-                : `Escribiendo e ilustrando capitulo ${i + 1}: ${chapter.title}...`,
+                ? `${msg.writingFast} ${i + 1}: ${chapter.title} ${msg.fastMode}...`
+                : `${msg.writing} ${i + 1}: ${chapter.title}...`,
               progress: Math.round((currentStep / totalSteps) * 100),
             })
 
             // Run text + image IN PARALLEL for each chapter
+            // Language-aware user messages
+            const langInstructions: Record<string, { write: string; context: string; product: string; first: string; last: string }> = {
+              es: { write: 'Escribe el capítulo', context: 'Contexto del capítulo', product: 'Producto relacionado', first: 'Este es el primer capítulo — introduce los conceptos de forma accesible.', last: 'Este es el último capítulo — cierra con consejos finales y motivación.' },
+              en: { write: 'Write the chapter', context: 'Chapter context', product: 'Related product', first: 'This is the first chapter — introduce concepts in an accessible way.', last: 'This is the last chapter — close with final tips and motivation.' },
+              fr: { write: 'Écrivez le chapitre', context: 'Contexte du chapitre', product: 'Produit associé', first: 'C\'est le premier chapitre — introduisez les concepts de manière accessible.', last: 'C\'est le dernier chapitre — concluez avec des conseils finaux et de la motivation.' },
+              it: { write: 'Scrivi il capitolo', context: 'Contesto del capitolo', product: 'Prodotto correlato', first: 'Questo è il primo capitolo — introduci i concetti in modo accessibile.', last: 'Questo è l\'ultimo capitolo — chiudi con consigli finali e motivazione.' },
+              pt: { write: 'Escreva o capítulo', context: 'Contexto do capítulo', product: 'Produto relacionado', first: 'Este é o primeiro capítulo — introduza os conceitos de forma acessível.', last: 'Este é o último capítulo — feche com dicas finais e motivação.' },
+              de: { write: 'Schreiben Sie das Kapitel', context: 'Kapitelkontext', product: 'Verwandtes Produkt', first: 'Dies ist das erste Kapitel — führen Sie die Konzepte verständlich ein.', last: 'Dies ist das letzte Kapitel — schließen Sie mit abschließenden Tipps und Motivation.' },
+            }
+            const li = langInstructions[language || 'es'] || langInstructions.en
+
             const textPromise = generateAIText(textKeys, {
-              systemPrompt: CHAPTER_SYSTEM_PROMPT,
-              userMessage: `Escribe el capítulo "${chapter.title}" para el ebook "${outline.title}".
-Contexto del capítulo: ${chapter.summary}
-Producto relacionado: ${productName}
-${i === 0 ? 'Este es el primer capítulo — introduce los conceptos de forma accesible.' : ''}
-${i === chaptersWithContent.length - 1 ? 'Este es el último capítulo — cierra con consejos finales y motivación.' : ''}`,
+              systemPrompt: getChapterPrompt(language),
+              userMessage: `${li.write} "${chapter.title}" para el ebook "${outline.title}".
+${li.context}: ${chapter.summary}
+${li.product}: ${productName}
+${i === 0 ? li.first : ''}
+${i === chaptersWithContent.length - 1 ? li.last : ''}`,
               temperature: 0.7,
               googleFirst: true,
               googleModel: 'gemini-3.1-pro-preview',
@@ -253,7 +373,7 @@ ${i === chaptersWithContent.length - 1 ? 'Este es el último capítulo — cierr
           currentStep++
           sendProgress({
             type: 'compiling',
-            message: 'Compilando PDF profesional...',
+            message: msg.compiling,
             progress: Math.round((currentStep / totalSteps) * 100),
           })
 
@@ -268,6 +388,7 @@ ${i === chaptersWithContent.length - 1 ? 'Este es el último capítulo — cierr
               template,
               coverImageUrl: coverImageUrl || undefined,
               logoUrl: logoUrl || undefined,
+              language: language || 'en',
             }) as any
           )
           const pdfBuffer = Buffer.from(pdfArrayBuffer)
@@ -309,6 +430,26 @@ ${i === chaptersWithContent.length - 1 ? 'Este es el último capítulo — cierr
             // R2 optional
           }
 
+          // Upload cover image to Storage for gallery thumbnail
+          let coverStoragePath: string | null = null
+          if (coverImageUrl && coverImageUrl.startsWith('data:')) {
+            try {
+              const base64Match = coverImageUrl.match(/^data:[^;]+;base64,(.+)$/)
+              if (base64Match) {
+                const coverBuffer = Buffer.from(base64Match[1], 'base64')
+                const coverFileName = `ebooks/${user.id}/cover-${Date.now()}.png`
+                await supabase.storage.from('landing-images').upload(coverFileName, coverBuffer, {
+                  contentType: 'image/png', upsert: true,
+                })
+                const { data: coverUrlData } = supabase.storage.from('landing-images').getPublicUrl(coverFileName)
+                coverStoragePath = coverUrlData?.publicUrl || null
+                console.log(`[Ebook] Cover saved to Storage: ${coverStoragePath?.substring(0, 80)}`)
+              }
+            } catch (e: any) {
+              console.warn('[Ebook] Cover upload failed:', e.message)
+            }
+          }
+
           // Save to generations table
           const serviceClient = await createServiceClient()
           const { data: genData, error: genError } = await serviceClient
@@ -321,6 +462,7 @@ ${i === chaptersWithContent.length - 1 ? 'Este es el último capítulo — cierr
                 template: template.id,
                 chapters: chaptersWithContent.length,
                 pages: Math.min(20, chaptersWithContent.length * 3 + 5),
+                coverImageUrl: coverStoragePath || null,
               }),
               status: 'completed',
               generated_image_url: r2Url || storageRef,
@@ -335,7 +477,7 @@ ${i === chaptersWithContent.length - 1 ? 'Este es el último capítulo — cierr
           // ---- DONE ----
           sendProgress({
             type: 'done',
-            message: 'Ebook generado exitosamente',
+            message: msg.done,
             progress: 100,
           })
 

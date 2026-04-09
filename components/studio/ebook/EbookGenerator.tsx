@@ -4,6 +4,7 @@ import { useState, useRef } from 'react'
 import { ArrowLeft, Loader2, BookOpen } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useI18n } from '@/lib/i18n'
+import EbookLibrary from './EbookLibrary'
 import ProductSelector from './ProductSelector'
 import IdeaSelector from './IdeaSelector'
 import TemplateSelector from './TemplateSelector'
@@ -20,18 +21,18 @@ import type {
   GenerationStep,
 } from '@/lib/ebook/types'
 
-type WizardStep = 'product' | 'idea' | 'template' | 'outline' | 'generating' | 'done'
+type WizardStep = 'library' | 'product' | 'idea' | 'template' | 'outline' | 'generating' | 'done'
 
 interface EbookGeneratorProps {
   onBack: () => void
 }
 
 export default function EbookGenerator({ onBack }: EbookGeneratorProps) {
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
   const se = t.studio.ebook
 
   // Wizard state
-  const [step, setStep] = useState<WizardStep>('product')
+  const [step, setStep] = useState<WizardStep>('library')
   const [loading, setLoading] = useState(false)
 
   // Data
@@ -164,6 +165,7 @@ export default function EbookGenerator({ onBack }: EbookGeneratorProps) {
           template: selectedTemplate,
           logoUrl,
           productName: product!.name,
+          language: locale || 'en',
         }),
         signal: abortRef.current.signal,
       })
@@ -243,7 +245,7 @@ export default function EbookGenerator({ onBack }: EbookGeneratorProps) {
   // Reset
   // ============================================
   const handleNewEbook = () => {
-    setStep('product')
+    setStep('library')
     setProduct(null)
     setAnalysis('')
     setIdeas([])
@@ -260,6 +262,7 @@ export default function EbookGenerator({ onBack }: EbookGeneratorProps) {
   // Step indicator
   // ============================================
   const stepLabels: Record<WizardStep, string> = {
+    library: se.myEbooks,
     product: se.steps.product,
     idea: se.steps.idea,
     template: se.steps.style,
@@ -267,7 +270,7 @@ export default function EbookGenerator({ onBack }: EbookGeneratorProps) {
     generating: se.steps.generating,
     done: se.steps.done,
   }
-  const stepOrder: WizardStep[] = ['product', 'idea', 'template', 'outline', 'generating', 'done']
+  const stepOrder: WizardStep[] = ['library', 'product', 'idea', 'template', 'outline', 'generating', 'done']
   const currentIdx = stepOrder.indexOf(step)
 
   return (
@@ -275,7 +278,7 @@ export default function EbookGenerator({ onBack }: EbookGeneratorProps) {
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">
         <button
-          onClick={step === 'product' ? onBack : () => {
+          onClick={step === 'library' ? onBack : () => {
             if (step === 'generating') return // can't go back while generating
             const prevStep = stepOrder[Math.max(0, currentIdx - 1)]
             setStep(prevStep)
@@ -316,6 +319,8 @@ export default function EbookGenerator({ onBack }: EbookGeneratorProps) {
       )}
 
       {/* Steps */}
+      {step === 'library' && <EbookLibrary onCreateNew={() => setStep('product')} />}
+
       {!loading && step === 'product' && <ProductSelector onSelect={handleProductSelect} />}
 
       {!loading && step === 'idea' && (

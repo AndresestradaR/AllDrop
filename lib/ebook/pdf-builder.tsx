@@ -15,6 +15,20 @@ import type { EbookTemplate, EbookOutline, EbookChapter } from './types'
 // Uses @react-pdf/renderer for server-side PDF generation
 // ============================================
 
+// PDF label translations (used inside the PDF itself)
+const PDF_LABELS: Record<string, { badge: string; toc: string; intro: string; chapter: string; conclusion: string; backCover: string }> = {
+  es: { badge: 'Guia Completa', toc: 'Contenido', intro: 'Introduccion', chapter: 'Capitulo', conclusion: 'Conclusion', backCover: 'Gracias por leer esta guia. Esperamos que la informacion te sea de gran utilidad para aprovechar al maximo tu producto.' },
+  en: { badge: 'Complete Guide', toc: 'Contents', intro: 'Introduction', chapter: 'Chapter', conclusion: 'Conclusion', backCover: 'Thank you for reading this guide. We hope the information is useful for getting the most out of your product.' },
+  fr: { badge: 'Guide Complet', toc: 'Sommaire', intro: 'Introduction', chapter: 'Chapitre', conclusion: 'Conclusion', backCover: 'Merci d\'avoir lu ce guide. Nous esperons que les informations vous seront utiles pour profiter au maximum de votre produit.' },
+  it: { badge: 'Guida Completa', toc: 'Indice', intro: 'Introduzione', chapter: 'Capitolo', conclusion: 'Conclusione', backCover: 'Grazie per aver letto questa guida. Speriamo che le informazioni ti siano utili per sfruttare al meglio il tuo prodotto.' },
+  pt: { badge: 'Guia Completo', toc: 'Conteudo', intro: 'Introducao', chapter: 'Capitulo', conclusion: 'Conclusao', backCover: 'Obrigado por ler este guia. Esperamos que as informacoes sejam uteis para aproveitar ao maximo seu produto.' },
+  de: { badge: 'Kompletter Leitfaden', toc: 'Inhalt', intro: 'Einleitung', chapter: 'Kapitel', conclusion: 'Fazit', backCover: 'Vielen Dank fur das Lesen dieses Leitfadens. Wir hoffen, dass die Informationen Ihnen helfen, das Beste aus Ihrem Produkt herauszuholen.' },
+}
+
+function getPdfLabels(language?: string) {
+  return PDF_LABELS[language || 'es'] || PDF_LABELS.es
+}
+
 // Register default fonts (system fonts available in @react-pdf)
 Font.register({
   family: 'Helvetica',
@@ -347,14 +361,17 @@ function CoverPage({
   coverImageUrl,
   logoUrl,
   template,
+  language,
 }: {
   title: string
   subtitle: string
   coverImageUrl?: string
   logoUrl?: string
   template: EbookTemplate
+  language?: string
 }) {
   const styles = createStyles(template)
+  const labels = getPdfLabels(language)
 
   return (
     <Page size="A4" style={styles.coverPage}>
@@ -368,7 +385,7 @@ function CoverPage({
       )}
       <View style={styles.coverContent}>
         <View style={styles.coverBadge}>
-          <Text style={styles.coverBadgeText}>Guia Completa</Text>
+          <Text style={styles.coverBadgeText}>{labels.badge}</Text>
         </View>
         <Text style={styles.coverTitle}>{title}</Text>
         <View style={styles.coverDivider} />
@@ -385,15 +402,18 @@ function CoverPage({
 function TableOfContents({
   chapters,
   template,
+  language,
 }: {
   chapters: EbookChapter[]
   template: EbookTemplate
+  language?: string
 }) {
   const styles = createStyles(template)
+  const labels = getPdfLabels(language)
 
   return (
     <Page size="A4" style={styles.tocPage}>
-      <Text style={styles.tocHeader}>Contenido</Text>
+      <Text style={styles.tocHeader}>{labels.toc}</Text>
       <View style={styles.tocDivider} />
       {chapters.map((ch) => (
         <View key={ch.number} style={styles.tocItem}>
@@ -414,17 +434,20 @@ function IntroductionPage({
   content,
   template,
   ebookTitle,
+  language,
 }: {
   content: string
   template: EbookTemplate
   ebookTitle: string
+  language?: string
 }) {
   const styles = createStyles(template)
   const paragraphs = splitIntoParagraphs(content)
+  const labels = getPdfLabels(language)
 
   return (
     <Page size="A4" style={styles.page}>
-      <Text style={styles.introTitle}>Introduccion</Text>
+      <Text style={styles.introTitle}>{labels.intro}</Text>
       {paragraphs.map((p, i) => (
         <Text key={i} style={styles.introContent}>
           {p}
@@ -447,13 +470,16 @@ function ChapterPages({
   template,
   ebookTitle,
   startPage,
+  language,
 }: {
   chapter: EbookChapter
   template: EbookTemplate
   ebookTitle: string
   startPage: number
+  language?: string
 }) {
   const styles = createStyles(template)
+  const labels = getPdfLabels(language)
   const content = chapter.content || chapter.summary
   const paragraphs = splitIntoParagraphs(content)
 
@@ -485,7 +511,7 @@ function ChapterPages({
           {/* Chapter header only on first page */}
           {pageIdx === 0 && (
             <View style={styles.chapterHeader}>
-              <Text style={styles.chapterNumber}>Capitulo {chapter.number}</Text>
+              <Text style={styles.chapterNumber}>{labels.chapter} {chapter.number}</Text>
               <Text style={styles.chapterTitle}>{chapter.title}</Text>
               <View style={styles.chapterDivider} />
             </View>
@@ -525,18 +551,21 @@ function ConclusionPage({
   template,
   ebookTitle,
   pageNumber,
+  language,
 }: {
   content: string
   template: EbookTemplate
   ebookTitle: string
   pageNumber: number
+  language?: string
 }) {
   const styles = createStyles(template)
   const paragraphs = splitIntoParagraphs(content)
+  const labels = getPdfLabels(language)
 
   return (
     <Page size="A4" style={styles.page}>
-      <Text style={styles.introTitle}>Conclusion</Text>
+      <Text style={styles.introTitle}>{labels.conclusion}</Text>
       {paragraphs.map((p, i) => (
         <Text key={i} style={styles.introContent}>
           {p}
@@ -558,19 +587,21 @@ function BackCover({
   title,
   logoUrl,
   template,
+  language,
 }: {
   title: string
   logoUrl?: string
   template: EbookTemplate
+  language?: string
 }) {
   const styles = createStyles(template)
+  const labels = getPdfLabels(language)
 
   return (
     <Page size="A4" style={styles.backCoverPage}>
       <Text style={styles.backCoverTitle}>{title}</Text>
       <Text style={styles.backCoverText}>
-        Gracias por leer esta guia. Esperamos que la informacion te sea de gran utilidad
-        para aprovechar al maximo tu producto.
+        {labels.backCover}
       </Text>
       {logoUrl && <Image src={logoUrl} style={styles.backCoverLogo} />}
     </Page>
@@ -585,11 +616,13 @@ export function EbookDocument({
   template,
   coverImageUrl,
   logoUrl,
+  language,
 }: {
   outline: EbookOutline
   template: EbookTemplate
   coverImageUrl?: string
   logoUrl?: string
+  language?: string
 }) {
   // Calculate page numbers:
   // Cover (1) + TOC (2) + Intro (3) + chapters start at 4
@@ -608,14 +641,16 @@ export function EbookDocument({
         coverImageUrl={coverImageUrl}
         logoUrl={logoUrl}
         template={template}
+        language={language}
       />
 
-      <TableOfContents chapters={outline.chapters} template={template} />
+      <TableOfContents chapters={outline.chapters} template={template} language={language} />
 
       <IntroductionPage
         content={outline.introduction}
         template={template}
         ebookTitle={outline.title}
+        language={language}
       />
 
       {outline.chapters.map((chapter) => {
@@ -632,6 +667,7 @@ export function EbookDocument({
             template={template}
             ebookTitle={outline.title}
             startPage={startPage}
+            language={language}
           />
         )
       })}
@@ -641,9 +677,10 @@ export function EbookDocument({
         template={template}
         ebookTitle={outline.title}
         pageNumber={currentPage}
+        language={language}
       />
 
-      <BackCover title={outline.title} logoUrl={logoUrl} template={template} />
+      <BackCover title={outline.title} logoUrl={logoUrl} template={template} language={language} />
     </Document>
   )
 }
