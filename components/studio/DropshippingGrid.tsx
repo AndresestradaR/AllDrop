@@ -55,6 +55,8 @@ type ActiveTool = typeof DROPSHIPPING_TOOLS[number]['id'] | null
 // RESENA UGC COMPONENT (Video Version)
 // ============================================
 function ResenaUGCTool({ onBack }: { onBack: () => void }) {
+  const { t } = useI18n()
+  const sr = t.studio.resena
   // Product info
   const [productName, setProductName] = useState('')
   const [productBenefit, setProductBenefit] = useState('')
@@ -130,8 +132,8 @@ function ResenaUGCTool({ onBack }: { onBack: () => void }) {
         pollingRef.current = null
         setIsGenerating(false)
         setGenerationStep('')
-        setError('Tiempo de espera agotado. El video puede seguir procesandose.')
-        toast.error('Tiempo de espera agotado')
+        setError(sr.timeout)
+        toast.error(sr.timeout)
         return
       }
 
@@ -147,18 +149,18 @@ function ResenaUGCTool({ onBack }: { onBack: () => void }) {
           setResultVideoUrl(data.videoUrl)
           setIsGenerating(false)
           setGenerationStep('')
-          toast.success('Video generado exitosamente!')
+          toast.success(sr.genSuccess)
         } else if (data.status === 'failed' || (!data.success && data.error)) {
           clearInterval(pollingRef.current!)
           pollingRef.current = null
           setIsGenerating(false)
           setGenerationStep('')
-          setError(data.error || 'Error generando video')
-          toast.error(data.error || 'Error generando video')
+          setError(data.error || sr.genError)
+          toast.error(data.error || sr.genError)
         } else {
           // Still processing - update progress
           const progress = Math.min(Math.round((attempts / maxAttempts) * 100), 95)
-          setGenerationStep(`Generando video... ${progress}%`)
+          setGenerationStep(`${sr.generateVideo}... ${progress}%`)
         }
       } catch (err) {
         console.error('[ResenaUGC] Polling error:', err)
@@ -180,10 +182,10 @@ function ResenaUGCTool({ onBack }: { onBack: () => void }) {
       // Prepare image if uploaded
       let imageBase64: string | undefined
       if (imageSource === 'upload' && uploadedImage) {
-        setGenerationStep('Preparando imagen...')
+        setGenerationStep(sr.preparingImage)
         imageBase64 = await fileToBase64(uploadedImage)
       } else {
-        setGenerationStep('Iniciando generacion...')
+        setGenerationStep(sr.startingGen)
       }
 
       // Call the API
@@ -207,7 +209,7 @@ function ResenaUGCTool({ onBack }: { onBack: () => void }) {
       const data = await response.json()
 
       if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Error en la generacion')
+        throw new Error(data.error || sr.genError)
       }
 
       // Save generated data
@@ -216,19 +218,19 @@ function ResenaUGCTool({ onBack }: { onBack: () => void }) {
 
       // Start polling for video result
       if (data.taskId) {
-        setGenerationStep('Video en proceso de generacion...')
-        toast.success('Proceso iniciado! El video puede tardar varios minutos.')
+        setGenerationStep(sr.startingGen)
+        toast.success(sr.processStarted)
         pollVideoStatus(data.taskId)
       } else {
-        throw new Error('No se recibio taskId del servidor')
+        throw new Error(sr.noTaskId)
       }
 
     } catch (err: any) {
       console.error('[ResenaUGC] Error:', err)
       setIsGenerating(false)
       setGenerationStep('')
-      setError(err.message || 'Error desconocido')
-      toast.error(err.message || 'Error generando video')
+      setError(err.message || sr.unknownError)
+      toast.error(err.message || sr.genError)
     }
   }
 
@@ -269,8 +271,8 @@ function ResenaUGCTool({ onBack }: { onBack: () => void }) {
               <span className="text-xl">{tool.emoji}</span>
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-text-primary">{tool.name}</h2>
-              <p className="text-sm text-text-secondary">Genera videos de resenas UGC con IA</p>
+              <h2 className="text-lg font-semibold text-text-primary">{sr.title}</h2>
+              <p className="text-sm text-text-secondary">{sr.desc}</p>
             </div>
           </div>
         </div>
@@ -281,24 +283,24 @@ function ResenaUGCTool({ onBack }: { onBack: () => void }) {
           <div className="w-1/2 flex flex-col gap-4 overflow-y-auto pr-2">
             {/* Product Info */}
             <div className="space-y-3">
-              <h3 className="text-sm font-semibold text-text-primary uppercase tracking-wide">Producto</h3>
+              <h3 className="text-sm font-semibold text-text-primary uppercase tracking-wide">{sr.product}</h3>
               <div>
-                <label className="block text-sm font-medium text-text-secondary mb-1.5">Nombre del producto *</label>
+                <label className="block text-sm font-medium text-text-secondary mb-1.5">{sr.productName} *</label>
                 <input
                   type="text"
                   value={productName}
                   onChange={(e) => setProductName(e.target.value)}
-                  placeholder="Ej: Serum facial, Faja reductora..."
+                  placeholder={sr.productNamePh}
                   className="w-full px-4 py-2.5 bg-surface-elevated border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-accent text-sm"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-text-secondary mb-1.5">Beneficio principal</label>
+                <label className="block text-sm font-medium text-text-secondary mb-1.5">{sr.mainBenefit}</label>
                 <input
                   type="text"
                   value={productBenefit}
                   onChange={(e) => setProductBenefit(e.target.value)}
-                  placeholder="Ej: Reduce arrugas en 2 semanas..."
+                  placeholder={sr.mainBenefitPh}
                   className="w-full px-4 py-2.5 bg-surface-elevated border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-accent text-sm"
                 />
               </div>
@@ -306,7 +308,7 @@ function ResenaUGCTool({ onBack }: { onBack: () => void }) {
 
             {/* Divider */}
             <div className="border-t border-border pt-4">
-              <h3 className="text-sm font-semibold text-text-primary uppercase tracking-wide mb-3">Imagen de la Persona</h3>
+              <h3 className="text-sm font-semibold text-text-primary uppercase tracking-wide mb-3">{sr.personImage}</h3>
 
               {/* Image Source Toggle */}
               <div className="flex gap-2 mb-3">
@@ -317,7 +319,7 @@ function ResenaUGCTool({ onBack }: { onBack: () => void }) {
                     imageSource === 'generate' ? 'bg-accent text-background' : 'bg-surface-elevated text-text-secondary hover:text-text-primary'
                   )}
                 >
-                  Generar con IA
+                  {sr.generateAI}
                 </button>
                 <button
                   onClick={() => setImageSource('upload')}
@@ -326,7 +328,7 @@ function ResenaUGCTool({ onBack }: { onBack: () => void }) {
                     imageSource === 'upload' ? 'bg-accent text-background' : 'bg-surface-elevated text-text-secondary hover:text-text-primary'
                   )}
                 >
-                  Subir imagen
+                  {sr.uploadImage}
                 </button>
               </div>
 
@@ -346,8 +348,8 @@ function ResenaUGCTool({ onBack }: { onBack: () => void }) {
                     <label className="flex flex-col items-center justify-center h-32 border-2 border-dashed border-border hover:border-accent/50 rounded-xl cursor-pointer transition-colors">
                       <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
                       <UserCircle className="w-8 h-8 text-text-secondary mb-2" />
-                      <p className="text-sm text-text-secondary">Subir foto de la persona</p>
-                      <p className="text-xs text-text-secondary/70">Cara frontal, buena iluminacion</p>
+                      <p className="text-sm text-text-secondary">{sr.uploadFace}</p>
+                      <p className="text-xs text-text-secondary/70">{sr.faceHint}</p>
                     </label>
                   )}
                 </div>
@@ -355,12 +357,12 @@ function ResenaUGCTool({ onBack }: { onBack: () => void }) {
                 <>
                   {/* Image Model */}
                   <div className="mb-3">
-                    <label className="block text-sm font-medium text-text-secondary mb-1.5">Modelo de imagen</label>
+                    <label className="block text-sm font-medium text-text-secondary mb-1.5">{sr.imageModel}</label>
                     <div className="space-y-1.5">
                       {[
-                        { id: 'nano-banana', label: 'Nano Banana Pro', desc: 'Recomendado para caras realistas' },
-                        { id: 'gemini', label: 'Gemini 2.5 Flash Image', desc: 'Buena calidad general' },
-                        { id: 'imagen3', label: 'Imagen 3', desc: 'Alta calidad, mas lento' },
+                        { id: 'nano-banana', label: 'Nano Banana Pro', desc: sr.recommended },
+                        { id: 'gemini', label: 'Gemini 2.5 Flash Image', desc: sr.goodQuality },
+                        { id: 'imagen3', label: 'Imagen 3', desc: sr.highQuality },
                       ].map((model) => (
                         <button
                           key={model.id}
@@ -379,13 +381,13 @@ function ResenaUGCTool({ onBack }: { onBack: () => void }) {
 
                   {/* Persona */}
                   <div>
-                    <label className="block text-sm font-medium text-text-secondary mb-1.5">Persona del reviewer</label>
+                    <label className="block text-sm font-medium text-text-secondary mb-1.5">{sr.reviewerPerson}</label>
                     <div className="grid grid-cols-2 gap-1.5">
                       {[
-                        { id: 'mujer-joven', label: 'Mujer joven (18-30)' },
-                        { id: 'mujer-adulta', label: 'Mujer adulta (30-50)' },
-                        { id: 'hombre-joven', label: 'Hombre joven (18-30)' },
-                        { id: 'hombre-adulto', label: 'Hombre adulto (30-50)' },
+                        { id: 'mujer-joven', label: sr.youngWoman },
+                        { id: 'mujer-adulta', label: sr.adultWoman },
+                        { id: 'hombre-joven', label: sr.youngMan },
+                        { id: 'hombre-adulto', label: sr.adultMan },
                       ].map((option) => (
                         <button
                           key={option.id}
@@ -406,16 +408,16 @@ function ResenaUGCTool({ onBack }: { onBack: () => void }) {
 
             {/* Video Section */}
             <div className="border-t border-border pt-4">
-              <h3 className="text-sm font-semibold text-text-primary uppercase tracking-wide mb-3">Video</h3>
+              <h3 className="text-sm font-semibold text-text-primary uppercase tracking-wide mb-3">{sr.video}</h3>
 
               {/* Video Model */}
               <div className="mb-3">
-                <label className="block text-sm font-medium text-text-secondary mb-1.5">Modelo de video *</label>
+                <label className="block text-sm font-medium text-text-secondary mb-1.5">{sr.videoModel} *</label>
                 <div className="space-y-1.5">
                   {[
-                    { id: 'kling', label: 'Kling 2.6 Pro', desc: 'Recomendado - mejor para personas hablando' },
-                    { id: 'veo', label: 'Veo 3.1', desc: 'Alta calidad cinematografica' },
-                    { id: 'sora', label: 'Sora 2', desc: 'Bueno para creatividad' },
+                    { id: 'kling', label: 'Kling 2.6 Pro', desc: sr.recommended },
+                    { id: 'veo', label: 'Veo 3.1', desc: sr.highQuality },
+                    { id: 'sora', label: 'Sora 2', desc: sr.goodQuality },
                   ].map((model) => (
                     <button
                       key={model.id}
@@ -434,12 +436,12 @@ function ResenaUGCTool({ onBack }: { onBack: () => void }) {
 
               {/* Tone */}
               <div className="mb-3">
-                <label className="block text-sm font-medium text-text-secondary mb-1.5">Tono de la resena</label>
+                <label className="block text-sm font-medium text-text-secondary mb-1.5">{sr.toneLabel}</label>
                 <div className="flex gap-1.5">
                   {[
-                    { id: 'casual', label: 'Casual' },
-                    { id: 'entusiasta', label: 'Entusiasta' },
-                    { id: 'esceptico-convencido', label: 'Esceptico convencido' },
+                    { id: 'casual', label: sr.casual },
+                    { id: 'entusiasta', label: sr.enthusiastic },
+                    { id: 'esceptico-convencido', label: sr.skepticConvinced },
                   ].map((option) => (
                     <button
                       key={option.id}
@@ -457,12 +459,12 @@ function ResenaUGCTool({ onBack }: { onBack: () => void }) {
 
               {/* Duration */}
               <div>
-                <label className="block text-sm font-medium text-text-secondary mb-1.5">Duracion</label>
+                <label className="block text-sm font-medium text-text-secondary mb-1.5">{sr.durationLabel}</label>
                 <div className="flex gap-1.5">
                   {[
-                    { id: '15', label: '15 seg' },
-                    { id: '30', label: '30 seg' },
-                    { id: '60', label: '60 seg' },
+                    { id: '15', label: sr.sec15 },
+                    { id: '30', label: sr.sec30 },
+                    { id: '60', label: sr.sec60 },
                   ].map((dur) => (
                     <button
                       key={dur.id}
@@ -490,7 +492,7 @@ function ResenaUGCTool({ onBack }: { onBack: () => void }) {
                   className="w-4 h-4 rounded border-border text-accent focus:ring-accent"
                 />
                 <label htmlFor="customScript" className="text-sm font-medium text-text-primary cursor-pointer">
-                  Escribir guion personalizado
+                  {sr.customScript}
                 </label>
               </div>
 
@@ -506,7 +508,7 @@ function ResenaUGCTool({ onBack }: { onBack: () => void }) {
 
               {!useCustomScript && (
                 <p className="text-xs text-text-secondary/70">
-                  El guion se generara automaticamente basado en el producto, beneficio, tono y persona seleccionados.
+                  {sr.autoScriptHint}
                 </p>
               )}
             </div>
@@ -514,7 +516,7 @@ function ResenaUGCTool({ onBack }: { onBack: () => void }) {
 
           {/* Output Section */}
           <div className="w-1/2 flex flex-col">
-            <label className="block text-sm font-medium text-text-secondary mb-2">Video generado</label>
+            <label className="block text-sm font-medium text-text-secondary mb-2">{sr.videoGenerated}</label>
             <div className="flex-1 bg-surface-elevated rounded-xl overflow-hidden flex flex-col">
               {/* Video/Preview Area */}
               <div className="flex-1 flex items-center justify-center min-h-[300px]">
@@ -523,33 +525,33 @@ function ResenaUGCTool({ onBack }: { onBack: () => void }) {
                 ) : error ? (
                   <div className="text-center p-8">
                     <AlertCircle className="w-12 h-12 text-error mx-auto mb-3" />
-                    <p className="text-error font-medium">Error</p>
+                    <p className="text-error font-medium">{sr.error}</p>
                     <p className="text-sm text-text-secondary mt-1 max-w-xs">{error}</p>
                     <button
                       onClick={handleReset}
                       className="mt-4 px-4 py-2 text-sm text-accent hover:bg-accent/10 rounded-lg transition-colors"
                     >
-                      Intentar de nuevo
+                      {sr.tryAgain}
                     </button>
                   </div>
                 ) : isGenerating ? (
                   <div className="text-center p-8">
                     <Loader2 className="w-12 h-12 text-accent mx-auto mb-3 animate-spin" />
                     <p className="text-text-primary font-medium">{generationStep}</p>
-                    <p className="text-sm text-text-secondary mt-1">Esto puede tardar varios minutos</p>
+                    <p className="text-sm text-text-secondary mt-1">{sr.processing}</p>
                     {generatedFaceUrl && (
                       <div className="mt-4">
-                        <p className="text-xs text-text-secondary mb-2">Cara generada:</p>
-                        <img src={generatedFaceUrl} alt="Cara generada" className="w-20 h-20 rounded-lg mx-auto object-cover" />
+                        <p className="text-xs text-text-secondary mb-2">{sr.faceGenerated}</p>
+                        <img src={generatedFaceUrl} alt={sr.faceGenerated} className="w-20 h-20 rounded-lg mx-auto object-cover" />
                       </div>
                     )}
                   </div>
                 ) : (
                   <div className="text-center p-8">
                     <Video className="w-12 h-12 text-text-secondary mx-auto mb-3" />
-                    <p className="text-text-secondary">El video de la resena aparecera aqui</p>
+                    <p className="text-text-secondary">{sr.videoPlaceholder}</p>
                     <p className="text-xs text-text-secondary/70 mt-2">
-                      Persona hablando a camara con tu guion
+                      {sr.videoPlaceholderSub}
                     </p>
                   </div>
                 )}
@@ -558,7 +560,7 @@ function ResenaUGCTool({ onBack }: { onBack: () => void }) {
               {/* Generated Script Preview */}
               {generatedScript && (
                 <div className="border-t border-border p-4">
-                  <p className="text-xs font-medium text-text-secondary mb-1">Guion generado:</p>
+                  <p className="text-xs font-medium text-text-secondary mb-1">{sr.scriptGenerated}</p>
                   <p className="text-sm text-text-primary line-clamp-3">{generatedScript}</p>
                 </div>
               )}
@@ -570,16 +572,16 @@ function ResenaUGCTool({ onBack }: { onBack: () => void }) {
         <div className="px-6 py-4 border-t border-border flex items-center justify-between">
           <div className="flex items-center gap-4">
             <p className="text-xs text-text-secondary">
-              {videoModel === 'kling' && 'Kling 2.6 Pro - Mejor calidad para personas hablando'}
-              {videoModel === 'veo' && 'Veo 3.1 - Cinematografia de alta calidad'}
-              {videoModel === 'sora' && 'Sora 2 - Bueno para estilos creativos'}
+              {videoModel === 'kling' && `Kling 2.6 Pro - ${sr.recommended}`}
+              {videoModel === 'veo' && `Veo 3.1 - ${sr.highQuality}`}
+              {videoModel === 'sora' && `Sora 2 - ${sr.goodQuality}`}
             </p>
             {isGenerating && (
               <button
                 onClick={handleReset}
                 className="text-xs text-error hover:text-error/80 transition-colors"
               >
-                Cancelar
+                {sr.cancel}
               </button>
             )}
           </div>
@@ -590,7 +592,7 @@ function ResenaUGCTool({ onBack }: { onBack: () => void }) {
                 className="flex items-center gap-2 px-4 py-2 bg-surface-elevated border border-border rounded-lg text-sm font-medium text-text-primary hover:bg-border/50 transition-colors"
               >
                 <Download className="w-4 h-4" />
-                Descargar
+                {sr.download}
               </button>
             )}
             <button
@@ -606,12 +608,12 @@ function ResenaUGCTool({ onBack }: { onBack: () => void }) {
               {isGenerating ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  Generando...
+                  {sr.generateVideo}...
                 </>
               ) : (
                 <>
                   <Sparkles className="w-4 h-4" />
-                  Generar Video
+                  {sr.generateVideo}
                 </>
               )}
             </button>
@@ -626,6 +628,8 @@ function ResenaUGCTool({ onBack }: { onBack: () => void }) {
 // DEEP FACE COMPONENT
 // ============================================
 function DeepFaceTool({ onBack }: { onBack: () => void }) {
+  const { t } = useI18n()
+  const df = t.studio.deepFace
   // File states (for preview)
   const [sourceVideo, setSourceVideo] = useState<File | null>(null)
   const [targetFace, setTargetFace] = useState<File | null>(null)
@@ -689,15 +693,15 @@ function DeepFaceTool({ onBack }: { onBack: () => void }) {
     // Validate video format (KIE supports .mp4/.mov)
     const validVideoTypes = ['video/mp4', 'video/quicktime', 'video/x-matroska']
     if (!validVideoTypes.includes(file.type)) {
-      toast.error('Formato no soportado. Usa MP4 o MOV.')
-      setError('Formato de video no soportado. Usa MP4 o MOV.')
+      toast.error(df.formatError)
+      setError(df.formatError)
       return
     }
 
     // Validate size (max 100MB)
     if (file.size > 100 * 1024 * 1024) {
-      toast.error('Video muy grande. Máximo 100MB.')
-      setError('Video muy grande. Máximo 100MB.')
+      toast.error(df.videoTooLarge)
+      setError(df.videoTooLarge)
       return
     }
 
@@ -706,17 +710,17 @@ function DeepFaceTool({ onBack }: { onBack: () => void }) {
     setResultVideoUrl(null)
     setError(null)
     setIsUploadingVideo(true)
-    setUploadProgress('Subiendo video...')
+    setUploadProgress(df.uploadingVideo)
 
     try {
       const url = await uploadToSupabase(file, 'deep-face/videos')
       setVideoUrl(url)
       setUploadProgress('')
-      toast.success('Video subido correctamente')
+      toast.success(df.videoUploaded)
     } catch (err: any) {
-      setError(err.message || 'Error al subir video')
+      setError(err.message || df.uploadError)
       setSourceVideo(null)
-      toast.error('Error al subir video')
+      toast.error(df.uploadError)
     } finally {
       setIsUploadingVideo(false)
     }
@@ -729,15 +733,15 @@ function DeepFaceTool({ onBack }: { onBack: () => void }) {
     // Validate image format (KIE supports .jpg/.jpeg/.png)
     const validImageTypes = ['image/jpeg', 'image/png', 'image/jpg']
     if (!validImageTypes.includes(file.type)) {
-      toast.error('Formato no soportado. Usa JPG o PNG.')
-      setError('Formato de imagen no soportado. Usa JPG o PNG.')
+      toast.error(df.imgFormatError)
+      setError(df.imgFormatError)
       return
     }
 
     // Validate size (max 10MB)
     if (file.size > 10 * 1024 * 1024) {
-      toast.error('Imagen muy grande. Máximo 10MB.')
-      setError('Imagen muy grande. Máximo 10MB.')
+      toast.error(df.imgTooLarge)
+      setError(df.imgTooLarge)
       return
     }
 
@@ -746,17 +750,17 @@ function DeepFaceTool({ onBack }: { onBack: () => void }) {
     setResultVideoUrl(null)
     setError(null)
     setIsUploadingFace(true)
-    setUploadProgress('Subiendo imagen...')
+    setUploadProgress(df.uploadingImage)
 
     try {
       const url = await uploadToSupabase(file, 'deep-face/faces')
       setFaceUrl(url)
       setUploadProgress('')
-      toast.success('Imagen subida correctamente')
+      toast.success(df.imgUploaded)
     } catch (err: any) {
-      setError(err.message || 'Error al subir imagen')
+      setError(err.message || df.imgUploadError)
       setTargetFace(null)
-      toast.error('Error al subir imagen')
+      toast.error(df.imgUploadError)
     } finally {
       setIsUploadingFace(false)
     }
@@ -789,13 +793,13 @@ function DeepFaceTool({ onBack }: { onBack: () => void }) {
         }
 
         if (data.error || data.status === 'failed') {
-          setError(data.error || 'Error al procesar video')
+          setError(data.error || df.processError)
           setIsProcessing(false)
           setProcessingStatus('')
           return
         }
 
-        setProcessingStatus(`Procesando... (${Math.floor(attempts * 5 / 60)}:${String((attempts * 5) % 60).padStart(2, '0')})`)
+        setProcessingStatus(`${df.processingVideo} (${Math.floor(attempts * 5 / 60)}:${String((attempts * 5) % 60).padStart(2, '0')})`)
         await new Promise(r => setTimeout(r, 5000))
         attempts++
       } catch (err) {
@@ -805,7 +809,7 @@ function DeepFaceTool({ onBack }: { onBack: () => void }) {
       }
     }
 
-    setError('Tiempo de espera agotado')
+    setError(df.timeoutError)
     setIsProcessing(false)
     setProcessingStatus('')
   }
@@ -813,14 +817,14 @@ function DeepFaceTool({ onBack }: { onBack: () => void }) {
   const handleProcess = async () => {
     // Verify URLs are ready (files uploaded to Supabase)
     if (!videoUrl || !faceUrl) {
-      setError('Espera a que los archivos terminen de subir')
+      setError(df.waitUpload)
       return
     }
 
     setIsProcessing(true)
     setError(null)
     setResultVideoUrl(null)
-    setProcessingStatus('Iniciando procesamiento...')
+    setProcessingStatus(df.startingProcess)
 
     try {
       // Send only URLs to backend (small JSON payload, no file data)
@@ -842,15 +846,15 @@ function DeepFaceTool({ onBack }: { onBack: () => void }) {
       const data = await res.json()
 
       if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Error al procesar')
+        throw new Error(data.error || df.processError)
       }
 
       if (data.taskId) {
-        setProcessingStatus('Procesando video con IA...')
+        setProcessingStatus(df.processingVideo)
         await pollStatus(data.taskId)
       }
     } catch (err: any) {
-      setError(err.message || 'Error al procesar')
+      setError(err.message || df.processError)
       setIsProcessing(false)
       setProcessingStatus('')
     }
@@ -872,8 +876,8 @@ function DeepFaceTool({ onBack }: { onBack: () => void }) {
               <span className="text-xl">{tool.emoji}</span>
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-text-primary">{tool.name}</h2>
-              <p className="text-sm text-text-secondary">{tool.description}</p>
+              <h2 className="text-lg font-semibold text-text-primary">{df.title}</h2>
+              <p className="text-sm text-text-secondary">{df.title}</p>
             </div>
           </div>
         </div>
@@ -885,7 +889,7 @@ function DeepFaceTool({ onBack }: { onBack: () => void }) {
             {/* Video Upload */}
             <div>
               <label className="block text-sm font-medium text-text-secondary mb-2">
-                Video original *
+                {df.videoOriginal} *
                 {videoUrl && <Check className="inline w-4 h-4 text-green-500 ml-2" />}
               </label>
               {sourceVideo ? (
@@ -897,7 +901,7 @@ function DeepFaceTool({ onBack }: { onBack: () => void }) {
                   {isUploadingVideo && (
                     <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center">
                       <Loader2 className="w-8 h-8 text-white animate-spin mb-2" />
-                      <span className="text-white text-xs">Subiendo video...</span>
+                      <span className="text-white text-xs">{df.uploadingVideo}</span>
                     </div>
                   )}
                   {!isUploadingVideo && (
@@ -916,7 +920,7 @@ function DeepFaceTool({ onBack }: { onBack: () => void }) {
                 <label className="flex flex-col items-center justify-center h-32 border-2 border-dashed border-border hover:border-accent/50 rounded-xl cursor-pointer transition-colors">
                   <input type="file" accept="video/*" className="hidden" onChange={handleVideoUpload} />
                   <Video className="w-8 h-8 text-text-secondary mb-2" />
-                  <p className="text-sm text-text-secondary">Subir video</p>
+                  <p className="text-sm text-text-secondary">{df.uploadVideo}</p>
                 </label>
               )}
             </div>
@@ -924,7 +928,7 @@ function DeepFaceTool({ onBack }: { onBack: () => void }) {
             {/* Face Upload */}
             <div>
               <label className="block text-sm font-medium text-text-secondary mb-2">
-                Cara destino *
+                {df.targetFace} *
                 {faceUrl && <Check className="inline w-4 h-4 text-green-500 ml-2" />}
               </label>
               {targetFace ? (
@@ -937,7 +941,7 @@ function DeepFaceTool({ onBack }: { onBack: () => void }) {
                   {isUploadingFace && (
                     <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center">
                       <Loader2 className="w-8 h-8 text-white animate-spin mb-2" />
-                      <span className="text-white text-xs">Subiendo imagen...</span>
+                      <span className="text-white text-xs">{df.uploadingImage}</span>
                     </div>
                   )}
                   {!isUploadingFace && (
@@ -953,7 +957,7 @@ function DeepFaceTool({ onBack }: { onBack: () => void }) {
                 <label className="flex flex-col items-center justify-center h-32 border-2 border-dashed border-border hover:border-accent/50 rounded-xl cursor-pointer transition-colors">
                   <input type="file" accept="image/*" className="hidden" onChange={handleFaceUpload} />
                   <UserCircle className="w-8 h-8 text-text-secondary mb-2" />
-                  <p className="text-sm text-text-secondary">Subir imagen de cara</p>
+                  <p className="text-sm text-text-secondary">{df.uploadFaceImage}</p>
                 </label>
               )}
             </div>
@@ -961,7 +965,7 @@ function DeepFaceTool({ onBack }: { onBack: () => void }) {
             {/* Orientation Selector */}
             <div>
               <label className="block text-sm font-medium text-text-secondary mb-2">
-                Orientación del personaje
+                {df.orientation}
               </label>
               <div className="grid grid-cols-2 gap-2">
                 <button
@@ -973,7 +977,7 @@ function DeepFaceTool({ onBack }: { onBack: () => void }) {
                       : 'bg-surface-elevated text-text-secondary hover:bg-border/50'
                   )}
                 >
-                  Desde video
+                  {df.fromVideo}
                 </button>
                 <button
                   onClick={() => setOrientation('image')}
@@ -984,18 +988,18 @@ function DeepFaceTool({ onBack }: { onBack: () => void }) {
                       : 'bg-surface-elevated text-text-secondary hover:bg-border/50'
                   )}
                 >
-                  Desde imagen
+                  {df.fromImage}
                 </button>
               </div>
               <p className="text-xs text-text-secondary mt-1">
-                {orientation === 'video' ? 'Usa la orientación del video original' : 'Usa la orientación de la imagen de cara'}
+                {orientation === 'video' ? df.orientVideoHint : df.orientImageHint}
               </p>
             </div>
 
             {/* Quality Selector */}
             <div>
               <label className="block text-sm font-medium text-text-secondary mb-2">
-                Calidad de salida
+                {df.outputQuality}
               </label>
               <div className="grid grid-cols-2 gap-2">
                 <button
@@ -1026,16 +1030,16 @@ function DeepFaceTool({ onBack }: { onBack: () => void }) {
             {/* Prompt (Optional) */}
             <div>
               <label className="block text-sm font-medium text-text-secondary mb-2">
-                Prompt (opcional)
+                {df.promptOptional}
               </label>
               <textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value.slice(0, 2500))}
-                placeholder="Describe movimientos o acciones adicionales..."
+                placeholder={df.promptPh}
                 className="w-full h-20 px-3 py-2 bg-surface-elevated border border-border rounded-lg text-text-primary placeholder:text-text-secondary/50 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-accent/50"
               />
               <p className="text-xs text-text-secondary mt-1">
-                {prompt.length}/2500 caracteres
+                {prompt.length}/2500 {df.chars}
               </p>
             </div>
           </div>
@@ -1043,7 +1047,7 @@ function DeepFaceTool({ onBack }: { onBack: () => void }) {
           {/* Output Section */}
           <div className="flex-1 flex flex-col">
             <label className="block text-sm font-medium text-text-secondary mb-2">
-              Video resultado
+              {df.videoResult}
             </label>
             <div className="flex-1 bg-surface-elevated rounded-xl overflow-hidden flex items-center justify-center">
               {resultVideoUrl ? (
@@ -1053,8 +1057,8 @@ function DeepFaceTool({ onBack }: { onBack: () => void }) {
                   {isProcessing ? (
                     <>
                       <Loader2 className="w-12 h-12 text-accent mx-auto mb-3 animate-spin" />
-                      <p className="text-text-primary font-medium">Procesando video...</p>
-                      <p className="text-sm text-text-secondary mt-1">{processingStatus || 'Esto puede tardar varios minutos'}</p>
+                      <p className="text-text-primary font-medium">{df.processingVideo}</p>
+                      <p className="text-sm text-text-secondary mt-1">{processingStatus || df.processingHint}</p>
                     </>
                   ) : error ? (
                     <>
@@ -1067,7 +1071,7 @@ function DeepFaceTool({ onBack }: { onBack: () => void }) {
                   ) : (
                     <>
                       <Drama className="w-12 h-12 text-text-secondary mx-auto mb-3" />
-                      <p className="text-text-secondary">El video procesado aparecerá aquí</p>
+                      <p className="text-text-secondary">{df.resultPlaceholder}</p>
                     </>
                   )}
                 </div>
@@ -1083,11 +1087,11 @@ function DeepFaceTool({ onBack }: { onBack: () => void }) {
             {(isUploadingVideo || isUploadingFace) && (
               <span className="flex items-center gap-2">
                 <Loader2 className="w-4 h-4 animate-spin" />
-                {uploadProgress || 'Subiendo archivos...'}
+                {uploadProgress || df.uploadingVideo}
               </span>
             )}
             {!isUploadingVideo && !isUploadingFace && sourceVideo && targetFace && !videoUrl && !faceUrl && (
-              <span className="text-amber-500">Esperando subida...</span>
+              <span className="text-amber-500">{df.waitUpload}</span>
             )}
           </div>
 
@@ -1104,12 +1108,12 @@ function DeepFaceTool({ onBack }: { onBack: () => void }) {
             {isProcessing ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                {processingStatus || 'Procesando...'}
+                {processingStatus || df.processingVideo}
               </>
             ) : (
               <>
                 <Sparkles className="w-4 h-4" />
-                Procesar Video
+                {df.processVideo}
               </>
             )}
           </button>
@@ -1134,6 +1138,8 @@ interface CloneInfluencer {
 }
 
 function ClonarViralTool({ onBack }: { onBack: () => void }) {
+  const { t } = useI18n()
+  const cv = t.studio.clonarViral
   const [step, setStep] = useState<CloneStep>('upload')
   const [error, setError] = useState<string | null>(null)
 
@@ -1226,7 +1232,7 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
     try {
       const url = await uploadToSupabase(file, 'clone-viral/source')
       setViralVideoUrl(url)
-      toast.success('Video subido')
+      toast.success(cv.videoUploaded)
     } catch (err: any) {
       setError(err.message)
       setViralVideo(null)
@@ -1249,7 +1255,7 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
       })
 
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Error al transcribir')
+      if (!res.ok) throw new Error(data.error || cv.transcribeError)
 
       setTranscript(data.transcript || '')
       setDetectedLanguage(data.language || '')
@@ -1278,7 +1284,7 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
       })
 
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Error al traducir')
+      if (!res.ok) throw new Error(data.error || cv.translateError)
 
       setTranslatedScript(data.translated_script || transcript)
       setStep('translate')
@@ -1300,7 +1306,7 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
         if (attempts > maxAttempts) {
           clearInterval(pollingRef.current!)
           pollingRef.current = null
-          reject(new Error('Tiempo de espera agotado (15 min)'))
+          reject(new Error(cv.taskTimeout))
           return
         }
 
@@ -1327,7 +1333,7 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
           } else if (data.status === 'failed' || (data.success === false && data.error)) {
             clearInterval(pollingRef.current!)
             pollingRef.current = null
-            reject(new Error(data.error || 'Tarea fallida'))
+            reject(new Error(data.error || cv.taskFailed))
           }
         } catch (err) {
           // Keep polling on network errors
@@ -1361,14 +1367,14 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
       })
 
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Error al generar prompts')
+      if (!res.ok) throw new Error(data.error || cv.taskFailed)
 
       if (data.sections && data.sections.length > 0) {
         setGeneratedSections(data.sections)
         setSectionVideos(new Array(data.sections.length).fill(null))
-        toast.success(`${data.sections.length} seccion(es) generada(s)`)
+        toast.success(`${data.sections.length} ${cv.sectionsGenerated}`)
       } else {
-        throw new Error('No se generaron secciones')
+        throw new Error(cv.noSections)
       }
     } catch (err: any) {
       setError(err.message)
@@ -1406,17 +1412,17 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
       })
 
       const data = await res.json()
-      if (!res.ok || !data.success) throw new Error(data.error || 'Error al iniciar generacion')
+      if (!res.ok || !data.success) throw new Error(data.error || cv.taskFailed)
 
       if (data.taskId) {
-        const videoUrl = await pollKieTask(data.taskId, `Seccion ${sectionIdx + 1} — Kling 3.0`)
+        const videoUrl = await pollKieTask(data.taskId, `${cv.section} ${sectionIdx + 1} — Kling 3.0`)
         if (videoUrl) {
           setSectionVideos(prev => {
             const next = [...prev]
             next[sectionIdx] = videoUrl
             return next
           })
-          toast.success(`Video seccion ${sectionIdx + 1} listo`)
+          toast.success(cv.videoSectionReady)
         }
       }
     } catch (err: any) {
@@ -1428,11 +1434,11 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
   }
 
   const STEPS: { id: CloneStep; label: string; num: number }[] = [
-    { id: 'upload', label: 'Subir', num: 1 },
-    { id: 'transcribe', label: 'Transcribir', num: 2 },
-    { id: 'translate', label: 'Traducir', num: 3 },
-    { id: 'generate', label: 'Generar', num: 4 },
-    { id: 'result', label: 'Resultado', num: 5 },
+    { id: 'upload', label: cv.stepUpload, num: 1 },
+    { id: 'transcribe', label: cv.stepTranscribe, num: 2 },
+    { id: 'translate', label: cv.stepTranslate, num: 3 },
+    { id: 'generate', label: cv.stepGenerate, num: 4 },
+    { id: 'result', label: cv.stepResult, num: 5 },
   ]
 
   const currentStepIndex = STEPS.findIndex(s => s.id === step)
@@ -1450,8 +1456,8 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
               <span className="text-xl">{tool.emoji}</span>
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-text-primary">{tool.name}</h2>
-              <p className="text-sm text-text-secondary">Pipeline completo para clonar videos virales</p>
+              <h2 className="text-lg font-semibold text-text-primary">{cv.title}</h2>
+              <p className="text-sm text-text-secondary">{cv.desc}</p>
             </div>
           </div>
         </div>
@@ -1501,7 +1507,7 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
           {/* STEP 1: Upload */}
           {step === 'upload' && (
             <div className="max-w-lg mx-auto space-y-4">
-              <p className="text-sm text-text-secondary">Sube el video viral que quieres clonar.</p>
+              <p className="text-sm text-text-secondary">{cv.uploadHint}</p>
 
               {viralVideo ? (
                 <div className="relative bg-surface-elevated rounded-xl overflow-hidden">
@@ -1521,19 +1527,19 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
                 <label className="flex flex-col items-center justify-center h-48 border-2 border-dashed border-border hover:border-accent/50 rounded-xl cursor-pointer transition-colors">
                   <input type="file" accept="video/*" className="hidden" onChange={handleVideoUpload} />
                   <Video className="w-10 h-10 text-text-secondary mb-3" />
-                  <p className="text-text-primary font-medium">Subir video viral</p>
-                  <p className="text-xs text-text-secondary mt-1">MP4, MOV hasta 100MB</p>
+                  <p className="text-text-primary font-medium">{cv.uploadBtn}</p>
+                  <p className="text-xs text-text-secondary mt-1">{cv.uploadFormat}</p>
                 </label>
               )}
 
               <div>
                 <label className="block text-sm font-medium text-text-secondary mb-1.5">
-                  Nombre de tu producto (para adaptar el guion)
+                  {cv.productNameLabel}
                 </label>
                 <input
                   value={productName}
                   onChange={(e) => setProductName(e.target.value)}
-                  placeholder="Ej: Serum Vitamina C"
+                  placeholder={cv.productNamePh}
                   className="w-full px-4 py-2.5 bg-surface-elevated border border-border rounded-xl text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/50 text-sm"
                 />
               </div>
@@ -1549,9 +1555,9 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
                 )}
               >
                 {isTranscribing ? (
-                  <><Loader2 className="w-5 h-5 animate-spin" /> Transcribiendo...</>
+                  <><Loader2 className="w-5 h-5 animate-spin" /> {cv.transcribing}</>
                 ) : (
-                  <><Sparkles className="w-5 h-5" /> Transcribir audio</>
+                  <><Sparkles className="w-5 h-5" /> {cv.transcribeBtn}</>
                 )}
               </button>
             </div>
@@ -1561,10 +1567,10 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
           {step === 'transcribe' && (
             <div className="max-w-lg mx-auto space-y-4">
               <div className="flex items-center justify-between">
-                <p className="text-sm text-text-secondary">Transcripcion del video</p>
+                <p className="text-sm text-text-secondary">{cv.transcription}</p>
                 {detectedLanguage && (
                   <span className="text-xs bg-accent/20 text-accent px-2 py-1 rounded-lg">
-                    Idioma: {detectedLanguage}
+                    {cv.detectedLang}: {detectedLanguage}
                   </span>
                 )}
               </div>
@@ -1587,9 +1593,9 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
                 )}
               >
                 {isTranslating ? (
-                  <><Loader2 className="w-5 h-5 animate-spin" /> Traduciendo...</>
+                  <><Loader2 className="w-5 h-5 animate-spin" /> {cv.translating}</>
                 ) : (
-                  <><Sparkles className="w-5 h-5" /> Traducir y adaptar</>
+                  <><Sparkles className="w-5 h-5" /> {cv.translateBtn}</>
                 )}
               </button>
             </div>
@@ -1598,7 +1604,7 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
           {/* STEP 3: Translate result */}
           {step === 'translate' && (
             <div className="max-w-lg mx-auto space-y-4">
-              <p className="text-sm text-text-secondary">Guion traducido y adaptado. Puedes editarlo antes de continuar.</p>
+              <p className="text-sm text-text-secondary">{cv.translatedHint}</p>
 
               <textarea
                 value={translatedScript}
@@ -1617,7 +1623,7 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
                     : 'bg-accent hover:bg-accent-hover text-background shadow-lg shadow-accent/25'
                 )}
               >
-                Continuar a generacion
+                {cv.continueToGen}
               </button>
             </div>
           )}
@@ -1625,21 +1631,21 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
           {/* STEP 4: Generate prompts + videos */}
           {step === 'generate' && (
             <div className="max-w-2xl mx-auto space-y-4">
-              <p className="text-sm text-text-secondary">Selecciona influencer, duracion y genera prompts multi-shot para Kling 3.0.</p>
+              <p className="text-sm text-text-secondary">{cv.genHint}</p>
 
               {influencers.length === 0 ? (
                 <div className="text-center py-8">
                   <UserCircle className="w-12 h-12 text-text-secondary mx-auto mb-3" />
-                  <p className="text-text-secondary mb-2">No tienes influencers creados</p>
+                  <p className="text-text-secondary mb-2">{cv.noInfluencers}</p>
                   <p className="text-xs text-text-muted">
-                    Ve a la herramienta "Mi Influencer" para crear un personaje virtual primero.
+                    {cv.goToInfluencer}
                   </p>
                 </div>
               ) : (
                 <>
                   {/* Influencer grid */}
                   <div>
-                    <label className="block text-sm font-medium text-text-secondary mb-2">Selecciona influencer</label>
+                    <label className="block text-sm font-medium text-text-secondary mb-2">{cv.selectInfluencer}</label>
                     <div className="grid grid-cols-3 gap-3">
                       {influencers.map((inf) => (
                         <button
@@ -1669,7 +1675,7 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
 
                   {/* Duration selector */}
                   <div>
-                    <label className="block text-sm font-medium text-text-secondary mb-2">Duracion del clon</label>
+                    <label className="block text-sm font-medium text-text-secondary mb-2">{cv.cloneDuration}</label>
                     <div className="flex gap-3">
                       {([14, 28, 42] as const).map((d) => (
                         <button
@@ -1682,7 +1688,7 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
                               : 'border-border bg-surface-elevated text-text-secondary hover:border-accent/50'
                           )}
                         >
-                          ~{d}s ({d === 14 ? '1 seccion' : d === 28 ? '2 secciones' : '3 secciones'})
+                          ~{d}s ({d === 14 ? `1 ${cv.section}` : d === 28 ? `2 ${cv.section}s` : `3 ${cv.section}s`})
                         </button>
                       ))}
                     </div>
@@ -1700,9 +1706,9 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
                     )}
                   >
                     {isGeneratingPrompts ? (
-                      <><Loader2 className="w-5 h-5 animate-spin" /> Generando prompts con IA...</>
+                      <><Loader2 className="w-5 h-5 animate-spin" /> {cv.generatingPrompts}</>
                     ) : (
-                      <><Sparkles className="w-5 h-5" /> Generar prompts con IA</>
+                      <><Sparkles className="w-5 h-5" /> {cv.generatePrompts}</>
                     )}
                   </button>
 
@@ -1716,15 +1722,15 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
                             {/* Section header */}
                             <div className="px-4 py-3 bg-surface-elevated border-b border-border">
                               <h4 className="text-sm font-semibold text-text-primary">
-                                Seccion {sIdx + 1}: {section.title}
+                                {cv.section} {sIdx + 1}: {section.title}
                               </h4>
-                              <p className="text-xs text-text-muted mt-0.5">Total: {totalSec}s</p>
+                              <p className="text-xs text-text-muted mt-0.5">{cv.total}: {totalSec}s</p>
                             </div>
 
                             <div className="p-4 space-y-3">
                               {/* Start image prompt */}
                               <div>
-                                <label className="block text-xs font-medium text-text-muted uppercase mb-1">Prompt imagen inicial</label>
+                                <label className="block text-xs font-medium text-text-muted uppercase mb-1">{cv.initialImagePrompt}</label>
                                 <textarea
                                   value={section.startImagePrompt}
                                   onChange={(e) => {
@@ -1741,7 +1747,7 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
 
                               {/* Scenes */}
                               <div>
-                                <label className="block text-xs font-medium text-text-muted uppercase mb-1">Escenas multi-shot</label>
+                                <label className="block text-xs font-medium text-text-muted uppercase mb-1">{cv.multiShot}</label>
                                 <div className="space-y-2">
                                   {section.scenes.map((scene, scIdx) => (
                                     <div key={scIdx} className="flex gap-2">
@@ -1776,7 +1782,7 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
                                           }}
                                           className="w-12 px-1 py-1 bg-surface-elevated border border-border rounded-lg text-text-primary text-center text-xs focus:outline-none focus:ring-2 focus:ring-accent/50"
                                         />
-                                        <span className="text-[10px] text-text-muted">seg</span>
+                                        <span className="text-[10px] text-text-muted">{cv.sec}</span>
                                       </div>
                                     </div>
                                   ))}
@@ -1793,7 +1799,7 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
                                     className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-accent/10 border border-accent/30 text-accent hover:bg-accent/20 font-medium text-xs transition-colors"
                                   >
                                     <Download className="w-3.5 h-3.5" />
-                                    Descargar video
+                                    {cv.download}
                                   </a>
                                 </div>
                               ) : (
@@ -1808,9 +1814,9 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
                                   )}
                                 >
                                   {generatingVideoIdx === sIdx ? (
-                                    <><Loader2 className="w-4 h-4 animate-spin" /> {generationStatus || 'Generando video...'}</>
+                                    <><Loader2 className="w-4 h-4 animate-spin" /> {generationStatus || `${cv.generateKling}...`}</>
                                   ) : (
-                                    <>Generar video Kling 3.0</>
+                                    <>{cv.generateKling}</>
                                   )}
                                 </button>
                               )}
@@ -1828,13 +1834,13 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
           {/* STEP 5: Result */}
           {step === 'result' && (
             <div className="max-w-3xl mx-auto space-y-4">
-              <p className="text-sm text-text-secondary">Videos generados con Kling 3.0 multi-shot.</p>
+              <p className="text-sm text-text-secondary">{cv.resultHint}</p>
 
               <div className={cn('grid gap-4', generatedSections.length === 1 ? 'grid-cols-1 max-w-md mx-auto' : generatedSections.length === 2 ? 'grid-cols-2' : 'grid-cols-3')}>
                 {generatedSections.map((section, sIdx) => (
                   <div key={sIdx} className="space-y-2">
                     <label className="block text-sm font-medium text-text-secondary">
-                      Seccion {sIdx + 1}: {section.title}
+                      {cv.section} {sIdx + 1}: {section.title}
                     </label>
                     <div className="bg-surface-elevated rounded-xl overflow-hidden aspect-[9/16] flex items-center justify-center">
                       {sectionVideos[sIdx] ? (
@@ -1842,7 +1848,7 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
                       ) : (
                         <div className="text-center p-4">
                           <Video className="w-8 h-8 text-text-muted mx-auto mb-2" />
-                          <p className="text-xs text-text-muted">Pendiente</p>
+                          <p className="text-xs text-text-muted">{cv.pending}</p>
                         </div>
                       )}
                     </div>
@@ -1853,7 +1859,7 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
                         className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-accent/10 border border-accent/30 text-accent hover:bg-accent/20 font-medium text-sm transition-colors"
                       >
                         <Download className="w-4 h-4" />
-                        Descargar
+                        {cv.download}
                       </a>
                     )}
                   </div>
@@ -1862,7 +1868,7 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
 
               {/* Script */}
               <div className="p-4 bg-surface-elevated rounded-xl">
-                <label className="block text-xs font-medium text-text-muted uppercase mb-2">Guion usado</label>
+                <label className="block text-xs font-medium text-text-muted uppercase mb-2">{cv.scriptUsed}</label>
                 <p className="text-sm text-text-secondary">{translatedScript}</p>
               </div>
 
@@ -1871,7 +1877,7 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
                 onClick={() => setStep('generate')}
                 className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-border text-text-secondary hover:bg-border/30 font-medium text-sm transition-colors"
               >
-                Volver a editar prompts
+                {cv.backToEdit}
               </button>
             </div>
           )}
@@ -1885,6 +1891,8 @@ function ClonarViralTool({ onBack }: { onBack: () => void }) {
 // VIDEO PRODUCTO COMPONENT
 // ============================================
 function VideoProductoTool({ onBack }: { onBack: () => void }) {
+  const { t } = useI18n()
+  const vp = t.studio.videoProd
   const [productImages, setProductImages] = useState<File[]>([])
   const [productName, setProductName] = useState('')
   const [productDescription, setProductDescription] = useState('')
@@ -1929,8 +1937,8 @@ function VideoProductoTool({ onBack }: { onBack: () => void }) {
               <span className="text-xl">{tool.emoji}</span>
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-text-primary">{tool.name}</h2>
-              <p className="text-sm text-text-secondary">{tool.description}</p>
+              <h2 className="text-lg font-semibold text-text-primary">{vp.title}</h2>
+              <p className="text-sm text-text-secondary">{vp.title}</p>
             </div>
           </div>
         </div>
@@ -1942,7 +1950,7 @@ function VideoProductoTool({ onBack }: { onBack: () => void }) {
             {/* Product Images */}
             <div>
               <label className="block text-sm font-medium text-text-secondary mb-2">
-                Imagenes del producto * (max 6)
+                {vp.productImages} * {vp.maxImages}
               </label>
               <div className="grid grid-cols-3 gap-2">
                 {productImages.map((file, index) => (
@@ -1968,13 +1976,13 @@ function VideoProductoTool({ onBack }: { onBack: () => void }) {
             {/* Product Name */}
             <div>
               <label className="block text-sm font-medium text-text-secondary mb-2">
-                Nombre del producto *
+                {vp.productName} *
               </label>
               <input
                 type="text"
                 value={productName}
                 onChange={(e) => setProductName(e.target.value)}
-                placeholder="Ej: Serum Vitamina C, Faja Colombiana..."
+                placeholder={vp.productNamePh}
                 className="w-full px-4 py-3 bg-surface-elevated border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-accent"
               />
             </div>
@@ -1982,12 +1990,12 @@ function VideoProductoTool({ onBack }: { onBack: () => void }) {
             {/* Product Description */}
             <div>
               <label className="block text-sm font-medium text-text-secondary mb-2">
-                Descripcion y beneficios
+                {vp.descBenefits}
               </label>
               <textarea
                 value={productDescription}
                 onChange={(e) => setProductDescription(e.target.value)}
-                placeholder="Describe las caracteristicas principales y beneficios..."
+                placeholder={vp.descBenefitsPh}
                 rows={3}
                 className="w-full px-4 py-3 bg-surface-elevated border border-border rounded-xl text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-accent resize-none"
               />
@@ -1996,14 +2004,14 @@ function VideoProductoTool({ onBack }: { onBack: () => void }) {
             {/* Video Style */}
             <div>
               <label className="block text-sm font-medium text-text-secondary mb-2">
-                Estilo del video
+                {vp.videoStyle}
               </label>
               <div className="grid grid-cols-2 gap-2">
                 {[
-                  { id: 'promocional', label: 'Promocional', desc: 'Enfoque en beneficios' },
-                  { id: 'unboxing', label: 'Unboxing', desc: 'Abriendo el paquete' },
-                  { id: 'lifestyle', label: 'Lifestyle', desc: 'Uso en la vida real' },
-                  { id: 'testimonial', label: 'Testimonial', desc: 'Estilo resena' },
+                  { id: 'promocional', label: vp.promotional, desc: vp.promotionalDesc },
+                  { id: 'unboxing', label: vp.unboxing, desc: vp.unboxingDesc },
+                  { id: 'lifestyle', label: vp.lifestyle, desc: vp.lifestyleDesc },
+                  { id: 'testimonial', label: vp.testimonial, desc: vp.testimonialDesc },
                 ].map((style) => (
                   <button
                     key={style.id}
@@ -2025,13 +2033,13 @@ function VideoProductoTool({ onBack }: { onBack: () => void }) {
             {/* Duration */}
             <div>
               <label className="block text-sm font-medium text-text-secondary mb-2">
-                Duracion
+                {vp.duration}
               </label>
               <div className="flex gap-2">
                 {[
-                  { id: '15', label: '15 seg' },
-                  { id: '30', label: '30 seg' },
-                  { id: '60', label: '60 seg' },
+                  { id: '15', label: vp.sec15 },
+                  { id: '30', label: vp.sec30 },
+                  { id: '60', label: vp.sec60 },
                 ].map((dur) => (
                   <button
                     key={dur.id}
@@ -2053,7 +2061,7 @@ function VideoProductoTool({ onBack }: { onBack: () => void }) {
           {/* Output Section */}
           <div className="w-1/2 flex flex-col">
             <label className="block text-sm font-medium text-text-secondary mb-2">
-              Video generado
+              {vp.videoGenerated}
             </label>
             <div className="flex-1 bg-surface-elevated rounded-xl overflow-hidden flex items-center justify-center">
               {resultVideoUrl ? (
@@ -2063,13 +2071,13 @@ function VideoProductoTool({ onBack }: { onBack: () => void }) {
                   {isProcessing ? (
                     <>
                       <Loader2 className="w-12 h-12 text-accent mx-auto mb-3 animate-spin" />
-                      <p className="text-text-primary font-medium">Generando video...</p>
-                      <p className="text-sm text-text-secondary mt-1">Creando escenas y transiciones</p>
+                      <p className="text-text-primary font-medium">{vp.generateVideo}...</p>
+                      <p className="text-sm text-text-secondary mt-1">{vp.creatingScenes}</p>
                     </>
                   ) : (
                     <>
                       <Video className="w-12 h-12 text-text-secondary mx-auto mb-3" />
-                      <p className="text-text-secondary">El video generado aparecera aqui</p>
+                      <p className="text-text-secondary">{vp.videoPlaceholder}</p>
                     </>
                   )}
                 </div>
@@ -2093,12 +2101,12 @@ function VideoProductoTool({ onBack }: { onBack: () => void }) {
             {isProcessing ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                Generando...
+                {vp.generateVideo}...
               </>
             ) : (
               <>
                 <Sparkles className="w-4 h-4" />
-                Generar Video
+                {vp.generateVideo}
               </>
             )}
           </button>
@@ -2114,7 +2122,12 @@ function VideoProductoTool({ onBack }: { onBack: () => void }) {
 // PLACEHOLDER TOOL COMPONENT
 // ============================================
 function PlaceholderTool({ toolId, onBack }: { toolId: string; onBack: () => void }) {
+  const { t } = useI18n()
+  const tn = t.studio.toolNames as Record<string, string>
+  const td = t.studio.toolDescs as Record<string, string>
   const tool = DROPSHIPPING_TOOLS.find(t => t.id === toolId)!
+  const toolName = tn[tool.nameKey] || tool.name
+  const toolDesc = td[tool.descKey] || tool.description
 
   return (
     <div className="h-[calc(100vh-200px)] min-h-[600px]">
@@ -2132,8 +2145,8 @@ function PlaceholderTool({ toolId, onBack }: { toolId: string; onBack: () => voi
               <span className="text-xl">{tool.emoji}</span>
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-text-primary">{tool.name}</h2>
-              <p className="text-sm text-text-secondary">{tool.description}</p>
+              <h2 className="text-lg font-semibold text-text-primary">{toolName}</h2>
+              <p className="text-sm text-text-secondary">{toolDesc}</p>
             </div>
           </div>
         </div>
@@ -2142,9 +2155,9 @@ function PlaceholderTool({ toolId, onBack }: { toolId: string; onBack: () => voi
         <div className="flex-1 p-6 flex items-center justify-center">
           <div className="text-center">
             <span className="text-6xl mb-4 block">{tool.emoji}</span>
-            <h3 className="text-xl font-semibold text-text-primary mb-2">{tool.name}</h3>
+            <h3 className="text-xl font-semibold text-text-primary mb-2">{toolName}</h3>
             <p className="text-text-secondary max-w-md">
-              Esta herramienta esta en desarrollo. Pronto podras {tool.description.toLowerCase()}.
+              {t.studio.videoProd?.toolInDev || 'This tool is in development.'}
             </p>
           </div>
         </div>
@@ -2237,7 +2250,7 @@ export function DropshippingGrid({ initialTool, onBack: onBackProp }: Dropshippi
           >
             {tool.soon && (
               <span className="absolute top-3 right-3 px-2 py-0.5 text-xs font-medium bg-border text-text-secondary rounded">
-                Pronto
+                {t.nav.soon}
               </span>
             )}
             <div
