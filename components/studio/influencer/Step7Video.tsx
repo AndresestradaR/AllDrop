@@ -10,6 +10,7 @@ import { SceneScriptGenerator, type SceneData } from './SceneScriptGenerator'
 import { ParallelVideoManager } from './ParallelVideoManager'
 import { VideoEditor } from '@/components/studio/video-prompt/VideoEditor'
 import { ViralTransformationMode } from './ViralTransformationMode'
+import { useI18n } from '@/lib/i18n'
 
 interface Step7VideoProps {
   influencerId: string
@@ -41,6 +42,7 @@ export function Step7Video({
   onSendToEditor,
   onGoToBoard,
 }: Step7VideoProps) {
+  const { t } = useI18n()
   console.log('[Step7Video] Props received:', { promptDescriptor: promptDescriptor?.substring(0, 30), influencerId, realisticImageUrl: !!realisticImageUrl })
 
   // Video creation mode: 'standard' (existing UGC) or 'viral' (transformation)
@@ -360,7 +362,7 @@ export function Step7Video({
   const handleOptimizePrompt = async () => {
     console.log('[Step7Video] handleOptimizePrompt called, resolvedDescriptor:', resolvedDescriptor?.substring(0, 50))
     if (!userIdea.trim()) {
-      toast.error('Escribe una idea para el video')
+      toast.error(t.studio.influencer.step7.writeVideoIdea)
       return
     }
 
@@ -400,7 +402,7 @@ export function Step7Video({
           const hasSpanish = optimized.toLowerCase().includes('español') || optimized.toLowerCase().includes('spanish') || optimized.toLowerCase().includes('latino')
           setPrompt(hasSpanish ? optimized : `${optimized}, habla en español con acento latino`)
         }
-        toast.success('Prompt optimizado')
+        toast.success(t.studio.influencer.step7.promptOptimized)
       } else {
         if (isSora) {
           const desc = resolvedDescriptor || `a person called ${influencerName}`
@@ -408,7 +410,7 @@ export function Step7Video({
         } else {
           setPrompt(`${userIdea.trim()}. Habla en español con acento latino.`)
         }
-        toast.success('Prompt generado')
+        toast.success(t.studio.influencer.step7.promptGenerated)
       }
     } catch (err: any) {
       console.error('[Step7Video] Optimize error:', err)
@@ -418,7 +420,7 @@ export function Step7Video({
       } else {
         setPrompt(`${userIdea.trim()}. Habla en español con acento latino.`)
       }
-      toast.success('Prompt generado (modo fallback)')
+      toast.success(t.studio.influencer.step7.promptFallback)
     } finally {
       setIsOptimizing(false)
     }
@@ -427,7 +429,7 @@ export function Step7Video({
   // === Constructor Inteligente handler ===
   const handleConstructor = async () => {
     if (!constructorProduct.trim()) {
-      toast.error('Describe el producto')
+      toast.error(t.studio.influencer.step7.describeProduct)
       return
     }
 
@@ -455,7 +457,7 @@ export function Step7Video({
       }
 
       setConstructorResults(data.result)
-      toast.success(`${data.result.scenes.length} escenas generadas`)
+      toast.success(t.studio.influencer.step7.scenesGenerated.replace('{count}', String(data.result.scenes.length)))
     } catch (err: any) {
       console.error('[Step7Video] Constructor error:', err)
       setError(err.message)
@@ -470,7 +472,7 @@ export function Step7Video({
     setMultiPrompts(constructorResults.scenes.map(s => ({ prompt: s.prompt, duration: s.duration })))
     setIsMultiShot(true)
     setShowConstructor(false)
-    toast.success('Escenas aplicadas al editor')
+    toast.success(t.studio.influencer.step7.scenesApplied)
   }
 
   // === Multi-shot scene handlers ===
@@ -481,7 +483,7 @@ export function Step7Video({
   const addScene = () => {
     const remaining = 15 - multiShotTotalDuration
     if (remaining < 1) {
-      toast.error('No queda duración disponible (máx 15s)')
+      toast.error(t.studio.influencer.step7.noDurationLeft)
       return
     }
     setMultiPrompts(prev => [...prev, { prompt: '', duration: Math.min(3, remaining) }])
@@ -489,7 +491,7 @@ export function Step7Video({
 
   const removeScene = (index: number) => {
     if (multiPrompts.length <= 2) {
-      toast.error('Mínimo 2 escenas')
+      toast.error(t.studio.influencer.step7.min2ScenesRequired)
       return
     }
     setMultiPrompts(prev => prev.filter((_, i) => i !== index))
@@ -924,12 +926,12 @@ export function Step7Video({
   return (
     <div className="max-w-3xl mx-auto">
       <p className="text-sm text-text-secondary mb-5">
-        Genera videos con tu influencer. Describe tu idea y optimizaremos el prompt para el modelo elegido.
+        {t.studio.influencer.step7.description}
       </p>
 
       {/* ============ INFLUENCER SELECTOR ============ */}
       <div className="mb-5">
-        <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-2">Influencer</label>
+        <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-2">{t.studio.influencer.step7.influencer}</label>
         <div className="flex gap-2 overflow-x-auto pb-2">
           {allInfluencers.map((inf: any) => (
             <button
@@ -976,7 +978,7 @@ export function Step7Video({
             )}
           >
             <Video className="w-3.5 h-3.5" />
-            Video UGC
+            {t.studio.influencer.step7.videoUgc}
           </button>
           <button
             onClick={() => setCreationMode('viral')}
@@ -988,7 +990,7 @@ export function Step7Video({
             )}
           >
             <Sparkles className="w-3.5 h-3.5" />
-            Transformación Viral
+            {t.studio.influencer.step7.viralTransformation}
           </button>
         </div>
       </div>
@@ -1006,7 +1008,7 @@ export function Step7Video({
       <>
       {/* ============ MODELO DE VIDEO ============ */}
       <div className="mb-4">
-        <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">Modelo de IA</label>
+        <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">{t.studio.influencer.step7.aiModel}</label>
         <select
           value={videoModelId}
           onChange={(e) => setVideoModelId(e.target.value as VideoModelId)}
@@ -1065,7 +1067,7 @@ export function Step7Video({
       {!isSora && (
         <div className="mb-4">
           <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">
-            Modo de generacion
+            {t.studio.influencer.step7.generationMode}
           </label>
           <div className="flex gap-2">
             {selectedModel?.apiModelIdText && !selectedModel?.requiresImage && (
@@ -1078,7 +1080,7 @@ export function Step7Video({
                     : 'bg-surface-elevated border-border text-text-secondary hover:border-text-muted'
                 )}
               >
-                Solo Texto
+                {t.studio.influencer.step7.textOnly}
               </button>
             )}
             <button
@@ -1090,7 +1092,7 @@ export function Step7Video({
                   : 'bg-surface-elevated border-border text-text-secondary hover:border-text-muted'
               )}
             >
-              Imagen Inicial
+              {t.studio.influencer.step7.startImage}
             </button>
             {selectedModel?.supportsStartEndFrames && !isMultiShot && (
               <button
@@ -1102,7 +1104,7 @@ export function Step7Video({
                     : 'bg-surface-elevated border-border text-text-secondary hover:border-text-muted'
                 )}
               >
-                Inicio + Final
+                {t.studio.influencer.step7.startEnd}
               </button>
             )}
           </div>
@@ -1115,7 +1117,7 @@ export function Step7Video({
           {/* Imagen de inicio */}
           <div className="mb-4">
             <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">
-              {videoMode === 'start_end' ? 'Frame inicial' : 'Imagen de referencia'}
+              {videoMode === 'start_end' ? t.studio.influencer.step7.startFrame : t.studio.influencer.step7.referenceImage}
             </label>
             <div
               onClick={() => setShowImagePicker('start')}
@@ -1125,14 +1127,14 @@ export function Step7Video({
                 <>
                   <img src={startImageUrl} alt="Start" className="w-14 h-14 rounded-lg object-cover flex-shrink-0" />
                   <div className="flex-1">
-                    <p className="text-sm text-text-primary font-medium">Imagen seleccionada</p>
-                    <p className="text-[10px] text-accent">Click para cambiar</p>
+                    <p className="text-sm text-text-primary font-medium">{t.studio.influencer.step7.imageSelected}</p>
+                    <p className="text-[10px] text-accent">{t.studio.influencer.step7.clickToChange}</p>
                   </div>
                 </>
               ) : (
                 <div className="flex items-center gap-2 py-3">
                   <ImageIcon className="w-5 h-5 text-text-muted" />
-                  <p className="text-sm text-text-secondary">Seleccionar de la galeria</p>
+                  <p className="text-sm text-text-secondary">{t.studio.influencer.step7.selectFromGallery}</p>
                 </div>
               )}
             </div>
@@ -1142,7 +1144,7 @@ export function Step7Video({
           {videoMode === 'start_end' && !isMultiShot && (
             <div className="mb-4">
               <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">
-                Frame final
+                {t.studio.influencer.step7.endFrame}
               </label>
               <div
                 onClick={() => setShowImagePicker('end')}
@@ -1152,14 +1154,14 @@ export function Step7Video({
                   <>
                     <img src={endImageUrl} alt="End" className="w-14 h-14 rounded-lg object-cover flex-shrink-0" />
                     <div className="flex-1">
-                      <p className="text-sm text-text-primary font-medium">Imagen final seleccionada</p>
+                      <p className="text-sm text-text-primary font-medium">{t.studio.influencer.step7.endImageSelected}</p>
                       <p className="text-[10px] text-accent">Click para cambiar</p>
                     </div>
                   </>
                 ) : (
                   <div className="flex items-center gap-2 py-3">
                     <ImageIcon className="w-5 h-5 text-text-muted" />
-                    <p className="text-sm text-text-secondary">Seleccionar imagen final (opcional)</p>
+                    <p className="text-sm text-text-secondary">{t.studio.influencer.step7.selectEndImage}</p>
                   </div>
                 )}
               </div>
@@ -1222,7 +1224,7 @@ export function Step7Video({
 
           {/* Shot Mode Toggle */}
           <div>
-            <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">Shot</label>
+            <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">{t.studio.influencer.step7.shot}</label>
             <div className="flex gap-2">
               <button
                 onClick={() => setIsMultiShot(false)}
@@ -1251,7 +1253,7 @@ export function Step7Video({
 
           {/* Audio Toggle */}
           <div>
-            <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">Audio</label>
+            <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">{t.studio.influencer.step7.audio}</label>
             <button
               onClick={() => { if (!isMultiShot) setEnableAudio(!enableAudio) }}
               disabled={isMultiShot}
@@ -1273,7 +1275,7 @@ export function Step7Video({
           {!isMultiShot && (
             <div>
               <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">
-                Duracion: {duration}s
+                {t.studio.influencer.step7.duration}: {duration}s
               </label>
               <input
                 type="range"
@@ -1296,7 +1298,7 @@ export function Step7Video({
       {!isKling30 && (
         <div className="grid grid-cols-2 gap-3 mb-4">
           <div>
-            <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">Duracion</label>
+            <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">{t.studio.influencer.step7.duration}</label>
             <div className="flex gap-2">
               {[5, 10].map(d => (
                 <button
@@ -1315,7 +1317,7 @@ export function Step7Video({
             </div>
           </div>
           <div>
-            <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">Aspecto</label>
+            <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">{t.studio.influencer.step7.aspect}</label>
             <div className="flex gap-2">
               {(['9:16', '16:9', '1:1'] as const).map(ar => (
                 <button
@@ -1345,7 +1347,7 @@ export function Step7Video({
           >
             <div className="flex items-center gap-2">
               <Wand2 className="w-4 h-4" />
-              Constructor Inteligente
+              {t.studio.influencer.step7.smartConstructor}
             </div>
             {showConstructor ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
@@ -1475,7 +1477,7 @@ export function Step7Video({
           )}
         >
           <Film className="w-4 h-4" />
-          Guion por Escenas
+          {t.studio.influencer.step7.sceneScript}
         </button>
         {showScriptGenerator && (
           <SceneScriptGenerator
@@ -1533,7 +1535,7 @@ export function Step7Video({
       {isKling30 && isMultiShot && (
         <div className="mb-4">
           <div className="flex items-center justify-between mb-2">
-            <label className="block text-xs font-medium text-text-muted uppercase tracking-wide">Editor de Escenas</label>
+            <label className="block text-xs font-medium text-text-muted uppercase tracking-wide">{t.studio.influencer.step7.sceneEditor}</label>
             <span className={cn(
               'text-xs font-mono font-semibold px-2 py-0.5 rounded-full',
               multiShotTotalDuration > 15 || multiShotTotalDuration < 3
@@ -1600,7 +1602,7 @@ export function Step7Video({
             )}
           >
             <Plus className="w-3.5 h-3.5" />
-            Agregar escena
+            {t.studio.influencer.step7.addScene}
           </button>
 
           {/* Total duration warning */}
@@ -1640,7 +1642,7 @@ export function Step7Video({
       {/* ============ IDEA + OPTIMIZADOR (hidden in multi-shot mode) ============ */}
       {!(isKling30 && isMultiShot) && (
         <div className="mb-4">
-          <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">Tu idea para el video</label>
+          <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">{t.studio.influencer.step7.videoIdea}</label>
           <textarea
             value={userIdea}
             onChange={(e) => setUserIdea(e.target.value)}
@@ -1662,7 +1664,7 @@ export function Step7Video({
             )}
           >
             {isOptimizing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />}
-            {isSora ? 'Optimizar prompt (incluye descripcion del personaje)' : 'Optimizar prompt con IA'}
+            {isSora ? t.studio.influencer.step7.optimizePromptSora : t.studio.influencer.step7.optimizePromptAi}
           </button>
         </div>
       )}
@@ -1671,7 +1673,7 @@ export function Step7Video({
       {prompt && !(isKling30 && isMultiShot) && (
         <div className="mb-4 p-4 bg-accent/5 border border-accent/30 rounded-xl">
           <div className="flex items-center justify-between mb-2">
-            <h4 className="text-xs font-bold text-accent uppercase tracking-wide">Prompt optimizado</h4>
+            <h4 className="text-xs font-bold text-accent uppercase tracking-wide">{t.studio.influencer.step7.optimizedPrompt}</h4>
             <button
               onClick={async () => {
                 await navigator.clipboard.writeText(prompt)
@@ -1757,7 +1759,7 @@ export function Step7Video({
                 title="Extender video (+segundos)"
               >
                 {isExtending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FastForward className="w-3.5 h-3.5" />}
-                Extender
+                {t.studio.influencer.step7.extend}
               </button>
             )}
             {/* Publicar */}
@@ -1766,7 +1768,7 @@ export function Step7Video({
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium text-text-secondary border border-border hover:text-accent hover:border-accent/30 transition-all"
             >
               <Share2 className="w-3.5 h-3.5" />
-              Compartir
+              {t.studio.influencer.step7.share}
             </button>
             {/* Volver a pizarra */}
             <button
@@ -1774,7 +1776,7 @@ export function Step7Video({
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium text-text-secondary border border-border hover:text-accent hover:border-accent/30 transition-all"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
-              Pizarra
+              {t.studio.influencer.step7.board}
             </button>
           </div>
         </div>
@@ -1784,10 +1786,10 @@ export function Step7Video({
         <div className="mb-4 p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl">
           <div className="flex items-center gap-2 mb-1">
             <Loader2 className="w-4 h-4 text-amber-400 animate-spin" />
-            <p className="text-sm text-amber-400 font-medium">Video en proceso...</p>
+            <p className="text-sm text-amber-400 font-medium">{t.studio.influencer.step7.videoInProgress}</p>
           </div>
           <p className="text-xs text-text-secondary mt-1">
-            Verificando estado automaticamente. Esto puede tardar 1-3 minutos.
+            {t.studio.influencer.step7.videoInProgressDesc}
           </p>
           <p className="text-[10px] text-text-muted mt-1 font-mono">Task ID: {taskId}</p>
         </div>
@@ -1839,9 +1841,9 @@ export function Step7Video({
         )}
       >
         {isGenerating ? (
-          <><Loader2 className="w-5 h-5 animate-spin" /> Generando video...</>
+          <><Loader2 className="w-5 h-5 animate-spin" /> {t.studio.influencer.step7.generatingVideo}</>
         ) : (
-          <><Video className="w-5 h-5" /> {isKling30 && isMultiShot ? `Generar Video Multi-Shot (${multiShotTotalDuration}s)` : 'Generar Video'}</>
+          <><Video className="w-5 h-5" /> {isKling30 && isMultiShot ? t.studio.influencer.step7.generateMultiShot.replace('{duration}', String(multiShotTotalDuration)) : t.studio.influencer.step7.generateVideo}</>
         )}
       </button>
 

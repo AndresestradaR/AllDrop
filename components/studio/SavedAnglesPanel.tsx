@@ -160,10 +160,10 @@ ${t.editor.targetAudience}: ${angle.avatarSuggestion}`
           }}
           className="w-full px-3 py-2 bg-[#1a1a1a] border border-[#333] rounded-lg text-sm text-[#e5e5e5] focus:outline-none focus:ring-2 focus:ring-teal-500/50 mb-2"
         >
-          <option value="">Seleccionar producto...</option>
+          <option value="">{t.studio.influencer.angles.selectProductPlaceholder}</option>
           {groups.map(g => (
             <option key={g.productName} value={g.productName}>
-              {g.productName} ({g.angles.length} angulos)
+              {g.productName} ({t.studio.influencer.angles.anglesCount.replace('{count}', String(g.angles.length))})
             </option>
           ))}
         </select>
@@ -171,7 +171,7 @@ ${t.editor.targetAudience}: ${angle.avatarSuggestion}`
 
       {showProductFilter && !selectedProduct && groups.length > 1 && (
         <p className="text-[10px] text-text-muted text-center py-2">
-          Selecciona un producto para ver sus angulos
+          {t.studio.influencer.angles.selectProductHint}
         </p>
       )}
 
@@ -249,14 +249,14 @@ ${t.editor.targetAudience}: ${angle.avatarSuggestion}`
                           </span>
                           {isSelected && (
                             <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-teal-500 text-white font-medium ml-auto flex-shrink-0">
-                              Seleccionado
+                              {t.studio.influencer.angles.selected}
                             </span>
                           )}
                         </div>
                         <button
                           onClick={(e) => handleCopyAngle(angle, e)}
                           className="p-1 hover:bg-[#333] rounded-lg text-text-muted hover:text-teal-400 transition-colors flex-shrink-0 ml-1"
-                          title="Copiar angulo"
+                          title={t.studio.influencer.angles.copyAngle}
                         >
                           {copiedAngleId === angle.id ? (
                             <Check className="w-3.5 h-3.5 text-teal-400" />
@@ -275,15 +275,15 @@ ${t.editor.targetAudience}: ${angle.avatarSuggestion}`
                       {(isAngleExpanded && !selectable) && (
                         <div className="px-3 pb-3 pt-1 border-t border-[#333] space-y-2.5">
                           <div>
-                            <span className="text-[9px] font-bold text-teal-400 uppercase tracking-wider">Angulo de Venta</span>
+                            <span className="text-[9px] font-bold text-teal-400 uppercase tracking-wider">{t.studio.influencer.angles.salesAngle}</span>
                             <p className="text-[11px] text-[#ccc] mt-0.5 leading-relaxed">{angle.salesAngle}</p>
                           </div>
                           <div>
-                            <span className="text-[9px] font-bold text-teal-400 uppercase tracking-wider">Descripcion</span>
+                            <span className="text-[9px] font-bold text-teal-400 uppercase tracking-wider">{t.studio.influencer.angles.description}</span>
                             <p className="text-[11px] text-[#ccc] mt-0.5 leading-relaxed">{angle.description}</p>
                           </div>
                           <div>
-                            <span className="text-[9px] font-bold text-teal-400 uppercase tracking-wider">Publico Objetivo</span>
+                            <span className="text-[9px] font-bold text-teal-400 uppercase tracking-wider">{t.studio.influencer.angles.targetAudience}</span>
                             <p className="text-[11px] text-[#ccc] mt-0.5">{angle.avatarSuggestion}</p>
                           </div>
                         </div>

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Loader2, Check, X, RefreshCw, Film, Scissors, LayoutGrid } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { useI18n } from '@/lib/i18n'
 import type { SceneData } from './SceneScriptGenerator'
 
 type SceneStatus = 'pending' | 'generating' | 'polling' | 'completed' | 'error'
@@ -44,6 +45,7 @@ export function ParallelVideoManager({
   onSendToEditor,
   onGoToBoard,
 }: ParallelVideoManagerProps) {
+  const { t } = useI18n()
   const [sceneStates, setSceneStates] = useState<Map<number, SceneState>>(() => {
     const map = new Map<number, SceneState>()
     scenes.forEach((_, i) => {
@@ -192,9 +194,9 @@ export function ParallelVideoManager({
         allDoneNotifiedRef.current = true
         const done = states.filter(s => s.status === 'completed').length
         if (done === states.length) {
-          toast.success(`${done} videos generados!`)
+          toast.success(t.studio.influencer.parallel.videosGenerated.replace('{count}', String(done)))
         } else {
-          toast.success(`${done}/${states.length} videos completados`)
+          toast.success(t.studio.influencer.parallel.videosCompleted.replace('{done}', String(done)).replace('{total}', String(states.length)))
         }
         return
       }
@@ -226,10 +228,10 @@ export function ParallelVideoManager({
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-bold text-teal-400 flex items-center gap-2">
           <Film className="w-4 h-4" />
-          Generacion Paralela
+          {t.studio.influencer.parallel.title}
         </h3>
         <span className="text-xs text-[#e5e5e5] font-mono">
-          {completedCount}/{totalCount} completadas
+          {t.studio.influencer.parallel.completed.replace('{done}', String(completedCount)).replace('{total}', String(totalCount))}
         </span>
       </div>
 
@@ -262,9 +264,9 @@ export function ParallelVideoManager({
               }`}
             >
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[10px] font-bold text-[#e5e5e5]">Escena {scene.sceneNumber}</span>
+                <span className="text-[10px] font-bold text-[#e5e5e5]">{t.studio.influencer.parallel.sceneN.replace('{n}', String(scene.sceneNumber))}</span>
                 {state.status === 'pending' && (
-                  <span className="text-[9px] text-text-muted">Pendiente</span>
+                  <span className="text-[9px] text-text-muted">{t.studio.influencer.parallel.pending}</span>
                 )}
                 {state.status === 'generating' && (
                   <Loader2 className="w-3 h-3 text-amber-400 animate-spin" />
@@ -303,7 +305,7 @@ export function ParallelVideoManager({
                     className="flex items-center gap-1 text-[10px] text-red-400 hover:text-red-300 transition-colors"
                   >
                     <RefreshCw className="w-3 h-3" />
-                    Reintentar
+                    {t.studio.influencer.parallel.retry}
                   </button>
                 </div>
               )}
@@ -323,7 +325,7 @@ export function ParallelVideoManager({
                   scenes.forEach((scene, i) => {
                     const state = sceneStates.get(i)
                     if (state?.status === 'completed' && state.videoUrl) {
-                      clips.push({ url: state.videoUrl, label: `Escena ${scene.sceneNumber}` })
+                      clips.push({ url: state.videoUrl, label: t.studio.influencer.parallel.sceneN.replace('{n}', String(scene.sceneNumber)) })
                     }
                   })
                   if (clips.length > 0) onSendToEditor(clips)
@@ -331,7 +333,7 @@ export function ParallelVideoManager({
                 className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-teal-600 hover:bg-teal-500 text-white rounded-xl text-xs font-bold transition-colors"
               >
                 <Scissors className="w-3.5 h-3.5" />
-                Enviar al Editor ({completedCount})
+                {t.studio.influencer.parallel.sendToEditor.replace('{count}', String(completedCount))}
               </button>
             )}
             {onGoToBoard && (
@@ -340,7 +342,7 @@ export function ParallelVideoManager({
                 className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-[#222] hover:bg-[#333] text-[#e5e5e5] rounded-xl text-xs font-bold border border-[#333] transition-colors"
               >
                 <LayoutGrid className="w-3.5 h-3.5" />
-                Ir a Pizarra
+                {t.studio.influencer.parallel.goToBoard}
               </button>
             )}
           </div>
@@ -349,7 +351,7 @@ export function ParallelVideoManager({
           onClick={() => { onComplete(); onClose() }}
           className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-[#222] text-[#999] rounded-xl text-xs font-medium hover:bg-[#333] border border-[#333] transition-colors"
         >
-          Cerrar
+          {t.studio.influencer.parallel.close}
         </button>
       </div>
     </div>

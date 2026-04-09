@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils/cn'
 import { VIDEO_COMPANY_GROUPS, type VideoModelId } from '@/lib/video-providers/types'
 import { Loader2, Upload, Sparkles, Film, Trash2, ChevronDown, ChevronUp, Copy, Check, Play, AlertCircle, RefreshCw, Zap, Scissors } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { useI18n } from '@/lib/i18n'
 import { createBrowserClient } from '@supabase/ssr'
 
 /**
@@ -73,6 +74,7 @@ export function ViralTransformationMode({
   realisticImageUrl,
   onSendToEditor,
 }: ViralTransformationModeProps) {
+  const { t } = useI18n()
   // Product context (loaded from persisted data)
   const [productDescription, setProductDescription] = useState('')
   const [extraContext, setExtraContext] = useState('')
@@ -536,7 +538,7 @@ export function ViralTransformationMode({
 
     if (queue.length === 0) {
       setIsGeneratingAll(false)
-      toast.success('Todas las escenas ya están completadas')
+      toast.success(t.studio.influencer.viral.allCompleted)
       return
     }
 
@@ -551,7 +553,7 @@ export function ViralTransformationMode({
     const workers = Array.from({ length: Math.min(MAX_CONCURRENT, queue.length) }, () => runNext())
     await Promise.all(workers)
     setIsGeneratingAll(false)
-    toast.success('Generación completada')
+    toast.success(t.studio.influencer.viral.generationComplete)
   }, [scriptResult, generateSceneVideo, sceneVideoStates])
 
   // Cancel all generations
@@ -629,13 +631,13 @@ export function ViralTransformationMode({
   // Handle video upload
   const handleVideoUpload = async (file: File) => {
     if (file.size > 100 * 1024 * 1024) {
-      toast.error('El video debe ser menor a 100MB')
+      toast.error(t.studio.influencer.viral.videoTooLarge)
       return
     }
 
     const duration = await getVideoDuration(file)
     if (duration > 60) {
-      toast.error('El video debe ser de máximo 60 segundos')
+      toast.error(t.studio.influencer.viral.videoTooLong)
       return
     }
 
@@ -675,14 +677,14 @@ export function ViralTransformationMode({
       const url = signedData?.signedUrl
       if (url) {
         setReferenceVideoUrl(url)
-        toast.success('Video de referencia subido')
+        toast.success(t.studio.influencer.viral.videoUploaded)
       } else {
         throw new Error('No se obtuvo URL del video')
       }
     } catch (err: any) {
       console.error('[ViralMode] Upload error:', err)
       setError('Error al subir el video. Intenta de nuevo.')
-      toast.error('Error al subir el video')
+      toast.error(t.studio.influencer.viral.uploadError)
     } finally {
       setIsUploadingVideo(false)
     }
@@ -705,7 +707,7 @@ export function ViralTransformationMode({
   // Generate viral script
   const handleGenerate = async () => {
     if (!productDescription.trim()) {
-      toast.error('Selecciona un producto o escribe la descripción')
+      toast.error(t.studio.influencer.viral.selectProductOrDescribe)
       return
     }
 
@@ -749,7 +751,7 @@ export function ViralTransformationMode({
 
       setScriptResult(data.result)
       setExpandedScene(0)
-      toast.success(`¡Guión viral generado! ${data.result.scenes.length} escenas`)
+      toast.success(t.studio.influencer.viral.viralScriptGenerated.replace('{count}', String(data.result.scenes.length)))
     } catch (err: any) {
       console.error('[ViralMode] Generate error:', err)
       setError(err.message)
@@ -788,10 +790,10 @@ export function ViralTransformationMode({
 
   const sceneTypeLabel = (type: string) => {
     switch (type) {
-      case 'transformation': return 'Transformación'
-      case 'influencer': return 'Influencer'
-      case 'product-demo': return 'Demo Producto'
-      case 'beauty-shot': return 'Beauty Shot'
+      case 'transformation': return t.studio.influencer.viral.transformation
+      case 'influencer': return t.studio.influencer.viral.influencerType
+      case 'product-demo': return t.studio.influencer.viral.productDemo
+      case 'beauty-shot': return t.studio.influencer.viral.beautyShot
       default: return type
     }
   }
@@ -809,7 +811,7 @@ export function ViralTransformationMode({
       {/* ============ PRODUCTO ============ */}
       <div>
         <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">
-          Producto
+          {t.studio.influencer.viral.product}
         </label>
         {products.length > 0 ? (
           <select
@@ -817,19 +819,19 @@ export function ViralTransformationMode({
             onChange={(e) => setSelectedProductId(e.target.value)}
             className="w-full px-3 py-2 bg-surface-elevated border border-border rounded-xl text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50"
           >
-            <option value="">Selecciona un producto...</option>
+            <option value="">{t.studio.influencer.viral.selectProduct}</option>
             {products.map(p => (
               <option key={p.id} value={p.id}>{p.name}</option>
             ))}
           </select>
         ) : (
-          <p className="text-xs text-text-muted">No hay productos. Crea uno en el Banner Generator.</p>
+          <p className="text-xs text-text-muted">{t.studio.influencer.viral.noProducts}</p>
         )}
 
         {isLoadingContext && (
           <div className="flex items-center gap-2 mt-2">
             <Loader2 className="w-3 h-3 animate-spin text-accent" />
-            <span className="text-xs text-text-muted">Cargando contexto del producto...</span>
+            <span className="text-xs text-text-muted">{t.studio.influencer.viral.loadingContext}</span>
           </div>
         )}
       </div>
@@ -837,12 +839,12 @@ export function ViralTransformationMode({
       {/* Descripción del producto (pre-llenada o manual) */}
       <div>
         <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">
-          Descripción del Producto {productDescription ? '(del Banner Generator)' : ''}
+          {t.studio.influencer.viral.productDescription} {productDescription ? t.studio.influencer.viral.fromBannerGen : ''}
         </label>
         <textarea
           value={productDescription}
           onChange={(e) => setProductDescription(e.target.value)}
-          placeholder="Describe tu producto: qué es, qué hace, beneficios, puntos de dolor que resuelve..."
+          placeholder={t.studio.influencer.viral.productPlaceholder}
           rows={4}
           className="w-full px-3 py-2 bg-surface-elevated border border-border rounded-xl text-sm text-text-primary placeholder:text-text-muted/50 resize-none focus:outline-none focus:ring-2 focus:ring-accent/50"
         />
@@ -855,13 +857,13 @@ export function ViralTransformationMode({
           className="flex items-center gap-1.5 text-xs text-accent hover:text-accent/80 transition-colors"
         >
           {extraContext ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-          Agregar más contexto (opcional)
+          {t.studio.influencer.viral.addMoreContext}
         </button>
         {extraContext !== '' && (
           <textarea
             value={extraContext}
             onChange={(e) => setExtraContext(e.target.value)}
-            placeholder="Contexto adicional: competidores, público objetivo específico, estilo deseado..."
+            placeholder={t.studio.influencer.viral.extraContextPlaceholder}
             rows={2}
             className="w-full mt-2 px-3 py-2 bg-surface-elevated border border-border rounded-xl text-sm text-text-primary placeholder:text-text-muted/50 resize-none focus:outline-none focus:ring-2 focus:ring-accent/50"
           />
@@ -872,7 +874,7 @@ export function ViralTransformationMode({
       {filteredAngles.length > 0 && (
         <div>
           <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">
-            Ángulo de Venta
+            {t.studio.influencer.viral.salesAngle}
           </label>
           <div className="flex flex-wrap gap-2">
             {filteredAngles.map((angle) => (
@@ -901,10 +903,10 @@ export function ViralTransformationMode({
       {/* ============ VIDEO DE REFERENCIA ============ */}
       <div>
         <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">
-          Video de Referencia (opcional, max 60s)
+          {t.studio.influencer.viral.referenceVideo}
         </label>
         <p className="text-[11px] text-text-muted mb-2">
-          Sube un video viral de TikTok como referencia de estilo. La IA analizará su estructura, transiciones y ritmo para crear algo similar con tu producto.
+          {t.studio.influencer.viral.referenceVideoDesc}
         </p>
 
         {!referenceVideoUrl ? (
@@ -920,13 +922,13 @@ export function ViralTransformationMode({
             {isUploadingVideo ? (
               <div className="flex flex-col items-center gap-2">
                 <Loader2 className="w-6 h-6 text-accent animate-spin" />
-                <span className="text-xs text-text-muted">Subiendo video...</span>
+                <span className="text-xs text-text-muted">{t.studio.influencer.viral.uploadingVideo}</span>
               </div>
             ) : (
               <div className="flex flex-col items-center gap-2">
                 <Upload className="w-6 h-6 text-text-muted" />
-                <span className="text-xs text-text-muted">Arrastra o haz clic para subir</span>
-                <span className="text-[10px] text-text-muted/60">MP4, MOV, AVI — máx 100MB, 60 segundos</span>
+                <span className="text-xs text-text-muted">{t.studio.influencer.viral.dragOrClick}</span>
+                <span className="text-[10px] text-text-muted/60">{t.studio.influencer.viral.videoFormats}</span>
               </div>
             )}
           </div>
@@ -965,10 +967,10 @@ export function ViralTransformationMode({
       {/* ============ FOTOS DEL PRODUCTO ============ */}
       <div>
         <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">
-          Fotos del Producto (para referencia visual)
+          {t.studio.influencer.viral.productPhotos}
         </label>
         <p className="text-[11px] text-text-muted mb-2">
-          Sube fotos reales del producto. Se usarán como referencia visual para que el AI genere escenas con el producto correcto.
+          {t.studio.influencer.viral.productPhotosDesc}
         </p>
 
         <div className="flex flex-wrap gap-2 mb-2">
@@ -990,7 +992,7 @@ export function ViralTransformationMode({
           {productImageUrls.length < 3 && (
             <label className="w-20 h-20 rounded-lg border-2 border-dashed border-border hover:border-accent/50 flex flex-col items-center justify-center cursor-pointer transition-colors">
               <Upload className="w-4 h-4 text-text-muted" />
-              <span className="text-[9px] text-text-muted mt-0.5">Agregar</span>
+              <span className="text-[9px] text-text-muted mt-0.5">{t.studio.influencer.viral.addPhoto}</span>
               <input
                 type="file"
                 accept="image/*"
@@ -1013,7 +1015,7 @@ export function ViralTransformationMode({
                     if (signedData?.signedUrl) {
                       setProductImageUrls(prev => [...prev, signedData.signedUrl])
                       referenceImagesCache.current = null // Invalidate cache
-                      toast.success('Foto del producto agregada')
+                      toast.success(t.studio.influencer.viral.productPhotoAdded)
                     }
                   } catch {
                     toast.error('Error al subir la imagen')
@@ -1026,7 +1028,7 @@ export function ViralTransformationMode({
 
         {productImageUrls.length === 0 && (
           <p className="text-[10px] text-amber-400/70">
-            Sin fotos del producto. Las escenas se generarán solo con el prompt de texto.
+            {t.studio.influencer.viral.noProductPhotos}
           </p>
         )}
       </div>
@@ -1035,7 +1037,7 @@ export function ViralTransformationMode({
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">
-            Modelo de Video
+            {t.studio.influencer.viral.videoModel}
           </label>
           <select
             value={videoModelId}
@@ -1055,7 +1057,7 @@ export function ViralTransformationMode({
         </div>
         <div>
           <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">
-            Escenas ({sceneCount})
+            {t.studio.influencer.viral.scenes.replace('{count}', String(sceneCount))}
           </label>
           <input
             type="range"
@@ -1086,12 +1088,12 @@ export function ViralTransformationMode({
         {isGenerating ? (
           <>
             <Loader2 className="w-4 h-4 animate-spin" />
-            Analizando video y generando guión viral...
+            {t.studio.influencer.viral.analyzingAndGenerating}
           </>
         ) : (
           <>
             <Sparkles className="w-4 h-4" />
-            Generar Guión Viral ({sceneCount} escenas)
+            {t.studio.influencer.viral.generateViralScript.replace('{count}', String(sceneCount))}
           </>
         )}
       </button>
@@ -1112,12 +1114,12 @@ export function ViralTransformationMode({
             <h3 className="text-sm font-bold text-text-primary mb-1">{scriptResult.videoTitle}</h3>
             <p className="text-xs text-text-secondary">{scriptResult.videoConcept}</p>
             {scriptResult.detectedStyle && (
-              <p className="text-[11px] text-accent mt-1">Estilo detectado: <strong>{scriptResult.detectedStyle}</strong></p>
+              <p className="text-[11px] text-accent mt-1">{t.studio.influencer.viral.detectedStyle}: <strong>{scriptResult.detectedStyle}</strong></p>
             )}
             {scriptResult.referenceAnalysis && (
               <details className="mt-2 pt-2 border-t border-border">
                 <summary className="text-[11px] text-text-muted cursor-pointer hover:text-text-secondary">
-                  Ver análisis del video de referencia
+                  {t.studio.influencer.viral.viewReferenceAnalysis}
                 </summary>
                 <p className="text-[11px] text-text-muted mt-1 whitespace-pre-wrap">
                   {scriptResult.referenceAnalysis}
@@ -1127,7 +1129,7 @@ export function ViralTransformationMode({
             {scriptResult.fullScript && (
               <details className="mt-2 pt-2 border-t border-border">
                 <summary className="text-[11px] text-text-muted cursor-pointer hover:text-text-secondary">
-                  Ver guión completo
+                  {t.studio.influencer.viral.viewFullScript}
                 </summary>
                 <p className="text-[11px] text-text-primary mt-1 whitespace-pre-wrap">
                   {scriptResult.fullScript}
@@ -1153,7 +1155,7 @@ export function ViralTransformationMode({
                 className="w-full flex items-center justify-between p-3 bg-surface-elevated hover:bg-surface-elevated/80 transition-colors"
               >
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-text-primary">Escena {scene.sceneNumber}</span>
+                  <span className="text-xs font-bold text-text-primary">{t.studio.influencer.viral.sceneN.replace('{n}', String(scene.sceneNumber))}</span>
                   {scene.startsAtSecond != null && (
                     <span className="text-[10px] px-1.5 py-0.5 bg-surface border border-border rounded text-text-muted font-mono">
                       {scene.startsAtSecond}s–{scene.startsAtSecond + scene.duration}s
@@ -1164,7 +1166,7 @@ export function ViralTransformationMode({
                   </span>
                   {scene.complexity === 'high' && (
                     <span className="text-[10px] px-2 py-0.5 bg-red-500/15 text-red-400 rounded-full border border-red-500/30">
-                      Compleja
+                      {t.studio.influencer.viral.complex}
                     </span>
                   )}
                   <span className="text-[10px] text-text-muted">{scene.duration}s</span>
@@ -1184,7 +1186,7 @@ export function ViralTransformationMode({
                   {scene.influencerDialogue && (
                     <div>
                       <label className="block text-[10px] font-medium text-blue-400 uppercase tracking-wide mb-1">
-                        Diálogo del Influencer (Español)
+                        {t.studio.influencer.viral.influencerDialogue}
                       </label>
                       <textarea
                         value={scene.influencerDialogue}
@@ -1294,7 +1296,7 @@ export function ViralTransformationMode({
             <div className="flex items-center justify-between">
               <h4 className="text-xs font-bold text-text-primary flex items-center gap-1.5">
                 <Film className="w-3.5 h-3.5 text-accent" />
-                Generar Videos (Imagen + Animación)
+                {t.studio.influencer.viral.generateVideos}
               </h4>
               <div className="flex items-center gap-1.5">
                 {(['9:16', '16:9', '1:1'] as const).map(ar => (
@@ -1315,13 +1317,13 @@ export function ViralTransformationMode({
             </div>
 
             <p className="text-[10px] text-text-muted">
-              Cada escena genera una imagen nueva del escenario (del video de referencia) usando tu influencer y producto como referencia visual. Luego anima esa imagen.
+              {t.studio.influencer.viral.generateVideosDesc}
             </p>
 
             {/* Model selectors: Image + Video side by side */}
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="block text-[10px] text-text-muted mb-1">Modelo Imagen (fotograma)</label>
+                <label className="block text-[10px] text-text-muted mb-1">{t.studio.influencer.viral.imageModelLabel}</label>
                 <select
                   value={imageModelId}
                   onChange={(e) => setImageModelId(e.target.value)}
@@ -1335,7 +1337,7 @@ export function ViralTransformationMode({
                 </select>
               </div>
               <div>
-                <label className="block text-[10px] text-text-muted mb-1">Modelo Video (animación)</label>
+                <label className="block text-[10px] text-text-muted mb-1">{t.studio.influencer.viral.videoModelLabel}</label>
                 <select
                   value={videoModelId}
                   onChange={(e) => setVideoModelId(e.target.value as VideoModelId)}
@@ -1492,7 +1494,7 @@ export function ViralTransformationMode({
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-accent hover:bg-accent/90 text-white rounded-xl text-xs font-bold transition-colors"
                 >
                   <Zap className="w-3.5 h-3.5" />
-                  Generar Todo en Paralelo
+                  {t.studio.influencer.viral.generateAllParallel}
                 </button>
               ) : (
                 <button
@@ -1500,7 +1502,7 @@ export function ViralTransformationMode({
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-bold transition-colors"
                 >
                   <AlertCircle className="w-3.5 h-3.5" />
-                  Cancelar
+                  {t.studio.influencer.viral.cancel}
                 </button>
               )}
               {/* Send completed videos to editor — in scene order */}
