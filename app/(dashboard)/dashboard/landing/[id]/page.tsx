@@ -2208,9 +2208,9 @@ export default function ProductGeneratePage() {
                         ) : (
                           <>
                             <Sparkles className="w-5 h-5" />
-                            Generar {selectedAngleIds.size} Landing{selectedAngleIds.size > 1 ? 's' : ''} Completa{selectedAngleIds.size > 1 ? 's' : ''}
+                            {t.landing.generateFull} {selectedAngleIds.size} {selectedAngleIds.size > 1 ? t.landing.landingsComplete : t.landing.landingComplete}
                             <span className="text-sm font-normal opacity-80">
-                              ({selectedAngleIds.size} x {selectedSections.size} = {selectedAngleIds.size * selectedSections.size} banners)
+                              ({selectedAngleIds.size} x {selectedSections.size} = {selectedAngleIds.size * selectedSections.size} {t.landing.banners})
                             </span>
                           </>
                         )}
@@ -2231,7 +2231,7 @@ export default function ProductGeneratePage() {
                       )}
 
                       <p className="text-xs text-text-secondary text-center mt-2">
-                        Se generaran {selectedAngleIds.size * selectedSections.size} banners en paralelo (maximo 3 simultaneos)
+                        {t.landing.willGenerate} {selectedAngleIds.size * selectedSections.size} {t.landing.bannersParallel}
                       </p>
                     </div>
                   )}
