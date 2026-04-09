@@ -426,6 +426,70 @@ async function removeBackgroundFal(
 }
 
 /**
+ * Remove background using KIE recraft/remove-background.
+ * Needs image URL (not base64). Returns base64 PNG.
+ */
+async function removeBackgroundKIE(
+  imageUrl: string,
+  apiKey: string,
+  timeoutMs: number = 60000
+): Promise<{ success: boolean; imageBase64?: string; error?: string }> {
+  console.log('[Tools/KIE-bg] Starting recraft/remove-background...')
+  try {
+    const createRes = await fetch(`${KIE_API_BASE}/jobs/createTask`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'recraft/remove-background', input: { image: imageUrl } }),
+    })
+    if (!createRes.ok) return { success: false, error: `KIE bg: ${createRes.status}` }
+    const createData = await createRes.json()
+    if (createData.code !== 200 && createData.code !== 0) {
+      return { success: false, error: `KIE bg: ${createData.msg || 'error'}` }
+    }
+    const taskId = createData.data?.taskId || createData.taskId
+    if (!taskId) return { success: false, error: 'KIE bg: no taskId' }
+
+    console.log(`[Tools/KIE-bg] Task: ${taskId}, polling...`)
+    const start = Date.now()
+    while (Date.now() - start < timeoutMs) {
+      await new Promise(r => setTimeout(r, 2000))
+      const statusRes = await fetch(`${KIE_API_BASE}/jobs/recordInfo?taskId=${taskId}`, {
+        headers: { Authorization: `Bearer ${apiKey}` },
+      })
+      if (!statusRes.ok) continue
+      const statusData = await statusRes.json()
+      const taskData = statusData.data || statusData
+      const state = taskData.state || ''
+
+      if (state === 'success' || state === 'completed') {
+        let resultUrls: string[] = []
+        if (taskData.resultJson) {
+          try {
+            const r = typeof taskData.resultJson === 'string' ? JSON.parse(taskData.resultJson) : taskData.resultJson
+            resultUrls = r.resultUrls || r.images || []
+          } catch {}
+        }
+        if (resultUrls.length > 0) {
+          const imgRes = await fetch(resultUrls[0])
+          const buf = await imgRes.arrayBuffer()
+          const base64 = Buffer.from(buf).toString('base64')
+          console.log(`[Tools/KIE-bg] Success! (${base64.length} chars)`)
+          return { success: true, imageBase64: base64 }
+        }
+        return { success: false, error: 'KIE bg: no result URL' }
+      }
+      if (state === 'fail' || state === 'failed' || state === 'error') {
+        return { success: false, error: `KIE bg: ${taskData.failMsg || 'failed'}` }
+      }
+    }
+    return { success: false, error: 'KIE bg: timeout' }
+  } catch (err: any) {
+    console.error('[Tools/KIE-bg] Error:', err.message)
+    return { success: false, error: err.message || 'KIE bg: error' }
+  }
+}
+
+/**
  * Remove background using BFL FLUX Kontext Pro
  * Uses polling to wait for the result
  */
@@ -1057,10 +1121,32 @@ export async function POST(request: Request) {
 
       // ========================================
       // Background removal
-      // Cascade: BFL flux-kontext-pro → fal.ai birefnet
+      // Cascade: KIE recraft → BFL flux-kontext-pro → fal.ai birefnet
       // ========================================
       case 'remove-bg': {
         const bgErrors: string[] = []
+
+        // ── Step 0: KIE recraft/remove-background (needs URL) ──
+        const bgKieKey = profile.kie_api_key
+          ? (() => { try { return decrypt(profile.kie_api_key) } catch { return null } })()
+          : null
+        const bgKieApiKey = bgKieKey || process.env.KIE_API_KEY
+
+        if (bgKieApiKey) {
+          const tempUrl = await uploadTempForCascade(supabase, user.id, imageBase64, mimeType)
+          if (tempUrl) {
+            const result = await removeBackgroundKIE(tempUrl, bgKieApiKey, 60000)
+            cleanupTempImage(supabase, tempUrl)
+            if (result.success && result.imageBase64) {
+              console.log('[Tools] remove-bg succeeded via KIE recraft')
+              const r2Url = await tryUploadToR2(user.id, Buffer.from(result.imageBase64, 'base64'), `tools/remove-bg/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.png`, 'image/png')
+              if (r2Url) console.log('[Tools] ✓ remove-bg saved to R2:', r2Url)
+              return NextResponse.json({ success: true, imageBase64: result.imageBase64, mimeType: 'image/png', r2Url })
+            }
+            bgErrors.push(`KIE: ${result.error}`)
+            console.error('[Tools] remove-bg KIE failed:', result.error)
+          }
+        }
 
         // ── Step 1: BFL flux-kontext-pro (accepts base64 directly) ──
         const bflKey = profile.bfl_api_key
@@ -1103,7 +1189,7 @@ export async function POST(request: Request) {
         }
 
         if (bgErrors.length === 0) {
-          return NextResponse.json({ error: 'Configura tu API key de BFL o fal.ai en Settings' }, { status: 400 })
+          return NextResponse.json({ error: 'No API key available for background removal' }, { status: 400 })
         }
         return NextResponse.json({ error: bgErrors[bgErrors.length - 1] || 'Error al quitar fondo' }, { status: 500 })
       }
