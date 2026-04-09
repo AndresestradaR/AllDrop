@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils/cn'
 import { Sparkles, Loader2, RefreshCw, Check } from 'lucide-react'
 import { IMAGE_MODELS, STUDIO_COMPANY_GROUPS, type ImageModelId } from '@/lib/image-providers/types'
+import { useI18n } from '@/lib/i18n'
 
 interface Step4BodyProps {
   influencerId: string
@@ -16,18 +17,6 @@ interface Step4BodyProps {
   onBack: () => void
 }
 
-const BODY_GRID_LABELS = [
-  'Cuerpo completo, frontal',
-  'Cuerpo completo, 3/4 frontal',
-  'Cuerpo completo, perfil',
-  'Tres cuartos, pose casual',
-  'Cuerpo completo, espalda',
-  'Tres cuartos, 3/4 posterior',
-  'Cuerpo completo, caminando',
-  'Cuerpo completo, sentado',
-  'Cuerpo completo, pose dinamica',
-]
-
 export function Step4Body({
   influencerId,
   realisticImageUrl,
@@ -38,6 +27,9 @@ export function Step4Body({
   onComplete,
   onBack,
 }: Step4BodyProps) {
+  const { t } = useI18n()
+  const s = t.studio.influencer.step4body
+
   const [isGenerating, setIsGenerating] = useState(false)
   const [gridImage, setGridImage] = useState<string | null>(null)
   const [gridUrl, setGridUrl] = useState<string | null>(null)
@@ -92,12 +84,12 @@ export function Step4Body({
   return (
     <div className="max-w-3xl mx-auto">
       <p className="text-sm text-text-secondary mb-5">
-        Generaremos un grid con poses de cuerpo completo de tu influencer para mayor consistencia en contenido.
+        {s.description}
       </p>
 
       {/* Model selector */}
       <div className="mb-4">
-        <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">Modelo de IA</label>
+        <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">{s.aiModel}</label>
         <select
           value={modelId}
           onChange={(e) => onModelChange(e.target.value as ImageModelId)}
@@ -119,8 +111,8 @@ export function Step4Body({
           className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
         />
         <div>
-          <p className="text-sm font-medium text-text-primary">Imagen hiperrealista</p>
-          <p className="text-xs text-text-secondary">Se usara como referencia para el grid de cuerpo completo</p>
+          <p className="text-sm font-medium text-text-primary">{s.hyperrealisticImage}</p>
+          <p className="text-xs text-text-secondary">{s.referenceForBodyGrid}</p>
         </div>
       </div>
 
@@ -132,7 +124,7 @@ export function Step4Body({
           </div>
           {/* Grid labels */}
           <div className="grid grid-cols-3 gap-1 mt-2">
-            {BODY_GRID_LABELS.map((label, i) => (
+            {s.gridLabels.map((label: string, i: number) => (
               <p key={i} className="text-[10px] text-text-muted text-center py-1">{label}</p>
             ))}
           </div>
@@ -141,8 +133,8 @@ export function Step4Body({
         <div className="flex items-center justify-center py-16 bg-surface-elevated rounded-xl border border-border mb-4">
           <div className="text-center">
             <Loader2 className="w-10 h-10 text-accent animate-spin mx-auto mb-3" />
-            <p className="text-sm text-text-secondary">Generando grid de cuerpo completo...</p>
-            <p className="text-xs text-text-muted mt-1">Esto puede tomar hasta 2 minutos</p>
+            <p className="text-sm text-text-secondary">{s.generatingBodyGrid}</p>
+            <p className="text-xs text-text-muted mt-1">{s.canTakeMinutes}</p>
           </div>
         </div>
       ) : null}
@@ -160,7 +152,7 @@ export function Step4Body({
             className="flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold bg-accent hover:bg-accent-hover text-background shadow-lg shadow-accent/25 transition-all"
           >
             <Check className="w-5 h-5" />
-            Continuar
+            {s.continue}
           </button>
           <button
             onClick={handleGenerate}
@@ -168,7 +160,7 @@ export function Step4Body({
             className="flex items-center gap-2 px-4 py-3 rounded-xl font-medium bg-surface-elevated border border-border text-text-secondary hover:text-text-primary transition-all"
           >
             {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-            Regenerar
+            {s.regenerate}
           </button>
         </div>
       ) : !isGenerating ? (
@@ -178,7 +170,7 @@ export function Step4Body({
           className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-semibold bg-accent hover:bg-accent-hover text-background shadow-lg shadow-accent/25 transition-all"
         >
           <Sparkles className="w-5 h-5" />
-          Generar Grid de Cuerpo
+          {s.generateBodyGrid}
         </button>
       ) : null}
     </div>

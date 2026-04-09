@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils/cn'
 import { Sparkles, Loader2, ChevronDown, ChevronRight, Copy, Check, Pencil } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { useI18n } from '@/lib/i18n'
 
 interface Step4AnalysisProps {
   influencerId: string
@@ -14,22 +15,6 @@ interface Step4AnalysisProps {
   onBack: () => void
 }
 
-const LOADING_MESSAGES = [
-  'Analizando estructura facial...',
-  'Examinando textura de piel y detalles...',
-  'Catalogando cabello y accesorios...',
-  'Generando ADN visual completo...',
-]
-
-const SECTION_LABELS: Record<string, string> = {
-  face: 'Rostro',
-  hair: 'Cabello',
-  expression_and_body_language: 'Expresion y Lenguaje Corporal',
-  clothing: 'Vestimenta',
-  accessories: 'Accesorios',
-  immediate_visual_context: 'Contexto Visual',
-}
-
 export function Step4Analysis({
   influencerId,
   realisticImageUrl,
@@ -38,6 +23,25 @@ export function Step4Analysis({
   onComplete,
   onBack,
 }: Step4AnalysisProps) {
+  const { t } = useI18n()
+  const s = t.studio.influencer.step4analysis
+
+  const LOADING_MESSAGES = [
+    s.analyzingFace,
+    s.analyzingSkin,
+    s.analyzingHair,
+    s.generatingDna,
+  ]
+
+  const SECTION_LABELS: Record<string, string> = {
+    face: s.sectionFace,
+    hair: s.sectionHair,
+    expression_and_body_language: s.sectionExpression,
+    clothing: s.sectionClothing,
+    accessories: s.sectionAccessories,
+    immediate_visual_context: s.sectionContext,
+  }
+
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [loadingMsgIdx, setLoadingMsgIdx] = useState(0)
   const [visualDna, setVisualDna] = useState<string | null>(null)
@@ -108,10 +112,10 @@ export function Step4Analysis({
     try {
       await navigator.clipboard.writeText(text)
       setCopiedField(field)
-      toast.success('Copiado al portapapeles')
+      toast.success(s.copiedToClipboard)
       setTimeout(() => setCopiedField(null), 2000)
     } catch {
-      toast.error('Error al copiar')
+      toast.error(s.copyError)
     }
   }
 
@@ -123,23 +127,23 @@ export function Step4Analysis({
   return (
     <div className="max-w-3xl mx-auto">
       <p className="text-sm text-text-secondary mb-5">
-        Extraeremos cada detalle de tu influencer. Este analisis se usara para mantener consistencia en todas las imagenes y videos futuros.
+        {s.description}
       </p>
 
       {/* Reference thumbnails */}
       <div className="flex gap-3 mb-5">
         <div className="flex items-center gap-2 p-2 bg-surface-elevated rounded-xl border border-border flex-1">
           <img src={realisticImageUrl} alt="Realistic" className="w-12 h-12 rounded-lg object-cover flex-shrink-0" />
-          <p className="text-xs text-text-secondary">Foto realista</p>
+          <p className="text-xs text-text-secondary">{s.realisticPhoto}</p>
         </div>
         <div className="flex items-center gap-2 p-2 bg-surface-elevated rounded-xl border border-border flex-1">
           <img src={anglesGridUrl} alt="Angles" className="w-12 h-12 rounded-lg object-cover flex-shrink-0" />
-          <p className="text-xs text-text-secondary">Grid de angulos</p>
+          <p className="text-xs text-text-secondary">{s.anglesGrid}</p>
         </div>
         {bodyGridUrl && (
           <div className="flex items-center gap-2 p-2 bg-surface-elevated rounded-xl border border-border flex-1">
             <img src={bodyGridUrl} alt="Body" className="w-12 h-12 rounded-lg object-cover flex-shrink-0" />
-            <p className="text-xs text-text-secondary">Grid de cuerpo</p>
+            <p className="text-xs text-text-secondary">{s.bodyGrid}</p>
           </div>
         )}
       </div>
@@ -149,7 +153,7 @@ export function Step4Analysis({
         <div className="flex flex-col items-center justify-center py-16 bg-surface-elevated rounded-xl border border-border mb-4">
           <Loader2 className="w-10 h-10 text-accent animate-spin mb-4" />
           <p className="text-sm text-text-primary font-medium">{LOADING_MESSAGES[loadingMsgIdx]}</p>
-          <p className="text-xs text-text-muted mt-2">Analizando con Gemini Pro...</p>
+          <p className="text-xs text-text-muted mt-2">{s.analyzingWith}</p>
         </div>
       )}
 
@@ -171,14 +175,14 @@ export function Step4Analysis({
                     }
                   }}
                   className="p-1.5 rounded-lg hover:bg-accent/10 text-accent transition-colors"
-                  title={isEditing ? 'Guardar edicion' : 'Editar'}
+                  title={isEditing ? s.saveEdit : s.editLabel}
                 >
                   {isEditing ? <Check className="w-3.5 h-3.5" /> : <Pencil className="w-3.5 h-3.5" />}
                 </button>
                 <button
                   onClick={() => handleCopy(isEditing ? editableDescriptor : promptDescriptor, 'descriptor')}
                   className="p-1.5 rounded-lg hover:bg-accent/10 text-accent transition-colors"
-                  title="Copiar"
+                  title={s.copy}
                 >
                   {copiedField === 'descriptor' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                 </button>
@@ -230,7 +234,7 @@ export function Step4Analysis({
             className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-surface-elevated border border-border text-text-secondary hover:text-text-primary transition-all"
           >
             {copiedField === 'full' ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-            Copiar analisis completo
+            {s.copyFullAnalysis}
           </button>
         </div>
       )}
@@ -248,7 +252,7 @@ export function Step4Analysis({
           className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-semibold bg-accent hover:bg-accent-hover text-background shadow-lg shadow-accent/25 transition-all"
         >
           <Check className="w-5 h-5" />
-          Guardar y Continuar
+          {s.saveAndContinue}
         </button>
       ) : !isAnalyzing ? (
         <button
@@ -256,7 +260,7 @@ export function Step4Analysis({
           className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-semibold bg-accent hover:bg-accent-hover text-background shadow-lg shadow-accent/25 transition-all"
         >
           <Sparkles className="w-5 h-5" />
-          Analizar a Profundidad
+          {s.analyzeInDepth}
         </button>
       ) : null}
     </div>

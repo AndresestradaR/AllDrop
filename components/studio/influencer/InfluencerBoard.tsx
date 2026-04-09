@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { ArrowLeft, Heart, Download, Image as ImageIcon, Video, X, Grid3X3, LayoutGrid, Loader2, Share2, Film, Check } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
 import toast from 'react-hot-toast'
+import { useI18n } from '@/lib/i18n'
 import { PublisherModal } from '../PublisherModal'
 
 interface InfluencerBoardProps {
@@ -21,6 +22,9 @@ export function InfluencerBoard({
   onCreateVideo,
   onSendToEditor,
 }: InfluencerBoardProps) {
+  const { t } = useI18n()
+  const s = t.studio.influencer.board
+
   const [items, setItems] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<'all' | 'images' | 'videos' | 'favorites'>('all')
@@ -77,9 +81,9 @@ export function InfluencerBoard({
       a.download = `${influencer.name}_${Date.now()}.${ext}`
       a.click()
       URL.revokeObjectURL(blobUrl)
-      toast.success('Descargado')
+      toast.success(s.downloaded)
     } catch {
-      toast.error('Error al descargar')
+      toast.error(s.downloadError)
     }
   }
 
@@ -89,10 +93,10 @@ export function InfluencerBoard({
       if (res.ok) {
         setItems(prev => prev.filter(g => g.id !== item.id))
         setLightboxItem(null)
-        toast.success('Eliminado')
+        toast.success(s.deleted)
       }
     } catch {
-      toast.error('Error al eliminar')
+      toast.error(s.deleteError)
     }
   }
 
@@ -145,10 +149,10 @@ export function InfluencerBoard({
             </button>
             <div>
               <h2 className="text-lg font-semibold text-text-primary">
-                Pizarra de {influencer.name}
+                {s.boardOf.replace('{name}', influencer.name)}
               </h2>
               <p className="text-sm text-text-secondary">
-                {imageCount} fotos, {videoCount} videos
+                {s.photosVideos.replace('{photos}', String(imageCount)).replace('{videos}', String(videoCount))}
               </p>
             </div>
           </div>
@@ -179,10 +183,10 @@ export function InfluencerBoard({
         {/* Filters */}
         <div className="flex items-center gap-2 px-6 py-3 border-b border-border">
           {([
-            { key: 'all', label: 'Todo' },
-            { key: 'images', label: 'Fotos' },
-            { key: 'videos', label: 'Videos' },
-            { key: 'favorites', label: 'Favoritos' },
+            { key: 'all', label: s.all },
+            { key: 'images', label: s.photos },
+            { key: 'videos', label: s.videos },
+            { key: 'favorites', label: s.favorites },
           ] as const).map(f => (
             <button
               key={f.key}
@@ -212,7 +216,7 @@ export function InfluencerBoard({
               )}
             >
               <Film className="w-3.5 h-3.5" />
-              {isSelectMode ? 'Cancelar' : 'Editar videos'}
+              {isSelectMode ? s.cancel : s.editVideos}
             </button>
           )}
           <button
@@ -220,14 +224,14 @@ export function InfluencerBoard({
             className="flex items-center gap-1.5 px-3 py-1.5 bg-accent/10 text-accent hover:bg-accent/20 rounded-lg text-xs font-medium transition-all"
           >
             <ImageIcon className="w-3.5 h-3.5" />
-            Crear Foto
+            {s.createPhoto}
           </button>
           <button
             onClick={onCreateVideo}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-surface-elevated text-text-secondary hover:text-text-primary rounded-lg text-xs font-medium transition-all border border-border"
           >
             <Video className="w-3.5 h-3.5" />
-            Crear Video
+            {s.createVideo}
           </button>
         </div>
 
@@ -241,9 +245,9 @@ export function InfluencerBoard({
             <div className="text-center py-16">
               <ImageIcon className="w-12 h-12 text-text-muted mx-auto mb-3" />
               <p className="text-sm text-text-muted">
-                {filter === 'all' ? 'No hay contenido generado aun' : `No hay ${filter === 'images' ? 'fotos' : filter === 'videos' ? 'videos' : 'favoritos'}`}
+                {filter === 'all' ? s.noContent : filter === 'images' ? s.noPhotos : filter === 'videos' ? s.noVideos : s.noFavorites}
               </p>
-              <p className="text-xs text-text-muted mt-1">Usa los botones de arriba para crear contenido</p>
+              <p className="text-xs text-text-muted mt-1">{s.useButtonsAbove}</p>
             </div>
           ) : (
             <div className={cn(
@@ -312,7 +316,7 @@ export function InfluencerBoard({
                     {/* "No es video" indicator in select mode */}
                     {isSelectMode && !isVideo && (
                       <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-                        <span className="text-[10px] text-white/60 font-medium">Solo videos</span>
+                        <span className="text-[10px] text-white/60 font-medium">{s.onlyVideos}</span>
                       </div>
                     )}
 
@@ -376,14 +380,16 @@ export function InfluencerBoard({
       {isSelectMode && selectedVideoIds.size > 0 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 px-5 py-3 bg-[#1a1a1a] border border-pink-500/30 rounded-2xl shadow-2xl shadow-black/50">
           <span className="text-sm text-white font-medium">
-            {selectedVideoIds.size} video{selectedVideoIds.size > 1 ? 's' : ''} seleccionado{selectedVideoIds.size > 1 ? 's' : ''}
+            {selectedVideoIds.size > 1
+              ? s.videosSelected.replace('{count}', String(selectedVideoIds.size))
+              : s.videoSelected.replace('{count}', String(selectedVideoIds.size))}
           </span>
           <button
             onClick={handleSendToEditor}
             className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 text-white rounded-xl text-sm font-semibold transition-all shadow-lg shadow-pink-500/25"
           >
             <Film className="w-4 h-4" />
-            Enviar al Editor
+            {s.sendToEditor}
           </button>
         </div>
       )}

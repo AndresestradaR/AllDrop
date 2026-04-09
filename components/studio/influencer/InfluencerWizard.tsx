@@ -336,7 +336,7 @@ export function InfluencerWizard({ onBack }: { onBack: () => void }) {
                               </span>
                             ) : (
                               <span className="text-[10px] px-2 py-0.5 bg-amber-500/15 text-amber-400 rounded-full font-medium">
-                                Paso {step}/5
+                                {sinf.stepLabel.replace('{n}', String(step))}
                               </span>
                             )}
                           </div>
@@ -387,7 +387,7 @@ export function InfluencerWizard({ onBack }: { onBack: () => void }) {
             </button>
             <div>
               <h2 className="text-lg font-semibold text-text-primary">{activeInfluencer.name}</h2>
-              <p className="text-sm text-text-secondary">Resumen del influencer</p>
+              <p className="text-sm text-text-secondary">{sinf.summaryView}</p>
             </div>
           </div>
 
@@ -460,7 +460,7 @@ export function InfluencerWizard({ onBack }: { onBack: () => void }) {
           </button>
           <div>
             <h2 className="text-lg font-semibold text-text-primary">{getStepTitle()}</h2>
-            <p className="text-sm text-text-secondary">Paso {currentStep} de 7</p>
+            <p className="text-sm text-text-secondary">{sinf.stepNofM.replace('{n}', String(currentStep))}</p>
           </div>
         </div>
 

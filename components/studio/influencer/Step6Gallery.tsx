@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils/cn'
 import { Sparkles, Loader2, RefreshCw, Upload, Shuffle, Heart, Download, X, Share2, RectangleVertical, RectangleHorizontal, Square, Image as ImageIcon } from 'lucide-react'
 import { IMAGE_MODELS, STUDIO_COMPANY_GROUPS, type ImageModelId } from '@/lib/image-providers/types'
 import toast from 'react-hot-toast'
+import { useI18n } from '@/lib/i18n'
 import { PublisherModal } from '@/components/studio/PublisherModal'
 
 interface Step6GalleryProps {
@@ -45,21 +46,11 @@ const RANDOM_SITUATIONS = [
   'En un festival de musica, multitud de fondo, vibra energetica',
 ]
 
-const PRODUCT_POSITIONS = [
-  { v: 'en_la_mano', l: 'En la mano' },
-  { v: 'junto_al_rostro', l: 'Junto al rostro' },
-  { v: 'en_la_mesa', l: 'En la mesa' },
-  { v: 'usando', l: 'Usandolo' },
-]
+// Product positions will be translated inside the component
 
 type AspectRatio = '9:16' | '16:9' | '1:1' | '4:5'
 
-const ASPECT_RATIOS: { value: AspectRatio; label: string; sublabel: string; icon: typeof RectangleVertical }[] = [
-  { value: '9:16', label: 'Vertical', sublabel: 'Stories/TikTok', icon: RectangleVertical },
-  { value: '16:9', label: 'Horizontal', sublabel: 'YouTube', icon: RectangleHorizontal },
-  { value: '1:1', label: 'Cuadrado', sublabel: 'Feed', icon: Square },
-  { value: '4:5', label: 'Post IG', sublabel: 'Instagram', icon: ImageIcon },
-]
+// Aspect ratios will be translated inside the component
 
 function getAspectClass(ratio?: string): string {
   switch (ratio) {
@@ -91,6 +82,23 @@ export function Step6Gallery({
   onModelChange,
   onBack,
 }: Step6GalleryProps) {
+  const { t } = useI18n()
+  const s = t.studio.influencer.step6
+
+  const PRODUCT_POSITIONS = [
+    { v: 'en_la_mano', l: s.inHand },
+    { v: 'junto_al_rostro', l: s.nearFace },
+    { v: 'en_la_mesa', l: s.onTable },
+    { v: 'usando', l: s.wearing },
+  ]
+
+  const ASPECT_RATIOS: { value: AspectRatio; label: string; sublabel: string; icon: typeof RectangleVertical }[] = [
+    { value: '9:16', label: s.vertical, sublabel: 'Stories/TikTok', icon: RectangleVertical },
+    { value: '16:9', label: s.horizontal, sublabel: 'YouTube', icon: RectangleHorizontal },
+    { value: '1:1', label: s.square, sublabel: 'Feed', icon: Square },
+    { value: '4:5', label: s.igPost, sublabel: 'Instagram', icon: ImageIcon },
+  ]
+
   const [mode, setMode] = useState<'solo' | 'with_product'>('solo')
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>('9:16')
   const [situation, setSituation] = useState('')
@@ -183,7 +191,7 @@ export function Step6Gallery({
 
   const handleGenerate = async () => {
     if (!situation.trim()) {
-      toast.error('Escribe o genera una situacion')
+      toast.error(s.writeSituation)
       return
     }
 
@@ -228,7 +236,7 @@ export function Step6Gallery({
       }
 
       setGallery(prev => [newItem, ...prev])
-      toast.success('Imagen generada')
+      toast.success(s.imageGenerated)
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -247,7 +255,7 @@ export function Step6Gallery({
       a.click()
       URL.revokeObjectURL(url)
     } catch {
-      toast.error('Error al descargar')
+      toast.error(s.downloadError)
     }
   }
 
@@ -273,22 +281,22 @@ export function Step6Gallery({
     try {
       await fetch(`/api/studio/influencer/gallery?id=${item.id}`, { method: 'DELETE' })
       setGallery(prev => prev.filter(g => g.id !== item.id))
-      toast.success('Imagen eliminada')
+      toast.success(s.imageDeleted)
     } catch {
-      toast.error('Error al eliminar')
+      toast.error(s.deleteError)
     }
   }
 
   return (
     <div className="max-w-3xl mx-auto">
       <p className="text-sm text-text-secondary mb-5">
-        Genera contenido con tu influencer. Elige una situacion y crea imagenes unicas.
+        {s.description}
       </p>
 
       {/* Warning if no prompt descriptor */}
       {!promptDescriptor && (
         <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl mb-4">
-          <p className="text-sm text-amber-400">Sin prompt descriptor. Las imagenes pueden no mantener consistencia.</p>
+          <p className="text-sm text-amber-400">{s.noDescriptorWarning}</p>
         </div>
       )}
 
@@ -301,7 +309,7 @@ export function Step6Gallery({
             mode === 'solo' ? 'bg-accent text-background shadow-lg shadow-accent/25' : 'bg-surface-elevated text-text-secondary hover:text-text-primary'
           )}
         >
-          Solo
+          {s.solo}
         </button>
         <button
           onClick={() => setMode('with_product')}
@@ -310,13 +318,13 @@ export function Step6Gallery({
             mode === 'with_product' ? 'bg-accent text-background shadow-lg shadow-accent/25' : 'bg-surface-elevated text-text-secondary hover:text-text-primary'
           )}
         >
-          Con Producto
+          {s.withProduct}
         </button>
       </div>
 
       {/* Model selector */}
       <div className="mb-4">
-        <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">Modelo de IA</label>
+        <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">{s.aiModel}</label>
         <select
           value={modelId}
           onChange={(e) => onModelChange(e.target.value as ImageModelId)}
@@ -334,17 +342,17 @@ export function Step6Gallery({
       {mode === 'with_product' && (
         <div className="space-y-3 mb-4 p-4 bg-surface-elevated rounded-xl border border-border">
           <div>
-            <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">Nombre del producto</label>
+            <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">{s.productName}</label>
             <input
               value={productName}
               onChange={(e) => setProductName(e.target.value)}
-              placeholder="Ej: Perfume Channel N°5"
+              placeholder={s.productNamePlaceholder}
               className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/50"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">Posicion del producto</label>
+            <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">{s.productPosition}</label>
             <div className="flex gap-2 flex-wrap">
               {PRODUCT_POSITIONS.map(p => (
                 <button
@@ -364,7 +372,7 @@ export function Step6Gallery({
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">Imagen del producto (opcional)</label>
+            <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">{s.productImage}</label>
             {productPreview ? (
               <div className="relative inline-block">
                 <img src={productPreview} alt="Product" className="w-24 h-24 rounded-xl object-cover border border-border" />
@@ -379,7 +387,7 @@ export function Step6Gallery({
               <label className="flex items-center gap-2 px-4 py-3 border border-dashed border-border rounded-xl cursor-pointer hover:border-accent/50 transition-colors">
                 <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleProductFileSelect} />
                 <Upload className="w-4 h-4 text-text-muted" />
-                <span className="text-xs text-text-secondary">Subir imagen de producto</span>
+                <span className="text-xs text-text-secondary">{s.uploadProductImage}</span>
               </label>
             )}
           </div>
@@ -388,19 +396,19 @@ export function Step6Gallery({
 
       {/* Situation input */}
       <div className="mb-4">
-        <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">Situacion / Escena</label>
+        <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">{s.situation}</label>
         <div className="relative">
           <textarea
             value={situation}
             onChange={(e) => setSituation(e.target.value)}
-            placeholder="Describe la situacion o escena para la foto..."
+            placeholder={s.situationPlaceholder}
             rows={3}
             className="w-full px-3 py-2 bg-surface-elevated border border-border rounded-xl text-sm text-text-primary placeholder:text-text-muted resize-none focus:outline-none focus:ring-2 focus:ring-accent/50 pr-12"
           />
           <button
             onClick={handleRandomSituation}
             className="absolute top-2 right-2 p-2 rounded-lg hover:bg-border/50 text-text-secondary hover:text-accent transition-colors"
-            title="Situacion aleatoria"
+            title={s.randomSituation}
           >
             <Shuffle className="w-4 h-4" />
           </button>
@@ -409,7 +417,7 @@ export function Step6Gallery({
 
       {/* Aspect Ratio selector */}
       <div className="mb-4">
-        <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">Formato de imagen</label>
+        <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">{s.imageFormat}</label>
         <div className="flex gap-2">
           {ASPECT_RATIOS.map(ar => {
             const Icon = ar.icon
@@ -453,12 +461,12 @@ export function Step6Gallery({
         {isGenerating ? (
           <>
             <Loader2 className="w-5 h-5 animate-spin" />
-            Generando contenido...
+            {s.generatingContent}
           </>
         ) : (
           <>
             <Sparkles className="w-5 h-5" />
-            Generar Imagen
+            {s.generateImage}
           </>
         )}
       </button>
@@ -467,7 +475,7 @@ export function Step6Gallery({
       <div className="mt-6">
         <div className="flex items-center justify-between mb-3">
           <h4 className="text-xs font-semibold text-text-muted uppercase tracking-wide">
-            Galeria de {influencerName} ({gallery.length})
+            {s.galleryOf.replace('{name}', influencerName).replace('{count}', String(gallery.length))}
           </h4>
           <div className="flex gap-1">
             {(['all', 'favorites', 'solo', 'with_product'] as const).map(f => (
@@ -481,7 +489,7 @@ export function Step6Gallery({
                     : 'text-text-muted hover:text-text-secondary'
                 )}
               >
-                {f === 'all' ? 'Todas' : f === 'favorites' ? 'Favoritas' : f === 'solo' ? 'Solo' : 'Producto'}
+                {f === 'all' ? s.all : f === 'favorites' ? s.favorites : f === 'solo' ? s.solo : s.product}
               </button>
             ))}
           </div>
@@ -494,7 +502,7 @@ export function Step6Gallery({
         ) : filteredGallery.length === 0 ? (
           <div className="text-center py-8">
             <p className="text-sm text-text-muted">
-              {galleryFilter === 'all' ? 'No hay imagenes aun. Genera tu primer contenido!' : 'No hay imagenes en esta categoria'}
+              {galleryFilter === 'all' ? s.noImages : s.noCategoryImages}
             </p>
           </div>
         ) : (
@@ -600,7 +608,7 @@ export function Step6Gallery({
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-white/20 rounded-lg text-xs text-white hover:bg-white/30 transition-colors"
                 >
                   <Download className="w-3.5 h-3.5" />
-                  Descargar
+                  {s.download}
                 </button>
               </div>
             </div>

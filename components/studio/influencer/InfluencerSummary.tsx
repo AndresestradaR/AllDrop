@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { Copy, Check, Pencil, Loader2, Heart, Download, Image as ImageIcon, Video, LayoutGrid, Share2, X, Film, CheckSquare, Square } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
 import toast from 'react-hot-toast'
+import { useI18n } from '@/lib/i18n'
 import { PublisherModal } from '../PublisherModal'
 
 interface InfluencerSummaryProps {
@@ -25,6 +26,9 @@ export function InfluencerSummary({
   onBack,
   onSendToEditor,
 }: InfluencerSummaryProps) {
+  const { t } = useI18n()
+  const s = t.studio.influencer.summary
+
   const [isEditingName, setIsEditingName] = useState(false)
   const [name, setName] = useState(influencer.name || 'Mi Influencer')
   const [copiedField, setCopiedField] = useState<string | null>(null)
@@ -62,10 +66,10 @@ export function InfluencerSummary({
     try {
       await navigator.clipboard.writeText(text)
       setCopiedField(field)
-      toast.success('Copiado al portapapeles')
+      toast.success(s.copiedToClipboard)
       setTimeout(() => setCopiedField(null), 2000)
     } catch {
-      toast.error('Error al copiar')
+      toast.error(s.copyError)
     }
   }
 
@@ -115,10 +119,10 @@ export function InfluencerSummary({
       if (res.ok) {
         setRecentContent(prev => prev.filter(g => g.id !== item.id))
         setLightboxItem(null)
-        toast.success('Eliminado')
+        toast.success(s.deleted)
       }
     } catch {
-      toast.error('Error al eliminar')
+      toast.error(s.deleteError)
     }
   }
 
@@ -159,15 +163,15 @@ export function InfluencerSummary({
   return (
     <div className="max-w-3xl mx-auto">
       <div className="text-center mb-6">
-        <h3 className="text-xl font-bold text-text-primary mb-1">Influencer Listo</h3>
-        <p className="text-sm text-text-secondary">Tu influencer virtual esta completo y listo para crear contenido</p>
+        <h3 className="text-xl font-bold text-text-primary mb-1">{s.influencerReady}</h3>
+        <p className="text-sm text-text-secondary">{s.readyDescription}</p>
       </div>
 
       {/* Main images */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         {influencer.realistic_image_url && (
           <div>
-            <p className="text-xs text-text-muted uppercase tracking-wide mb-2">Foto Realista</p>
+            <p className="text-xs text-text-muted uppercase tracking-wide mb-2">{s.realisticPhoto}</p>
             <div className="rounded-xl overflow-hidden bg-surface-elevated border border-border">
               <img
                 src={influencer.realistic_image_url}
@@ -179,7 +183,7 @@ export function InfluencerSummary({
         )}
         {influencer.angles_grid_url && (
           <div>
-            <p className="text-xs text-text-muted uppercase tracking-wide mb-2">Grid de Angulos</p>
+            <p className="text-xs text-text-muted uppercase tracking-wide mb-2">{s.anglesGrid}</p>
             <div className="rounded-xl overflow-hidden bg-surface-elevated border border-border">
               <img
                 src={influencer.angles_grid_url}
@@ -191,7 +195,7 @@ export function InfluencerSummary({
         )}
         {influencer.body_grid_url && (
           <div>
-            <p className="text-xs text-text-muted uppercase tracking-wide mb-2">Grid de Cuerpo</p>
+            <p className="text-xs text-text-muted uppercase tracking-wide mb-2">{s.bodyGrid}</p>
             <div className="rounded-xl overflow-hidden bg-surface-elevated border border-border">
               <img
                 src={influencer.body_grid_url}
@@ -206,7 +210,7 @@ export function InfluencerSummary({
       {/* Name */}
       <div className="mb-4 p-4 bg-surface-elevated rounded-xl border border-border">
         <div className="flex items-center justify-between mb-1">
-          <p className="text-xs text-text-muted uppercase tracking-wide">Nombre</p>
+          <p className="text-xs text-text-muted uppercase tracking-wide">{s.name}</p>
           <button
             onClick={() => isEditingName ? handleSaveName() : setIsEditingName(true)}
             className="p-1 rounded hover:bg-border/50 text-text-secondary"
@@ -250,7 +254,7 @@ export function InfluencerSummary({
           className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-surface-elevated border border-border text-text-secondary hover:text-text-primary transition-all mb-4"
         >
           {copiedField === 'dna' ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-          Copiar ADN Visual completo
+          {s.copyVisualDna}
         </button>
       )}
 
@@ -260,7 +264,7 @@ export function InfluencerSummary({
           <div className="flex items-center gap-2">
             <ImageIcon className="w-4 h-4 text-accent" />
             <h4 className="text-sm font-semibold text-text-primary">
-              Pizarra de Contenido
+              {s.contentBoard}
             </h4>
             <span className="text-xs text-text-muted">
               ({recentContent.length})
@@ -278,7 +282,7 @@ export function InfluencerSummary({
                     : 'text-text-muted hover:text-text-secondary'
                 )}
               >
-                {f === 'all' ? 'Todo' : f === 'favorites' ? '⭐' : f === 'images' ? '📷 Fotos' : '🎬 Videos'}
+                {f === 'all' ? s.all : f === 'favorites' ? '⭐' : f === 'images' ? s.photos : s.videos}
               </button>
             ))}
             {onSendToEditor && videoItems.length > 0 && (
@@ -297,7 +301,7 @@ export function InfluencerSummary({
                   )}
                 >
                   <Film className="w-3 h-3" />
-                  {isSelectMode ? 'Cancelar' : 'Editar videos'}
+                  {isSelectMode ? s.cancel : s.editVideos}
                 </button>
               </>
             )}
@@ -311,8 +315,8 @@ export function InfluencerSummary({
         ) : recentContent.length === 0 ? (
           <div className="text-center py-8 bg-surface-elevated rounded-xl border border-border">
             <ImageIcon className="w-8 h-8 text-text-muted mx-auto mb-2" />
-            <p className="text-xs text-text-muted">No hay contenido generado aun</p>
-            <p className="text-[10px] text-text-muted mt-1">Usa "Crear Contenido" para generar imagenes</p>
+            <p className="text-xs text-text-muted">{s.noContentYet}</p>
+            <p className="text-[10px] text-text-muted mt-1">{s.useCreateContent}</p>
           </div>
         ) : (
           <>
@@ -380,7 +384,7 @@ export function InfluencerSummary({
                     {/* "No es video" indicator in select mode */}
                     {isSelectMode && !isVideo && (
                       <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-                        <span className="text-[9px] text-white/60 font-medium">Solo videos</span>
+                        <span className="text-[9px] text-white/60 font-medium">{s.onlyVideos}</span>
                       </div>
                     )}
 
@@ -448,7 +452,7 @@ export function InfluencerSummary({
                 onClick={() => setShowAllContent(!showAllContent)}
                 className="w-full mt-3 py-2 text-xs text-accent hover:bg-accent/5 rounded-lg transition-colors font-medium"
               >
-                {showAllContent ? 'Ver menos' : `Ver todas (${filteredContent.length})`}
+                {showAllContent ? s.viewLess : s.viewMore.replace('{count}', String(filteredContent.length))}
               </button>
             )}
           </>
@@ -461,7 +465,7 @@ export function InfluencerSummary({
         className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-accent/10 border border-accent/30 text-accent hover:bg-accent/20 transition-all mb-4"
       >
         <LayoutGrid className="w-4 h-4" />
-        Ver Pizarra de Contenido
+        {s.viewBoard}
       </button>
 
       {/* Acciones principales */}
@@ -471,14 +475,14 @@ export function InfluencerSummary({
           className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-accent hover:bg-accent-hover text-background rounded-xl font-semibold transition-all shadow-lg shadow-accent/25"
         >
           <ImageIcon className="w-4 h-4" />
-          Crear Contenido
+          {s.createContent}
         </button>
         <button
           onClick={onCreateVideo}
           className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-surface-elevated hover:bg-border/50 text-text-primary rounded-xl font-semibold transition-all border border-border"
         >
           <Video className="w-4 h-4" />
-          Crear Video
+          {s.createVideo}
         </button>
       </div>
 
@@ -486,14 +490,16 @@ export function InfluencerSummary({
       {isSelectMode && selectedVideoIds.size > 0 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 px-5 py-3 bg-[#1a1a1a] border border-pink-500/30 rounded-2xl shadow-2xl shadow-black/50">
           <span className="text-sm text-white font-medium">
-            {selectedVideoIds.size} video{selectedVideoIds.size > 1 ? 's' : ''} seleccionado{selectedVideoIds.size > 1 ? 's' : ''}
+            {selectedVideoIds.size > 1
+              ? s.videosSelected.replace('{count}', String(selectedVideoIds.size))
+              : s.videoSelected.replace('{count}', String(selectedVideoIds.size))}
           </span>
           <button
             onClick={handleSendToEditor}
             className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 text-white rounded-xl text-sm font-semibold transition-all shadow-lg shadow-pink-500/25"
           >
             <Film className="w-4 h-4" />
-            Enviar al Editor
+            {s.sendToEditor}
           </button>
         </div>
       )}

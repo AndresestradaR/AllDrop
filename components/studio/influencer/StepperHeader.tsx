@@ -2,22 +2,13 @@
 
 import { cn } from '@/lib/utils/cn'
 import { Check, Lock } from 'lucide-react'
+import { useI18n } from '@/lib/i18n'
 
 interface Step {
   number: number
   label: string
   comingSoon?: boolean
 }
-
-const STEPS: Step[] = [
-  { number: 1, label: 'Diseña' },
-  { number: 2, label: 'Realismo' },
-  { number: 3, label: 'Rostro' },
-  { number: 4, label: 'Cuerpo' },
-  { number: 5, label: 'Analisis' },
-  { number: 6, label: 'Galeria' },
-  { number: 7, label: 'Videos' },
-]
 
 interface StepperHeaderProps {
   currentStep: number
@@ -26,6 +17,19 @@ interface StepperHeaderProps {
 }
 
 export function StepperHeader({ currentStep, completedSteps, onStepClick }: StepperHeaderProps) {
+  const { t } = useI18n()
+  const st = t.studio.influencer.stepper
+
+  const STEPS: Step[] = [
+    { number: 1, label: st.design },
+    { number: 2, label: st.realism },
+    { number: 3, label: st.face },
+    { number: 4, label: st.body },
+    { number: 5, label: st.analysis },
+    { number: 6, label: st.gallery },
+    { number: 7, label: st.videos },
+  ]
+
   return (
     <div className="flex items-center gap-1 px-4 py-3 overflow-x-auto">
       {STEPS.map((step, idx) => {
@@ -72,7 +76,7 @@ export function StepperHeader({ currentStep, completedSteps, onStepClick }: Step
               </span>
               <span>{step.label}</span>
               {isComingSoon && (
-                <span className="text-[9px] bg-border/80 px-1 py-0.5 rounded">Pronto</span>
+                <span className="text-[9px] bg-border/80 px-1 py-0.5 rounded">{t.studio.influencer.soon}</span>
               )}
             </button>
           </div>
