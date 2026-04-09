@@ -159,9 +159,10 @@ export default function DashboardLayout({
     }
 
     if (item.external) {
+      const externalHref = item.href.includes('constructor') ? `${item.href}?lang=${locale}` : item.href
       return (
         <a
-          href={item.href}
+          href={externalHref}
           target="_blank"
           rel="noopener noreferrer"
           onClick={() => setSidebarOpen(false)}
