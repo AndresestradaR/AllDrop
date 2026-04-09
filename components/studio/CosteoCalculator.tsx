@@ -275,9 +275,9 @@ function CalculatorMode({ country }: { country: CountryConfig }) {
     }
   }, [cost, shipping, price, ordersPerDay, cancelPct, returnPct, currentCPA])
 
-  const marginLabel = calc.marginPct >= 60 ? 'Excelente (60%+)' :
-    calc.marginPct >= 50 ? 'Aceptable (50%+)' :
-    calc.marginPct >= 40 ? 'Bajo (40-50%)' : 'Peligroso (menor a 40%)'
+  const marginLabel = calc.marginPct >= 60 ? sc.marginExcellent :
+    calc.marginPct >= 50 ? sc.marginAcceptable :
+    calc.marginPct >= 40 ? sc.marginLow : sc.marginDangerous
   const marginVariant = calc.marginPct >= 50 ? 'success' : calc.marginPct >= 40 ? 'warning' : 'danger'
 
   return (
@@ -286,21 +286,21 @@ function CalculatorMode({ country }: { country: CountryConfig }) {
       <SectionCard>
         <SectionHeader step={1} title={sc.title} subtitle={sc.subtitle} />
         <div className="flex flex-wrap gap-4 mb-4">
-          <CurrencyInput label="💰 Costo Producto" value={cost} onChange={setCost} hint="Lo que pagas al proveedor" symbol={country.symbol} />
-          <CurrencyInput label="🚚 Flete Promedio" value={shipping} onChange={setShipping} hint={country.shippingHint} symbol={country.symbol} />
-          <CurrencyInput label="🏷️ Precio de Venta" value={price} onChange={setPrice} hint="¿A cuánto lo vendes?" symbol={country.symbol} />
+          <CurrencyInput label={`💰 ${sc.costProduct}`} value={cost} onChange={setCost} hint={sc.costProductHint} symbol={country.symbol} />
+          <CurrencyInput label={`🚚 ${sc.avgShipping}`} value={shipping} onChange={setShipping} hint={country.shippingHint} symbol={country.symbol} />
+          <CurrencyInput label={`🏷️ ${sc.salePrice}`} value={price} onChange={setPrice} hint={sc.salePriceHint} symbol={country.symbol} />
         </div>
 
         <ResultCard
           title={sc.grossMargin}
           value={`${calc.marginPct.toFixed(1)}% — ${marginLabel}`}
-          subtitle={`Costo total: ${fmt(calc.totalCost)} · Ganancia por unidad: ${fmt(calc.profit)}`}
+          subtitle={`${sc.totalCost}: ${fmt(calc.totalCost)} · ${sc.profitPerUnit}: ${fmt(calc.profit)}`}
           variant={marginVariant as any}
         />
 
         <div className="grid grid-cols-2 gap-3 mt-3">
-          <ResultCard title="Precio Mínimo (50%)" value={fmt(calc.minPrice)} subtitle="Margen bruto del 50%" />
-          <ResultCard title="Precio Óptimo (60%) ⭐" value={fmt(calc.optPrice)} subtitle="Margen bruto del 60%" highlight />
+          <ResultCard title={sc.minPrice} value={fmt(calc.minPrice)} subtitle={sc.grossMargin50} />
+          <ResultCard title={`${sc.optimalPrice} ⭐`} value={fmt(calc.optPrice)} subtitle={sc.grossMargin60} highlight />
         </div>
       </SectionCard>
 
@@ -309,23 +309,23 @@ function CalculatorMode({ country }: { country: CountryConfig }) {
         <SectionHeader step={2} title={sc.salesSim} subtitle={sc.salesSimSub} />
 
         <div className="flex flex-wrap gap-4 mb-4">
-          <NumberInput label="📦 Pedidos / Día" value={ordersPerDay} onChange={setOrdersPerDay} />
-          <SliderInput label="📵 % Cancelaciones" value={cancelPct} onChange={setCancelPct} />
-          <SliderInput label="↩️ % Devoluciones" value={returnPct} onChange={setReturnPct} />
+          <NumberInput label={`📦 ${sc.ordersPerDay}`} value={ordersPerDay} onChange={setOrdersPerDay} />
+          <SliderInput label={`📵 ${sc.cancelPct}`} value={cancelPct} onChange={setCancelPct} />
+          <SliderInput label={`↩️ ${sc.returnPct}`} value={returnPct} onChange={setReturnPct} />
         </div>
 
         <div className="space-y-1">
-          <ResultCard title="Ventas Totales" value={`${calc.totalOrders} pedidos · ${fmt(calc.totalRevenue)}`} />
-          <FlowArrow text={`−${cancelPct}% = −${calc.cancelledOrders} pedidos cancelados`} />
-          <ResultCard title="Despachados" value={`${calc.dispatched} pedidos · ${fmt(calc.dispatchedRevenue)}`} />
-          <FlowArrow text={`−${returnPct}% = −${calc.returnedOrders} pedidos devueltos`} />
-          <ResultCard title="Entregados ✅" value={`${calc.delivered} pedidos · ${fmt(calc.deliveredRevenue)}`} variant="success" />
+          <ResultCard title={sc.totalSales} value={`${calc.totalOrders} ${sc.orders} · ${fmt(calc.totalRevenue)}`} />
+          <FlowArrow text={`−${cancelPct}% = −${calc.cancelledOrders} ${sc.cancelledOrders}`} />
+          <ResultCard title={sc.dispatched} value={`${calc.dispatched} ${sc.orders} · ${fmt(calc.dispatchedRevenue)}`} />
+          <FlowArrow text={`−${returnPct}% = −${calc.returnedOrders} ${sc.returnedOrders}`} />
+          <ResultCard title={`${sc.delivered} ✅`} value={`${calc.delivered} ${sc.orders} · ${fmt(calc.deliveredRevenue)}`} variant="success" />
         </div>
 
         <div className="grid grid-cols-3 gap-3 mt-3">
-          <ResultCard title={`Margen Bruto (${calc.marginPct.toFixed(0)}%)`} value={fmt(calc.grossMargin)} subtitle={`${calc.marginPct.toFixed(1)}% sobre ingresos entregados`} />
-          <ResultCard title="Fletes Devueltos" value={`−${fmt(calc.returnShipping)}`} subtitle={`${calc.returnedOrders} dev. × ${fmt(shipping)}`} variant="danger" />
-          <ResultCard title="Margen Bruto Real 🎯" value={fmt(calc.realMargin)} subtitle="Margen bruto − fletes devueltos" variant={calc.realMargin > 0 ? 'success' : 'danger'} />
+          <ResultCard title={`${sc.grossMarginLabel} (${calc.marginPct.toFixed(0)}%)`} value={fmt(calc.grossMargin)} subtitle={`${calc.marginPct.toFixed(1)}% ${sc.overDeliveredRevenue}`} />
+          <ResultCard title={sc.returnedShipping} value={`−${fmt(calc.returnShipping)}`} subtitle={`${calc.returnedOrders} dev. × ${fmt(shipping)}`} variant="danger" />
+          <ResultCard title={`${sc.realGrossMargin} 🎯`} value={fmt(calc.realMargin)} subtitle={sc.realGrossMarginDesc} variant={calc.realMargin > 0 ? 'success' : 'danger'} />
         </div>
       </SectionCard>
 
@@ -336,19 +336,19 @@ function CalculatorMode({ country }: { country: CountryConfig }) {
         <InsetBox className="mb-4">
           <p className={cn('text-[10px] font-bold uppercase tracking-wider mb-1', theme === 'dark' && 'text-text-secondary')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>{sc.scenarioSummary}</p>
           <div className={cn('flex flex-wrap gap-x-4 gap-y-0.5 text-xs', theme === 'dark' && 'text-text-secondary')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>
-            <span>Precio venta: <b style={theme === 'light' ? { color: '#111827' } : undefined} className={theme === 'dark' ? 'text-text-primary' : undefined}>{fmt(price)}</b></span>
-            <span>Costo total: <b style={theme === 'light' ? { color: '#111827' } : undefined} className={theme === 'dark' ? 'text-text-primary' : undefined}>{fmt(calc.totalCost)}</b></span>
-            <span>Margen bruto: <b style={theme === 'light' ? { color: '#111827' } : undefined} className={theme === 'dark' ? 'text-text-primary' : undefined}>{calc.marginPct.toFixed(1)}%</b></span>
-            <span>Pedidos: <b style={theme === 'light' ? { color: '#111827' } : undefined} className={theme === 'dark' ? 'text-text-primary' : undefined}>{calc.totalOrders}</b></span>
-            <span>Margen neto: <b style={theme === 'light' ? { color: '#111827' } : undefined} className={theme === 'dark' ? 'text-text-primary' : undefined}>{fmt(calc.realMargin)}</b></span>
+            <span>{sc.salePrice}: <b style={theme === 'light' ? { color: '#111827' } : undefined} className={theme === 'dark' ? 'text-text-primary' : undefined}>{fmt(price)}</b></span>
+            <span>{sc.totalCost}: <b style={theme === 'light' ? { color: '#111827' } : undefined} className={theme === 'dark' ? 'text-text-primary' : undefined}>{fmt(calc.totalCost)}</b></span>
+            <span>{sc.grossMarginLabel}: <b style={theme === 'light' ? { color: '#111827' } : undefined} className={theme === 'dark' ? 'text-text-primary' : undefined}>{calc.marginPct.toFixed(1)}%</b></span>
+            <span>{sc.orders}: <b style={theme === 'light' ? { color: '#111827' } : undefined} className={theme === 'dark' ? 'text-text-primary' : undefined}>{calc.totalOrders}</b></span>
+            <span>{sc.realNetMargin}: <b style={theme === 'light' ? { color: '#111827' } : undefined} className={theme === 'dark' ? 'text-text-primary' : undefined}>{fmt(calc.realMargin)}</b></span>
           </div>
         </InsetBox>
 
-        <p className={cn('text-xs font-bold uppercase tracking-wider mb-3', theme === 'dark' && 'text-text-secondary')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>{'🎯'} Presupuesto de Pauta sobre el Margen Bruto</p>
+        <p className={cn('text-xs font-bold uppercase tracking-wider mb-3', theme === 'dark' && 'text-text-secondary')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>{'🎯'} {sc.adBudgetOverMargin}</p>
 
         <div className="grid grid-cols-3 gap-3 mb-4">
           {[
-            { pct: 35, label: 'IDEAL', budget: calc.budget35, cpa: calc.cpa35, op: calc.opMargin35 },
+            { pct: 35, label: sc.idealLabel, budget: calc.budget35, cpa: calc.cpa35, op: calc.opMargin35 },
             { pct: 40, label: '', budget: calc.budget40, cpa: calc.cpa40, op: calc.opMargin40 },
             { pct: 50, label: '', budget: calc.budget50, cpa: calc.cpa50, op: calc.opMargin50 },
           ].map((tier) => (
@@ -363,16 +363,16 @@ function CalculatorMode({ country }: { country: CountryConfig }) {
                   {tier.label}
                 </span>
               )}
-              <p className={cn('text-[10px] font-bold uppercase tracking-wider', theme === 'dark' && 'text-text-secondary')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>{tier.pct}% del Margen</p>
+              <p className={cn('text-[10px] font-bold uppercase tracking-wider', theme === 'dark' && 'text-text-secondary')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>{tier.pct}% {sc.ofMargin}</p>
               <p className={cn('text-lg font-bold', theme === 'dark' && 'text-text-primary')} style={theme === 'light' ? { color: '#111827' } : undefined}>{fmt(tier.budget)}</p>
               <div className="mt-2 space-y-1">
                 <div>
-                  <p className={cn('text-[10px]', theme === 'dark' && 'text-text-secondary')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>CPA máximo</p>
+                  <p className={cn('text-[10px]', theme === 'dark' && 'text-text-secondary')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>{sc.maxCPA}</p>
                   <p className={cn('text-sm font-bold', theme === 'dark' && 'text-text-primary')} style={theme === 'light' ? { color: '#111827' } : undefined}>{fmt(tier.cpa)}</p>
-                  <p className={cn('text-[10px]', theme === 'dark' && 'text-text-secondary')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>para {calc.totalOrders} pedidos</p>
+                  <p className={cn('text-[10px]', theme === 'dark' && 'text-text-secondary')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>{sc.forOrders.replace('{n}', String(calc.totalOrders))}</p>
                 </div>
                 <div className={cn('pt-1 border-t', theme === 'light' ? 'border-gray-100' : 'border-border/50')}>
-                  <p className={cn('text-[10px]', theme === 'dark' && 'text-text-secondary')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>Margen operacional</p>
+                  <p className={cn('text-[10px]', theme === 'dark' && 'text-text-secondary')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>{sc.operationalMargin}</p>
                   <p className={cn('text-sm font-bold', theme === 'dark' && 'text-emerald-400')} style={theme === 'light' ? { color: '#047857' } : undefined}>{fmt(tier.op)}</p>
                 </div>
               </div>
@@ -381,12 +381,12 @@ function CalculatorMode({ country }: { country: CountryConfig }) {
         </div>
 
         <InsetBox className="p-4">
-          <CurrencyInput label="📈 ¿Cuál es tu CPA actual?" value={currentCPA} onChange={setCurrentCPA} hint="Costo por adquisición en tu plataforma de pauta" symbol={country.symbol} />
+          <CurrencyInput label={`📈 ${sc.currentCPALabel}`} value={currentCPA} onChange={setCurrentCPA} hint={sc.currentCPAHint} symbol={country.symbol} />
           {currentCPA > 0 && (
             <div className="grid grid-cols-3 gap-3 mt-3">
-              <ResultCard title="Gasto Total en Pauta" value={fmt(calc.cpaTotalSpend)} subtitle={`${calc.totalOrders} pedidos × ${fmt(currentCPA)}`} />
-              <ResultCard title="Margen Operacional" value={fmt(calc.cpaOperational)} variant={calc.cpaOperational > 0 ? 'success' : 'danger'} subtitle="Margen real − gasto pauta" />
-              <ResultCard title="ROAS" value={`${calc.cpaROAS.toFixed(1)}x`} variant={calc.cpaROAS >= 3 ? 'success' : calc.cpaROAS >= 2 ? 'warning' : 'danger'} subtitle="Retorno sobre inversión" />
+              <ResultCard title={sc.totalAdSpend} value={fmt(calc.cpaTotalSpend)} subtitle={`${calc.totalOrders} ${sc.orders} × ${fmt(currentCPA)}`} />
+              <ResultCard title={sc.operationalMarginResult} value={fmt(calc.cpaOperational)} variant={calc.cpaOperational > 0 ? 'success' : 'danger'} subtitle={sc.operationalMarginDesc} />
+              <ResultCard title="ROAS" value={`${calc.cpaROAS.toFixed(1)}x`} variant={calc.cpaROAS >= 3 ? 'success' : calc.cpaROAS >= 2 ? 'warning' : 'danger'} subtitle={sc.returnOnInvestment} />
             </div>
           )}
         </InsetBox>
@@ -397,9 +397,9 @@ function CalculatorMode({ country }: { country: CountryConfig }) {
         <p className={cn('text-xs font-bold uppercase tracking-wider mb-3', theme === 'dark' && 'text-text-secondary')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>{'📚'} {sc.goldenRules}</p>
         <div className="grid grid-cols-3 gap-3">
           {[
-            { emoji: '🎯', title: 'Regla del 50%', desc: 'Costo total = máximo 50% del precio de venta.' },
-            { emoji: '⭐', title: 'Regla del 40%', desc: 'Costo total = 40% del precio → margen del 60%.' },
-            { emoji: '📢', title: 'Regla del 35%', desc: 'Pauta = máximo 35% del margen neto real.' },
+            { emoji: '🎯', title: sc.rule50Title, desc: sc.rule50Desc },
+            { emoji: '⭐', title: sc.rule40Title, desc: sc.rule40Desc },
+            { emoji: '📢', title: sc.rule35Title, desc: sc.rule35Desc },
           ].map((rule) => (
             <div
               key={rule.title}
@@ -481,37 +481,37 @@ function RealMode({ country }: { country: CountryConfig }) {
   return (
     <div className="space-y-5 overflow-y-auto max-h-[calc(100vh-280px)] pr-2 pb-6 custom-scrollbar">
       <SectionCard>
-        <SectionHeader step={1} title="Tu Producto" subtitle="Precio, costo y flete" />
+        <SectionHeader step={1} title={sc.yourProduct} subtitle={sc.yourProductSub} />
         <div className="flex flex-wrap gap-4">
-          <CurrencyInput label="🏷️ Precio de Venta" value={price} onChange={setPrice} symbol={country.symbol} />
-          <CurrencyInput label="💰 Costo Producto" value={cost} onChange={setCost} symbol={country.symbol} />
-          <CurrencyInput label="🚚 Flete Promedio" value={shipping} onChange={setShipping} hint={country.shippingHint} symbol={country.symbol} />
+          <CurrencyInput label={`🏷️ ${sc.salePrice}`} value={price} onChange={setPrice} symbol={country.symbol} />
+          <CurrencyInput label={`💰 ${sc.costProduct}`} value={cost} onChange={setCost} symbol={country.symbol} />
+          <CurrencyInput label={`🚚 ${sc.avgShipping}`} value={shipping} onChange={setShipping} hint={country.shippingHint} symbol={country.symbol} />
         </div>
       </SectionCard>
 
       <SectionCard>
-        <SectionHeader step={2} title="Tu Campaña Real" subtitle="Inversión, pedidos y días" />
+        <SectionHeader step={2} title={sc.yourRealCampaign} subtitle={sc.yourRealCampaignSub} />
         <div className="flex flex-wrap gap-4 mb-4">
-          <CurrencyInput label="💸 Inversión en Pauta" value={adSpend} onChange={setAdSpend} hint="Total invertido en ese período" symbol={country.symbol} />
-          <NumberInput label="📦 Pedidos Totales" value={totalOrders} onChange={setTotalOrders} hint="Pedidos recibidos en ese período" />
-          <NumberInput label="📅 Días de Campaña" value={days} onChange={setDays} hint="¿En cuántos días fue eso?" />
+          <CurrencyInput label={`💸 ${sc.adInvestment}`} value={adSpend} onChange={setAdSpend} hint={sc.adInvestmentHint} symbol={country.symbol} />
+          <NumberInput label={`📦 ${sc.totalOrdersLabel}`} value={totalOrders} onChange={setTotalOrders} hint={sc.totalOrdersHint} />
+          <NumberInput label={`📅 ${sc.campaignDays}`} value={days} onChange={setDays} hint={sc.campaignDaysHint} />
         </div>
         <div className="flex flex-wrap gap-4">
-          <SliderInput label="📵 % Cancelaciones" value={cancelPct} onChange={setCancelPct} />
-          <SliderInput label="↩️ % Devoluciones" value={returnPct} onChange={setReturnPct} />
+          <SliderInput label={`📵 ${sc.cancelPct}`} value={cancelPct} onChange={setCancelPct} />
+          <SliderInput label={`↩️ ${sc.returnPct}`} value={returnPct} onChange={setReturnPct} />
         </div>
       </SectionCard>
 
       {allFilled ? (
         <>
           <SectionCard>
-            <SectionHeader step={3} title="Tu Embudo Real" subtitle="Pedidos → Entregas → Ganancia" />
+            <SectionHeader step={3} title={sc.yourRealFunnel} subtitle={sc.yourRealFunnelSub} />
             <div className="space-y-1">
-              <ResultCard title="Pedidos Totales" value={`${totalOrders} pedidos · ${fmt(calc.totalRevenue)}`} />
-              <FlowArrow text={`−${cancelPct}% = −${calc.cancelledOrders} cancelados`} />
-              <ResultCard title="Despachados" value={`${calc.dispatched} pedidos · ${fmt(calc.dispatchedRevenue)}`} />
-              <FlowArrow text={`−${returnPct}% = −${calc.returnedOrders} devueltos`} />
-              <ResultCard title="Entregados ✅" value={`${calc.delivered} pedidos · ${fmt(calc.deliveredRevenue)}`} variant="success" />
+              <ResultCard title={sc.totalOrdersLabel} value={`${totalOrders} ${sc.orders} · ${fmt(calc.totalRevenue)}`} />
+              <FlowArrow text={`−${cancelPct}% = −${calc.cancelledOrders} ${sc.cancelled}`} />
+              <ResultCard title={sc.dispatched} value={`${calc.dispatched} ${sc.orders} · ${fmt(calc.dispatchedRevenue)}`} />
+              <FlowArrow text={`−${returnPct}% = −${calc.returnedOrders} ${sc.returned}`} />
+              <ResultCard title={`${sc.delivered} ✅`} value={`${calc.delivered} ${sc.orders} · ${fmt(calc.deliveredRevenue)}`} variant="success" />
             </div>
           </SectionCard>
 
@@ -519,33 +519,33 @@ function RealMode({ country }: { country: CountryConfig }) {
             <SectionHeader step={4} title={sc.realProfitability} subtitle={sc.realProfitabilitySub} />
 
             <div className="grid grid-cols-2 gap-3 mb-3">
-              <ResultCard title="Ingresos Entregados" value={fmt(calc.deliveredRevenue)} />
-              <ResultCard title={`Margen Bruto (${calc.marginPct.toFixed(0)}%)`} value={fmt(calc.grossMargin)} />
-              <ResultCard title="Fletes Devueltos" value={`−${fmt(calc.returnShipping)}`} variant="danger" subtitle={`${calc.returnedOrders} dev. × ${fmt(shipping)}`} />
-              <ResultCard title="Margen Neto Real" value={fmt(calc.realMargin)} variant={calc.realMargin > 0 ? 'success' : 'danger'} />
+              <ResultCard title={sc.deliveredRevenue} value={fmt(calc.deliveredRevenue)} />
+              <ResultCard title={`${sc.grossMarginLabel} (${calc.marginPct.toFixed(0)}%)`} value={fmt(calc.grossMargin)} />
+              <ResultCard title={sc.returnedShipping} value={`−${fmt(calc.returnShipping)}`} variant="danger" subtitle={`${calc.returnedOrders} dev. × ${fmt(shipping)}`} />
+              <ResultCard title={sc.realNetMargin} value={fmt(calc.realMargin)} variant={calc.realMargin > 0 ? 'success' : 'danger'} />
             </div>
 
-            <ResultCard title="Inversión en Pauta" value={`−${fmt(adSpend)}`} variant="danger" subtitle={`${days} día(s) de campaña`} />
+            <ResultCard title={sc.adInvestment} value={`−${fmt(adSpend)}`} variant="danger" subtitle={`${days} ${sc.daysOfCampaign}`} />
 
             <div className="grid grid-cols-2 gap-3 mb-3">
-              <ResultCard title="CPA Real" value={fmt(calc.cpa)} subtitle="Por cada pedido recibido (inversión ÷ pedidos totales)" variant={calc.cpa <= calc.breakEvenCPA ? 'success' : 'danger'} />
-              <ResultCard title={'CPA Real por Entrega ⭐'} value={fmt(calc.cpaPerDelivery)} subtitle="Lo que realmente te cuesta cada pedido entregado" variant={calc.cpaPerDelivery <= calc.breakEvenCPA ? 'success' : 'danger'} />
+              <ResultCard title={sc.realCPA} value={fmt(calc.cpa)} subtitle={sc.realCPADesc} variant={calc.cpa <= calc.breakEvenCPA ? 'success' : 'danger'} />
+              <ResultCard title={`${sc.realCPAPerDelivery} ⭐`} value={fmt(calc.cpaPerDelivery)} subtitle={sc.realCPAPerDeliveryDesc} variant={calc.cpaPerDelivery <= calc.breakEvenCPA ? 'success' : 'danger'} />
             </div>
 
             <div className="grid grid-cols-2 gap-3 mb-3">
-              <ResultCard title="CPA Break-Even" value={fmt(calc.breakEvenCPA)} subtitle="CPA máximo sin perder" />
-              <ResultCard title="ROAS" value={`${calc.roas.toFixed(1)}x`} variant={calc.roas >= 3 ? 'success' : calc.roas >= 2 ? 'warning' : 'danger'} subtitle={calc.roas >= 3 ? 'Excelente' : calc.roas >= 2 ? 'Aceptable' : 'Bajo'} />
+              <ResultCard title={sc.cpaBreakEven} value={fmt(calc.breakEvenCPA)} subtitle={sc.cpaBreakEvenDesc} />
+              <ResultCard title="ROAS" value={`${calc.roas.toFixed(1)}x`} variant={calc.roas >= 3 ? 'success' : calc.roas >= 2 ? 'warning' : 'danger'} subtitle={calc.roas >= 3 ? sc.excellent : calc.roas >= 2 ? sc.acceptable : sc.low} />
             </div>
 
             <ResultCard
-              title="% de Pauta sobre Margen"
+              title={sc.adSpendPctOfMargin}
               value={`${calc.adSpendPctOfMargin.toFixed(1)}%`}
               subtitle={
                 calc.adSpendPctOfMargin <= 35
-                  ? `Excelente — dentro del 35% ideal`
+                  ? sc.adPctExcellent
                   : calc.adSpendPctOfMargin <= 50
-                  ? `Aceptable — pero intenta bajar al 35%`
-                  : `Peligroso — estás gastando demasiado en pauta`
+                  ? sc.adPctAcceptable
+                  : sc.adPctDangerous
               }
               variant={calc.adSpendPctOfMargin <= 35 ? 'success' : calc.adSpendPctOfMargin <= 50 ? 'warning' : 'danger'}
               highlight
@@ -553,11 +553,11 @@ function RealMode({ country }: { country: CountryConfig }) {
           </SectionCard>
 
           <SectionCard>
-            <SectionHeader step={5} title={`Lo que te queda en ${days} día(s)`} subtitle="Margen Operacional Real" />
+            <SectionHeader step={5} title={`${sc.whatYouKeepIn} ${days} ${sc.daysOfCampaign}`} subtitle={sc.realOperationalMargin} />
             <ResultCard
-              title={'🏆 Margen Operacional Real'}
+              title={`🏆 ${sc.realOperationalMargin}`}
               value={fmt(calc.operationalMargin)}
-              subtitle="Margen bruto real − inversión pauta"
+              subtitle={sc.realOperationalMarginDesc}
               variant={calc.operationalMargin > 0 ? 'success' : 'danger'}
               highlight
             />
@@ -567,14 +567,14 @@ function RealMode({ country }: { country: CountryConfig }) {
                 'rounded-xl border p-4',
                 theme === 'light' ? 'bg-white border-gray-200' : 'border-border'
               )}>
-                <p className={cn('text-[10px] font-bold uppercase tracking-wider mb-2', theme === 'dark' && 'text-text-secondary')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>{'📅'} A la Semana</p>
+                <p className={cn('text-[10px] font-bold uppercase tracking-wider mb-2', theme === 'dark' && 'text-text-secondary')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>{'📅'} {sc.weekly}</p>
                 <div className="space-y-1.5">
                   <div>
-                    <p className={cn('text-[10px]', theme === 'dark' && 'text-text-secondary')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>Inversión en pauta</p>
+                    <p className={cn('text-[10px]', theme === 'dark' && 'text-text-secondary')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>{sc.adInvestmentSmall}</p>
                     <p className="text-sm font-bold" style={{ color: theme === 'light' ? '#b91c1c' : '#f87171' }}>{fmt(calc.weeklyAdSpend)}</p>
                   </div>
                   <div>
-                    <p className={cn('text-[10px]', theme === 'dark' && 'text-text-secondary')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>Ganancia neta</p>
+                    <p className={cn('text-[10px]', theme === 'dark' && 'text-text-secondary')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>{sc.netProfit}</p>
                     <p className="text-sm font-bold" style={{ color: calc.weeklyProfit > 0 ? (theme === 'light' ? '#047857' : '#34d399') : (theme === 'light' ? '#b91c1c' : '#f87171') }}>{fmt(calc.weeklyProfit)}</p>
                   </div>
                 </div>
@@ -583,14 +583,14 @@ function RealMode({ country }: { country: CountryConfig }) {
                 'rounded-xl border p-4',
                 theme === 'light' ? 'bg-white border-gray-200' : 'border-border'
               )}>
-                <p className={cn('text-[10px] font-bold uppercase tracking-wider mb-2', theme === 'dark' && 'text-text-secondary')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>{'📆'} Al Mes</p>
+                <p className={cn('text-[10px] font-bold uppercase tracking-wider mb-2', theme === 'dark' && 'text-text-secondary')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>{'📆'} {sc.monthly}</p>
                 <div className="space-y-1.5">
                   <div>
-                    <p className={cn('text-[10px]', theme === 'dark' && 'text-text-secondary')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>Inversión en pauta</p>
+                    <p className={cn('text-[10px]', theme === 'dark' && 'text-text-secondary')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>{sc.adInvestmentSmall}</p>
                     <p className="text-sm font-bold" style={{ color: theme === 'light' ? '#b91c1c' : '#f87171' }}>{fmt(calc.monthlyAdSpend)}</p>
                   </div>
                   <div>
-                    <p className={cn('text-[10px]', theme === 'dark' && 'text-text-secondary')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>Ganancia neta</p>
+                    <p className={cn('text-[10px]', theme === 'dark' && 'text-text-secondary')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>{sc.netProfit}</p>
                     <p className="text-sm font-bold" style={{ color: calc.monthlyProfit > 0 ? (theme === 'light' ? '#047857' : '#34d399') : (theme === 'light' ? '#b91c1c' : '#f87171') }}>{fmt(calc.monthlyProfit)}</p>
                   </div>
                 </div>
@@ -598,22 +598,22 @@ function RealMode({ country }: { country: CountryConfig }) {
             </div>
 
             <ResultCard
-              title={`Ganancia / Día`}
+              title={sc.profitPerDay}
               value={fmt(calc.profitPerDay)}
               variant={calc.profitPerDay > 0 ? 'success' : 'danger'}
-              subtitle={`${calc.ordersPerDay.toFixed(1)} pedidos/día`}
+              subtitle={`${calc.ordersPerDay.toFixed(1)} ${sc.ordersPerDayUnit}`}
             />
           </SectionCard>
         </>
       ) : (
         <div className={cn('rounded-2xl border p-6 text-center', theme === 'light' ? 'bg-amber-50 border-amber-200' : 'bg-surface-secondary border-amber-500/20')}>
-          <p className={cn('font-bold text-sm mb-2', theme === 'dark' && 'text-amber-400')} style={theme === 'light' ? { color: '#b45309' } : undefined}>{'⛔'} Completa todos los campos para ver los resultados</p>
+          <p className={cn('font-bold text-sm mb-2', theme === 'dark' && 'text-amber-400')} style={theme === 'light' ? { color: '#b45309' } : undefined}>{'⛔'} {sc.fillAllFields}</p>
           <div className="flex flex-wrap gap-2 justify-center">
-            {price <= 0 && <span className={cn('text-xs px-2 py-1 rounded', theme === 'light' ? 'bg-gray-100' : 'text-text-secondary bg-[#1a1a2e]')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>{'🏷️'} Precio de venta</span>}
-            {cost <= 0 && <span className={cn('text-xs px-2 py-1 rounded', theme === 'light' ? 'bg-gray-100' : 'text-text-secondary bg-[#1a1a2e]')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>{'💰'} Costo producto</span>}
-            {shipping <= 0 && <span className={cn('text-xs px-2 py-1 rounded', theme === 'light' ? 'bg-gray-100' : 'text-text-secondary bg-[#1a1a2e]')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>{'🚚'} Flete promedio</span>}
-            {adSpend <= 0 && <span className={cn('text-xs px-2 py-1 rounded', theme === 'light' ? 'bg-gray-100' : 'text-text-secondary bg-[#1a1a2e]')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>{'💸'} Inversión en pauta</span>}
-            {totalOrders <= 0 && <span className={cn('text-xs px-2 py-1 rounded', theme === 'light' ? 'bg-gray-100' : 'text-text-secondary bg-[#1a1a2e]')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>{'📦'} Pedidos totales</span>}
+            {price <= 0 && <span className={cn('text-xs px-2 py-1 rounded', theme === 'light' ? 'bg-gray-100' : 'text-text-secondary bg-[#1a1a2e]')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>{'🏷️'} {sc.salePrice}</span>}
+            {cost <= 0 && <span className={cn('text-xs px-2 py-1 rounded', theme === 'light' ? 'bg-gray-100' : 'text-text-secondary bg-[#1a1a2e]')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>{'💰'} {sc.costProduct}</span>}
+            {shipping <= 0 && <span className={cn('text-xs px-2 py-1 rounded', theme === 'light' ? 'bg-gray-100' : 'text-text-secondary bg-[#1a1a2e]')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>{'🚚'} {sc.avgShipping}</span>}
+            {adSpend <= 0 && <span className={cn('text-xs px-2 py-1 rounded', theme === 'light' ? 'bg-gray-100' : 'text-text-secondary bg-[#1a1a2e]')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>{'💸'} {sc.adInvestment}</span>}
+            {totalOrders <= 0 && <span className={cn('text-xs px-2 py-1 rounded', theme === 'light' ? 'bg-gray-100' : 'text-text-secondary bg-[#1a1a2e]')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>{'📦'} {sc.totalOrdersLabel}</span>}
           </div>
         </div>
       )}
@@ -623,6 +623,8 @@ function RealMode({ country }: { country: CountryConfig }) {
 
 // ── Main component ───────────────────────────────────────
 export default function CosteoCalculator({ onBack }: { onBack: () => void }) {
+  const { t } = useI18n()
+  const sc = t.studio.costeo
   const [mode, setMode] = useState<'calculator' | 'real'>('calculator')
   const [countryIdx, setCountryIdx] = useState(0)
   const [showCountries, setShowCountries] = useState(false)
@@ -653,8 +655,8 @@ export default function CosteoCalculator({ onBack }: { onBack: () => void }) {
                 <span className="text-xl">{'📊'}</span>
               </div>
               <div>
-                <h2 className={cn('text-lg font-semibold', theme === 'dark' && 'text-text-primary')} style={theme === 'light' ? { color: '#111827' } : undefined}>Calculadora de Costeo</h2>
-                <p className={cn('text-sm', theme === 'dark' && 'text-text-secondary')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>Rentabilidad COD · {country.currency}</p>
+                <h2 className={cn('text-lg font-semibold', theme === 'dark' && 'text-text-primary')} style={theme === 'light' ? { color: '#111827' } : undefined}>{sc.title}</h2>
+                <p className={cn('text-sm', theme === 'dark' && 'text-text-secondary')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>{sc.subtitle} · {country.currency}</p>
               </div>
             </div>
 
@@ -671,7 +673,7 @@ export default function CosteoCalculator({ onBack }: { onBack: () => void }) {
                   )}
                   style={theme === 'light' ? { color: mode === 'calculator' ? '#b45309' : '#6b7280' } : undefined}
                 >
-                  {'📊'} Calculadora
+                  {'📊'} {sc.calculatorTab}
                 </button>
                 <button
                   onClick={() => setMode('real')}
@@ -683,7 +685,7 @@ export default function CosteoCalculator({ onBack }: { onBack: () => void }) {
                   )}
                   style={theme === 'light' ? { color: mode === 'real' ? '#b45309' : '#6b7280' } : undefined}
                 >
-                  {'📈'} Real
+                  {'📈'} {sc.realTab}
                 </button>
               </div>
 
@@ -753,12 +755,12 @@ export default function CosteoCalculator({ onBack }: { onBack: () => void }) {
                 {country.flag} Dropshipping {country.name} · {country.currency}
               </span>
               <h3 className={cn('text-xl font-bold mt-2', theme === 'dark' && 'text-text-primary')} style={theme === 'light' ? { color: '#111827' } : undefined}>
-                {mode === 'calculator' ? '¿Es rentable tu producto?' : '¿Cuánto te estás ganando'}
+                {mode === 'calculator' ? sc.isProductProfitable : sc.howMuchEarning}
               </h3>
               <p className={cn('text-sm', theme === 'dark' && 'text-text-secondary')} style={theme === 'light' ? { color: '#6b7280' } : undefined}>
                 {mode === 'calculator'
-                  ? 'Calcula todo en 3 pasos.'
-                  : 'con lo que ya inviertes?'}
+                  ? sc.calculateIn3Steps
+                  : sc.withCurrentInvestment}
               </p>
             </div>
 
