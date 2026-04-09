@@ -66,11 +66,21 @@ export async function POST(request: Request) {
   const startTime = Date.now()
   
   try {
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    // Support internal calls (e.g. from ebook generator)
+    const internalKey = request.headers.get('X-Internal-Key')
+    const internalUserId = request.headers.get('X-Internal-User-Id')
+    const isInternal = internalKey === process.env.SUPABASE_SERVICE_ROLE_KEY && internalUserId
 
-    if (authError || !user) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    let userId: string
+    const supabase = isInternal ? await createServiceClient() : await createClient()
+    if (isInternal) {
+      userId = internalUserId!
+    } else {
+      const { data: { user }, error: authError } = await supabase.auth.getUser()
+      if (authError || !user) {
+        return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+      }
+      userId = userId
     }
 
     const body = await request.json()
@@ -104,13 +114,13 @@ export async function POST(request: Request) {
       )
     }
 
-    console.log(`[Studio] Request received - Model: ${modelId}, User: ${user.id.substring(0, 8)}...`)
+    console.log(`[Studio] Request received - Model: ${modelId}, User: ${userId.substring(0, 8)}...`)
 
     // Get API keys from profile
     const { data: profile } = await supabase
       .from('profiles')
       .select('google_api_key, openai_api_key, kie_api_key, bfl_api_key, fal_api_key, wavespeed_api_key')
-      .eq('id', user.id)
+      .eq('id', userId)
       .single()
 
     // Build API keys object
@@ -200,7 +210,7 @@ export async function POST(request: Request) {
 
       for (let i = 0; i < productImagesBase64.length; i++) {
         const img = productImagesBase64[i]
-        const url = await uploadImageToStorage(supabase, img.data, img.mimeType, user.id, i)
+        const url = await uploadImageToStorage(supabase, img.data, img.mimeType, userId, i)
         if (url) {
           urls.push(url)
         }
@@ -270,11 +280,11 @@ export async function POST(request: Request) {
 
     // 1. Try R2 upload first (user's own Cloudflare — preferred)
     const r2Key = `images/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${ext}`
-    r2Url = await tryUploadToR2(user.id, buffer, r2Key, resultMime)
+    r2Url = await tryUploadToR2(userId, buffer, r2Key, resultMime)
     if (r2Url) console.log(`[Studio] ✓ Image saved to R2: ${r2Url}`)
 
     // 2. Always upload to Supabase Storage as fallback (signed URLs always work)
-    storagePath = `studio/${user.id}/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${ext}`
+    storagePath = `studio/${userId}/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${ext}`
     const { error: storageErr } = await supabase.storage
       .from('landing-images')
       .upload(storagePath, buffer, { contentType: resultMime, upsert: true })
@@ -294,7 +304,7 @@ export async function POST(request: Request) {
     serviceClient
       .from('generations')
       .insert({
-        user_id: user.id,
+        user_id: userId,
         product_name: `Studio: ${modelConfig.name}`,
         original_prompt: prompt,
         enhanced_prompt: prompt,

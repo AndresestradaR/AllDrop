@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { generateAIText, getAIKeys, requireAIKeys } from '@/lib/services/ai-text'
-import { generateImage, hasCascadeKey, type ImageModelId } from '@/lib/image-providers'
-import { decrypt } from '@/lib/services/encryption'
+import type { ImageModelId } from '@/lib/image-providers'
 import { tryUploadToR2 } from '@/lib/services/r2-upload'
 import { renderToBuffer } from '@react-pdf/renderer'
 import { EbookDocument } from '@/lib/ebook/pdf-builder'
@@ -131,71 +130,53 @@ function getChapterPrompt(language?: string): string {
 }
 
 // ============================================
-// Helper: Get image API keys from profile
-// ============================================
-async function getImageApiKeys(supabase: any, userId: string) {
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('google_api_key, openai_api_key, kie_api_key, bfl_api_key, fal_api_key, wavespeed_api_key')
-    .eq('id', userId)
-    .single()
-
-  const apiKeys: { gemini?: string; openai?: string; kie?: string; bfl?: string; fal?: string; wavespeed?: string } = {}
-
-  if (profile?.google_api_key) apiKeys.gemini = decrypt(profile.google_api_key)
-  if (profile?.openai_api_key) apiKeys.openai = decrypt(profile.openai_api_key)
-  if (profile?.kie_api_key) apiKeys.kie = decrypt(profile.kie_api_key)
-  if (profile?.bfl_api_key) apiKeys.bfl = decrypt(profile.bfl_api_key)
-  if (profile?.fal_api_key) apiKeys.fal = decrypt(profile.fal_api_key)
-  if (profile?.wavespeed_api_key) apiKeys.wavespeed = decrypt(profile.wavespeed_api_key)
-
-  // Env var fallbacks
-  if (!apiKeys.gemini && process.env.GEMINI_API_KEY) apiKeys.gemini = process.env.GEMINI_API_KEY
-  if (!apiKeys.openai && process.env.OPENAI_API_KEY) apiKeys.openai = process.env.OPENAI_API_KEY
-  if (!apiKeys.kie && process.env.KIE_API_KEY) apiKeys.kie = process.env.KIE_API_KEY
-  if (!apiKeys.bfl && process.env.BFL_API_KEY) apiKeys.bfl = process.env.BFL_API_KEY
-  if (!apiKeys.fal && process.env.FAL_API_KEY) apiKeys.fal = process.env.FAL_API_KEY
-  if (!apiKeys.wavespeed && process.env.WAVESPEED_API_KEY) apiKeys.wavespeed = process.env.WAVESPEED_API_KEY
-
-  return apiKeys
-}
-
-// ============================================
-// Helper: Generate a single illustration
+// Helper: Generate a single illustration via internal HTTP
 // ============================================
 async function generateIllustration(
   keyword: string,
   ebookTitle: string,
-  apiKeys: any,
+  userId: string,
   modelId: ImageModelId = 'nano-banana-2',
-  timeoutMs: number = 25000
+  timeoutMs: number = 50000
 ): Promise<string | null> {
   try {
     const prompt = `Professional high-quality stock photography for an ebook about "${ebookTitle}": ${keyword}. Photorealistic, real people if appropriate, natural lighting, editorial magazine quality. Crisp detail, vibrant colors, modern lifestyle feel. No text overlay, no watermarks, no AI artifacts, no logos.`
 
-    const result = await generateImage(
-      {
-        provider: 'gemini',
-        modelId,
-        prompt,
-        aspectRatio: '16:9',
+    // Use internal HTTP call to /api/studio/generate-image which handles auth + cascade properly
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'
+
+    console.log(`[Ebook:Image] START keyword="${keyword.substring(0, 50)}" via ${appUrl}/api/studio/generate-image`)
+
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), timeoutMs)
+
+    const res = await fetch(`${appUrl}/api/studio/generate-image`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Internal-Key': process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        'X-Internal-User-Id': userId,
       },
-      apiKeys,
-      { maxTotalMs: timeoutMs }
-    )
+      body: JSON.stringify({ modelId, prompt, aspectRatio: '16:9' }),
+      signal: controller.signal,
+    })
+    clearTimeout(timer)
+
+    if (!res.ok) {
+      console.warn(`[Ebook:Image] HTTP ${res.status} for "${keyword.substring(0, 30)}"`)
+      return null
+    }
+
+    const result = await res.json()
+    console.log(`[Ebook:Image] RESULT success=${result.success} hasBase64=${!!result.imageBase64} provider=${result.provider || '?'}`)
 
     if (result.success && result.imageBase64) {
       return `data:image/png;base64,${result.imageBase64}`
     }
 
-    // Some providers return URL directly
-    if (result.success && (result as any).imageUrl) {
-      return (result as any).imageUrl
-    }
-
     return null
   } catch (err: any) {
-    console.error(`[Ebook] Image generation failed for "${keyword}":`, err?.message || err)
+    console.error(`[Ebook:Image] EXCEPTION for "${keyword.substring(0, 30)}":`, err?.message || err)
     return null
   }
 }
@@ -247,9 +228,7 @@ export async function POST(request: Request) {
     const textKeys = await getAIKeys(supabase, user.id)
     requireAIKeys(textKeys)
 
-    // Get image API keys
-    const imageKeys = await getImageApiKeys(supabase, user.id)
-
+    // Image model for illustrations (cascade handles provider selection via internal HTTP)
     // nano-banana-2: más rápido, misma calidad, más barato
     const imageModel: ImageModelId = 'nano-banana-2' // cascade: KIE → fal.ai → Gemini direct
 
@@ -278,9 +257,9 @@ export async function POST(request: Request) {
           const coverPromise = generateIllustration(
             `Dramatic cinematic cover photo for premium digital guide about "${productName}". Photorealistic, stunning composition, professional editorial photography. Hero shot with dramatic lighting, rich colors, emotional impact. Magazine cover quality. No text, no watermarks.`,
             outline.title,
-            imageKeys,
+            user.id,
             imageModel,
-            50000
+            60000
           ).catch((err: any) => {
             console.error('[Ebook] Cover image failed:', err?.message || err)
             return null
@@ -344,9 +323,9 @@ ${i === chaptersWithContent.length - 1 ? li.last : ''}`,
               : generateIllustration(
                   chapter.imageKeyword,
                   outline.title,
-                  imageKeys,
+                  user.id,
                   imageModel,
-                  imgTimeout
+                  Math.max(50000, imgTimeout)
                 ).catch((err: any) => {
                   console.error(`[Ebook] Chapter ${i + 1} image failed:`, err?.message || err)
                   return null
