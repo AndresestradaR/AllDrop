@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils/cn'
+import { useI18n } from '@/lib/i18n'
 import {
   IMAGE_COMPANY_GROUPS,
   IMAGE_MODELS,
@@ -66,6 +67,8 @@ function getAspectRatioClass(ratio: AspectRatio): string {
 }
 
 export function ImageGenerator() {
+  const { t } = useI18n()
+  const si = t.studio.img
   // Model selection
   const [selectedModel, setSelectedModel] = useState<ImageModelId>('gemini-3-pro-image')
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false)
@@ -175,7 +178,7 @@ export function ImageGenerator() {
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
-      toast.error('Escribe un prompt para generar')
+      toast.error(si.noPrompt)
       return
     }
 
@@ -225,12 +228,12 @@ export function ImageGenerator() {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || 'Error generando imagen')
+        throw new Error(data.error || si.genError)
       }
 
       // Check for API-level errors (success: false with status 200)
       if (data.success === false) {
-        throw new Error(data.error || 'Error generando imagen')
+        throw new Error(data.error || si.genError)
       }
 
       if (data.success && data.imageBase64) {
@@ -246,15 +249,15 @@ export function ImageGenerator() {
           aspectRatio, // Save the aspect ratio used
         }
         setGeneratedImages((prev) => [newImage, ...prev])
-        toast.success('Imagen generada exitosamente')
+        toast.success(si.generated)
       } else if (data.taskId) {
         // Handle async providers (polling)
-        toast('Generando imagen...', { icon: '⏳' })
+        toast(si.generating, { icon: '⏳' })
         pollForResult(data.taskId, data.provider)
       }
     } catch (error) {
       console.error('Generation error:', error)
-      toast.error(error instanceof Error ? error.message : 'Error generando imagen')
+      toast.error(error instanceof Error ? error.message : si.genError)
     } finally {
       setIsGenerating(false)
     }
@@ -282,12 +285,12 @@ export function ImageGenerator() {
             aspectRatio, // Save the aspect ratio used
           }
           setGeneratedImages((prev) => [newImage, ...prev])
-          toast.success('Imagen generada exitosamente')
+          toast.success(si.generated)
           return
         }
 
         if (data.status === 'failed') {
-          toast.error(data.error || 'Error en la generacion')
+          toast.error(data.error || si.pollError)
           return
         }
       } catch {
@@ -295,7 +298,7 @@ export function ImageGenerator() {
       }
     }
 
-    toast.error('Tiempo de espera agotado')
+    toast.error(si.timeout)
   }
 
   const handleDownload = async (image: GeneratedImage) => {
@@ -311,7 +314,7 @@ export function ImageGenerator() {
     } catch {
       // Fallback: open in new tab if fetch fails (e.g. CORS)
       window.open(image.url, '_blank')
-      toast.error('No se pudo descargar directamente. Se abrio en nueva pestaña.')
+      toast.error(si.dlError)
     }
   }
 
@@ -329,7 +332,7 @@ export function ImageGenerator() {
     supabase.from('generations').delete().eq('id', image.id).then(({ error }) => {
       if (error) console.warn('[Studio] Delete failed:', error.message)
     })
-    toast.success('Imagen eliminada')
+    toast.success(si.deleted)
   }
 
   const handleFileSelect = (
@@ -357,7 +360,7 @@ export function ImageGenerator() {
           {/* Model Selector */}
           <div>
             <label className="block text-sm font-medium text-text-secondary mb-2">
-              Modelo
+              {si.model}
             </label>
             <div className="relative">
               <button
@@ -464,7 +467,7 @@ export function ImageGenerator() {
           {supportsImageInput && (
             <div>
               <label className="block text-sm font-medium text-text-secondary mb-2">
-                Modo de generacion
+                {si.mode}
               </label>
               <div className="flex gap-2 p-1 bg-surface-elevated rounded-xl border border-border">
                 <button
@@ -477,7 +480,7 @@ export function ImageGenerator() {
                   )}
                 >
                   <Type className="w-4 h-4" />
-                  Texto a Imagen
+                  {si.t2i}
                 </button>
                 <button
                   onClick={() => setGenerationMode('image')}
@@ -489,7 +492,7 @@ export function ImageGenerator() {
                   )}
                 >
                   <ImageLucide className="w-4 h-4" />
-                  Imagen a Imagen
+                  {si.i2i}
                 </button>
               </div>
             </div>
@@ -499,7 +502,7 @@ export function ImageGenerator() {
           {supportsImageInput && generationMode === 'image' && (
             <div>
               <label className="block text-sm font-medium text-text-secondary mb-2">
-                Referencias
+                {si.refs}
               </label>
               <div className="flex gap-2">
                 <input
@@ -535,7 +538,7 @@ export function ImageGenerator() {
                   )}
                 >
                   <Palette className="w-4 h-4" />
-                  <span className="text-sm">Estilo</span>
+                  <span className="text-sm">{si.style}</span>
                   {styleRef && (
                     <button
                       onClick={(e) => {
@@ -559,7 +562,7 @@ export function ImageGenerator() {
                   )}
                 >
                   <User className="w-4 h-4" />
-                  <span className="text-sm">Personaje</span>
+                  <span className="text-sm">{si.character}</span>
                   {characterRef && (
                     <button
                       onClick={(e) => {
@@ -584,7 +587,7 @@ export function ImageGenerator() {
                 >
                   <Upload className="w-4 h-4" />
                   <span className="text-sm">
-                    {uploadedImages.length > 0 ? `(${uploadedImages.length})` : 'Subir'}
+                    {uploadedImages.length > 0 ? `(${uploadedImages.length})` : si.upload}
                   </span>
                 </button>
               </div>
@@ -617,12 +620,12 @@ export function ImageGenerator() {
           {/* Prompt */}
           <div>
             <label className="block text-sm font-medium text-text-secondary mb-2">
-              PROMPT
+              {si.prompt}
             </label>
             <textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Describe la imagen que quieres generar..."
+              placeholder={si.promptPh}
               rows={5}
               className="w-full px-4 py-3 bg-surface-elevated border border-border rounded-xl text-text-primary placeholder:text-text-muted resize-none focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all"
             />
@@ -633,7 +636,7 @@ export function ImageGenerator() {
             {/* Quantity */}
             <div>
               <label className="block text-xs font-medium text-text-secondary mb-1.5">
-                Cantidad
+                {si.qty}
               </label>
               <select
                 value={quantity}
@@ -651,7 +654,7 @@ export function ImageGenerator() {
             {/* Aspect Ratio */}
             <div>
               <label className="block text-xs font-medium text-text-secondary mb-1.5">
-                Ratio
+                {si.ratio}
               </label>
               <select
                 value={aspectRatio}
@@ -667,7 +670,7 @@ export function ImageGenerator() {
             {/* Quality */}
             <div>
               <label className="block text-xs font-medium text-text-secondary mb-1.5">
-                Calidad
+                {si.quality}
               </label>
               <select
                 value={quality}
@@ -694,12 +697,12 @@ export function ImageGenerator() {
             {isGenerating ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
-                Generando...
+                {si.generating}
               </>
             ) : (
               <>
                 <Sparkles className="w-5 h-5" />
-                Generar
+                {si.generate}
               </>
             )}
           </button>
@@ -710,7 +713,7 @@ export function ImageGenerator() {
       <div className="flex-1 bg-surface rounded-2xl border border-border p-5 overflow-hidden flex flex-col">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-text-primary">
-            Galeria ({generatedImages.length})
+            {si.gallery} ({generatedImages.length})
           </h3>
         </div>
 
@@ -721,7 +724,7 @@ export function ImageGenerator() {
                 <ImageIcon className="w-8 h-8 text-text-secondary" />
               </div>
               <p className="text-text-secondary">
-                Tus imagenes generadas apareceran aqui
+                {si.emptyGallery}
               </p>
             </div>
           </div>
@@ -754,7 +757,7 @@ export function ImageGenerator() {
                     style={{ display: 'none' }}
                   >
                     <ImageIcon className="w-6 h-6 mb-1 opacity-50" />
-                    <span>Imagen no disponible</span>
+                    <span>{si.imgUnavailable}</span>
                   </div>
                   {/* Overlay */}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity">

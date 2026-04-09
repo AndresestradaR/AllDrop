@@ -29,6 +29,7 @@ import {
   FastForward,
   UserCircle,
 } from 'lucide-react'
+import { useI18n } from '@/lib/i18n'
 import { PublisherModal } from './PublisherModal'
 import {
   VIDEO_MODELS,
@@ -94,6 +95,8 @@ const TAG_CONFIG: Record<string, { label: string; color: string; icon: React.Rea
 }
 
 export function VideoGenerator() {
+  const { t } = useI18n()
+  const sv = t.studio.vid
   // Model selection - default to an affordable recommended model
   const [selectedModel, setSelectedModel] = useState<VideoModelId>('hailuo-2.3-standard')
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false)
@@ -472,7 +475,7 @@ export function VideoGenerator() {
           {/* Model Selector */}
           <div>
             <label className="block text-sm font-medium text-text-secondary mb-2">
-              Modelo
+              {sv.model}
             </label>
             <div className="relative">
               <button
@@ -607,7 +610,7 @@ export function VideoGenerator() {
           {isVeoModel && (
             <div>
               <label className="block text-sm font-medium text-text-secondary mb-2">
-                Tipo de Generación
+                {sv.genType}
               </label>
               <div className="grid grid-cols-1 gap-2">
                 {VEO_GENERATION_TYPES.map((type) => {
@@ -666,8 +669,8 @@ export function VideoGenerator() {
             <div>
               <label className="block text-sm font-medium text-text-secondary mb-2">
                 {veoGenerationType === 'FIRST_AND_LAST_FRAMES_2_VIDEO'
-                  ? 'Frames (Inicial / Final)'
-                  : 'Imágenes de Referencia'
+                  ? sv.frames
+                  : sv.refImages
                 }
                 <span className="text-xs text-text-muted ml-2">
                   ({currentVeoType.imagesRequired}-{currentVeoType.imagesMax} imágenes)
@@ -712,7 +715,7 @@ export function VideoGenerator() {
                           </button>
                           <span className="absolute bottom-1 left-1 text-[10px] bg-black/70 text-white px-1.5 py-0.5 rounded">
                             {veoGenerationType === 'FIRST_AND_LAST_FRAMES_2_VIDEO'
-                              ? index === 0 ? 'Inicio' : 'Final'
+                              ? index === 0 ? sv.start : sv.end
                               : `Ref ${index + 1}`
                             }
                           </span>
@@ -722,12 +725,12 @@ export function VideoGenerator() {
                           <ImageIcon className="w-5 h-5 text-text-secondary" />
                           <span className="text-[10px] text-text-secondary">
                             {veoGenerationType === 'FIRST_AND_LAST_FRAMES_2_VIDEO'
-                              ? index === 0 ? 'Inicio' : 'Final'
+                              ? index === 0 ? sv.start : sv.end
                               : `Ref ${index + 1}`
                             }
                           </span>
                           {index < currentVeoType.imagesRequired && (
-                            <span className="text-[9px] text-accent">Requerido</span>
+                            <span className="text-[9px] text-accent">{sv.required}</span>
                           )}
                         </>
                       )}
@@ -752,7 +755,7 @@ export function VideoGenerator() {
           {isVeoModel && (
             <div>
               <label className="block text-sm font-medium text-text-secondary mb-2">
-                Seed
+                {sv.seed}
                 <span className="text-xs text-text-muted ml-2">(10000-99999)</span>
               </label>
               <div className="flex gap-2">
@@ -790,7 +793,7 @@ export function VideoGenerator() {
           {!isVeoModel && currentModel.supportsStartEndFrames && (
             <div>
               <label className="block text-sm font-medium text-text-secondary mb-2">
-                Imagen de entrada (opcional)
+                {sv.inputImage}
               </label>
               <input
                 ref={inputImageRef}
@@ -829,7 +832,7 @@ export function VideoGenerator() {
                   <>
                     <ImageIcon className="w-5 h-5 text-text-secondary" />
                     <span className="text-sm text-text-secondary">
-                      Subir imagen (convierte a video)
+                      {sv.uploadImage}
                     </span>
                   </>
                 )}
@@ -860,12 +863,12 @@ export function VideoGenerator() {
           {/* Prompt */}
           <div>
             <label className="block text-sm font-medium text-text-secondary mb-2">
-              PROMPT
+              {sv.prompt}
             </label>
             <textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Describe el video que quieres generar..."
+              placeholder={sv.promptPh}
               rows={4}
               className="w-full px-4 py-3 bg-surface-elevated border border-border rounded-xl text-text-primary placeholder:text-text-muted resize-none focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all"
             />
@@ -876,7 +879,7 @@ export function VideoGenerator() {
             {/* Duration */}
             <div>
               <label className="block text-xs font-medium text-text-secondary mb-1.5">
-                Duración
+                {sv.duration}
               </label>
               <select
                 value={duration}
@@ -894,7 +897,7 @@ export function VideoGenerator() {
             {/* Resolution */}
             <div>
               <label className="block text-xs font-medium text-text-secondary mb-1.5">
-                Resolución
+                {sv.resolution}
               </label>
               <select
                 value={resolution}
@@ -912,7 +915,7 @@ export function VideoGenerator() {
             {/* Aspect Ratio */}
             <div>
               <label className="block text-xs font-medium text-text-secondary mb-1.5">
-                Ratio
+                {sv.ratio}
               </label>
               <select
                 value={aspectRatio}
@@ -937,10 +940,10 @@ export function VideoGenerator() {
                 )}
                 <div>
                   <p className="text-sm font-medium text-text-primary">
-                    Generar Audio
+                    {sv.genAudio}
                   </p>
                   <p className="text-xs text-text-secondary">
-                    Audio ambiental generado por IA
+                    {sv.ambientAudio}
                   </p>
                 </div>
               </div>
@@ -1133,7 +1136,7 @@ export function VideoGenerator() {
                   className="flex items-center gap-1.5 px-3 py-2 text-xs text-accent hover:bg-accent/10 rounded-lg border border-dashed border-accent/30 transition-colors w-full justify-center"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  Agregar elemento de referencia
+                  {sv.addRef}
                 </button>
               )}
             </div>
@@ -1165,7 +1168,7 @@ export function VideoGenerator() {
             ) : (
               <>
                 <Sparkles className="w-5 h-5" />
-                Generar Video
+                {sv.generate}
               </>
             )}
           </button>
@@ -1176,7 +1179,7 @@ export function VideoGenerator() {
       <div className="flex-1 bg-surface rounded-2xl border border-border p-5 overflow-hidden flex flex-col">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-text-primary">
-            Galería ({generatedVideos.length})
+            {sv.gallery} ({generatedVideos.length})
           </h3>
         </div>
 
@@ -1187,7 +1190,7 @@ export function VideoGenerator() {
                 <Video className="w-8 h-8 text-text-secondary" />
               </div>
               <p className="text-text-secondary">
-                Tus videos generados aparecerán aquí
+                {sv.emptyGallery}
               </p>
             </div>
           </div>

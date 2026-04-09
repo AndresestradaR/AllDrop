@@ -19,6 +19,7 @@ import {
   AlertCircle,
   RefreshCw,
 } from 'lucide-react'
+import { useI18n } from '@/lib/i18n'
 
 type AudioProviderId = 'elevenlabs' | 'google-tts'
 type AudioModelId = 'eleven_multilingual_v2' | 'eleven_flash_v2_5' | 'eleven_turbo_v2_5'
@@ -95,6 +96,8 @@ const ELEVENLABS_MODELS: Record<AudioModelId, { name: string; description: strin
 }
 
 export function AudioGenerator() {
+  const { t } = useI18n()
+  const sa = t.studio.aud
   // Provider selection
   const [selectedProvider, setSelectedProvider] = useState<AudioProviderId>('elevenlabs')
   const [isProviderDropdownOpen, setIsProviderDropdownOpen] = useState(false)
@@ -247,7 +250,7 @@ export function AudioGenerator() {
           {/* Provider Selector */}
           <div>
             <label className="block text-sm font-medium text-text-secondary mb-2">
-              Proveedor de Audio
+              {sa.provider}
             </label>
             <div className="relative">
               <button
@@ -318,7 +321,7 @@ export function AudioGenerator() {
           {selectedProvider === 'elevenlabs' && (
             <div>
               <label className="block text-sm font-medium text-text-secondary mb-2">
-                Modelo
+                {sa.model}
               </label>
               <div className="relative">
                 <button
@@ -386,7 +389,7 @@ export function AudioGenerator() {
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="block text-sm font-medium text-text-secondary">
-                Voz {selectedProvider === 'google-tts' ? 'Gemini' : 'ElevenLabs'}
+                {sa.voice} {selectedProvider === 'google-tts' ? 'Gemini' : 'ElevenLabs'}
               </label>
               <button
                 onClick={loadVoices}
@@ -394,14 +397,14 @@ export function AudioGenerator() {
                 className="text-xs text-text-secondary hover:text-accent flex items-center gap-1"
               >
                 <RefreshCw className={cn('w-3 h-3', isLoadingVoices && 'animate-spin')} />
-                Recargar
+                {sa.reload}
               </button>
             </div>
             <div className="relative">
               {isLoadingVoices ? (
                 <div className="w-full flex items-center justify-center px-4 py-3 bg-surface-elevated border border-border rounded-xl">
                   <Loader2 className="w-5 h-5 animate-spin text-accent mr-2" />
-                  <span className="text-sm text-text-secondary">Cargando voces...</span>
+                  <span className="text-sm text-text-secondary">{sa.loadingVoices}</span>
                 </div>
               ) : voicesError ? (
                 <div className="w-full px-4 py-3 bg-surface-elevated border border-error/30 rounded-xl">
@@ -447,7 +450,7 @@ export function AudioGenerator() {
                       <div className="p-2 border-b border-border">
                         <input
                           type="text"
-                          placeholder="Buscar voz..."
+                          placeholder={sa.searchVoice}
                           value={voiceSearch}
                           onChange={(e) => setVoiceSearch(e.target.value)}
                           className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/50"
@@ -524,7 +527,7 @@ export function AudioGenerator() {
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="block text-sm font-medium text-text-secondary">
-                Texto
+                {sa.text}
               </label>
               <span className={cn(
                 'text-xs',
@@ -536,7 +539,7 @@ export function AudioGenerator() {
             <textarea
               value={text}
               onChange={(e) => setText(e.target.value)}
-              placeholder="Escribe el texto que quieres convertir a voz..."
+              placeholder={sa.textPh}
               rows={6}
               className="w-full px-4 py-3 bg-surface-elevated border border-border rounded-xl text-text-primary placeholder:text-text-muted resize-none focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all"
             />
@@ -548,7 +551,7 @@ export function AudioGenerator() {
             className="flex items-center gap-2 text-sm text-text-secondary hover:text-text-primary transition-colors"
           >
             <Settings2 className="w-4 h-4" />
-            Configuracion avanzada
+            {sa.advConfig}
             <ChevronDown className={cn(
               'w-4 h-4 transition-transform',
               showAdvanced && 'rotate-180'
@@ -562,7 +565,7 @@ export function AudioGenerator() {
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-xs font-medium text-text-secondary">
-                    Velocidad
+                    {sa.speed}
                   </label>
                   <span className="text-xs text-text-muted">
                     {settings.speed.toFixed(1)}x
@@ -583,7 +586,7 @@ export function AudioGenerator() {
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-xs font-medium text-text-secondary">
-                    Estabilidad
+                    {sa.stability}
                   </label>
                   <span className="text-xs text-text-muted">
                     {Math.round(settings.stability * 100)}%
@@ -607,7 +610,7 @@ export function AudioGenerator() {
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-xs font-medium text-text-secondary">
-                    Similitud
+                    {sa.similarity}
                   </label>
                   <span className="text-xs text-text-muted">
                     {Math.round(settings.similarityBoost * 100)}%
@@ -629,7 +632,7 @@ export function AudioGenerator() {
                 className="flex items-center gap-2 text-xs text-text-secondary hover:text-accent transition-colors"
               >
                 <RotateCcw className="w-3 h-3" />
-                Restablecer valores
+                {sa.reset}
               </button>
             </div>
           )}
@@ -664,12 +667,12 @@ export function AudioGenerator() {
             {isGenerating ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
-                Generando audio...
+                {sa.generating}
               </>
             ) : (
               <>
                 <Sparkles className="w-5 h-5" />
-                Generar Audio
+                {sa.generate}
               </>
             )}
           </button>
@@ -690,7 +693,7 @@ export function AudioGenerator() {
       <div className="flex-1 bg-surface rounded-2xl border border-border p-5 overflow-hidden flex flex-col">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-text-primary">
-            Audios Generados ({generatedAudios.length})
+            {sa.generatedAudios} ({generatedAudios.length})
           </h3>
         </div>
 
@@ -701,7 +704,7 @@ export function AudioGenerator() {
                 <AudioLines className="w-8 h-8 text-text-secondary" />
               </div>
               <p className="text-text-secondary">
-                Tus audios generados apareceran aqui
+                {sa.emptyGallery}
               </p>
             </div>
           </div>
