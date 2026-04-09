@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { decrypt } from '@/lib/services/encryption'
 import { aiLimiter, getClientIp } from '@/lib/rate-limit'
+import { hasEnoughDrops, consumeDrops } from '@/lib/drops/service'
+import { DROP_COSTS } from '@/lib/drops/constants'
 
 // Call Gemini 2.5 Flash Image API for editing
 async function editImageWithGemini(
@@ -101,6 +103,13 @@ export async function POST(request: Request) {
 
     if (authError || !user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
+    // Drops check
+    const userEmail = user.email ?? null
+    const { enough } = await hasEnoughDrops(user.id, userEmail, DROP_COSTS.image)
+    if (!enough) {
+      return NextResponse.json({ error: 'Insufficient drops' }, { status: 402 })
     }
 
     const body = await request.json()
@@ -203,6 +212,9 @@ export async function POST(request: Request) {
     if (insertError) {
       console.error('Database insert error:', insertError)
     }
+
+    // Deduct drops after successful edit
+    await consumeDrops(user.id, userEmail, DROP_COSTS.image, 'image')
 
     return NextResponse.json({
       success: true,

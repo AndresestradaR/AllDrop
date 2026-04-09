@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { decrypt } from '@/lib/services/encryption'
 import { tryUploadToR2, tryUploadUrlToR2 } from '@/lib/services/r2-upload'
+import { hasEnoughDrops, consumeDrops } from '@/lib/drops/service'
+import { DROP_COSTS } from '@/lib/drops/constants'
 
 type ToolType = 'variations' | 'upscale' | 'remove-bg' | 'camera-angle' | 'mockup' | 'lip-sync' | 'deep-face'
 
@@ -939,6 +941,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
+    // Determine drop cost based on tool type (peek at request to get tool)
+    // We'll do the actual check after parsing, but need to read content-type first
+    const userEmail = user.email ?? null
+
     // Check Content-Type to determine how to parse the request
     const contentType = request.headers.get('content-type') || ''
     const isJson = contentType.includes('application/json')
@@ -1016,6 +1022,17 @@ export async function POST(request: Request) {
       }
     }
 
+    // Determine drop cost based on tool type
+    const videoCostTools = ['lip-sync', 'deep-face']
+    const dropCost = videoCostTools.includes(tool) ? DROP_COSTS.video : DROP_COSTS.image
+    const dropType = videoCostTools.includes(tool) ? 'video' : 'image'
+
+    // Drops check
+    const { enough } = await hasEnoughDrops(user.id, userEmail, dropCost)
+    if (!enough) {
+      return NextResponse.json({ error: 'Insufficient drops' }, { status: 402 })
+    }
+
     // Get user's API keys
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
@@ -1060,6 +1077,7 @@ export async function POST(request: Request) {
             console.log(`[Tools] ${tool} succeeded via Google Gemini`)
             const r2Url = await tryUploadToR2(user.id, Buffer.from(result.imageBase64, 'base64'), `tools/${tool}/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.png`, 'image/png')
             if (r2Url) console.log(`[Tools] ✓ ${tool} saved to R2: ${r2Url}`)
+            await consumeDrops(user.id, userEmail, dropCost, dropType as 'image' | 'video')
             return NextResponse.json({ success: true, imageBase64: result.imageBase64, mimeType: 'image/png', r2Url })
           }
           cascadeErrors.push(`Google: ${result.error}`)
@@ -1085,6 +1103,7 @@ export async function POST(request: Request) {
             cleanupTempImage(supabase, tempUrl)
             const r2Url = await tryUploadToR2(user.id, Buffer.from(result.imageBase64, 'base64'), `tools/${tool}/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.png`, 'image/png')
             if (r2Url) console.log(`[Tools] ✓ ${tool} saved to R2: ${r2Url}`)
+            await consumeDrops(user.id, userEmail, dropCost, dropType as 'image' | 'video')
             return NextResponse.json({ success: true, imageBase64: result.imageBase64, mimeType: 'image/png', r2Url })
           }
           cascadeErrors.push(`KIE: ${result.error}`)
@@ -1104,6 +1123,7 @@ export async function POST(request: Request) {
             cleanupTempImage(supabase, tempUrl)
             const r2Url = await tryUploadToR2(user.id, Buffer.from(result.imageBase64, 'base64'), `tools/${tool}/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.png`, 'image/png')
             if (r2Url) console.log(`[Tools] ✓ ${tool} saved to R2: ${r2Url}`)
+            await consumeDrops(user.id, userEmail, dropCost, dropType as 'image' | 'video')
             return NextResponse.json({ success: true, imageBase64: result.imageBase64, mimeType: 'image/png', r2Url })
           }
           cascadeErrors.push(`fal.ai: ${result.error}`)
@@ -1141,6 +1161,7 @@ export async function POST(request: Request) {
               console.log('[Tools] remove-bg succeeded via KIE recraft')
               const r2Url = await tryUploadToR2(user.id, Buffer.from(result.imageBase64, 'base64'), `tools/remove-bg/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.png`, 'image/png')
               if (r2Url) console.log('[Tools] ✓ remove-bg saved to R2:', r2Url)
+              await consumeDrops(user.id, userEmail, dropCost, dropType as 'image' | 'video')
               return NextResponse.json({ success: true, imageBase64: result.imageBase64, mimeType: 'image/png', r2Url })
             }
             bgErrors.push(`KIE: ${result.error}`)
@@ -1160,6 +1181,7 @@ export async function POST(request: Request) {
             console.log('[Tools] remove-bg succeeded via BFL')
             const r2Url = await tryUploadToR2(user.id, Buffer.from(result.imageBase64, 'base64'), `tools/remove-bg/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.png`, 'image/png')
             if (r2Url) console.log('[Tools] ✓ remove-bg saved to R2:', r2Url)
+            await consumeDrops(user.id, userEmail, dropCost, dropType as 'image' | 'video')
             return NextResponse.json({ success: true, imageBase64: result.imageBase64, mimeType: 'image/png', r2Url })
           }
           bgErrors.push(`BFL: ${result.error}`)
@@ -1181,6 +1203,7 @@ export async function POST(request: Request) {
               console.log('[Tools] remove-bg succeeded via fal.ai birefnet')
               const r2Url = await tryUploadToR2(user.id, Buffer.from(result.imageBase64, 'base64'), `tools/remove-bg/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.png`, 'image/png')
               if (r2Url) console.log('[Tools] ✓ remove-bg saved to R2:', r2Url)
+              await consumeDrops(user.id, userEmail, dropCost, dropType as 'image' | 'video')
               return NextResponse.json({ success: true, imageBase64: result.imageBase64, mimeType: 'image/png', r2Url })
             }
             bgErrors.push(`fal.ai: ${result.error}`)
@@ -1259,6 +1282,7 @@ export async function POST(request: Request) {
 
           if (result.success && result.taskId) {
             if (keyLabel === 'platform') console.log('[Tools] lip-sync succeeded via platform key (fallback)')
+            await consumeDrops(user.id, userEmail, dropCost, dropType as 'image' | 'video')
             return NextResponse.json({
               success: true,
               taskId: result.taskId,
@@ -1328,6 +1352,7 @@ export async function POST(request: Request) {
 
           if (result.success && result.taskId) {
             if (keyLabel === 'platform') console.log('[Tools] deep-face succeeded via platform key (fallback)')
+            await consumeDrops(user.id, userEmail, dropCost, dropType as 'image' | 'video')
             return NextResponse.json({
               success: true,
               taskId: result.taskId,

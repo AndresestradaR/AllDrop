@@ -13,6 +13,8 @@ import {
   type ImageModelId,
 } from '@/lib/image-providers'
 import { tryUploadToR2 } from '@/lib/services/r2-upload'
+import { hasEnoughDrops, consumeDrops } from '@/lib/drops/service'
+import { DROP_COSTS } from '@/lib/drops/constants'
 
 // Mark this route as requiring extended timeout (Vercel Pro)
 export const maxDuration = 120 // 2 minutes max
@@ -72,6 +74,7 @@ export async function POST(request: Request) {
     const isInternal = internalKey === process.env.SUPABASE_SERVICE_ROLE_KEY && internalUserId
 
     let userId: string
+    let userEmail: string | null = null
     const supabase = isInternal ? await createServiceClient() : await createClient()
     if (isInternal) {
       userId = internalUserId!
@@ -81,6 +84,13 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
       }
       userId = user.id
+      userEmail = user.email ?? null
+    }
+
+    // Drops check
+    const { enough } = await hasEnoughDrops(userId, userEmail, DROP_COSTS.image)
+    if (!enough) {
+      return NextResponse.json({ error: 'Insufficient drops' }, { status: 402 })
     }
 
     const body = await request.json()
@@ -327,6 +337,9 @@ export async function POST(request: Request) {
         })
       ).catch(() => {})
     }
+
+    // Deduct drops after successful generation
+    await consumeDrops(userId, userEmail, DROP_COSTS.image, 'image')
 
     return NextResponse.json({
       success: true,

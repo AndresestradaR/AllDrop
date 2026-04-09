@@ -12,6 +12,8 @@ import {
   hasCascadeKey,
   type ImageModelId,
 } from '@/lib/image-providers'
+import { hasEnoughDrops, consumeDrops } from '@/lib/drops/service'
+import { DROP_COSTS } from '@/lib/drops/constants'
 
 // Allow up to 5 minutes for image generation (KIE polling can take time)
 export const maxDuration = 300
@@ -134,6 +136,13 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
       }
       user = cookieUser
+    }
+
+    // Drops check (1 banner per call)
+    const userEmail = user.email ?? null
+    const { enough } = await hasEnoughDrops(user.id, userEmail, DROP_COSTS.image)
+    if (!enough) {
+      return NextResponse.json({ error: 'Insufficient drops' }, { status: 402 })
     }
 
     const body = await request.json()
@@ -482,6 +491,9 @@ export async function POST(request: Request) {
           .catch(() => {})
       }
     }
+
+    // Deduct drops after successful generation
+    await consumeDrops(user.id, userEmail, DROP_COSTS.image, 'image')
 
     return NextResponse.json({
       success: true,

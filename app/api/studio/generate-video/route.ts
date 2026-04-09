@@ -6,6 +6,8 @@ import {
   VIDEO_MODELS,
   type VideoModelId,
 } from '@/lib/video-providers'
+import { hasEnoughDrops, consumeDrops } from '@/lib/drops/service'
+import { DROP_COSTS } from '@/lib/drops/constants'
 
 // Extended timeout for video generation (Vercel Pro required)
 export const maxDuration = 120
@@ -60,6 +62,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
     const { userId, supabase } = auth
+
+    // Get user email for drops check
+    const { data: { user: authUser } } = await supabase.auth.getUser()
+    const userEmail = authUser?.email ?? null
+
+    // Drops check
+    const { enough } = await hasEnoughDrops(userId, userEmail, DROP_COSTS.video)
+    if (!enough) {
+      return NextResponse.json({ error: 'Insufficient drops' }, { status: 402 })
+    }
 
     const body = await request.json()
     const {
@@ -257,6 +269,9 @@ export async function POST(request: Request) {
 
     // Return taskId immediately - frontend will poll for status
     console.log(`[Video] Task created in ${elapsed}s: ${result.taskId}`)
+
+    // Deduct drops after successful task creation
+    await consumeDrops(userId, userEmail, DROP_COSTS.video, 'video')
 
     return NextResponse.json({
       success: true,
