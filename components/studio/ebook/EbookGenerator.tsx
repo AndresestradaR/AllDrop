@@ -41,7 +41,7 @@ export default function EbookGenerator({ onBack }: EbookGeneratorProps) {
   const se = t.studio.ebook
 
   // Ebook content language (independent from UI locale)
-  const [ebookLang, setEbookLang] = useState(locale || 'en')
+  const [ebookLang, setEbookLang] = useState<string>(locale || 'en')
 
   // Wizard state
   const [step, setStep] = useState<WizardStep>('library')
