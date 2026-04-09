@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react'
 import { Check, Upload, X, Palette } from 'lucide-react'
 import { TEMPLATE_LIST } from '@/lib/ebook/templates'
+import { useI18n } from '@/lib/i18n'
 import type { EbookTemplate, EbookCategory } from '@/lib/ebook/types'
 
 interface TemplateSelectorProps {
@@ -11,6 +12,8 @@ interface TemplateSelectorProps {
 }
 
 export default function TemplateSelector({ suggestedTemplate, onSelect }: TemplateSelectorProps) {
+  const { t } = useI18n()
+  const te = t.studio.ebook
   const [selected, setSelected] = useState<EbookCategory>(suggestedTemplate)
   const [logoPreview, setLogoPreview] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -31,9 +34,9 @@ export default function TemplateSelector({ suggestedTemplate, onSelect }: Templa
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-semibold text-white mb-1">Elige el estilo del ebook</h3>
+        <h3 className="text-lg font-semibold text-white mb-1">{te.chooseStyle}</h3>
         <p className="text-sm text-zinc-400">
-          Selecciona una plantilla. Los colores se adaptaran a tu producto.
+          {te.chooseStyleDesc}
         </p>
       </div>
 
@@ -54,7 +57,7 @@ export default function TemplateSelector({ suggestedTemplate, onSelect }: Templa
             >
               {isSuggested && (
                 <span className="absolute -top-2 left-3 text-[10px] bg-emerald-600 text-white px-2 py-0.5 rounded-full font-medium">
-                  Sugerida
+                  {te.suggested}
                 </span>
               )}
               {isSelected && (
@@ -90,8 +93,8 @@ export default function TemplateSelector({ suggestedTemplate, onSelect }: Templa
       <div className="bg-zinc-800/30 border border-zinc-700/50 rounded-xl p-4">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-medium text-white">Tu logo (opcional)</p>
-            <p className="text-xs text-zinc-400 mt-0.5">Aparecera en la portada y contraportada</p>
+            <p className="text-sm font-medium text-white">{te.yourLogo}</p>
+            <p className="text-xs text-zinc-400 mt-0.5">{te.logoHint}</p>
           </div>
           {logoPreview ? (
             <div className="flex items-center gap-3">
@@ -112,7 +115,7 @@ export default function TemplateSelector({ suggestedTemplate, onSelect }: Templa
               className="px-3 py-1.5 bg-zinc-700 hover:bg-zinc-600 rounded-lg text-sm text-white flex items-center gap-2 transition-colors"
             >
               <Upload className="w-3.5 h-3.5" />
-              Subir
+              {te.upload}
             </button>
           )}
         </div>
@@ -131,7 +134,7 @@ export default function TemplateSelector({ suggestedTemplate, onSelect }: Templa
         className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 rounded-lg text-white font-medium flex items-center justify-center gap-2 transition-colors"
       >
         <Palette className="w-4 h-4" />
-        Continuar con esta plantilla
+        {te.continueTemplate}
       </button>
     </div>
   )

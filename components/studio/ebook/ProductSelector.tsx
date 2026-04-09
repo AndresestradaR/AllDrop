@@ -13,23 +13,26 @@ import {
   ChevronDown,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { useI18n } from '@/lib/i18n'
 import type { ProductInput, ProductSource } from '@/lib/ebook/types'
 
 interface ProductSelectorProps {
   onSelect: (product: ProductInput) => void
 }
 
-const SOURCES: { id: ProductSource; name: string; icon: React.ElementType; description: string }[] = [
-  { id: 'dropkiller', name: 'Catalogo Dropi', icon: Database, description: 'Busca en 13,500+ productos' },
-  { id: 'landing', name: 'Mis Productos', icon: Package, description: 'Productos de tus landings' },
-  { id: 'droppage', name: 'Mi Tienda', icon: Store, description: 'Productos de AllDrop Shop' },
-  { id: 'manual', name: 'Subir Manual', icon: Upload, description: 'Fotos + descripcion' },
+const SOURCE_DEFS: { id: ProductSource; nameKey: 'dropiCatalog' | 'myProducts' | 'myStore' | 'manualUpload'; icon: React.ElementType }[] = [
+  { id: 'dropkiller', nameKey: 'dropiCatalog', icon: Database },
+  { id: 'landing', nameKey: 'myProducts', icon: Package },
+  { id: 'droppage', nameKey: 'myStore', icon: Store },
+  { id: 'manual', nameKey: 'manualUpload', icon: Upload },
 ]
 
 // ============================================
 // DROPKILLER PRODUCT SEARCH
 // ============================================
 function DropKillerSearch({ onSelect }: { onSelect: (p: ProductInput) => void }) {
+  const { t } = useI18n()
+  const te = t.studio.ebook
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
@@ -44,7 +47,7 @@ function DropKillerSearch({ onSelect }: { onSelect: (p: ProductInput) => void })
       const data = await res.json()
       setResults(data.products || data || [])
     } catch {
-      toast.error('Error buscando productos')
+      toast.error(te.searchError)
     } finally {
       setLoading(false)
     }
@@ -53,7 +56,7 @@ function DropKillerSearch({ onSelect }: { onSelect: (p: ProductInput) => void })
   return (
     <div className="space-y-4">
       <p className="text-xs text-zinc-500">
-        Busca en el catalogo de Dropi (+13,500 productos). Escribe el nombre del tipo de producto que vendes.
+        {te.dropiSearchDesc}
       </p>
       <div className="flex gap-2">
         <input
@@ -61,7 +64,7 @@ function DropKillerSearch({ onSelect }: { onSelect: (p: ProductInput) => void })
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-          placeholder="Ej: corrector de postura, serum facial, faja reductora..."
+          placeholder={te.dropiSearchPh}
           className="flex-1 px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 outline-none"
         />
         <button
@@ -70,13 +73,13 @@ function DropKillerSearch({ onSelect }: { onSelect: (p: ProductInput) => void })
           className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg text-white font-medium flex items-center gap-2 transition-colors"
         >
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-          Buscar
+          {te.search}
         </button>
       </div>
 
       {!loading && results.length === 0 && query.trim() === '' && (
         <div className="text-center py-6 text-zinc-500 text-sm">
-          Escribe el nombre de un producto y presiona Buscar
+          {te.searchHint}
         </div>
       )}
 
@@ -105,7 +108,7 @@ function DropKillerSearch({ onSelect }: { onSelect: (p: ProductInput) => void })
               )}
               <p className="text-sm text-white font-medium truncate">{p.name}</p>
               {p.soldUnitsLast30Days > 0 && (
-                <p className="text-xs text-emerald-400 mt-1">{p.soldUnitsLast30Days} ventas/mes</p>
+                <p className="text-xs text-emerald-400 mt-1">{p.soldUnitsLast30Days} {te.salesMonth}</p>
               )}
             </button>
           ))}
@@ -119,6 +122,8 @@ function DropKillerSearch({ onSelect }: { onSelect: (p: ProductInput) => void })
 // SUPABASE PRODUCTS (Landing Generator)
 // ============================================
 function LandingProducts({ onSelect }: { onSelect: (p: ProductInput) => void }) {
+  const { t } = useI18n()
+  const te = t.studio.ebook
   const [products, setProducts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -131,7 +136,7 @@ function LandingProducts({ onSelect }: { onSelect: (p: ProductInput) => void }) 
           setProducts(data.products || [])
         }
       } catch {
-        toast.error('Error al cargar productos')
+        toast.error(te.loadError)
       } finally {
         setLoading(false)
       }
@@ -143,7 +148,7 @@ function LandingProducts({ onSelect }: { onSelect: (p: ProductInput) => void }) 
     return (
       <div className="flex items-center justify-center py-8 gap-2">
         <Loader2 className="w-5 h-5 text-emerald-400 animate-spin" />
-        <span className="text-sm text-zinc-400">Cargando tus productos...</span>
+        <span className="text-sm text-zinc-400">{te.loadingProducts}</span>
       </div>
     )
   }
@@ -151,8 +156,8 @@ function LandingProducts({ onSelect }: { onSelect: (p: ProductInput) => void }) 
   if (products.length === 0) {
     return (
       <div className="text-center py-8 space-y-2">
-        <p className="text-zinc-400">No tienes productos en el Landing Generator.</p>
-        <p className="text-xs text-zinc-500">Crea una landing primero o usa otra fuente.</p>
+        <p className="text-zinc-400">{te.noProducts}</p>
+        <p className="text-xs text-zinc-500">{te.noProductsHint}</p>
       </div>
     )
   }
@@ -182,7 +187,7 @@ function LandingProducts({ onSelect }: { onSelect: (p: ProductInput) => void }) 
           )}
           <p className="text-sm text-white font-medium truncate">{p.name}</p>
           {p.sections_count > 0 && (
-            <p className="text-xs text-zinc-500 mt-1">{p.sections_count} secciones</p>
+            <p className="text-xs text-zinc-500 mt-1">{p.sections_count} {te.sections}</p>
           )}
         </button>
       ))}
@@ -194,6 +199,8 @@ function LandingProducts({ onSelect }: { onSelect: (p: ProductInput) => void }) 
 // MANUAL UPLOAD
 // ============================================
 function ManualUpload({ onSelect }: { onSelect: (p: ProductInput) => void }) {
+  const { t } = useI18n()
+  const te = t.studio.ebook
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [images, setImages] = useState<string[]>([])
@@ -219,7 +226,7 @@ function ManualUpload({ onSelect }: { onSelect: (p: ProductInput) => void }) {
 
   const handleSubmit = () => {
     if (!name.trim() || !description.trim()) {
-      toast.error('Nombre y descripcion son requeridos')
+      toast.error(te.nameDescRequired)
       return
     }
     onSelect({
@@ -233,22 +240,22 @@ function ManualUpload({ onSelect }: { onSelect: (p: ProductInput) => void }) {
   return (
     <div className="space-y-4">
       <div>
-        <label className="block text-sm text-zinc-400 mb-1">Nombre del producto</label>
+        <label className="block text-sm text-zinc-400 mb-1">{te.productName}</label>
         <input
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Ej: Corrector de postura magnetico"
+          placeholder={te.productNamePh}
           className="w-full px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 outline-none"
         />
       </div>
 
       <div>
-        <label className="block text-sm text-zinc-400 mb-1">Descripcion del producto</label>
+        <label className="block text-sm text-zinc-400 mb-1">{te.productDesc}</label>
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          placeholder="Describe el producto, para que sirve, beneficios principales..."
+          placeholder={te.productDescPh}
           rows={4}
           className="w-full px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 outline-none resize-none"
         />
@@ -256,7 +263,7 @@ function ManualUpload({ onSelect }: { onSelect: (p: ProductInput) => void }) {
 
       <div>
         <label className="block text-sm text-zinc-400 mb-1">
-          Fotos del producto (opcional, max 3)
+          {te.productPhotos}
         </label>
         <div className="flex gap-3 items-center">
           {images.map((img, i) => (
@@ -294,7 +301,7 @@ function ManualUpload({ onSelect }: { onSelect: (p: ProductInput) => void }) {
         disabled={!name.trim() || !description.trim()}
         className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg text-white font-medium transition-colors"
       >
-        Continuar con este producto
+        {te.continueProduct}
       </button>
     </div>
   )
@@ -304,20 +311,22 @@ function ManualUpload({ onSelect }: { onSelect: (p: ProductInput) => void }) {
 // MAIN COMPONENT
 // ============================================
 export default function ProductSelector({ onSelect }: ProductSelectorProps) {
+  const { t } = useI18n()
+  const te = t.studio.ebook
   const [activeSource, setActiveSource] = useState<ProductSource>('dropkiller')
 
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-semibold text-white mb-1">Selecciona tu producto</h3>
+        <h3 className="text-lg font-semibold text-white mb-1">{te.selectProduct}</h3>
         <p className="text-sm text-zinc-400">
-          Elige un producto para crear un ebook complementario
+          {te.selectProductDesc}
         </p>
       </div>
 
       {/* Source tabs */}
       <div className="flex gap-2 flex-wrap">
-        {SOURCES.map((s) => {
+        {SOURCE_DEFS.map((s) => {
           const Icon = s.icon
           const active = activeSource === s.id
           return (
@@ -331,7 +340,7 @@ export default function ProductSelector({ onSelect }: ProductSelectorProps) {
               }`}
             >
               <Icon className="w-4 h-4" />
-              {s.name}
+              {te[s.nameKey]}
             </button>
           )
         })}
@@ -345,10 +354,9 @@ export default function ProductSelector({ onSelect }: ProductSelectorProps) {
           <div className="text-center py-8 space-y-3">
             <Store className="w-10 h-10 text-zinc-600 mx-auto" />
             <div>
-              <p className="text-zinc-400 font-medium">Proximamente</p>
+              <p className="text-zinc-400 font-medium">{te.comingSoon}</p>
               <p className="text-xs text-zinc-500 mt-1 max-w-xs mx-auto">
-                Pronto podras seleccionar productos directamente de tu tienda AllDrop Shop.
-                Por ahora usa &quot;Mis Productos&quot; o sube manualmente.
+                {te.comingSoonDesc}
               </p>
             </div>
           </div>

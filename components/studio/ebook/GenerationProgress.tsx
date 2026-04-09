@@ -1,6 +1,7 @@
 'use client'
 
 import { BookOpen, Loader2, CheckCircle, AlertCircle, ImageIcon, FileText, Upload } from 'lucide-react'
+import { useI18n } from '@/lib/i18n'
 import type { GenerationStep } from '@/lib/ebook/types'
 
 interface GenerationProgressProps {
@@ -19,6 +20,8 @@ const stepIcons: Record<string, React.ElementType> = {
 }
 
 export default function GenerationProgress({ steps, currentStep }: GenerationProgressProps) {
+  const { t } = useI18n()
+  const te = t.studio.ebook
   const progress = currentStep?.progress || 0
   const isDone = currentStep?.type === 'done'
   const isError = currentStep?.type === 'error'
@@ -28,17 +31,17 @@ export default function GenerationProgress({ steps, currentStep }: GenerationPro
       <div className="text-center">
         <h3 className="text-lg font-semibold text-white mb-1">
           {isDone
-            ? 'Ebook generado'
+            ? te.ebookGenerated
             : isError
-              ? 'Error en la generacion'
-              : 'Generando tu ebook...'}
+              ? te.generationError
+              : te.generatingEbook}
         </h3>
         <p className="text-sm text-zinc-400">
           {isDone
-            ? 'Tu ebook profesional esta listo para descargar'
+            ? te.readyToDownload
             : isError
               ? currentStep?.message
-              : 'Esto puede tardar 2-4 minutos'}
+              : te.genTime}
         </p>
       </div>
 

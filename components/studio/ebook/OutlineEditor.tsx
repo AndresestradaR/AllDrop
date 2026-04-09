@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { GripVertical, Edit3, Check, X, BookOpen } from 'lucide-react'
+import { useI18n } from '@/lib/i18n'
 import type { EbookOutline, EbookChapter } from '@/lib/ebook/types'
 
 interface OutlineEditorProps {
@@ -11,6 +12,8 @@ interface OutlineEditorProps {
 }
 
 export default function OutlineEditor({ outline, onConfirm, onBack }: OutlineEditorProps) {
+  const { t } = useI18n()
+  const te = t.studio.ebook
   const [chapters, setChapters] = useState<EbookChapter[]>(outline.chapters)
   const [editingIdx, setEditingIdx] = useState<number | null>(null)
   const [editTitle, setEditTitle] = useState('')
@@ -44,9 +47,9 @@ export default function OutlineEditor({ outline, onConfirm, onBack }: OutlineEdi
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-semibold text-white mb-1">Estructura del ebook</h3>
+        <h3 className="text-lg font-semibold text-white mb-1">{te.ebookStructure}</h3>
         <p className="text-sm text-zinc-400">
-          Revisa y edita los capitulos. Puedes cambiar titulos o eliminar capitulos.
+          {te.editChaptersDesc}
         </p>
       </div>
 
@@ -108,7 +111,7 @@ export default function OutlineEditor({ outline, onConfirm, onBack }: OutlineEdi
                 <button
                   onClick={() => handleEditStart(idx)}
                   className="p-1.5 hover:bg-zinc-700 rounded transition-colors"
-                  title="Editar titulo"
+                  title={te.editTitle}
                 >
                   <Edit3 className="w-3.5 h-3.5 text-zinc-400" />
                 </button>
@@ -116,7 +119,7 @@ export default function OutlineEditor({ outline, onConfirm, onBack }: OutlineEdi
                   <button
                     onClick={() => handleRemove(idx)}
                     className="p-1.5 hover:bg-red-500/20 rounded transition-colors"
-                    title="Eliminar capitulo"
+                    title={te.deleteChapter}
                   >
                     <X className="w-3.5 h-3.5 text-zinc-400 hover:text-red-400" />
                   </button>
@@ -129,7 +132,7 @@ export default function OutlineEditor({ outline, onConfirm, onBack }: OutlineEdi
 
       {/* Info */}
       <p className="text-xs text-zinc-500">
-        {chapters.length} capitulos — estimado ~{Math.max(20, chapters.length * 4 + 6)} paginas
+        {te.chaptersEstimate.replace('{count}', String(chapters.length)).replace('{pages}', String(Math.max(20, chapters.length * 4 + 6)))}
       </p>
 
       {/* Actions */}
@@ -138,14 +141,14 @@ export default function OutlineEditor({ outline, onConfirm, onBack }: OutlineEdi
           onClick={onBack}
           className="px-4 py-3 bg-zinc-700 hover:bg-zinc-600 rounded-lg text-white text-sm transition-colors"
         >
-          Atras
+          {te.back}
         </button>
         <button
           onClick={handleConfirm}
           className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 rounded-lg text-white font-medium flex items-center justify-center gap-2 transition-colors"
         >
           <BookOpen className="w-4 h-4" />
-          Generar ebook ({chapters.length} capitulos)
+          {te.generateEbook.replace('{count}', String(chapters.length))}
         </button>
       </div>
     </div>

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Download, BookOpen, CheckCircle, ExternalLink, Loader2 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { useI18n } from '@/lib/i18n'
 
 interface EbookPreviewProps {
   ebookId: string | null
@@ -21,21 +22,23 @@ export default function EbookPreview({
   coverImageUrl,
   onNewEbook,
 }: EbookPreviewProps) {
+  const { t } = useI18n()
+  const te = t.studio.ebook
   const [downloading, setDownloading] = useState(false)
 
   const handleDownload = async () => {
     if (!ebookId) {
-      toast.error('Error: ID del ebook no disponible')
+      toast.error(te.ebookIdError)
       return
     }
 
     setDownloading(true)
     try {
       const res = await fetch(`/api/studio/ebook/download?id=${ebookId}`)
-      if (!res.ok) throw new Error('Error al obtener enlace de descarga')
+      if (!res.ok) throw new Error(te.downloadLinkError)
 
       const data = await res.json()
-      if (!data.url) throw new Error('URL no disponible')
+      if (!data.url) throw new Error(te.urlNotAvailable)
 
       // Download via blob for cross-origin compatibility
       const pdfRes = await fetch(data.url)
@@ -50,9 +53,9 @@ export default function EbookPreview({
       document.body.removeChild(a)
       URL.revokeObjectURL(blobUrl)
 
-      toast.success('Ebook descargado')
+      toast.success(te.ebookDownloaded)
     } catch (err: any) {
-      toast.error(err.message || 'Error al descargar')
+      toast.error(err.message || te.downloadError)
     } finally {
       setDownloading(false)
     }
@@ -65,8 +68,8 @@ export default function EbookPreview({
         <div className="w-16 h-16 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
           <CheckCircle className="w-8 h-8 text-emerald-400" />
         </div>
-        <h3 className="text-xl font-bold text-white mb-1">Ebook listo</h3>
-        <p className="text-sm text-zinc-400">Tu ebook profesional ha sido generado y guardado</p>
+        <h3 className="text-xl font-bold text-white mb-1">{te.ebookReady}</h3>
+        <p className="text-sm text-zinc-400">{te.ebookSaved}</p>
       </div>
 
       {/* Ebook card */}
@@ -86,13 +89,13 @@ export default function EbookPreview({
           <h4 className="text-lg font-bold text-white mb-2 leading-snug">{title}</h4>
           <div className="space-y-1.5">
             <p className="text-sm text-zinc-400">
-              <span className="text-zinc-300 font-medium">{chaptersCount}</span> capitulos
+              <span className="text-zinc-300 font-medium">{chaptersCount}</span> {te.chapters}
             </p>
             <p className="text-sm text-zinc-400">
-              ~<span className="text-zinc-300 font-medium">{pagesEstimate}</span> paginas
+              ~<span className="text-zinc-300 font-medium">{pagesEstimate}</span> {te.pages}
             </p>
             <p className="text-sm text-zinc-400">
-              Formato: <span className="text-zinc-300 font-medium">PDF A4</span>
+              {te.format}: <span className="text-zinc-300 font-medium">PDF A4</span>
             </p>
           </div>
         </div>
@@ -110,18 +113,18 @@ export default function EbookPreview({
           ) : (
             <Download className="w-4 h-4" />
           )}
-          Descargar PDF
+          {te.downloadPdf}
         </button>
         <button
           onClick={onNewEbook}
           className="px-6 py-3 bg-zinc-700 hover:bg-zinc-600 rounded-lg text-white text-sm transition-colors"
         >
-          Crear otro
+          {te.createAnother}
         </button>
       </div>
 
       <p className="text-xs text-zinc-500 text-center">
-        Guardado en tu galeria. Puedes descargarlo en cualquier momento.
+        {te.savedInGallery}
       </p>
     </div>
   )

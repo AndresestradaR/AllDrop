@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { Sparkles, Edit3, Check } from 'lucide-react'
+import { useI18n } from '@/lib/i18n'
 import type { EbookIdea, EbookCategory } from '@/lib/ebook/types'
 
 interface IdeaSelectorProps {
@@ -11,6 +12,8 @@ interface IdeaSelectorProps {
 }
 
 export default function IdeaSelector({ ideas, analysis, onSelect }: IdeaSelectorProps) {
+  const { t } = useI18n()
+  const te = t.studio.ebook
   const [customMode, setCustomMode] = useState(false)
   const [customTitle, setCustomTitle] = useState('')
   const [customDescription, setCustomDescription] = useState('')
@@ -39,8 +42,8 @@ export default function IdeaSelector({ ideas, analysis, onSelect }: IdeaSelector
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-semibold text-white mb-1">Elige una idea para tu ebook</h3>
-        <p className="text-sm text-zinc-400">La IA sugirio estas opciones basadas en tu producto</p>
+        <h3 className="text-lg font-semibold text-white mb-1">{te.chooseIdea}</h3>
+        <p className="text-sm text-zinc-400">{te.aiSuggested}</p>
       </div>
 
       {/* Analysis summary */}
@@ -73,7 +76,7 @@ export default function IdeaSelector({ ideas, analysis, onSelect }: IdeaSelector
                 )}
                 <p className="text-sm text-zinc-300 leading-relaxed">{idea.description}</p>
                 {idea.targetAudience && (
-                  <p className="text-xs text-zinc-500 mt-2">Audiencia: {idea.targetAudience}</p>
+                  <p className="text-xs text-zinc-500 mt-2">{te.audience}: {idea.targetAudience}</p>
                 )}
               </div>
               <div className="w-10 h-10 rounded-lg bg-emerald-600/20 flex items-center justify-center flex-shrink-0 group-hover:bg-emerald-600/40 transition-colors">
@@ -92,7 +95,7 @@ export default function IdeaSelector({ ideas, analysis, onSelect }: IdeaSelector
             className="flex items-center gap-2 text-sm text-zinc-400 hover:text-white transition-colors"
           >
             <Edit3 className="w-4 h-4" />
-            Tengo mi propia idea
+            {te.ownIdea}
           </button>
         ) : (
           <div className="space-y-3">
@@ -100,13 +103,13 @@ export default function IdeaSelector({ ideas, analysis, onSelect }: IdeaSelector
               type="text"
               value={customTitle}
               onChange={(e) => setCustomTitle(e.target.value)}
-              placeholder="Titulo de tu ebook"
+              placeholder={te.ebookTitlePh}
               className="w-full px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 outline-none"
             />
             <textarea
               value={customDescription}
               onChange={(e) => setCustomDescription(e.target.value)}
-              placeholder="Describe brevemente de que trataria..."
+              placeholder={te.ebookDescPh}
               rows={2}
               className="w-full px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 outline-none resize-none"
             />
@@ -117,13 +120,13 @@ export default function IdeaSelector({ ideas, analysis, onSelect }: IdeaSelector
                 className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg text-white text-sm font-medium flex items-center gap-2 transition-colors"
               >
                 <Check className="w-4 h-4" />
-                Usar esta idea
+                {te.useIdea}
               </button>
               <button
                 onClick={() => setCustomMode(false)}
                 className="px-4 py-2 bg-zinc-700 hover:bg-zinc-600 rounded-lg text-white text-sm transition-colors"
               >
-                Cancelar
+                {te.cancel}
               </button>
             </div>
           </div>

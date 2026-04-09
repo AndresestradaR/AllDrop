@@ -17,6 +17,7 @@ import {
   Music,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { useI18n } from '@/lib/i18n'
 
 // Provider icons (simple text-based for now)
 const PROVIDER_CONFIG: Record<string, { label: string; color: string; emoji: string }> = {
@@ -69,6 +70,8 @@ export function PublisherModal({
   defaultCaption = '',
   previewUrl,
 }: PublisherModalProps) {
+  const { t } = useI18n()
+  const tp = t.studio.publisher
   const [accounts, setAccounts] = useState<PublerAccount[]>([])
   const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([])
   const [caption, setCaption] = useState(defaultCaption)
@@ -88,7 +91,7 @@ export function PublisherModal({
       const data = await response.json()
 
       if (!response.ok) {
-        setAccountsError(data.error || 'Error cargando cuentas')
+        setAccountsError(data.error || tp.publishError)
         return
       }
 
@@ -98,7 +101,7 @@ export function PublisherModal({
       )
       setAccounts(activeAccounts)
     } catch (err: any) {
-      setAccountsError(err.message || 'Error de conexión')
+      setAccountsError(err.message || tp.publishError)
     } finally {
       setIsLoadingAccounts(false)
     }
@@ -133,12 +136,12 @@ export function PublisherModal({
 
   const handlePublish = async () => {
     if (selectedAccountIds.length === 0) {
-      toast.error('Selecciona al menos una cuenta')
+      toast.error(tp.selectAccount)
       return
     }
 
     if (!mediaUrl && !mediaBase64 && contentType !== 'status') {
-      toast.error('No hay media para publicar')
+      toast.error(tp.noMedia)
       return
     }
 
@@ -177,21 +180,21 @@ export function PublisherModal({
       const publishData = await publishResponse.json()
 
       if (!publishResponse.ok || publishData.success === false) {
-        throw new Error(publishData.error || 'Error publicando')
+        throw new Error(publishData.error || tp.publishError)
       }
 
       setStep('done')
       toast.success(
         isScheduled
-          ? `Post agendado para ${selectedAccountIds.length} cuenta${selectedAccountIds.length > 1 ? 's' : ''}`
-          : `Publicado en ${selectedAccountIds.length} cuenta${selectedAccountIds.length > 1 ? 's' : ''}`
+          ? tp.scheduledToast.replace('{count}', String(selectedAccountIds.length))
+          : tp.publishedToast.replace('{count}', String(selectedAccountIds.length))
       )
 
       setTimeout(() => onClose(), 1500)
     } catch (err: any) {
       console.error('[Publisher] Error:', err)
       setStep('error')
-      setErrorMessage(err.message || 'Error al publicar')
+      setErrorMessage(err.message || tp.publishError)
     }
   }
 
@@ -209,7 +212,7 @@ export function PublisherModal({
             <div className="p-2 rounded-lg bg-gradient-to-br from-indigo-500 to-blue-500 text-white">
               <Share2 className="w-4 h-4" />
             </div>
-            <h3 className="text-lg font-semibold text-text-primary">Publicar en Redes</h3>
+            <h3 className="text-lg font-semibold text-text-primary">{tp.publishOnSocial}</h3>
           </div>
           <button
             onClick={onClose}
@@ -238,21 +241,21 @@ export function PublisherModal({
                   <div>
                     <p className="text-sm font-medium text-text-primary flex items-center gap-1">
                       <ContentIcon className="w-4 h-4" />
-                      {contentType === 'video' ? 'Video' : contentType === 'status' ? 'Texto' : 'Imagen'}
+                      {contentType === 'video' ? tp.contentVideo : contentType === 'status' ? tp.contentText : tp.contentPhoto}
                     </p>
-                    <p className="text-xs text-text-secondary">Listo para publicar</p>
+                    <p className="text-xs text-text-secondary">{tp.readyToPublish}</p>
                   </div>
                 </div>
               )}
 
               <div>
                 <label className="block text-sm font-medium text-text-secondary mb-1.5">
-                  Caption / Texto
+                  {tp.captionLabel}
                 </label>
                 <textarea
                   value={caption}
                   onChange={(e) => setCaption(e.target.value)}
-                  placeholder="Escribe el texto de tu publicación..."
+                  placeholder={tp.captionPh}
                   rows={3}
                   className="w-full px-4 py-3 bg-surface-elevated border border-border rounded-xl text-text-primary placeholder:text-text-muted resize-none focus:outline-none focus:ring-2 focus:ring-accent/50"
                 />
@@ -261,7 +264,7 @@ export function PublisherModal({
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-sm font-medium text-text-secondary">
-                    Cuentas destino
+                    {tp.targetAccounts}
                   </label>
                   {accounts.length > 0 && (
                     <button
@@ -269,8 +272,8 @@ export function PublisherModal({
                       className="text-xs text-accent hover:text-accent-hover transition-colors"
                     >
                       {selectedAccountIds.length === accounts.length
-                        ? 'Deseleccionar todo'
-                        : 'Seleccionar todo'}
+                        ? tp.deselectAll
+                        : tp.selectAll}
                     </button>
                   )}
                 </div>
@@ -278,7 +281,7 @@ export function PublisherModal({
                 {isLoadingAccounts ? (
                   <div className="flex items-center justify-center py-8">
                     <Loader2 className="w-6 h-6 animate-spin text-accent" />
-                    <span className="ml-2 text-sm text-text-secondary">Cargando cuentas...</span>
+                    <span className="ml-2 text-sm text-text-secondary">{tp.loadingAccounts}</span>
                   </div>
                 ) : accountsError ? (
                   <div className="text-center py-6">
@@ -289,13 +292,13 @@ export function PublisherModal({
                       className="inline-flex items-center gap-1 text-xs text-accent hover:text-accent-hover"
                     >
                       <Settings className="w-3 h-3" />
-                      Configurar Publer en Settings
+                      {tp.configPubler}
                     </a>
                   </div>
                 ) : accounts.length === 0 ? (
                   <div className="text-center py-6">
                     <p className="text-sm text-text-secondary mb-2">
-                      No hay cuentas sociales conectadas
+                      {tp.noAccounts}
                     </p>
                     <a
                       href="https://app.publer.com/settings"
@@ -303,7 +306,7 @@ export function PublisherModal({
                       rel="noopener noreferrer"
                       className="text-xs text-accent hover:text-accent-hover"
                     >
-                      Conectar cuentas en Publer
+                      {tp.connectPubler}
                     </a>
                   </div>
                 ) : (
@@ -377,7 +380,7 @@ export function PublisherModal({
                   )}
                 >
                   <Calendar className="w-4 h-4" />
-                  {isScheduled ? 'Publicación agendada' : 'Agendar para después'}
+                  {isScheduled ? tp.scheduled : tp.scheduleLater}
                 </button>
 
                 {isScheduled && (
@@ -405,10 +408,10 @@ export function PublisherModal({
             <div className="flex flex-col items-center justify-center py-12">
               <Loader2 className="w-10 h-10 animate-spin text-accent mb-4" />
               <p className="text-text-primary font-medium">
-                {isScheduled ? 'Agendando publicación...' : 'Publicando...'}
+                {isScheduled ? tp.schedulingPub : tp.publishing}
               </p>
               <p className="text-sm text-text-secondary mt-1">
-                Subiendo media y enviando a {selectedAccountIds.length} cuenta{selectedAccountIds.length > 1 ? 's' : ''}
+                {tp.uploadingMedia.replace('{count}', String(selectedAccountIds.length))}
               </p>
             </div>
           )}
@@ -419,10 +422,10 @@ export function PublisherModal({
                 <Check className="w-8 h-8 text-green-500" />
               </div>
               <p className="text-text-primary font-medium">
-                {isScheduled ? '¡Publicación agendada!' : '¡Publicado exitosamente!'}
+                {isScheduled ? tp.scheduledSuccess : tp.publishedSuccess}
               </p>
               <p className="text-sm text-text-secondary mt-1">
-                {selectedAccountIds.length} cuenta{selectedAccountIds.length > 1 ? 's' : ''}
+                {selectedAccountIds.length} {tp.accounts}
               </p>
             </div>
           )}
@@ -432,13 +435,13 @@ export function PublisherModal({
               <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center mb-4">
                 <AlertCircle className="w-8 h-8 text-red-500" />
               </div>
-              <p className="text-text-primary font-medium">Error al publicar</p>
+              <p className="text-text-primary font-medium">{tp.publishError}</p>
               <p className="text-sm text-error mt-1">{errorMessage}</p>
               <button
                 onClick={() => setStep('select')}
                 className="mt-4 px-4 py-2 text-sm bg-surface-elevated border border-border rounded-lg hover:bg-border/50 transition-colors text-text-primary"
               >
-                Reintentar
+                {tp.retry}
               </button>
             </div>
           )}
@@ -450,7 +453,7 @@ export function PublisherModal({
               onClick={onClose}
               className="flex-1 px-4 py-2.5 border border-border rounded-xl text-sm font-medium text-text-secondary hover:bg-surface-elevated transition-colors"
             >
-              Cancelar
+              {tp.cancelBtn}
             </button>
             <button
               onClick={handlePublish}
@@ -463,7 +466,7 @@ export function PublisherModal({
               )}
             >
               <Send className="w-4 h-4" />
-              {isScheduled ? 'Agendar' : 'Publicar ahora'}
+              {isScheduled ? tp.schedule : tp.publishNow}
             </button>
           </div>
         )}
