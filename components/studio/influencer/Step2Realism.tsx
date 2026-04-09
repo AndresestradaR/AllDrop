@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils/cn'
 import { Sparkles, Loader2, RefreshCw, Check } from 'lucide-react'
-import { IMAGE_MODELS, STUDIO_COMPANY_GROUPS, type ImageModelId } from '@/lib/image-providers/types'
+import { type ImageModelId } from '@/lib/image-providers/types'
 import { useI18n } from '@/lib/i18n'
 
 interface Step2RealismProps {
@@ -44,8 +44,6 @@ export function Step2Realism({
     setResultUrl(null)
     setError(null)
   }, [influencerId])
-
-  const availableModels = STUDIO_COMPANY_GROUPS.flatMap(g => g.models).filter(m => m.supportsImageInput)
 
   const handleGenerate = async () => {
     setIsGenerating(true)
@@ -91,22 +89,6 @@ export function Step2Realism({
       <p className="text-sm text-text-secondary mb-5">
         {s.description}
       </p>
-
-      {/* Model selector */}
-      <div className="mb-4">
-        <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">{s.aiModel}</label>
-        <select
-          value={modelId}
-          onChange={(e) => onModelChange(e.target.value as ImageModelId)}
-          className="w-full px-3 py-2 bg-surface-elevated border border-border rounded-xl text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50"
-        >
-          {availableModels.map(m => (
-            <option key={m.id} value={m.id}>
-              {m.name} — {m.description}
-            </option>
-          ))}
-        </select>
-      </div>
 
       {/* Before / After comparison */}
       <div className="grid grid-cols-2 gap-4 mb-4">

@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { cn } from '@/lib/utils/cn'
 import { Sparkles, Loader2, RefreshCw, Upload, Shuffle, Heart, Download, X, Share2, RectangleVertical, RectangleHorizontal, Square, Image as ImageIcon } from 'lucide-react'
-import { IMAGE_MODELS, STUDIO_COMPANY_GROUPS, type ImageModelId } from '@/lib/image-providers/types'
+import { type ImageModelId } from '@/lib/image-providers/types'
 import toast from 'react-hot-toast'
 import { useI18n } from '@/lib/i18n'
 import { PublisherModal } from '@/components/studio/PublisherModal'
@@ -117,8 +117,6 @@ export function Step6Gallery({
   const [productBase64, setProductBase64] = useState<string | null>(null)
   const [productMime, setProductMime] = useState<string>('image/jpeg')
   const fileInputRef = useRef<HTMLInputElement>(null)
-
-  const availableModels = STUDIO_COMPANY_GROUPS.flatMap(g => g.models)
 
   // Reset form state when switching influencers
   useEffect(() => {
@@ -320,22 +318,6 @@ export function Step6Gallery({
         >
           {s.withProduct}
         </button>
-      </div>
-
-      {/* Model selector */}
-      <div className="mb-4">
-        <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">{s.aiModel}</label>
-        <select
-          value={modelId}
-          onChange={(e) => onModelChange(e.target.value as ImageModelId)}
-          className="w-full px-3 py-2 bg-surface-elevated border border-border rounded-xl text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50"
-        >
-          {availableModels.map(m => (
-            <option key={m.id} value={m.id}>
-              {m.name} — {m.description}
-            </option>
-          ))}
-        </select>
       </div>
 
       {/* Product upload (only in with_product mode) */}

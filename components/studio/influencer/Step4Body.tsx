@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils/cn'
 import { Sparkles, Loader2, RefreshCw, Check } from 'lucide-react'
-import { IMAGE_MODELS, STUDIO_COMPANY_GROUPS, type ImageModelId } from '@/lib/image-providers/types'
+import { type ImageModelId } from '@/lib/image-providers/types'
 import { useI18n } from '@/lib/i18n'
 
 interface Step4BodyProps {
@@ -41,8 +41,6 @@ export function Step4Body({
     setGridUrl(null)
     setError(null)
   }, [influencerId])
-
-  const availableModels = STUDIO_COMPANY_GROUPS.flatMap(g => g.models).filter(m => m.supportsImageInput)
 
   const handleGenerate = async () => {
     setIsGenerating(true)
@@ -86,22 +84,6 @@ export function Step4Body({
       <p className="text-sm text-text-secondary mb-5">
         {s.description}
       </p>
-
-      {/* Model selector */}
-      <div className="mb-4">
-        <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">{s.aiModel}</label>
-        <select
-          value={modelId}
-          onChange={(e) => onModelChange(e.target.value as ImageModelId)}
-          className="w-full px-3 py-2 bg-surface-elevated border border-border rounded-xl text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50"
-        >
-          {availableModels.map(m => (
-            <option key={m.id} value={m.id}>
-              {m.name} — {m.description}
-            </option>
-          ))}
-        </select>
-      </div>
 
       {/* Reference thumbnail */}
       <div className="flex items-center gap-3 mb-4 p-3 bg-surface-elevated rounded-xl border border-border">

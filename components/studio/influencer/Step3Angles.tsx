@@ -87,22 +87,6 @@ export function Step3Angles({
         {s.description}
       </p>
 
-      {/* Model selector */}
-      <div className="mb-4">
-        <label className="block text-xs font-medium text-text-muted uppercase tracking-wide mb-1.5">{s.aiModel}</label>
-        <select
-          value={modelId}
-          onChange={(e) => onModelChange(e.target.value as ImageModelId)}
-          className="w-full px-3 py-2 bg-surface-elevated border border-border rounded-xl text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50"
-        >
-          {availableModels.map(m => (
-            <option key={m.id} value={m.id}>
-              {m.name} — {m.description}
-            </option>
-          ))}
-        </select>
-      </div>
-
       {/* Reference thumbnail */}
       <div className="flex items-center gap-3 mb-4 p-3 bg-surface-elevated rounded-xl border border-border">
         <img
