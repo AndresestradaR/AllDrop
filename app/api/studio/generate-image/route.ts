@@ -80,7 +80,7 @@ export async function POST(request: Request) {
       if (authError || !user) {
         return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
       }
-      userId = userId
+      userId = user.id
     }
 
     const body = await request.json()
